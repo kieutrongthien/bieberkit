@@ -27,6 +27,7 @@
 | Path | Content |
 | --- | --- |
 | `spec/SPEC.md` | The BieberKit specification. Source of truth for design and requirement IDs |
+| `ROADMAP.md` | Phase by phase checklist to 1.0. Agents tick items as work lands |
 | `adr/` | Architecture decision records. Changes to the technology baseline start here |
 | `modules/` | Short specs for modules and packages, written before their code |
 

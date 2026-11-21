@@ -1,0 +1,415 @@
+<!--
+  BieberKit
+
+  @file        docs/ROADMAP.md
+  @description Phase by phase checklist from the scaffold to 1.0, derived from spec section 25, ticked by agents as work lands.
+  @author      Bieber Kieu <kieutrongthien@gmail.com>
+  @copyright   Copyright (c) 2026 Bieber Kieu
+  @license     Apache-2.0
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+
+  SPDX-License-Identifier: Apache-2.0
+-->
+
+# BieberKit roadmap
+
+Derived from `docs/spec/SPEC.md` section 25 (spec 0.8). The spec stays the source of truth: when this file and the spec disagree, the spec wins and this file is fixed in the same pull request.
+
+## How agents use this file
+
+1. Pick the first unticked milestone whose dependencies are ticked. Work inside one milestone at a time.
+2. Follow the skill `bieberkit-implement-task` for every item: requirement IDs, ADR or module spec first, tests first, then code, `pnpm check`, `pnpm typecheck`, `pnpm lint`, `pnpm test`, signed commit.
+3. Tick an item (`- [x]`) in the same commit that lands its work. Tick only when its evidence exists: a merged test named after the requirement ID, an accepted ADR, or a command that passes. Never tick from memory.
+4. Items tagged **[M]** are the maintainer's call. Agents prepare them (propose an ADR as `Proposed`, show tests, open a pull request) and never tick them or merge them.
+5. Items tagged **[D]** are maintainer-designed areas (AGENTS.md, Workflow): use plan mode, propose, never merge. Applies to the public API of `defineEntity` and `definePlugin`, authentication, authorization, tenant isolation and the release pipeline.
+6. A phase gate is ticked only by the maintainer. A milestone is done when every item is ticked and its "Done when" line holds.
+7. If a requirement turns out wrong or missing, stop and write an ADR or a spec change. Do not work around it (P1).
+8. Add a new item here only when the spec gains the requirement behind it. Do not invent scope.
+
+Legend: **[M]** maintainer only, **[D]** maintainer-designed area, `ID` a spec requirement (for example `MOD-16`), `§` a spec section.
+
+## Status
+
+| Phase | Gate | State |
+| --- | --- | --- |
+| 0. Foundations | ADRs accepted | In progress, scaffold done |
+| 1. Core MVP | Pilot live in production | Not started |
+| 2. Plugins and templates | All three dialects green | Not started |
+| 3. Hardening and 1.0 | 1.0 released | Not started |
+
+Order inside Phase 1 follows the package layers (PKG-01): foundation, contracts, product, tools. Each milestone only depends on earlier ones.
+
+---
+
+## Phase 0. Foundations
+
+Goal: decisions recorded, repository and release pipeline proven. No framework code beyond stubs.
+
+### M0.1 Repository scaffold
+
+- [x] Monorepo with 18 package folders, pnpm workspace, Turborepo, shared tsconfig (§4.1)
+- [x] Header checker `tools/check-headers.ts` (HDR-01 to HDR-05, §23.6)
+- [x] Layer checker `tools/check-layers.ts` (PKG-01)
+- [x] Skill sync `tools/sync-skills.ts` and four repository skills in `.agents/skills/`
+- [x] `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, CODEOWNERS (SEC-14)
+- [x] `LICENSE`, `NOTICE`, `SECURITY.md`, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, issue and PR templates (§24.4)
+- [x] pnpm supply-chain settings in `pnpm-workspace.yaml` (SEC-11)
+- [x] Git hooks `pre-commit` and `commit-msg` (DCO, Conventional Commits)
+- [x] Changesets config and Renovate config
+- [x] ADR 0001 and the ADR and module spec templates
+
+Done when: `pnpm install && pnpm check` passes on a clean clone.
+
+### M0.2 Spikes and ADRs
+
+Each ADR is written as `Proposed` with the spike result attached. The maintainer accepts (§22.3, `docs/adr/README.md`).
+
+- [ ] **[M]** ADR: ORM and dialects. Spike: MikroORM 7 `defineEntity` on PostgreSQL 15, MySQL 8.4 and SQLite with one entity set, UUIDv7 key storage (DATA-14), collation and integer money (MOD-11)
+- [ ] **[M][D]** ADR: plugin manifest, static `package.json` field, resolution, collisions, per-plugin migrations (PLG-07, DATA-24, §11.2)
+- [ ] **[M][D]** ADR: `defineEntity` API and field DSL, compilation to MikroORM metadata, JSON Schema, Zod 4 Mini and CASL, escape hatches to raw MikroORM (§10.6, SCH-01 to SCH-06, P12)
+- [ ] **[M][D]** ADR: authentication. Spike: Better Auth 1.7.16+ through a MikroORM adapter that joins the request transaction, on all three dialects (AUTH-09, AUTH-10)
+- [ ] **[M][D]** ADR: authorization. Spike: `@ucast/sql` on MikroORM 7, otherwise an own CASL to ORM translator with a small operator set and generated permission tests (AUTHZ-02, §26)
+- [ ] **[M]** ADR: queue drivers. Spike: BullMQ on Valkey and the `database` driver behind one contract, outbox dispatch with SKIP LOCKED (Q-05, MOD-18)
+- [ ] **[M][D]** ADR: release pipeline, npm trusted publishing, protected tags, no shared cache, `id-token: write` on the publish job only (SEC-15, SEC-16, SEC-21)
+- [ ] **[M]** ADR: content editor, Lexical or Tiptap, judged on block support, Vietnamese input, bundle size (CNT-04)
+- [ ] **[M]** ADR: formatter, Oxfmt or Biome fallback (§3)
+- [ ] **[M]** ADR: where pino binds given `@bieberkit/core` has no runtime dependency (PKG-04, OBS-01)
+- [ ] **[M]** Decide the open questions in spec §26: MariaDB support level, docs site generator and hosting, default license of generated projects, Ant Design 6 `vi_VN` locale check
+- [ ] **[M]** Reserve the `@bieberkit` npm scope, the `bieberkit` and `create-bieberkit` names and the GitHub organization; confirm the employer question (§26)
+- [ ] Update `docs/adr/README.md` index for every ADR added
+
+Done when: every ADR above has status `Accepted` and the spec §3 table matches them.
+
+### M0.3 CI and release pipeline
+
+- [ ] **[D]** `.github/workflows/ci.yml` runs `pnpm install --frozen-lockfile`, `check`, `typecheck`, `lint`, `format:check`, `test`, `build` on Node.js 26 and 24 (SEC-12, §3)
+- [ ] Third-party Actions pinned by commit SHA (SEC-13)
+- [ ] `publint` and `attw` run per package in CI (§3)
+- [ ] API report per package committed, diff shows in pull requests, changeset required on change (§22.3 step 4)
+- [ ] **[D]** Release workflow: protected tags, manual approval environment, trusted publishing with provenance, no PR cache sharing, no install or build in the job holding `id-token: write` (SEC-15, SEC-16, SEC-21)
+- [ ] **[D]** Dry-run release publishes a throwaway package end to end
+- [ ] Renovate rules: 7 day release age, fast path for Better Auth and TanStack Start advisories (AUTH-08, SITE-06)
+- [ ] Database service containers (PostgreSQL, MySQL, Valkey) available to CI for later phases (TST, §9.1)
+
+Done when: the header checker and trusted publishing work end to end (spec §25 gate text).
+
+### Phase 0 gate **[M]**
+
+- [ ] **[M]** All ADRs accepted, header checker green in CI, dry-run trusted publish succeeded
+
+---
+
+## Phase 1. Core MVP
+
+Goal: a `blank` project that a real pilot can run in production with web, worker and scheduler roles behind a load balancer. Dialect focus is PostgreSQL first; SQLite and MySQL run in CI from the start (§26 mitigation) but may carry known gaps until Phase 2.
+
+### M1.1 Foundation: `@bieberkit/core`
+
+Depends on: Phase 0 gate. Only Node.js built-ins (PKG-04).
+
+- [ ] **[D]** `defineModule`, `definePlugin`, `defineConfig` with the manifest fields of §11.1 (MOD-01, MOD-02, CFG-08, CFG-09)
+- [ ] `defineEnv` and merged env schema with secret redaction, native `.env` loading, precedence of real env (CFG-01 to CFG-06)
+- [ ] Core env keys of §8.2 with defaults and the production safety checks (CFG-07, APP_SINGLE_NODE)
+- [ ] `process.env` read only in `packages/core/src/config/` (P8, `check` rule)
+- [ ] `BkError` base and subclasses with stable code, HTTP status, safe message (MOD-17)
+- [ ] Container: singleton, request and transient scopes, name resolution with inferred types, cycle and missing service fail at boot (§7.3)
+- [ ] Lifecycle: boot, ready, stop, reverse shutdown order, `onShutdown` hooks (§7.2, §19.4 steps 6 and 7)
+- [ ] Event bus with typed payloads (MOD-03, MOD-05)
+- [ ] **[D]** Plugin resolver: `core` range, `requires`, `conflicts`, `dialects`, topological sort, collision detection, shared with scaffolder and CLI (§11.2, PLG-07)
+- [ ] Process role selection from argv for `web`, `worker`, `scheduler`, `migrate` (§7.1)
+- [ ] Unit coverage at least 90% lines (TST-01)
+
+Done when: a test app boots a module and a plugin graph, fails on a missing env key with a stable code, and stops in reverse order.
+
+### M1.2 Data: `@bieberkit/data`
+
+Depends on: M1.1.
+
+- [ ] **[D]** Field DSL `f.*`: id, string, email, oneOf, decimal, money, sequence, createdAt, updatedAt, belongsTo, hasMany, hasOne, state, computed (§10.1, MOD-08, MOD-11, MOD-12)
+- [ ] **[D]** `defineEntity` compiling to MikroORM metadata, JSON Schema 2020-12, Zod 4 Mini and TypeScript types (SCH-01 to SCH-04)
+- [ ] Unicode NFC normalization at the validation boundary; code point length semantics; shared fixtures through Ajv and Zod Mini fail CI on disagreement (SCH-03, SCH-05)
+- [ ] Standalone Ajv and fast-json-stringify modules emitted at build (SCH-06, PERF-06)
+- [ ] Standard columns and entity options: `version`, `created_by`, `updated_by`, `deleted_at`, `deleted_token` (DATA-18)
+- [ ] UUIDv7 keys, native storage per dialect (DATA-03, DATA-14)
+- [ ] UTC timestamps (DATA-04); request context per request and per job (DATA-05)
+- [ ] Pagination limits, keyset cursor, `withTotal` (DATA-06, DATA-11); index required for filter and sort fields (DATA-07)
+- [ ] Read-only query path with batched relations (DATA-10, PERF-04)
+- [ ] Soft delete with unique indexes including `deleted_token` (DATA-16)
+- [ ] `.localized()` translation table and `?locale=` fallback (DATA-17)
+- [ ] **[D]** Tenant model: `tenant: true`, global filter, `asSystem()` audited, unique constraints include `tenant_id`, tenant resolution per request (DATA-09, DATA-15, DATA-19, CFG-11)
+- [ ] **[D]** Cross-tenant reference checks on writes (spec 0.8 review fix)
+- [ ] Optimistic concurrency by `version` and `If-Match` (API-13)
+- [ ] Migrations: snapshot diff per dialect, `migrate:make`, `migrate`, status and rollback, destructive statement detection, expand then contract (DATA-08, §9.3)
+- [ ] Plugin migration runner with `bieberkit_plugin_migrations` and portable schema builder (DATA-24)
+- [ ] `MIGRATE_DATABASE_URL` used only by the migrate role (DATA-25)
+- [ ] Outbox table, same-transaction write, dispatcher with SKIP LOCKED batches of 100, versioned events, per-subscriber processed ids, 7 day cleanup, lag metric (MOD-18, §7.5)
+- [ ] Audit log table, append-only for the app role, written in the same transaction (OBS-05, AUTHZ-05)
+- [ ] Features `attachments`, `comments`, `timeline`, `tags` as generic tables (MOD-13)
+- [ ] State machines: `f.state` transitions validated on the server, never through plain update (MOD-06, MOD-07)
+- [ ] Integration tests green on PostgreSQL, MySQL and SQLite (§9.1)
+
+Done when: one sample entity round-trips on all three dialects, generates a migration, enforces tenant isolation and a stale-version 412.
+
+### M1.3 HTTP: `@bieberkit/http`
+
+Depends on: M1.2.
+
+- [ ] Fastify 5 server and the 12-stage request pipeline with named plugin hook stages only (§13.4, REQ-01, REQ-02)
+- [ ] RFC 9457 errors with `code` and `traceId`, validation `errors[]` (MOD-17, SEC-07)
+- [ ] Generated entity routes from `api` settings: list, get, create, update, delete (§10.2, §13.1)
+- [ ] Filtering, sorting, `include`, `fields`, only on declared fields (§13.1)
+- [ ] Every route declares schemas and a permission or `public: true`; response serialized through schema (API-01, API-02)
+- [ ] Body limit, timeouts, `x-request-id`, trace headers (API-03 to API-05)
+- [ ] ETag and conditional GET; cache headers for public cacheable routes (API-08, API-09)
+- [ ] Action and transition routes `POST .../actions/<name>` with audit and event (MOD-06)
+- [ ] Bulk endpoints up to 500 ids with per-row results and version conflicts (API-14, API-17)
+- [ ] Aggregate endpoint for `aggregatable()` fields (API-15)
+- [ ] Idempotency-Key for `idempotent: true` routes (§13.1)
+- [ ] Deprecation and Sunset headers (API-16)
+- [ ] OpenAPI 3.1 generation, served in development and gated in production (API-06)
+- [ ] Security headers, CORS allowlist, CSRF with Fetch Metadata plus signed token, `http.fetch` with SSRF guard, timeouts and circuit breaker (SEC-01 to SEC-04, SEC-06, WH-04)
+- [ ] `/api/v1/_meta` with `schemaVersion`, per tenant and role, ETag (UI-02, META-01 to META-05)
+- [ ] Health endpoints `/health/live`, `/ready`, `/startup` and graceful shutdown sequence (§19.3, §19.4)
+- [ ] Test: a generated list endpoint that issues one query per row fails (PERF-04)
+
+Done when: entity routes, OpenAPI and `_meta` are generated for a sample entity and a request passes every pipeline stage in order.
+
+### M1.4 Auth: `@bieberkit/auth`
+
+Depends on: M1.3.
+
+- [ ] **[D]** Better Auth adapter on MikroORM sharing the request transaction; auth tables as versioned migration steps (AUTH-09)
+- [ ] **[D]** Better Auth configuration: client IP from `TRUST_PROXY`, rate-limit counters in shared store, snake_case, UUID ids, organization set per request from the tenant (AUTH-10)
+- [ ] CI job compares Better Auth's expected schema with BieberKit entities and fails on drift (AUTH-10)
+- [ ] Server-side sessions, `__Host-` cookie, database or Valkey storage (AUTH-01, AUTH-02)
+- [ ] Email and password with ASVS rules (AUTH-04); magic link, TOTP and passkeys (AUTH-03)
+- [ ] MFA required for roles flagged `requireMfa` (AUTH-05)
+- [ ] Per-IP and per-account limits on login, OTP, magic link and reset (AUTH-06, SEC-10)
+- [ ] **[D]** CASL ability per request from role data; permissions in code, roles in database (AUTHZ-01, §14.2)
+- [ ] **[D]** CASL to ORM condition translator; lists return only permitted rows (AUTHZ-02)
+- [ ] **[D]** Field masks on read and write, default deny (AUTHZ-03, AUTHZ-04)
+- [ ] Audit of role changes, `asSystem()`, impersonation, failed authorization (AUTHZ-05)
+- [ ] API keys primitive: shown once, hashed, scoped, expiring (AUTH-07)
+- [ ] `encrypted: true` fields with key rotation through `APP_KEY_PREVIOUS`; `pii: true` log redaction (SEC-08, SEC-09)
+
+Done when: generated permission and tenant tests pass for the sample entity and an unpermitted row never leaves the database.
+
+### M1.5 Contracts: queue, cache, storage, mail
+
+Depends on: M1.2. Can run in parallel with M1.4 (no shared files).
+
+- [ ] **[M]** Queue contract, `defineJob`, `sync`, `database` and `redis` (BullMQ) drivers under `@bieberkit/queue` subpaths (PKG-02, PKG-03, §15.1)
+- [ ] Queues `critical`, `default`, `reports`; dead-letter list; input validated on dispatch and execution; stable `jobId` (Q-01 to Q-04)
+- [ ] After-commit dispatch through the outbox (Q-06); job carries tenant and actor and restores them (Q-10)
+- [ ] Scheduler under a distributed lock per tick (Q-07)
+- [ ] `worker_threads` pool for CPU-heavy work (Q-09)
+- [ ] Cache contract on BentoCache: `get`, `set`, `remember`, `forget`, `tags`, `lock`; prefix and tenant namespacing; stampede lock (C-01 to C-03)
+- [ ] Tag generations bumped right after commit; 5 s memory TTL; read-your-write window; failed purge only warns (DATA-13)
+- [ ] Separate cache instance through `CACHE_REDIS_URL` (Q-08)
+- [ ] Storage contract on FlyDrive: local and S3-compatible, signed upload URLs, private by default, content sniffing (S-01 to S-04)
+- [ ] Mail contract with `log` and `smtp`, sent through the queue (M-01)
+- [ ] Error-reporter contract with an optional Sentry-compatible driver (OBS-06)
+- [ ] Contract test suite run against every driver; each driver imported only in `src/adapters/<driver>/` (PKG-03, `check:layers`)
+
+Done when: each contract passes its shared driver tests, and switching `QUEUE_DRIVER` or `CACHE_DRIVER` changes no application code.
+
+### M1.6 Observability and testing
+
+Depends on: M1.3, M1.4, M1.5.
+
+- [ ] pino JSON logs with the fields of OBS-01
+- [ ] OpenTelemetry traces over HTTP, database, cache, queue, jobs with context carried into jobs (OBS-02)
+- [ ] Prometheus metrics on `METRICS_PORT`, not routed publicly (OBS-03, OBS-04)
+- [ ] `@bieberkit/testing`: `createTestApp`, entity factories, `actingAs`, `withTenant` (TST-02)
+- [ ] Generated contract tests per entity: permissions, field masks, tenant isolation, validation, pagination limits (§21)
+- [ ] Testcontainers setup for PostgreSQL, MySQL and Valkey; network calls outside containers fail tests (TST-03)
+- [ ] Coverage gates: 90% core, data, http, auth; 80% elsewhere (TST-01)
+
+### M1.7 CLI and scaffolder
+
+Depends on: M1.1 to M1.6 (can start the resolver and flags earlier).
+
+- [ ] Stable error codes, `--json` on every command, exit codes 0, 1, 2, 3 (§5.3, AI-02, AI-03)
+- [ ] `create-bieberkit` with every flag and prompt equivalent; resolves the plugin graph before writing anything (§5.1, §6 steps 1 to 5)
+- [ ] Scaffold writes `bieberkit.config.ts`, headers with the project author, `.env` with generated secrets, `.env.example`, `compose.yaml`, git commit (§6 steps 6 to 12, §23.7)
+- [ ] Commands: `dev`, `build`, `start <role>`, `migrate:make`, `migrate`, `db:seed`, `env:check`, `env:example`, `routes`, `openapi`, `client:generate`, `doctor`, `test` (§5.2)
+- [ ] `make:entity`, `make:module`, `make:job` from official recipes (§5.2)
+- [ ] `bieberkit check` rules: boundaries, headers, env access, route permissions, destructive migrations, `http.fetch` or queue calls inside transactions, string-built SQL, stale generated files (WP-01, SEC-05, GEN-01, DATA-07)
+- [ ] Deterministic generators writing `.bieberkit/*` and `packages/client` (GEN-01 to GEN-03, API-07, SCH-04)
+- [ ] Oxlint plugin with BieberKit rules used by `check` (§3)
+- [ ] `bieberkit add` and `remove` with data ownership prompt (PLG-03, DATA-02)
+
+Done when: `pnpm create bieberkit@latest demo --yes` boots, migrates, seeds an admin and `bieberkit dev` serves the API.
+
+### M1.8 Blank template and base plugins
+
+Depends on: M1.7. Built and hardened first, as every other template relies on them (§12).
+
+- [ ] Plugins: `users`, `roles`, `auth-ui`, `settings`, `audit-log`, `notifications`, `media`
+- [ ] `templates/blank/template.ts` with plugin list, seeders and menu order; administrator account and base roles seeded (§12)
+- [ ] Thin admin slice: `@bieberkit/admin-core` metadata loading, routing, permissions; `@bieberkit/admin-antd` login, generic list and form, no more (UI-01, UI-02, UI-10)
+- [ ] Admin served under `/admin/` with its own CSP (UI-14, SEC-01)
+- [ ] Playwright flow: login and CRUD in the admin (§21)
+
+### M1.9 Deployment and benchmarks
+
+Depends on: M1.7, M1.8.
+
+- [ ] Generated `Dockerfile`, `.dockerignore`, `compose.yaml`, `compose.prod.yaml` with proxy, roles, database, Valkey (§19.1, §19.2, DEP-01 to DEP-06)
+- [ ] Hardened runtime image: non-root, read-only root, digest pinned, SBOM and provenance, Trivy gate (SEC-18, SEC-19)
+- [ ] Rollout order and `scheduler` stop-then-start documented in the generated files (§19.5)
+- [ ] Backup service and `backup:verify` (DEP-07, DEP-09)
+- [ ] `NODE_OPTIONS` heap sizing in compose (PERF-03)
+- [ ] k6 benchmarks for the reference endpoints; record results against §18.1 and update the targets in the spec (open question in §26)
+
+### M1.10 Pilot
+
+- [ ] **[M]** Pick the pilot project and keep it in a separate repository
+- [ ] Pilot built on the `blank` template, defect list fed back as issues
+- [ ] Pilot runs web, worker and scheduler behind a load balancer
+- [ ] Pilot survives a rolling deploy and a restore from backup
+
+### Phase 1 gate **[M]**
+
+- [ ] **[M]** Pilot live in production
+
+---
+
+## Phase 2. Plugins and templates
+
+Goal: `cms`, `crm`, `saas` templates, the full admin renderer, the public site and the registry, green on all three dialects.
+
+### M2.1 Plugin system hardening
+
+- [ ] Static manifests generated at plugin build and checked in CI; first-party manifests bundled in `create-bieberkit` (PLG-07)
+- [ ] Extension tables and `extends` for fields on other plugins' entities (PLG-06, §11.3)
+- [ ] `bieberkit plugins` graph, `make:plugin`, `remove` with migration prompt (PLG-03)
+- [ ] `check` rules for plugin imports and cross-plugin table queries (PLG-01, PLG-02)
+- [ ] Expand then contract guard in the migrate role (DATA-08)
+
+### M2.2 Admin renderer
+
+- [ ] Generic list with filters, saved views, bulk actions, export; form with `visibleWhen`, `requiredWhen`, inline child tables, relation pickers, file fields; detail with tabs (UI-03, UI-11)
+- [ ] Lazy chunks per route, per-language translations, virtualized lists, prefetch, optimistic updates (UI-12, UI-13, UI-15)
+- [ ] Mobile layout to 360 px, unsaved-change guard, local drafts, shortcuts, 412 conflict view, error boundaries, offline banner (UI-16 to UI-19)
+- [ ] Languages en, vi, zh; font stack; theme tokens (UI-05, UI-06, TOK-01 to TOK-03)
+- [ ] Hashed assets kept 24 hours after deploy; reload on chunk error (UI-22)
+- [ ] Custom widgets, replacement pages, plugin pages and dashboard widgets (UI-04)
+- [ ] `@bieberkit/tokens` compiling to Ant Design theme and CSS variables
+- [ ] Second small adapter as a test fixture to prove the contract (§26)
+- [ ] Axe checks on generic screens at WCAG 2.2 AA, admin initial JS under 400 KB (UI-07, §18.1)
+- [ ] Client errors and web vitals to the error-reporter contract (UI-21)
+
+### M2.3 Content and public site
+
+- [ ] `@bieberkit/content`: block schema, shared React renderers, sanitization, framework-free HTML serializer (CNT-01 to CNT-03, CNT-05)
+- [ ] Editor integrated per the accepted ADR (CNT-04)
+- [ ] `apps/site` on TanStack Start with SSR on by default, same-origin routing, no data store credentials (SITE-01 to SITE-04, SITE-09)
+- [ ] `@bieberkit/site-kit`: `seoHead()`, sitemap, preview tokens, cache helpers (SEO-01, SEO-05, SITE-05)
+- [ ] Composition endpoints and `site.fragment` with tag purging (API-10, API-12, COMP-01 to COMP-03)
+- [ ] Locale routing, hreflang, per-locale slugs, redirects, JSON-LD (SEO-02 to SEO-04, SEO-06)
+- [ ] Private caching for session-rendered pages and the generated test for it (SITE-18)
+- [ ] CDN purge driver contract with webhook and Cloudflare drivers (SEO-07)
+- [ ] Image variants in the worker, `srcset` (SEO-08)
+- [ ] Forms with honeypot and rate limit; consent banner; 404, 500 and maintenance pages (SITE-15 to SITE-17)
+- [ ] Streaming and Suspense for slow sections; client JS under 100 KB on content pages (SITE-11, SITE-13)
+- [ ] Lighthouse CI on `cms` home and article pages (SEO-09)
+- [ ] Site Dockerfile and image (§19.7)
+
+### M2.4 Cross-cutting features
+
+- [ ] Realtime: SSE `/api/v1/events`, Valkey fan-out, heartbeat, shutdown hint (RT-01 to RT-05)
+- [ ] Workflows with persistence, compensation, wait on event or timer, admin view (WF-01 to WF-06)
+- [ ] Search contract with `database` driver and Vietnamese normalization (SR-01, SR-02)
+- [ ] Import and export with dry run, error file and formula escaping (IO-01 to IO-04)
+- [ ] PDF documents rendered in the worker (MOD-14)
+- [ ] `webhooks` plugin with signed, retried deliveries (WH-01 to WH-03)
+- [ ] `privacy` plugin: consent, data subject requests, retention, crypto-shredded audit, PII inventory in `check` (PDP-01 to PDP-06)
+- [ ] `custom-fields` plugin (MOD-10)
+- [ ] Mail templates in en, vi, zh with block rendering (M-02)
+
+### M2.5 Template plugins
+
+- [ ] `cms`: pages, posts, categories, tags, menus, seo, theme, redirects, with the seeded home page, sample post and main menu
+- [ ] `crm`: contacts, companies, deals, pipelines, activities, tasks, imports, with the default pipeline
+- [ ] `saas`: tenants, teams, invitations, plans, subscriptions, api-keys, usage, payment driver contract and manual-invoice driver, with demo tenant and plans
+- [ ] `template.ts` for each template; adding one needs no scaffolder change (§12)
+- [ ] One Playwright flow per template (§21)
+
+### M2.6 Registry
+
+- [ ] `registry/` with dashboards, approval forms, import wizard, shadcn/ui site components, module recipes (UI-09, SITE-08)
+- [ ] `bieberkit add` installs registry blocks as owned source with the BieberKit header kept (§23.7)
+
+### M2.7 Dialect matrix
+
+- [ ] Full suite, generated permission and tenant tests green on PostgreSQL for every first-party plugin
+- [ ] Same on MySQL 8.4
+- [ ] Same on SQLite (no load tests)
+- [ ] Upgrade tests on `examples/` apps for each template (§21)
+
+### Phase 2 gate **[M]**
+
+- [ ] **[M]** All three dialects green
+
+---
+
+## Phase 3. Hardening and 1.0
+
+Goal: security review, documentation and upgrade path. No estimate until Phase 2 ends.
+
+### M3.1 Security
+
+- [ ] **[M]** Review against §17 and OWASP ASVS 5.0 Level 2; findings fixed or recorded
+- [ ] **[M]** Independent review of tenant isolation, authorization and release pipeline
+- [ ] Supply-chain audit of dependency list, licenses and ADR lines for each runtime dependency (P9)
+- [ ] `SECURITY.md` process exercised once with a test report (SEC-20)
+
+### M3.2 Performance
+
+- [ ] k6 runs on release candidates and fails on a regression above 10% (PERF-08)
+- [ ] All §18.1 targets met on the reference setup
+
+### M3.3 Developer experience for agents and humans
+
+- [ ] `@bieberkit/mcp` and `bieberkit mcp`: localhost only, off in production (AI-04, §22.1)
+- [ ] Shipped skills: `bieberkit-add-entity`, `bieberkit-add-module`, `bieberkit-add-workflow`, `bieberkit-write-tests`, `bieberkit-upgrade` (§22.1)
+- [ ] Bundled docs in each package and `llms.txt`, matching the installed version (§22.1)
+- [ ] Short hand-written `AGENTS.md` and one-line `CLAUDE.md` in generated projects (AI-01)
+- [ ] User documentation site on the chosen generator (§26)
+
+### M3.4 Deployment and upgrades
+
+- [ ] `bieberkit deploy:helm` chart with probes, preStop, migrate job, autoscaling (§19.2)
+- [ ] `bieberkit docker:init`
+- [ ] `bieberkit upgrade` moves all `@bieberkit/*` to one version and runs codemods, tested on `examples/` from the previous minor and major (P11, §24.2)
+- [ ] Deployment guide with recovery figures and bucket versioning notes (DEP-08, DEP-10)
+
+### M3.5 Release 1.0
+
+- [ ] Release candidates pass upgrade, load, accessibility and Lighthouse checks
+- [ ] Changelog generated from changesets
+- [ ] **[M]** Publish 1.0 through the trusted publishing workflow
+
+### Phase 3 gate **[M]**
+
+- [ ] **[M]** 1.0 released
+
+---
+
+## Parking lot
+
+Not scheduled. Items move into a phase only after a spec change.
+
+- GraphQL plugin, other admin adapters (shadcn/ui, MUI), schema-per-tenant (§1.3, §9.4), pg_trgm search driver (§15.7), other site renderers as headless clients (SITE-07)
