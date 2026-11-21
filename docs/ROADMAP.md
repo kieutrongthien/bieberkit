@@ -29,7 +29,7 @@ Derived from `docs/spec/SPEC.md` section 25 (spec 0.8). The spec stays the sourc
 ## How agents use this file
 
 1. Pick the first unticked milestone whose dependencies are ticked. Work inside one milestone at a time.
-2. Follow the skill `bieberkit-implement-task` for every item: requirement IDs, ADR or module spec first, tests first, then code, `pnpm check`, `pnpm typecheck`, `pnpm lint`, `pnpm test`, signed commit.
+2. Follow the skill `bieberkit-implement-task` for every item. It runs the Superpowers skills in order (brainstorming into an ADR or module spec, writing-plans, test-driven-development, verification-before-completion) and ends with `pnpm check`, `pnpm typecheck`, `pnpm lint`, `pnpm test` and a signed commit.
 3. Tick an item (`- [x]`) in the same commit that lands its work. Tick only when its evidence exists: a merged test named after the requirement ID, an accepted ADR, or a command that passes. Never tick from memory.
 4. Items tagged **[M]** are the maintainer's call. Agents prepare them (propose an ADR as `Proposed`, show tests, open a pull request) and never tick them or merge them.
 5. Items tagged **[D]** are maintainer-designed areas (AGENTS.md, Workflow): use plan mode, propose, never merge. Applies to the public API of `defineEntity` and `definePlugin`, authentication, authorization, tenant isolation and the release pipeline.

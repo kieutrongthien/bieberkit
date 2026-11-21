@@ -39,7 +39,7 @@ Open-source TypeScript framework for management-style web apps and APIs (Apache 
 
 - `packages/` framework packages, one folder each, published as `@bieberkit/*`, `bieberkit` and `create-bieberkit`.
 - `plugins/`, `templates/`, `registry/`, `examples/` are empty until Phase 2.
-- `skills/` holds skills shipped into generated projects. Skills for working on this repository are in `.agents/skills/`.
+- `skills/` holds skills shipped into generated projects. Skills for working on this repository are in `.agents/skills/`. Generic process skills come from the Superpowers plugin, which is not vendored here.
 - `docs/spec/SPEC.md` spec, `docs/adr/` decisions, `docs/modules/` module specs.
 
 ## Package layers (PKG-01)
@@ -77,16 +77,22 @@ Spec section 23. Copy the header from a file of the same kind, set `@file` to th
 
 ## Workflow
 
-1. A non-trivial change starts with an ADR (`docs/adr/`) or a module spec (`docs/modules/`).
-2. Write tests from the spec first. The maintainer reviews the tests, then you implement.
-3. Keep pull requests small. A change to a public API needs a changeset (`pnpm changeset`).
-4. The maintainer designs these by hand. Propose, never merge: the public API of `defineEntity` and `definePlugin`, authentication, authorization, tenant isolation, the release pipeline.
+This repository uses the Superpowers plugin. Start every task with the skill `bieberkit-implement-task`, which says which Superpowers skill to run at each step. Work from `docs/ROADMAP.md` and tick items there when the work lands.
+
+1. A non-trivial change starts with an ADR (`docs/adr/`) or a module spec (`docs/modules/`). This is the design document `superpowers:brainstorming` produces. Never write `docs/superpowers/specs/`.
+2. Write tests from the spec first (`superpowers:test-driven-development`). The maintainer reviews the tests, then you implement.
+3. Plans from `superpowers:writing-plans` go in `docs/superpowers/plans/` and carry the file header.
+4. Before saying work is done, run `pnpm check`, `pnpm typecheck`, `pnpm lint` and `pnpm test` and read the output (`superpowers:verification-before-completion`).
+5. Keep pull requests small. A change to a public API needs a changeset (`pnpm changeset`).
+6. The maintainer designs these by hand. Use plan mode, propose, never merge: the public API of `defineEntity` and `definePlugin`, authentication, authorization, tenant isolation, the release pipeline.
+7. Agents never merge into `main` and never push to it. When a branch is finished, keep it or open a pull request (`superpowers:finishing-a-development-branch`, those two options only).
+8. If a Superpowers skill conflicts with this file, this file wins.
 
 ## Commits
 
 - Conventional Commits, for example `feat(core): add lifecycle hooks`.
 - Sign off every commit: `git commit -s` (DCO).
-- Do not add `Co-Authored-By` trailers or "Generated with" lines to commits or pull requests.
+- Do not add `Co-Authored-By` trailers or "Generated with" lines to commits or pull requests, even when a Superpowers skill's template includes one.
 - Never commit `.env` files, secrets or `dist/`.
 
 ## Do not touch without being asked

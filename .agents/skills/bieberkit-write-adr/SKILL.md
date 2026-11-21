@@ -28,6 +28,8 @@ description: Write an architecture decision record in docs/adr for BieberKit. Us
 
 # Write an ADR
 
+An ADR is this repository's design document. When `superpowers:brainstorming` reaches the point of writing a design, write the ADR here instead of a file in `docs/superpowers/specs/`. The brainstorming questions and approach comparison become Context and Options.
+
 ## Steps
 
 1. Read `docs/adr/README.md` for the index and the next free number. Numbers never get reused.

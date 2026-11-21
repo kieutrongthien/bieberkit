@@ -27,6 +27,9 @@ dist/
 coverage/
 *.tsbuildinfo
 
+# Git worktrees created by the Superpowers workflow
+.worktrees/
+
 # Generated per project or per run
 .bieberkit/
 playwright-report/

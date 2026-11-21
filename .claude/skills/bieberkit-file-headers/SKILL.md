@@ -42,6 +42,8 @@ Every file that can hold a comment starts with the header from spec section 23. 
 
 The header goes first. Only a shebang, a Dockerfile `# syntax=` line or Markdown frontmatter may come before it.
 
+Files written by Superpowers skills need it too: plans in `docs/superpowers/plans/` and any note or doc a skill creates. Add the header right after the file is written, before the next step.
+
 ## Steps
 
 1. Copy the header from an existing file with the same style.

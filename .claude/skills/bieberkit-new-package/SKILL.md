@@ -39,7 +39,7 @@ A new package is rare. Check spec section 4.1 first: if the package is not liste
 5. Rewrite every file header: `@file` must be the new path, `@description` must describe the new package. Run `pnpm check:headers` to confirm.
 6. Keep `src/index.ts` as the only public entry until a subpath is needed. A driver adapter goes in `src/adapters/<driver>/index.ts` and gets its own entry in `exports` and in `tsdown.config.ts`.
 7. Add the package to the table in `README.md` at the repository root if it is published.
-8. Run `pnpm install`, `pnpm check`, `pnpm typecheck` and `pnpm test`.
+8. Run `pnpm install`, `pnpm check`, `pnpm typecheck` and `pnpm test`, and follow `superpowers:verification-before-completion`: read the output before saying the package is done.
 
 ## Done when
 

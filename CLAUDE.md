@@ -28,5 +28,6 @@
 
 - Skills live in `.claude/skills/` as a mirror of `.agents/skills/`. Edit `.agents/skills/`, then run `pnpm sync:skills`.
 - A hook checks the header of every file you write or edit. When it reports a problem, fix the header before moving on.
+- Install the Superpowers plugin (`superpowers@claude-plugins-official`). It is the only plugin this workflow assumes. The repository skills in `.claude/skills/` cover only what Superpowers does not: headers, ADRs, new packages and the task order.
 - Use plan mode before touching any of the maintainer-only areas listed under Workflow in AGENTS.md.
 - Commit attribution is off in `.claude/settings.json`. Keep it off.
