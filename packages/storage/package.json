@@ -1,0 +1,44 @@
+{
+  "name": "@bieberkit/storage",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Storage contract on FlyDrive.",
+  "keywords": [
+    "bieberkit"
+  ],
+  "license": "Apache-2.0",
+  "author": "Bieber Kieu <kieutrongthien@gmail.com>",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "@bieberkit/source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=24.12"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@bieberkit/core": "workspace:*"
+  },
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "./package.json": "./package.json"
+    }
+  }
+}

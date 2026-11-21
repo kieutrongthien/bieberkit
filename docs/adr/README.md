@@ -1,0 +1,51 @@
+<!--
+  BieberKit
+
+  @file        docs/adr/README.md
+  @description Index and process for architecture decision records.
+  @author      Bieber Kieu <kieutrongthien@gmail.com>
+  @copyright   Copyright (c) 2026 Bieber Kieu
+  @license     Apache-2.0
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+
+  SPDX-License-Identifier: Apache-2.0
+-->
+
+# Architecture decision records
+
+An ADR records one decision, the options considered and the consequences. The technology baseline in spec section 3 changes only through an ADR. Use the skill `bieberkit-write-adr` or copy [0000-template.md](0000-template.md).
+
+Status values: `Proposed`, `Accepted`, `Rejected`, `Superseded by NNNN`. Only the maintainer accepts an ADR.
+
+## Index
+
+| No. | Title | Status |
+| --- | --- | --- |
+| [0001](0001-record-architecture-decisions.md) | Record architecture decisions | Accepted |
+
+## Needed for the Phase 0 gate
+
+The gate "ADRs accepted" (spec section 25) needs decisions on the items below. Spikes that feed them are listed in spec section 26.
+
+| Topic | Questions to settle |
+| --- | --- |
+| ORM and dialects | MikroORM 7 `defineEntity` on PostgreSQL, MySQL 8.4 and SQLite, support tiers, collation and money handling |
+| Plugin manifest | Static manifest in `package.json` (PLG-07), resolution order, collisions, per-plugin migrations (DATA-24) |
+| `defineEntity` API | Field DSL, compilation to MikroORM metadata, JSON Schema, Zod Mini and CASL, escape hatches |
+| Authentication | Better Auth through a MikroORM adapter that shares the request transaction, on all three dialects |
+| Authorization | CASL rules to SQL: `@ucast/sql` on MikroORM 7, or an own translator with a small operator set |
+| Queue drivers | BullMQ on Valkey and the database driver behind one contract, outbox dispatch |
+| Release pipeline | npm trusted publishing, protected tags, no shared cache, `id-token: write` only on the publish job (SEC-15 to SEC-21) |
+| Content editor | Lexical or Tiptap for block JSON content (spec section 16.5) |
+| Formatter | Oxfmt, or the Biome formatter as fallback |

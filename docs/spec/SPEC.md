@@ -1,0 +1,1595 @@
+<!--
+  BieberKit
+
+  @file        docs/spec/SPEC.md
+  @description The BieberKit specification, version 0.8: design, requirements and roadmap.
+  @author      Bieber Kieu <kieutrongthien@gmail.com>
+  @copyright   Copyright (c) 2026 Bieber Kieu
+  @license     Apache-2.0
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+
+  SPDX-License-Identifier: Apache-2.0
+-->
+
+# BieberKit specification
+
+> Exported from the BieberKit specification doc, version 0.8 (revision 134), on 2026-11-22. From now on this file is the copy agents read. Change it through pull requests together with the code or ADR that needs the change.
+
+Nov 21, 2026 · @Bieber Kieu
+
+## 1. Overview
+
+BieberKit is an open-source TypeScript framework for management-style web apps and APIs. It is licensed under Apache 2.0. One command creates a production-ready project with API, admin UI, auth, permissions, queue, cache and storage already wired. Features come from plugins, and starter templates are presets of plugins.
+
+| Item | Value |
+| --- | --- |
+| Project name | BieberKit |
+| Scaffolder | `create-bieberkit` (run as `pnpm create bieberkit`) |
+| Project CLI | `bieberkit` |
+| npm scope | `@bieberkit/*` (to be reserved before the first release) |
+| License | Apache License 2.0 |
+| Author and maintainer | Bieber Kieu (kieutrongthien@gmail.com) |
+| Runtime | Node.js 26 LTS by default, Node.js 24.12 or later supported |
+| Language | TypeScript, erasable syntax only |
+| Package manager | pnpm |
+| Status | Draft specification, before implementation |
+
+### 1.1 Problem
+
+Every new back-office, CMS or CRM project rebuilds the same parts: login, roles, CRUD screens, uploads, background jobs, settings and audit logs. Requirements differ per project, but most of this work repeats. Earlier stacks (Laravel with Bootstrap or Vue, then Nuxt and Next) still required both backend and frontend to be assembled by hand each time.
+
+### 1.2 Goals
+
+- **G1** Create a working project (API, admin UI, auth, seeded admin user) with one command.
+- **G2** Define an entity once and derive the database schema, validation, REST API, OpenAPI, permissions, admin screens and typed client from it.
+- **G3** Compose features from plugins. A template is a preset list of plugins.
+- **G4** Ship production-ready defaults for security, observability, graceful shutdown and Docker packaging.
+- **G5** Scale horizontally with stateless processes and separate web, worker and scheduler roles.
+- **G6** Run the same application code on PostgreSQL, MySQL and SQLite.
+- **G7** Make correct usage easy for AI coding agents.
+- **G8** Stay sustainable for a single maintainer through a small core, automated releases and automated upgrades.
+- **G9** Server-render public sites so search engines and social previews receive full HTML, with SEO handled by the framework.
+
+### 1.3 Non-goals
+
+- Edge or serverless runtimes as a primary target.
+- React Server Components anywhere, and server-side rendering for the admin UI. Public sites are server-rendered (section 16.2).
+- GraphQL in core (possible as a plugin later).
+- MongoDB or other non-relational primary stores.
+- A visual low-code builder.
+- Bun or Deno support in version 1.
+
+### 1.4 Terminology
+
+| Term | Meaning |
+| --- | --- |
+| Core | The `@bieberkit/*` runtime packages every project depends on |
+| Module | A unit of application code that owns its entities, services, routes and jobs |
+| Plugin | A distributable module with a manifest, installed with `bieberkit add` |
+| Template | A preset of plugins, configuration and seed data used by the scaffolder |
+| Entity | A data model declared with `defineEntity` |
+| Process role | One of `web`, `worker`, `scheduler` or `migrate`, all served by the same image |
+| Driver | An interchangeable backend for a service contract (queue, cache, storage, mail) |
+
+### 1.5 Requirement keywords
+
+MUST, MUST NOT, SHOULD, SHOULD NOT and MAY are used as defined in RFC 2119. Requirements carry IDs (for example SEC-04) so issues and pull requests can reference them.
+
+## 2. Design principles
+
+These principles settle disagreements during design and review. When two of them conflict, security (P5) wins.
+
+1. **P1 One way to do each thing.** Adding an entity always uses `defineEntity`, adding a module always uses `defineModule`. Humans and AI agents both copy patterns, so the framework offers one pattern per task.
+2. **P2 Define once, derive the rest.** Entity metadata is the single source for schema, validation, API, OpenAPI, permissions, admin screens and test factories.
+3. **P3 Types carry the rules.** Mistakes SHOULD fail at type check, not at runtime. Code is erasable TypeScript: no enums, no decorators, no parameter properties, no runtime namespaces.
+4. **P4 Small core, everything else is a plugin.** Core holds only what every project needs. Business features live in plugins.
+5. **P5 Secure by default.** Insecure behavior requires an explicit, documented opt-out that `bieberkit check` reports.
+6. **P6 Stateless processes.** No process keeps sessions, files or locks in local memory or disk in production.
+7. **P7 Explicit boundaries.** Modules talk through events, declared entity extensions and published services. They never import each other's internals or query each other's tables.
+8. **P8 Validated configuration.** All configuration comes from environment variables that are validated against a schema at boot.
+9. **P9 Few, maintained dependencies.** Each third-party dependency needs a recorded reason, an active maintainer and a compatible license.
+10. **P10 AI-legible.** Predictable structure, errors that state the fix, machine-readable CLI output and version-matched docs inside the package.
+11. **P11 Upgradable.** Every breaking change ships a codemod run by `bieberkit upgrade`.
+
+12. **P12 Contracts where swapping is real.** Swappable infrastructure sits behind BieberKit contracts with drivers: queue, cache, storage, mail, search, error reporting, CDN purge and payment. Project code imports foundation libraries only through `@bieberkit/*`. These re-exports keep versions aligned. Fastify, MikroORM, Standard Schema with Zod, React with TanStack and Ant Design are committed foundations rather than wrapped, so replacing one of them is a major release, not a driver swap.
+
+## 3. Technology baseline
+
+The baseline below is fixed for version 1. Changing any row requires an ADR (architecture decision record).
+
+| Layer | Choice | Notes |
+| --- | --- | --- |
+| Runtime | Node.js 26 LTS by default, 24.12 or later supported | Minimum 24.12, the first release with stable type stripping. Maintenance LTS since 2026-10-20, end of life 2028-04-30. Docker images and CI default to Node.js 26 LTS (Active LTS since 2026-10-28, end of life 2029-04-30) from Phase 1. Node.js 24 stays in the CI matrix until its end of life. |
+| Language | TypeScript 7 for type checking | TypeScript 6 is kept only for tools that still need the JavaScript compiler API. |
+| Compiler options | `strict`, `erasableSyntaxOnly`, `verbatimModuleSyntax`, `module: nodenext`, `target: esnext` | Lets Node.js run sources directly through type stripping in development. Relative imports keep their .ts extension, and published packages ship compiled JavaScript because Node.js does not strip types inside node\_modules. |
+| Package manager | pnpm 12 with workspaces | Only pnpm is supported, for both the framework and generated projects. |
+| Task runner | Turborepo 2 | Cached builds and tests across workspace packages. |
+| HTTP server | Fastify 5 | Plugin encapsulation, JSON schema serialization, throughput close to raw node:http in the fastify/benchmarks suite. |
+| Validation | BieberKit field DSL compiled to JSON Schema and Zod 4 Mini. Zod 4 through Standard Schema for custom routes | Ajv validators and fast-json-stringify serializers are generated from JSON Schema at build as standalone modules (SCH-06). Section 10.6. |
+| ORM | MikroORM 7 with `defineEntity` | One entity definition for PostgreSQL, MySQL and SQLite. No decorators. |
+| Databases | PostgreSQL 15+, MySQL 8.4 LTS+, SQLite 3 | Support tiers in section 9. |
+| Authentication | Better Auth 1.7 (1.7.16 or later) | Sessions, MFA, passkeys, OAuth, organizations. |
+| Authorization | CASL | Action, subject, field and condition rules per request. |
+| Queue | BullMQ on Valkey or Redis, plus a built-in database driver | Section 15. |
+| Cache | BentoCache: memory first level, Valkey second level, tags, stampede protection, grace periods | Section 15. |
+| File storage | FlyDrive | Local disk, S3, R2, GCS and S3-compatible stores. |
+| Logging and telemetry | pino, OpenTelemetry | Section 20. |
+| Admin UI | React 19.2 (19.2.4 or later), Vite 8, TanStack Router, Query, Table and Form, Ant Design 6 | Single-page app, no server components. Ant Design is the default UI adapter (UI-10). |
+| API client | OpenAPI 3.1 and Orval | Typed client and TanStack Query hooks generated per project. |
+| Testing | Vitest 4, Testcontainers, Playwright, k6 | Section 21. |
+| Container | Docker, Docker Hardened Images `node:26` | Section 19. |
+| Public site | TanStack Start 1.x on Node.js through Nitro | Server-side rendering for SEO. Shares React, TanStack Router and Query with the admin UI. Section 16.2. |
+| Site styling | Tailwind CSS 4, shadcn/ui on Base UI | Copied in from the registry and owned by the project. |
+| Content editor | Lexical or Tiptap | Chosen by a Phase 0 spike. Content stored as block JSON. Section 16.5. |
+| Lint and type check | Oxlint with type-aware rules (tsgolint on TypeScript 7) | One pass runs lint rules and TypeScript diagnostics on the same program. BieberKit rules ship as an Oxlint plugin used by bieberkit check. |
+| Formatting | Oxfmt | Same Oxc toolchain as Oxlint, Rolldown and Vite. The Biome formatter is the fallback if Oxfmt is not stable enough at Phase 0. |
+| Package build | tsdown, pinned (pre-1.0) | ESM-only packages with exports maps. isolatedDeclarations for fast .d.ts output. publint and attw check every package in CI. |
+
+Dependency policy:
+
+- Exact versions are pinned in `pnpm-lock.yaml`, and CI installs with `--frozen-lockfile`.
+- Renovate opens update pull requests no sooner than 7 days after a release is published.
+- Every dependency MUST use a license compatible with Apache 2.0 (MIT, BSD, ISC, Apache 2.0). Copyleft and source-available licenses are not allowed in core.
+
+## 4. Repository layout
+
+The framework lives in one pnpm monorepo. Every package is published under `@bieberkit/*` on one shared version number.
+
+### 4.1 Framework repository
+
+```text
+bieberkit/
+├── packages/
+│   ├── core/        @bieberkit/core      kernel, container, config, lifecycle, events
+│   ├── http/        @bieberkit/http      Fastify integration, routing, OpenAPI
+│   ├── data/        @bieberkit/data      defineEntity, MikroORM integration, migrations
+│   ├── auth/        @bieberkit/auth      Better Auth and CASL integration
+│   ├── queue/       @bieberkit/queue     queue contract and drivers
+│   ├── cache/       @bieberkit/cache     cache contract, locks, tags
+│   ├── storage/     @bieberkit/storage   storage contract on FlyDrive
+│   ├── mail/        @bieberkit/mail      mail contract and drivers
+│   ├── search/      @bieberkit/search    search contract and database driver
+│   ├── admin-core/  @bieberkit/admin-core  headless admin: metadata, routing, state
+│   ├── admin-antd/  @bieberkit/admin-antd  default UI adapter on Ant Design
+│   ├── tokens/      @bieberkit/tokens    design tokens to Ant Design and CSS variables
+│   ├── content/     @bieberkit/content   block content schema and renderers
+│   ├── site-kit/    @bieberkit/site-kit  SEO head, sitemap, preview, cache helpers for the site
+│   ├── testing/     @bieberkit/testing   test app, factories, actingAs helpers
+│   ├── mcp/         @bieberkit/mcp       MCP server for AI agents
+│   ├── cli/         bieberkit            project CLI
+│   └── create/      create-bieberkit     scaffolder
+├── plugins/         @bieberkit/plugin-*  first-party plugins (section 12)
+├── templates/       blank, cms, crm, saas
+├── registry/        copy-in UI blocks and module recipes
+├── skills/          Agent Skills shipped to projects
+├── docs/            documentation source, bundled into packages at build
+├── examples/        sample apps used by upgrade and compatibility tests
+├── tools/           header checker, codemods, release scripts
+├── LICENSE  NOTICE  README.md  CONTRIBUTING.md  SECURITY.md
+├── CODE_OF_CONDUCT.md  AGENTS.md  CLAUDE.md
+└── pnpm-workspace.yaml  turbo.json  tsconfig.base.json
+```
+
+### 4.2 Generated project
+
+```text
+example-project/
+├── apps/
+│   ├── server/              API, workers, scheduler (one codebase, many roles)
+│   │   └── src/
+│   │       ├── modules/     the project's own modules
+│   │       └── main.ts      entry point, selects the process role
+│   ├── admin/               admin SPA (React, Vite)
+│   └── site/                public site with SSR (TanStack Start), optional
+├── packages/
+│   └── client/              generated typed API client
+├── migrations/              generated per project dialect
+├── bieberkit.config.ts      plugins, project metadata, feature flags
+├── .env  .env.example
+├── Dockerfile  compose.yaml  compose.prod.yaml
+├── AGENTS.md  CLAUDE.md  .agents/skills/
+└── pnpm-workspace.yaml
+```
+
+Rules:
+
+- Plugins are dependencies in `package.json`, never copied into the project. They upgrade with the framework.
+- Registry blocks are copied into the project and owned by it after installation.
+- `apps/server` is the only process codebase. The role is chosen at start (section 7).
+
+### 4.3 Package layers
+
+Framework packages form four layers, and imports only point downward. The contracts layer is the stable seam: everything above it is BieberKit's own API, and swappable infrastructure sits beside it as driver adapters. Foundation libraries are re-exported, not wrapped.
+
+Layers, top to bottom. Imports point downward only.
+
+| Layer | Packages | Notes |
+| --- | --- | --- |
+| Tools | `bieberkit` (cli), `create-bieberkit`, `@bieberkit/mcp` | Act on the project, never imported by it |
+| Your project and plugins | | Use foundation libraries through `@bieberkit/*` re-exports |
+| Product | admin-core, admin-antd, site-kit, tokens, content, testing | |
+| Contracts | http, data, auth, queue, cache, storage, mail, search | Driver adapters sit behind them: BullMQ, BentoCache, FlyDrive, mail, search, error reporting, CDN purge |
+| Foundation | `@bieberkit/core` | Kernel, container, config, errors, events, plugin resolver |
+
+Project code and plugins see only BieberKit packages. Tools act on the project but are never imported by it.
+
+- **PKG-01** A package imports only packages in its own layer or below. `bieberkit check` enforces this in the framework repository.
+- **PKG-02** Each contract package exports its interface and its default adapter under a subpath, for example `@bieberkit/cache` and `@bieberkit/cache/bentocache`, so a new adapter never touches callers.
+- **PKG-03** Swappable infrastructure libraries (BullMQ, BentoCache, FlyDrive, mail transports, search engines) are imported only inside driver adapters. Foundation libraries are re-exported by BieberKit packages so versions stay aligned (P12).
+- **PKG-04** `@bieberkit/core` has no runtime dependency besides Node.js built-ins.
+
+## 5. CLI specification
+
+Two binaries exist. `create-bieberkit` creates projects, and `bieberkit` runs inside a project from its local dependencies. No global install is required.
+
+### 5.1 Creating a project
+
+```bash
+pnpm create bieberkit@latest example-project
+```
+
+`bieberkit create example-project` is an alias that calls the same scaffolder.
+
+| Flag | Values | Default | Purpose |
+| --- | --- | --- | --- |
+| `--db` | `postgres`, `mysql`, `sqlite` | asked | Database dialect |
+| `--template` | `blank`, `cms`, `crm`, `saas` | asked | Starter template |
+| `--plugins` | comma-separated plugin names | none | Extra plugins on top of the template |
+| `--admin` / `--no-admin` | flag | `--admin` | Include the admin SPA |
+| `--author` | `"Name <email>"` | from git config | Author written into project file headers |
+| `--install` / `--no-install` | flag | `--install` | Run `pnpm install` |
+| `--git` / `--no-git` | flag | `--git` | Initialize a git repository |
+| `--yes` | flag | off | Accept defaults, never prompt |
+| `--json` | flag | off | Print a machine-readable result |
+| --site / --no-site | flag | --site for cms, otherwise --no-site | Include the server-rendered public site app |
+
+Every prompt MUST have an equivalent flag, so CI and AI agents can run the scaffolder without interaction.
+
+### 5.2 Project commands
+
+| Command | Purpose |
+| --- | --- |
+| `bieberkit dev` | Start local services from `compose.yaml`, then the server in watch mode with web, worker and scheduler in one process, plus the admin and site dev servers |
+| `bieberkit build` | Type check, build server, admin and site, generate OpenAPI and the client |
+| `bieberkit start <role>` | Start `web`, `worker`, `scheduler` or `migrate` from the built output |
+| `bieberkit migrate:make <name>` | Generate a migration from entity changes for the project dialect |
+| `bieberkit migrate` | Apply pending migrations (`--status`, `--rollback`) |
+| `bieberkit db:seed` | Run seeders |
+| `bieberkit make:entity`, `make:module`, `make:plugin`, `make:job` | Generate code from the official recipes |
+| `bieberkit add <plugin>` / `remove <plugin>` | Install or uninstall a plugin and update config, env schema and migrations |
+| `bieberkit plugins` | List installed plugins, versions and dependency graph |
+| `bieberkit env:check` | Validate the current environment against the merged schema |
+| `bieberkit env:example` | Regenerate `.env.example` |
+| `bieberkit check` | Run framework rules: module boundaries, file headers, env access, permissions, destructive migrations |
+| `bieberkit doctor` | Check connectivity to database, Valkey or Redis, storage and mail |
+| `bieberkit routes` | Print routes with their permissions |
+| `bieberkit openapi` / `client:generate` | Emit `openapi.json` / regenerate the typed client |
+| `bieberkit test` | Run tests through Vitest with framework presets |
+| `bieberkit upgrade` | Move all `@bieberkit/*` packages to one version and run codemods |
+| `bieberkit mcp` | Start the MCP server for AI agents (development only) |
+| `bieberkit docker:init` / `deploy:helm` | Regenerate Docker files / generate a Helm chart |
+
+### 5.3 Output and exit codes
+
+- Human-readable output by default. `--json` prints one JSON document on stdout and logs on stderr.
+- Every error has a stable code (for example `BK_ENV_MISSING`), a one-line cause, the fix, and a docs link.
+- Exit codes: `0` success, `1` failure, `2` usage error, `3` check violations found.
+- The CLI sends no telemetry.
+
+### 5.4 Generated files
+
+| Path | Content | Committed |
+| --- | --- | --- |
+| `.bieberkit/types/` | Entity, client and permission types (SCH-04) | No |
+| `.bieberkit/schemas/` | JSON Schema and Zod Mini output (section 10.6) | No |
+| `.bieberkit/meta/` | Resolved plugin graph and metadata snapshot | No |
+| `packages/client/` | Typed API client and query hooks (API-07) | Yes |
+| `migrations/` | Migrations for the project dialect (section 9.3) | Yes |
+| `.env.example` | Generated from the env schema (CFG-06) | Yes |
+
+- **GEN-01** Generated files carry a `@generated` header and are never edited by hand. `bieberkit check` fails when a committed generated file is stale.
+- **GEN-02** `bieberkit dev` regenerates on change. `bieberkit build` regenerates from scratch, so CI never depends on a developer's local state.
+- **GEN-03** Generators are deterministic: the same input gives byte-identical output, so diffs only show real changes.
+
+## 6. Project creation flow
+
+The scaffolder resolves every choice into a valid plugin graph before it writes a single file. A failed check leaves the target directory untouched.
+
+1. **Name.** Validate the project name as an npm package name and check that the target directory is empty.
+2. **Database.** Ask for `postgres`, `mysql` or `sqlite`. Choosing `sqlite` with the `saas` template prints a warning that SQLite is meant for development and single-server deployments.
+3. **Template.** Ask for `blank`, `cms`, `crm` or `saas`.
+4. **Extra plugins.** Offer only plugins that support the chosen dialect and do not conflict with the template.
+5. **Resolve.** Build the plugin dependency graph, sort it topologically, and stop on a missing dependency, a cycle, a version mismatch, or two plugins claiming the same table, route, permission or env key.
+6. **Write files.** Copy the template, render `bieberkit.config.ts`, and write file headers with the project author (section 23).
+7. **Environment.** Merge the env schemas of core and all plugins, then write `.env` with development defaults and freshly generated secrets, plus `.env.example` without secrets.
+8. **Install.** Run `pnpm install` with the supply-chain settings from section 17.
+9. **Services.** Generate `compose.yaml` with the chosen database and Valkey, so `bieberkit dev` can start them.
+10. **Database setup.** On the first `bieberkit dev`, generate the initial migration, apply it, and seed one administrator account with credentials asked for interactively or printed once.
+11. **Git.** Initialize a repository and create the first commit.
+12. **Next steps.** Print the URLs of the API, the admin UI and the docs.
+
+Development defaults written to `.env`:
+
+| Setting | Development default | Typical production value |
+| --- | --- | --- |
+| `QUEUE_DRIVER` | `sync` | `redis` |
+| `CACHE_DRIVER` | `file` | `redis` |
+| `STORAGE_DISK` | `local` | `s3` |
+| `MAIL_DRIVER` | `log` | `smtp` |
+
+## 7. Core runtime architecture
+
+Every process starts from the same entry point and the same kernel. Only the role chosen at start decides what runs after boot.
+
+One kernel boots every process role from the same code:
+
+1. `main.ts` reads the role from argv.
+2. Kernel: config (validated env), container (services by name), plugin resolver (graph, collisions), lifecycle (boot, ready, stop).
+3. Modules and plugins: entities, routes, jobs, events, workflows.
+4. Service contracts: data, HTTP, auth, queue, cache, storage, mail.
+5. Role: `web` (Fastify, admin assets), `worker` (queues and outbox), `scheduler` (cron under a lock) or `migrate` (migrate, then exit).
+
+The kernel validates config, resolves plugins and fills the container before any module code runs. Each role then starts only the part it needs.
+
+### 7.1 Process roles
+
+| Role | Starts | Scales by | Replicas |
+| --- | --- | --- | --- |
+| `web` | Fastify server, admin static assets, health endpoints | CPU and p95 latency | 2 or more in production |
+| `worker` | Queue consumers, outbox dispatcher | Queue depth | 1 or more, per queue group |
+| `scheduler` | Schedule ticks under a distributed lock | Does not scale | Exactly 1 |
+| `migrate` | Pending migrations, then exits | Once per deploy | 1 job |
+
+### 7.2 Boot sequence
+
+1. Read the static plugin manifests and resolve the plugin graph (section 11.2, PLG-07).
+2. Load and validate configuration against the env schema merged from core and the resolved plugins. Exit on error.
+3. Register services in the container.
+4. Boot modules and plugins in dependency order: entities, routes, jobs, events, admin metadata.
+5. Connect to the database, Valkey or Redis, and storage, with bounded retries.
+6. Start the role and report ready on `/health/ready`.
+7. On SIGTERM, run the shutdown sequence in section 19.4.
+
+### 7.3 Container
+
+- Services are registered as factories with a scope: `singleton`, `request` or `transient`.
+- The request scope holds the ORM context, current user, tenant and CASL ability.
+- Resolution is by name with inferred types, for example `ctx.services.pipeline`. No decorators and no reflection metadata.
+- Circular dependencies and missing services fail at boot, not at first use.
+
+### 7.4 Module structure and layering
+
+Every module, in a project or a plugin, has the same shape, so humans and agents always know where code goes.
+
+```text
+modules/crm/
+├── module.ts        defineModule: the only public entry point
+├── entities/        defineEntity files, one per entity
+├── services/        business logic, transactions, published service API
+├── routes/          custom HTTP routes (entity routes are generated)
+├── actions/         entity actions and transition handlers
+├── jobs/            defineJob files
+├── events/          event payload schemas and subscribers
+├── workflows/       multi-step workflows with compensations
+├── admin/           custom admin pages and widgets
+├── i18n/            vi.json, en.json, zh.json
+└── tests/
+```
+
+- **MOD-15** Dependencies point one way: routes, actions, jobs and subscribers call services. Services use the data layer. Nothing below calls upward.
+- **MOD-16** Only services open transactions. A request handler never writes to the database directly, so business rules have one home and can be reused by jobs and the CLI.
+- **MOD-17** Errors are thrown as `BkError` subclasses with a stable code, an HTTP status and a safe message. The HTTP layer maps them to RFC 9457 problems, and jobs map them to retry or fail decisions. Unknown errors become 500 and are reported (OBS-06).
+
+### 7.5 Write path
+
+A write commits exactly once, in one transaction that also records the audit entry and the outbox rows. Everything that talks to the outside world runs after the commit, so a failed side effect never corrupts data and a rolled-back write never sends an email.
+
+Writes commit once, and every side effect runs after the commit.
+
+- In the request: HTTP request (pipeline stages 1 to 8), then service (business rules), then transaction (data, audit, outbox), then commit (cache purge, response).
+- After commit, in the worker role: outbox dispatcher (batches, versioned), then subscribers and jobs (idempotent, retried), then side effects (realtime events, webhooks, search index, mail).
+
+The request only waits for the transaction and the cache purge. Realtime events, webhooks, search indexing and mail follow from the outbox within moments.
+
+- **WP-01** Code never calls external systems (mail, webhooks, payment, search engines) inside a transaction. `bieberkit check` reports calls to `http.fetch`, `mail.send` or queue dispatch made outside the outbox inside a service transaction.
+- **WP-02** A side effect that must happen exactly once (charging a card) uses an idempotency key stored with the outbox row and passed to the external system.
+
+## 8. Configuration and environment
+
+All runtime configuration comes from environment variables, validated once at boot against a merged schema. The process exits with a clear error if a required key is missing or invalid.
+
+### 8.1 Rules
+
+- **CFG-01** Core and each plugin declare their keys with `defineEnv`, including type, default, description and whether the value is secret.
+- **CFG-02** Code MUST read configuration through the typed `config` object. Direct `process.env` access outside `bieberkit.config.ts` is reported by `bieberkit check`.
+- **CFG-03** Real environment variables take precedence over the `.env` file. Node.js loads `.env` natively, so no dotenv dependency is used.
+- **CFG-04** In production, `.env` files are optional. Containers SHOULD receive configuration from the orchestrator or a secret manager.
+- **CFG-05** Secret values are redacted in logs, error reports and `bieberkit env:check` output.
+- **CFG-06** `.env.example` is generated from the schema and never edited by hand.
+- **CFG-07** Boot fails in production when unsafe settings are detected, such as `STORAGE_DISK=local` without APP\_SINGLE\_NODE=true, `APP_KEY` shorter than 32 bytes, a `sync` queue driver, or a `memory` or `file` cache driver without `APP_SINGLE_NODE=true`.
+
+### 8.2 Core keys
+
+| Key | Values | Default | Notes |
+| --- | --- | --- | --- |
+| `APP_NAME` | string | project name |  |
+| `APP_ENV` | `development`, `test`, `production` | `development` |  |
+| `APP_URL` | URL | `http://localhost:3000` | Used for links, CORS and cookies |
+| `APP_PORT` | integer | `3000` |  |
+| `APP_KEY` | 32+ random bytes, base64 | generated | Secret. Encryption and signing. Rotation supported through `APP_KEY_PREVIOUS` |
+| `AUTH_SECRET` | 32+ random bytes | generated | Secret. Session signing |
+| `LOG_LEVEL` | `fatal` to `trace` | `info` |  |
+| `TRUST_PROXY` | boolean or hop count | `false` | Required behind a load balancer |
+| `DB_CONNECTION` | `postgres`, `mysql`, `sqlite` | from scaffolder |  |
+| `DATABASE_URL` | connection URL | from scaffolder | Secret |
+| `DATABASE_READ_URLS` | comma-separated URLs | empty | Read replicas |
+| `DB_POOL_MAX` | integer | `10` | Per process |
+| `REDIS_URL` | URL | empty | Valkey or Redis. Secret |
+| `QUEUE_DRIVER` | `sync`, `database`, `redis` | `sync` |  |
+| `CACHE_DRIVER` | `memory`, `file`, `database`, `redis` | `file` |  |
+| `CACHE_PREFIX` | string | `APP_NAME` | Isolates apps that share one Valkey |
+| `STORAGE_DISK` | `local`, `s3` | `local` |  |
+| `STORAGE_LOCAL_ROOT` | path | `./storage` |  |
+| `S3_BUCKET`, `S3_REGION`, `S3_ENDPOINT` | strings | empty | `S3_ENDPOINT` for R2 and MinIO |
+| `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | strings | empty | Secrets |
+| `S3_FORCE_PATH_STYLE` | boolean | `false` | MinIO |
+| `MAIL_DRIVER` | `log`, `smtp` | `log` |  |
+| `SMTP_URL` | URL | empty | Secret |
+| `MAIL_FROM` | address | empty |  |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | URL | empty | Tracing is off when empty |
+| `METRICS_PORT` | integer | `9464` | Prometheus endpoint on a separate port |
+| APP\_KEY\_PREVIOUS | base64 | empty | Secret. Previous key, still accepted for decryption during rotation |
+| APP\_SINGLE\_NODE | boolean | false | Declares a one-server deployment, which allows local storage and file cache in production |
+| API\_DOCS\_PUBLIC | boolean | false | Serves openapi.json publicly in production (API-06) |
+| SITE\_URL, SITE\_API\_URL | URLs | empty | Public site address and the internal API address it calls |
+| SITE\_SERVICE\_TOKEN, SITE\_REVALIDATE\_SECRET | 32+ random bytes | generated | Secrets. Site to API authentication (API-12) and cache purge calls |
+| CACHE\_REDIS\_URL | URL | REDIS\_URL in development only | Secret. Separate Valkey instance with allkeys-lru for cache. REDIS\_URL keeps noeviction for queue, sessions, locks and rate limits |
+| MIGRATE\_DATABASE\_URL | connection URL | DATABASE\_URL in development only | Secret. Schema-owning role used only by the migrate role (DATA-25) |
+
+Plugins add their own keys with a prefix equal to the plugin name, for example `SEO_SITEMAP_CRON`.
+
+### 8.3 Project configuration
+
+`bieberkit.config.ts` holds everything about a project that is not a secret and does not change between environments.
+
+```ts
+import { defineConfig } from '@bieberkit/core'
+
+export default defineConfig({
+  name: 'example-project',
+  author: 'Nguyen Van A <a@example.com>',
+  license: 'UNLICENSED',
+  database: { dialect: 'postgres' },
+  tenancy: { mode: 'single' },
+  locales: { default: 'vi', supported: ['vi', 'en', 'zh'] },
+  plugins: [
+    '@bieberkit/plugin-users',
+    '@bieberkit/plugin-roles',
+    '@bieberkit/plugin-media',
+    ['@bieberkit/plugin-seo', { sitemap: true }],
+  ],
+  admin: { path: '/admin', adapter: '@bieberkit/admin-antd' },
+  site: { enabled: true, theme: '@bieberkit/theme-default' },
+  theme: { colors: { primary: '#2563EB' }, radius: 8, font: 'system' },
+})
+```
+
+- **CFG-08** The config file never holds secrets or environment-specific values. Those come only from environment variables.
+- **CFG-09** The config is validated by a schema at build and at boot, with the same error format as env validation.
+- **CFG-10** Project modules are discovered by convention from `apps/server/src/modules/*/module.ts`. Plugins are listed explicitly, because their order and options matter.
+- **CFG-11** `tenancy.mode` is `single` (no `tenant_id` columns) or `shared-schema` (section 9.4). The `saas` template starts in `shared-schema`, the others in `single`. Switching later needs a generated migration.
+
+## 9. Data layer
+
+BieberKit uses MikroORM 7 because one `defineEntity` definition works on PostgreSQL, MySQL and SQLite without decorators. Drizzle was rejected for this reason: it has no shared table type, so every plugin would need three schemas.
+
+### 9.1 Dialect support tiers
+
+| Dialect | Tier | Intended use | CI coverage |
+| --- | --- | --- | --- |
+| PostgreSQL 15+ | 1 | Production, multi-tenant SaaS | Full suite |
+| MySQL 8.4 LTS+ | 1 | Production, common shared hosting in Vietnam | Full suite |
+| SQLite 3 | 2 | Development, demos, single-server small apps | Full suite, no load tests |
+
+### 9.2 Rules
+
+- **DATA-01** Core and first-party plugins MUST NOT depend on dialect-only features (JSONB operators, arrays, full-text syntax). Such features go behind a driver, for example a search plugin.
+- **DATA-02** Each plugin declares `dialects` in its manifest. The CLI refuses to install a plugin on an unsupported dialect.
+- **DATA-03** Primary keys are UUIDv7 by default: unique across nodes and roughly time-ordered for index locality.
+- **DATA-04** Timestamps are stored in UTC. Conversion to the user's time zone happens at the edge.
+- **DATA-05** Every request and every job runs in its own MikroORM request context (unit of work).
+- **DATA-06** List queries MUST be paginated. The maximum page size is 100.
+- **DATA-07** Fields used in filters or sorting MUST declare an index. `bieberkit check` reports missing ones.
+
+### 9.3 Migrations
+
+- Project modules: `bieberkit migrate:make` diffs project entities against a committed schema snapshot (`migrations/.snapshot-<dialect>.json`), never against a live database, so the output is the same on every machine.
+- **DATA-24** Plugins own their migrations: ordered, versioned steps written with a portable schema builder plus data steps, keyed by plugin version and recorded in a `bieberkit_plugin_migrations` table. `bieberkit add` and `bieberkit upgrade` run each plugin's pending steps in version order, so a rename or a split moves data before anything is dropped.
+- **DATA-08** Schema changes follow expand, migrate, contract. Old and new versions run side by side during a rolling deploy, so a column is added first, filled, and only removed or constrained in a later release. A plugin MUST NOT ship an expand and its contract in the same minor release, and the migrate role refuses a contract step whose expand step was applied in the same deploy, so skipping several versions can never merge them. `bieberkit check` flags destructive statements (drop, rename, type narrowing, new non-null column without default).
+- Migrations run only in the `migrate` role, once per deploy, never at web start, using `MIGRATE_DATABASE_URL` (DATA-25).
+
+### 9.4 Multi-tenancy
+
+- Model: shared schema, one `tenant_id` column on every tenant-scoped table (`tenant: true` in `defineEntity`).
+- **DATA-09** Tenant isolation is enforced by a MikroORM global filter that is on by default and cannot be disabled inside request handlers. Disabling it requires the explicit `asSystem()` scope, which is audit-logged.
+- On PostgreSQL, row-level security MAY be enabled as a second layer. Tenant context is then set per transaction with `set_config('app.tenant_id', $1, true)`, tables use `FORCE ROW LEVEL SECURITY`, and the application role has no `BYPASSRLS`.
+- Schema-per-tenant and database-per-tenant are out of scope for version 1.
+
+### 9.5 Connections
+
+- Pool size per process comes from `DB_POOL_MAX`. Replicas times the total pool size per process (Better Auth shares the ORM pool, AUTH-09) MUST stay below the database connection limit.
+- PostgreSQL deployments with many replicas SHOULD put PgBouncer in transaction mode in front. MySQL deployments MAY use ProxySQL.
+- Read replicas from `DATABASE_READ_URLS` serve queries marked read-only, such as reports and large lists.
+
+### 9.6 Read performance
+
+- **DATA-10** List, export and report endpoints use read-only queries: no identity map tracking, only the requested or listed fields selected, relations loaded in one batched query per relation.
+- **DATA-11** Large tables use keyset (cursor) pagination on an indexed, unique sort. `meta.total` is computed only when the client asks with `withTotal=true`, because exact counts are expensive on big tables.
+- **DATA-12** Hot read paths MAY use the Kysely query builder that MikroORM 7 exposes, with the same tenant filter and permission conditions applied by BieberKit.
+- **DATA-13** Query results MAY be cached with `cache.tags()`. Cache keys include a generation number per tag that is bumped right after commit, so an entry written by a racing read before the bump is never served afterwards. First-level memory caches use a short TTL (default 5 s) because the bus that clears them on other replicas is asynchronous. A user's reads go to the primary database for 5 s after their own write. A failed purge is logged as a warning and never turns a committed write into an error.
+
+### 9.7 Keys, uniqueness and translations
+
+- **DATA-14** UUIDv7 keys are stored as native `uuid` on PostgreSQL, `BINARY(16)` on MySQL and `BLOB` on SQLite, and always appear as strings in the API.
+- **DATA-15** On tenant-scoped entities, every unique constraint includes `tenant_id` automatically, so two tenants can use the same customer code.
+- **DATA-16** On soft-deleted entities, unique indexes include a `deleted_token` column that is empty for live rows and unique for deleted ones. A deleted record therefore never blocks reuse of its code, on all three dialects.
+- **DATA-17** Fields marked `.localized()` keep translations in a per-entity translation table, which works the same on all dialects. The API takes `?locale=` and falls back to the default locale. Slugs and SEO fields are localized (SEO-02, SEO-03).
+
+* **DATA-18** Standard columns have fixed names and are added by entity options, never by hand: `id`, `tenant_id`, `version`, `created_at`, `updated_at`, `created_by`, `updated_by`, `deleted_at`, `deleted_token`. Plugins and generic features (audit, timeline, sync) rely on these names.
+* **DATA-19** The current tenant is resolved once per request: from the X-Tenant header (or a /t/:tenant URL segment) checked against the user's memberships for admin and API calls, from the API key for machine clients, and from the domain mapping for public site calls. It never comes from mutable session state, so two tabs open on two tenants can never cross. A request with no resolvable tenant on a tenant-scoped route is rejected with 400.
+* **DATA-20** Every write checks that each referenced id (relations, `owner`, `customerId` and so on) is visible under the current tenant filter and the user's CASL read rules. On PostgreSQL and MySQL, relations between tenant-scoped entities also use composite `(tenant_id, id)` foreign keys, so the database rejects a cross-tenant reference even if application code is wrong. The generated tenant tests cover both the two-tab case and the foreign-id case.
+
+- **DATA-21** Every text field declares its comparison semantics: `exact` (default), `ci` (case-insensitive) or `ci_ai` (case- and accent-insensitive). The compiler emits explicit collations or normalized shadow columns per dialect, so "Lê" and "Le" or "LE01" and "le01" behave the same on PostgreSQL, MySQL and SQLite. Contract tests run Vietnamese fixtures on all three.
+- **DATA-22** Money and decimals are stored as scaled integers (MOD-11), never as floating point. This matters on SQLite, which stores DECIMAL values with fractions as REAL.
+- **DATA-23** SQLite runs in WAL mode with a busy timeout and starts write transactions with `BEGIN IMMEDIATE`, so web, worker and scheduler processes can share one file.
+- **DATA-25** Two database roles: `MIGRATE_DATABASE_URL` owns the schema and runs DDL, `DATABASE_URL` is the application role with no DDL rights. On PostgreSQL and MySQL the application role has only INSERT and SELECT on `audit_log`, which makes the audit log append-only in fact. On SQLite, triggers enforce the same rule.
+
+## 10. Entities and modules
+
+An entity is declared once with `defineEntity`, and BieberKit derives everything else from it. A module groups entities with the services, routes, jobs and events that belong to them.
+
+### 10.1 Defining an entity
+
+```ts
+import { defineEntity, f } from '@bieberkit/data'
+import { User } from '@bieberkit/plugin-users'
+
+export const Customer = defineEntity({
+  name: 'crm.Customer',
+  table: 'crm_customers',
+  tenant: true,
+  softDelete: true,
+  fields: {
+    id: f.id(),
+    code: f.string({ max: 32 }).unique(),
+    name: f.string({ max: 200 }).searchable().index(),
+    email: f.email().optional(),
+    tier: f.oneOf(['standard', 'gold', 'vip']).default('standard').index(),
+    owner: f.belongsTo(() => User),
+    createdAt: f.createdAt(),
+    updatedAt: f.updatedAt(),
+  },
+  permissions: {
+    read: 'crm.customer.read',
+    create: 'crm.customer.create',
+    update: 'crm.customer.update',
+    delete: 'crm.customer.delete',
+    fields: { email: { read: 'crm.customer.read-pii' } },
+  },
+  api: { list: true, get: true, create: true, update: true, delete: true },
+  admin: { title: 'name', list: ['code', 'name', 'tier', 'owner'], icon: 'users' },
+  label: { en: 'Customer', vi: 'Khách hàng', zh: '客户' },
+})
+```
+
+`f.oneOf` produces a string union type. TypeScript enums are not used anywhere (P3).
+
+### 10.2 What is derived
+
+| Artifact | Derived from | Consumer |
+| --- | --- | --- |
+| MikroORM entity schema | `fields`, `table`, `tenant`, `softDelete` | Data layer, migrations |
+| Zod schemas for create, update and read | `fields` | HTTP validation, client |
+| REST routes | `api` | HTTP layer |
+| OpenAPI 3.1 components and paths | Zod schemas, routes | Docs, client generator |
+| CASL subject, actions and field masks | `permissions` | Authorization |
+| Admin list, form and detail metadata | `admin`, `fields`, `label` | Admin UI |
+| Test factories | `fields` | `@bieberkit/testing` |
+| Generated permission tests | `permissions`, `api` | CI |
+
+### 10.3 Modules
+
+```ts
+import { defineModule } from '@bieberkit/core'
+
+export default defineModule({
+  name: 'crm',
+  entities: [Customer, Deal],
+  services: { pipeline: PipelineService },
+  routes: [dealRoutes],
+  events: { 'crm.deal.won': DealWon },
+  jobs: [syncCustomerStats],
+  schedules: [{ job: syncCustomerStats, cron: '0 2 * * *' }],
+  workflows: [closeDealWorkflow],
+})
+```
+
+- **MOD-01** A module owns its tables. Other modules read them only through its published services or declared entity links.
+- **MOD-02** Services are registered in the container and resolved by name, with full type inference and no decorators.
+- **MOD-03** Cross-module side effects use events. Events that must survive a crash are written to an outbox table in the same transaction and dispatched by the worker role.
+- **MOD-04** Multi-step operations that touch several modules or external systems are workflows. Each step declares a compensation that runs when a later step fails.
+- **MOD-05** Lifecycle hooks (`beforeCreate`, `afterUpdate` and so on) are limited to the entity's own module. Other modules subscribe to events instead.
+
+* **MOD-18** Outbox delivery is at least once with no ordering guarantee, because open-source BullMQ has no per-group ordering. Every event carries the record version, and subscribers ignore an event older than what they already applied. Processed event ids are recorded per subscriber so a redelivered event is skipped. The dispatcher claims rows with SKIP LOCKED in batches of 100 (one dispatcher on SQLite), wakes on LISTEN/NOTIFY on PostgreSQL and polls every second otherwise, deletes delivered rows and processed ids after 7 days, and exports dispatch lag as a metric.
+
+### 10.4 Actions and state machines
+
+Management apps revolve around records that move through states (draft, submitted, approved) and buttons that do more than save. Both are first-class so they get permissions, audit, API and admin UI for free.
+
+```ts
+export const PurchaseOrder = defineEntity({
+  name: 'purchasing.PurchaseOrder',
+  fields: {
+    status: f.state({
+      initial: 'draft',
+      transitions: {
+        submit:  { from: ['draft'], to: 'submitted', permission: 'purchasing.po.submit' },
+        approve: { from: ['submitted'], to: 'approved', permission: 'purchasing.po.approve' },
+        reject:  { from: ['submitted'], to: 'draft', permission: 'purchasing.po.approve', input: z.object({ reason: z.string().min(3) }) },
+      },
+    }),
+    total: f.decimal({ precision: 14, scale: 2 }).computed((po) => sum(po.lines, 'amount')),
+    lines: f.hasMany(() => PurchaseOrderLine).inline(),
+  },
+  actions: {
+    duplicate: { permission: 'purchasing.po.create', handle: duplicatePurchaseOrder },
+  },
+})
+```
+
+- **MOD-06** Each transition and action becomes `POST /api/v1/<module>/<resource>/:id/actions/<name>`, a button in the admin UI shown only to users with its permission, an audit log entry, and an event such as `purchasing.po.approved`.
+- **MOD-07** Transitions are validated on the server. A record can only change state through its declared transitions, never through a plain update.
+- **MOD-08** Computed fields are calculated on save and stored when `stored: true`, so they can be filtered and sorted. Otherwise they are calculated on read.
+- **MOD-09** `.inline()` child collections are edited inside the parent form and saved in the parent's transaction.
+- **MOD-10** Runtime custom fields (fields added by administrators without code) are provided by an optional `custom-fields` plugin that stores values in a JSON column validated by a runtime schema. Filtering on them is limited to equality.
+
+### 10.5 Domain helpers
+
+- **MOD-11** Money uses `f.money({ currency })`: stored as an integer in the currency's minor unit plus a currency code, never as a float. Rounding follows the currency's minor unit (0 decimals for VND, 2 for USD) and is applied once, on save.
+- **MOD-12** Document numbers (for example `PO-2026-00042`) come from `f.sequence({ pattern, resetEvery })`. Numbers are allocated per tenant inside the saving transaction, so they are unique and gap-free even with many concurrent writers.
+- **MOD-13** Any entity can enable shared record features with `features: ['attachments', 'comments', 'timeline', 'tags']`. They are stored once in generic tables, carry the record's permissions, and appear as tabs in the admin detail screen.
+- **MOD-14** Printable documents (invoices, purchase orders, delivery notes) are React templates rendered to PDF in the worker role (Q-09). Each template declares the entity it prints and the permission needed.
+
+### 10.6 Schema pipeline
+
+The field DSL (`f.*`) is the single source of truth, and it belongs to BieberKit, not to any library. At build and boot it compiles into every format the stack needs, so nothing is written twice and entity definitions never depend on a library's own API (P12).
+
+| Output | Used by | Why this format |
+| --- | --- | --- |
+| MikroORM entity metadata | Data layer, migrations | Portable across the three dialects |
+| JSON Schema 2020-12 | Ajv request validation, fast-json-stringify responses, OpenAPI 3.1 | Fastest validation and serialization path in Fastify, and the native schema language of OpenAPI |
+| Zod 4 Mini schemas | Admin forms, site forms, generated client | Small, tree-shakable client bundles with the same rules as the server |
+| TypeScript types | Services, client, tests | End-to-end type safety without hand-written interfaces |
+| CASL subjects and field masks | Authorization | Permissions follow the same field names |
+
+- **SCH-01** Custom routes and jobs MAY use any Standard Schema library, Zod 4 by default. Their schemas are converted to JSON Schema for OpenAPI and serialization. Rules that JSON Schema cannot express (custom refinements) run as a second validation step.
+- **SCH-02** Changing the ORM, the validator or the client generator changes only the compiler targets, never entity definitions.
+
+* **SCH-03** The DSL defines one meaning for every rule, and both validators are generated to match it. String lengths count Unicode code points, so a Vietnamese or emoji-containing value gets the same answer on server and client. Shared fixtures run through Ajv and Zod Mini in the generated contract tests, and any disagreement fails CI.
+* **SCH-04** Entity, client and permission types are generated into `.bieberkit/types/` by `bieberkit dev` and `bieberkit build`, instead of being inferred through deep generic types. This keeps type checking and editor feedback fast as projects grow to hundreds of entities.
+
+- **SCH-05** Every string input is normalized to Unicode NFC at the validation boundary, so Vietnamese typed in decomposed form (NFD, common on macOS and some input methods) gets the same length, uniqueness and slug as composed text.
+- **SCH-06** Ajv validators and fast-json-stringify serializers are emitted as standalone modules at build. The web role loads them instead of compiling thousands of schemas at boot, which protects the cold start target.
+
+### 10.7 Workflows
+
+- **WF-01** A workflow is a list of named steps declared with `defineWorkflow`, each with `run` and `compensate`. Workflows run in the worker role.
+- **WF-02** Workflow state (current step, input, outputs of finished steps) is saved to the database after every step, so a crash resumes from the last finished step instead of starting over.
+- **WF-03** Steps are idempotent and retried with backoff. When a step fails for good, the compensations of finished steps run in reverse order, and the workflow ends as `compensated`, or as `failed` for manual review.
+- **WF-04** A workflow MAY wait for an event or a timer (payment confirmed, three days passed) without holding a worker.
+- **WF-05** Human approvals are entity state transitions (section 10.4). A workflow waits for the transition event, so approval rules never hide inside workflow code.
+- **WF-06** Running, waiting and failed workflows are visible in the admin UI with retry and cancel actions.
+
+## 11. Plugin system
+
+A plugin is a module packaged for reuse, with a manifest that the CLI and the kernel can read without running its code. Plugins are npm packages, installed and upgraded like any dependency.
+
+### 11.1 Manifest
+
+```ts
+import { definePlugin, env } from '@bieberkit/core'
+import { f } from '@bieberkit/data'
+
+export default definePlugin({
+  name: '@bieberkit/plugin-seo',
+  version: '1.0.0',
+  core: '^1.0.0',
+  requires: { '@bieberkit/plugin-pages': '^1.0.0' },
+  dialects: ['postgres', 'mysql', 'sqlite'],
+  env: { SEO_SITEMAP_CRON: env.string().default('0 3 * * *') },
+  entities: [SeoMeta],
+  extends: { 'pages.Page': { fields: { seo: f.hasOne(() => SeoMeta) } } },
+  permissions: ['seo.read', 'seo.manage'],
+  jobs: [generateSitemap],
+  schedules: [{ job: generateSitemap, cron: 'SEO_SITEMAP_CRON' }],
+  admin: { menu: [{ label: 'SEO', path: '/seo', permission: 'seo.read' }] },
+  seed: seedDefaults,
+})
+```
+
+| Field | Required | Meaning |
+| --- | --- | --- |
+| `name`, `version` | yes | npm name and version |
+| `core` | yes | Supported `@bieberkit/core` range |
+| `requires` | no | Other plugins and their version ranges |
+| `conflicts` | no | Plugins that cannot be installed together with this one |
+| `dialects` | yes | Supported database dialects |
+| `env` | no | Environment keys, prefixed with the plugin name |
+| `entities`, `extends` | no | Own entities and declared extensions of other plugins' entities |
+| `permissions` | no | Permission strings, prefixed with the plugin name |
+| `routes`, `jobs`, `schedules`, `events`, `workflows` | no | Runtime contributions |
+| `admin` | no | Menu items, pages, field panels, dashboard widgets |
+| `seed` | no | Idempotent seed function |
+
+### 11.2 Resolution
+
+1. Collect manifests of all plugins listed in `bieberkit.config.ts`.
+2. Check `core` ranges, `requires`, `conflicts` and `dialects`.
+3. Sort topologically. A cycle is an error.
+4. Detect collisions in table names, route paths, permission strings, env keys and admin paths.
+5. Boot plugins in dependency order. Shut them down in reverse order.
+
+The same resolver runs in the scaffolder, in `bieberkit add`, and at kernel boot, so a project that boots is a project that resolves.
+
+### 11.3 Extension points
+
+| Extension point | Mechanism |
+| --- | --- |
+| Add fields or relations to another plugin's entity | `extends`, stored in an extension table owned by the extending plugin, joined automatically, and exposed in the target's API and admin form |
+| React to something that happened | Event subscription, optionally through the outbox |
+| Call another plugin's logic | Published service from the container |
+| Add admin screens | `admin.menu`, `admin.pages`, `admin.fieldPanels` |
+| Add background work | `jobs`, `schedules` |
+| Change HTTP behavior | Fastify plugin scoped to the plugin's own routes |
+
+### 11.4 Rules
+
+- **PLG-01** A plugin MUST NOT import files from another plugin except through that plugin's public entry point. `bieberkit check` enforces this.
+- **PLG-02** A plugin MUST NOT query another plugin's tables directly.
+- **PLG-03** `bieberkit remove` lists the data the plugin owns and asks before generating a migration that drops it.
+- **PLG-04** Plugins run in-process with full trust. There is no sandbox, so projects SHOULD install only first-party or reviewed plugins. This is documented on the plugin page.
+- **PLG-05** First-party plugins are named `@bieberkit/plugin-<name>`. Community plugins SHOULD be named `bieberkit-plugin-<name>`.
+
+* **PLG-07** Each plugin publishes a static manifest in the `bieberkit` field of its `package.json`: core range, requires, conflicts, dialects, env keys, tables, route prefixes and permissions. It is generated from `definePlugin` at plugin build and checked against it in CI. The scaffolder reads first-party manifests bundled in `create-bieberkit`, so it can resolve the graph before anything is installed. Route collisions are checked again at kernel boot.
+
+- **PLG-06** Fields a plugin adds to another plugin's entity live in the extending plugin's own 1:1 extension table, never as columns in the target table. Ownership stays clear (MOD-01), the target plugin can upgrade its schema freely, and removing the extending plugin drops only its own table.
+
+## 12. Starter templates
+
+A template is a preset of plugins, configuration and seed data. After creation the project owns its configuration, and plugins keep upgrading as dependencies.
+
+| Template | Plugins on top of `blank` | Seeded with |
+| --- | --- | --- |
+| `blank` | users, roles, auth-ui, settings, audit-log, notifications, media | Administrator account, base roles |
+| `cms` | pages, posts, categories, tags, menus, seo, theme, redirects | Home page, sample post, main menu |
+| `crm` | contacts, companies, deals, pipelines, activities, tasks, imports | Default pipeline and stages |
+| `saas` | tenants, teams, invitations, plans, subscriptions, api-keys, usage | Demo tenant and plans |
+
+- The `blank` plugins form the shared base that every management app needs, so they are built and hardened first.
+- Billing in `saas` ships with a payment driver contract and a manual-invoice driver. Payment providers are separate plugins.
+- A template is a file `template.ts` in `templates/<name>/` that lists plugins, config defaults, seeders and the admin menu order. Adding a template needs no change to the scaffolder.
+
+The `cms` template includes the server-rendered public site (section 16.2) by default. Other templates add it with `--site`.
+
+## 13. HTTP API
+
+The API is REST over JSON on Fastify 5, described by an OpenAPI 3.1 document generated at build time. Entity routes are generated from `api` settings, and custom routes use the same validation and permission helpers.
+
+### 13.1 Conventions
+
+| Concern | Convention |
+| --- | --- |
+| Base path | `/api/v1/<module>/<resource>`, for example `/api/v1/crm/customers` |
+| Versioning | Major version in the path. Breaking changes need a new major path, old one kept for one framework major |
+| List | `GET` with `page` and `pageSize` (default 25, max 100), or `cursor` for large tables |
+| Sorting | `sort=-createdAt,name` |
+| Filtering | `filter[tier][eq]=gold`, `filter[createdAt][gte]=2026-01-01`. Operators: `eq`, `ne`, `in`, `lt`, `lte`, `gt`, `gte`, `null`. Only fields declared `filterable()` or `sortable()` are accepted, and both imply an index (DATA-07). Text search uses `q=` and the search contract (section 15.7) |
+| Relations and fields | `include=owner`, `fields=code,name` |
+| Success body | `{ "data": ..., "meta": { "page", "pageSize" } }`, plus `total` only when `withTotal=true` (DATA-11) and `nextCursor` for cursor lists |
+| Errors | RFC 9457 `application/problem+json` with `type`, `title`, `status`, `detail`, a stable `code` and `traceId` |
+| Validation errors | Problem with `errors: [{ path, code, message }]` |
+| Idempotency | `Idempotency-Key` header honored on `POST` for routes that declare `idempotent: true` |
+| Dates | ISO 8601 in UTC |
+| Naming | camelCase in JSON, snake\_case in the database |
+
+### 13.2 Requirements
+
+- **API-01** Every route declares input schemas (params, query, body) and a response schema. Responses are serialized through the schema, so fields not in it never leak.
+- **API-02** Every route declares a permission or is explicitly marked `public: true`. `bieberkit check` fails on routes with neither.
+- **API-03** Request body limit defaults to 1 MB. Uploads go directly to storage through signed URLs (section 15).
+- **API-04** Every response carries `x-request-id`. Incoming trace context headers are honored.
+- **API-05** Server timeouts: 30 s request timeout, keep-alive timeout above the load balancer idle timeout.
+- **API-06** `openapi.json` is served in development. In production it is served only when `API_DOCS_PUBLIC=true` or to users with the `system.api-docs` permission.
+- **API-07** The project client package is regenerated from `openapi.json` on every `bieberkit build`, and CI fails when the committed client is out of date.
+
+### 13.3 HTTP caching and composition
+
+- **API-08** `GET` responses carry an `ETag`. Conditional requests with `If-None-Match` return 304 without a body.
+- **API-09** Endpoints marked `public: true` and `cacheable` send `Cache-Control` with `s-maxage` and `stale-while-revalidate`, and cache tags for purging.
+- **API-10** Site composition endpoints (`/api/v1/site/pages/:slug`, `/api/v1/site/layout`) return everything one page needs in a single call: content, menus, SEO fields, related items. They are cached by tag and purged on publish, so a server-rendered page normally costs one cached API call. They serve public content only. Anything personal to a signed-in visitor comes from separate endpoints that are never cached publicly.
+- **API-11** HTTP/2 or HTTP/3 and compression are terminated at the load balancer, not in Node.js.
+
+* **API-12** Calls from the site server carry a service token (`SITE_SERVICE_TOKEN`) and forward the visitor's IP address and session cookie. The API rate-limits by the forwarded IP, and relaxes the Fetch Metadata CSRF check only for requests with a valid service token arriving from the internal network.
+
+- **API-13** Optimistic concurrency: every entity has a `version` column. Updates and transitions MUST send `If-Match` with the ETag or `version` they read, and a stale write returns 412 with the current record, so two editors never silently overwrite each other.
+- **API-14** Bulk endpoints (`POST /<resource>/bulk` for update, delete and transitions) accept up to 500 ids, check permissions and conditions per row, run in one transaction for 100 rows or fewer and as a queued job above that, and report per-row results.
+- **API-15** An aggregate endpoint (`GET /<resource>/aggregate?groupBy=&sum=&count=`) serves dashboards. It applies the same tenant filter, permission conditions and field masks as lists, and only allows fields declared `aggregatable()`.
+- **API-16** Deprecated endpoints and fields send `Deprecation` and `Sunset` headers and are listed in the OpenAPI document.
+
+* **API-17** Bulk payloads carry the `version` of each row (API-13), and rows with a stale version are reported as conflicts. Imports declare their conflict policy explicitly: skip, overwrite or fail.
+
+### 13.4 Request pipeline
+
+Every request passes the same stages in the same order. Core implements them as Fastify hooks, so no route can skip a security step.
+
+1. Request id, trace context and request timeout start.
+2. Client IP resolution through `TRUST_PROXY`, or from the site service token (API-12), followed by a coarse per-IP rate limit generous enough for many users behind one carrier-grade NAT address.
+3. Authentication by session cookie or API key.
+4. Per-user and per-API-key rate limits. Login endpoints apply their per-account limit right after body parsing.
+5. Tenant resolution (DATA-19).
+6. CSRF check for cookie-authenticated unsafe methods (SEC-03).
+7. Body parsing within the size limit, then schema validation by Ajv.
+8. Authorization: the route permission first, then the CASL ability for the subject and its conditions.
+9. The handler calls a service inside a request-scoped unit of work (MOD-16). Data, audit entries and outbox rows are written in one transaction, which commits before the response is built.
+10. Response serialization through the schema, with field masks applied (API-01, AUTHZ-03).
+11. ETag and cache headers (API-08, API-09).
+12. Logs and metrics are emitted when the response finishes. Side effects run later from the outbox (section 7.5).
+
+- **REQ-01** Plugins add hooks only at named stages (`afterAuth`, `beforeHandler`, `afterHandler`, `onResponse`). They cannot reorder or remove core stages.
+- **REQ-02** A failure at any stage stops the pipeline and returns an RFC 9457 problem. No later stage runs.
+
+### 13.5 Site composition
+
+- **COMP-01** Plugins register composition fragments with `site.fragment(name, loader)`: menus from `menus`, SEO fields from `seo`, page content from `pages`.
+- **COMP-02** A composition endpoint (API-10) runs only the fragments a route asks for, in parallel, each with its own cache tags.
+- **COMP-03** Fragments return public data only and declare their tags, so a publish event purges exactly the pages that used the changed data.
+
+## 14. Authentication and authorization
+
+Better Auth handles identity and sessions. CASL evaluates permissions per request. Roles are data, permissions are code.
+
+### 14.1 Authentication
+
+- **AUTH-01** Browser sessions are server-side, referenced by a `__Host-` cookie that is `HttpOnly`, `Secure` and `SameSite=Lax`. Tokens are never stored in `localStorage`.
+- **AUTH-02** Session storage uses the database by default and Valkey when `REDIS_URL` is set, so every web replica sees every session.
+- **AUTH-03** Supported methods: email and password, magic link, OAuth and OIDC providers, TOTP, passkeys. Organizations and teams through the Better Auth organization plugin in the `saas` template.
+- **AUTH-04** Passwords: minimum 8 characters, 15 or more recommended in the UI, no composition rules, optional breached-password check. This follows OWASP ASVS 5.0.
+- **AUTH-05** MFA is required for roles flagged `requireMfa`, which includes the built-in administrator role.
+- **AUTH-06** Login, OTP, magic-link and password-reset endpoints are rate limited per IP and per account.
+- **AUTH-07** Machine clients use API keys from the `api-keys` plugin. Keys are shown once, stored hashed, scoped to permissions, and expire.
+- **AUTH-08** Better Auth is pinned to 1.7.16 or later, and its security advisories are watched by a dedicated Renovate rule that skips the release-age delay.
+
+* **AUTH-09** Better Auth connects through a BieberKit adapter on top of MikroORM that joins the request's transaction, so signup writes its user, audit and outbox rows atomically (section 7.5). Its tables are part of the BieberKit schema and migrated as versioned steps of `@bieberkit/auth` (DATA-24), so auth and application data share one migration history. The Phase 0 spike confirms this works on all three dialects.
+
+- **AUTH-10** Better Auth is configured to fit the pipeline: client IP comes from the `TRUST_PROXY` resolution (never a raw `X-Forwarded-For`), rate-limit counters live in Valkey or the database (never per-process memory), tables and columns map to snake\_case, and user and organization ids use the DSL's UUID type so foreign keys from `created_by` match. A CI job compares Better Auth's expected schema with the BieberKit entities on every Better Auth upgrade and fails on drift. Better Auth's active organization is set per request from the resolved tenant (DATA-19) and never persisted in the session.
+
+### 14.2 Authorization model
+
+| Concept | Defined in | Example |
+| --- | --- | --- |
+| Permission | Code (entity, module, plugin) | `crm.customer.update` |
+| Role | Database, edited in the admin UI | `Sales manager` with a set of permissions |
+| Condition | Code, attached to a permission | Only rows where `ownerId = currentUser.id` |
+| Field mask | Entity `permissions.fields` | `email` readable only with `crm.customer.read-pii` |
+| Tenant scope | Global data filter | Rows of the current tenant only |
+
+- **AUTHZ-01** A CASL ability is built per request from the user's roles and cached for the request only.
+- **AUTHZ-02** CASL conditions are translated into MikroORM query conditions, so list endpoints return only permitted rows instead of filtering after loading. BieberKit owns this translator.
+- **AUTHZ-03** Field masks apply to both reads (fields removed from responses) and writes (fields rejected in input).
+- **AUTHZ-04** Default deny: a route without a matching permission returns 403.
+- **AUTHZ-05** Role and permission changes, impersonation, `asSystem()` calls and failed authorization attempts are written to the audit log.
+
+## 15. Queue, cache and storage services
+
+Application code depends only on contracts. `.env` picks the driver, so switching from local development to production changes configuration, never code.
+
+| Contract | Drivers | Library underneath | Production default |
+| --- | --- | --- | --- |
+| Queue | `sync`, `database`, `redis` | BullMQ for `redis`, BieberKit for `database` | `redis` |
+| Cache | `memory`, `file`, `database`, `redis` | BentoCache | `redis` |
+| Storage | `local`, `s3` (also R2, MinIO, GCS) | FlyDrive | `s3` |
+| Mail | `log`, `smtp` | Nodemailer-compatible transport | `smtp` |
+
+### 15.1 Queue
+
+```ts
+export const sendInvoice = defineJob({
+  name: 'billing.send-invoice',
+  queue: 'default',
+  input: z.object({ invoiceId: z.uuid() }),
+  retries: 5,
+  backoff: { type: 'exponential', delayMs: 2000 },
+  timeoutMs: 60_000,
+  handle: async ({ input, ctx }) => { /* ... */ },
+})
+
+await queue.dispatch(sendInvoice, { invoiceId })
+```
+
+- **Q-01** Delivery is at least once. Handlers MUST be idempotent, and the framework passes a stable `jobId` to help.
+- **Q-02** Job input is validated on dispatch and again on execution.
+- **Q-03** Named queues `critical`, `default` and `reports` exist by default, so long jobs never block urgent ones. Workers choose queues with `--queues`.
+- **Q-04** Failed jobs land in a dead-letter list visible in the admin UI, with retry and discard actions.
+- **Q-05** The `database` driver claims jobs with `SELECT ... FOR UPDATE SKIP LOCKED` on PostgreSQL and MySQL 8.4. On SQLite it uses a plain transaction, which is safe because SQLite has a single writer.
+- **Q-06** Jobs dispatched inside a database transaction are enqueued only after commit (outbox), so a rollback never leaves an orphan job.
+- **Q-07** Schedules run only in the `scheduler` role and take a distributed lock per tick, so a second scheduler cannot run the same tick twice.
+- **Q-08** Valkey or Redis used for queues MUST run with `maxmemory-policy noeviction`. `bieberkit doctor` checks it. Cache data lives on a separate instance (CACHE\_REDIS\_URL) with an eviction policy and a TTL on every key, because Valkey applies one memory policy per instance and a full cache must never block jobs, sessions or rate limits.
+
+* **Q-10** Every job carries the `tenantId` and the acting user or system actor of the code that dispatched it. Workers restore that context before running, so tenant filters, permission checks and audit entries behave exactly as in the original request.
+
+### 15.2 Cache
+
+- API: `get`, `set`, `remember(key, ttl, fn)`, `forget`, `tags([...]).flush()`, `lock(key, ttl)`.
+- **C-01** Keys are namespaced by `CACHE_PREFIX` and by tenant for tenant-scoped data.
+- **C-02** `memory` is per process. It is allowed in production only as a short-lived first level in front of `redis`, or as the only cache when APP\_SINGLE\_NODE=true (CFG-07).
+- **C-03** `remember` prevents stampedes with a lock, so one caller computes while others wait.
+
+### 15.3 Storage
+
+- API: `put`, `get`, `stream`, `exists`, `delete`, `copy`, `move`, `url`, `signedUrl`, `signedUploadUrl`.
+- **S-01** Browsers upload directly to the bucket through signed upload URLs. The API then confirms the upload and records it in the `media` plugin.
+- **S-02** Uploads are checked for size, MIME type by content sniffing, and an allowed extension list. A virus-scan hook MAY run as a job.
+- **S-03** Files are private by default. Public access is granted per file through `visibility: 'public'` or short-lived signed URLs.
+- **S-04** `local` is allowed in production only with `APP_SINGLE_NODE=true`.
+
+### 15.4 Mail
+
+- **M-01** Mail is sent through the queue by default, so a slow SMTP server never delays a request.
+- **M-02** Templates are React Email components with vi, en and zh variants. Block content renders into emails through the HTML serializer (CNT-05).
+
+### 15.5 CPU-heavy work
+
+- **Q-09** PDF rendering, spreadsheet import and export, and image transforms run in a `worker_threads` pool inside the worker role, so one heavy job never blocks the event loop of others.
+
+### 15.6 Realtime
+
+- **RT-01** The web role offers Server-Sent Events at `/api/v1/events`, filtered by the user's permissions and tenant.
+- **RT-02** Events fan out across replicas through Valkey pub/sub. Without Valkey, realtime is off and the admin UI falls back to polling.
+- **RT-03** The admin UI uses these events to refresh lists, show notifications and invalidate TanStack Query caches.
+
+* **RT-04** Event streams disable proxy buffering and send a heartbeat every 25 s so load balancers keep them open. HTTP/2 at the load balancer (API-11) avoids the browser limit of six HTTP/1.1 connections per origin.
+* **RT-05** On shutdown, open streams are closed with a retry hint right after step 1 of section 19.4, so clients reconnect to another replica instead of holding the old one until the timeout.
+
+### 15.7 Search
+
+- **SR-01** Search is a contract with a `database` driver by default (per-word prefix matching on a normalized copy of each searchable field: NFC, lowercase, Vietnamese diacritics removed, đ mapped to d. "nguyen lan" therefore finds "Nguyễn Thị Lan". Words are kept in a token table with a plain index, which works on every dialect. An optional pg\_trgm driver adds fuzzy matching on PostgreSQL).
+- **SR-02** Dedicated engines are plugins with their own drivers. Fields marked `searchable()` are indexed by a job on every write event.
+
+### 15.8 Webhooks and integrations
+
+- **WH-01** The `webhooks` plugin delivers selected events to external URLs, signed with HMAC-SHA256 and a timestamp, retried through the queue with exponential backoff, and logged per delivery.
+- **WH-02** Outbound webhook calls use the SSRF-guarded `http.fetch` helper (SEC-06).
+- **WH-03** Inbound integrations (ERP, payment, e-invoice providers) are plugins that verify signatures and enqueue work instead of processing inside the request.
+
+* **WH-04** `http.fetch` applies default timeouts (5 s to connect, 30 s in total), retries only idempotent requests, and opens a circuit breaker per host after repeated failures.
+
+### 15.9 Import and export
+
+- **IO-01** Any entity with `api.list` can be exported to CSV or XLSX, and any entity with `api.create` can be imported, with the same field masks and permissions as the API.
+- **IO-02** Imports run as queued jobs: upload, column mapping, a dry run that validates every row, then the real run. Progress streams to the admin UI (RT-01), and failed rows come back as a downloadable error file.
+- **IO-03** Imports match existing records by a declared natural key (for example `code`) to update instead of duplicate.
+- **IO-04** Exported spreadsheet cells that start with `=`, `+`, `-` or `@` are escaped to prevent formula injection.
+
+## 16. Admin UI and public site
+
+Projects have two user interfaces. The admin UI is a single-page app for signed-in staff. The public site is rendered on the server, so search engines and social previews receive complete HTML.
+
+### 16.1 Admin UI
+
+The admin UI is a React single-page app that renders most screens from entity metadata, so a new entity gets list, form and detail screens without frontend code. It calls the API like any other client, which keeps authentication and authorization in one place.
+
+- **UI-01** Stack: React 19.2 (19.2.4 or later), Vite 8, TanStack Router, Query, Table, Form and Virtual. No React Server Components. Visual components come through a UI adapter (UI-10), Ant Design 6 by default.
+- **UI-02** The shell loads `/api/v1/_meta`, which returns the entities, fields, permissions and menu entries the current user may see.
+- **UI-03** Generic screens: list (filters, sorting, saved views, bulk actions, export), form (validation from the same schemas as the API), detail (tabs for related records, activity, audit history).
+- **UI-04** Escape hatches: a field can use a custom widget, a screen can be replaced by a custom page, and plugins add pages and dashboard widgets.
+- **UI-05** Languages en, vi and zh are bundled. Dates, numbers and currency follow the user's locale. Vietnamese and Chinese labels come from the entity `label` and plugin translation files.
+- **UI-06** Theme tokens (colors, radius, font) are set in `bieberkit.config.ts`. The default font stack covers Latin, Vietnamese and Chinese scripts.
+- **UI-07** Accessibility target: WCAG 2.2 level AA for all generic screens.
+- **UI-08** Built assets are static files with content hashes, served from a CDN or from the web role.
+- **UI-09** Reusable blocks (dashboards, approval forms, import wizards) are installed from the registry as editable source.
+
+Admin architecture, forms and performance:
+
+- **UI-10** The admin is split in two packages. `@bieberkit/admin-core` holds no visual components: metadata loading, routing, permissions, list and form state on TanStack Table and Form, data hooks, realtime. `@bieberkit/admin-antd` is the default adapter that renders it with Ant Design 6. The adapter contract is public, so other adapters (shadcn/ui, MUI) can be built without forking the core. Only the Ant Design adapter is maintained by the project.
+- **UI-11** Form metadata supports repeatable groups and inline child tables, fields shown or required by condition (`visibleWhen`, `requiredWhen`), computed read-only fields, file and image fields with direct upload, relation pickers with server search, and the block content editor (section 16.5).
+- **UI-12** Every route and every screen of a plugin is a lazy chunk. Translations load per language and per module. Lists over 200 rows render with TanStack Virtual.
+- **UI-13** Data hooks prefetch on link hover, update optimistically for state transitions and inline edits, and invalidate caches from realtime events (RT-03).
+- **UI-14** The admin is served under `/admin/` on the same origin as the API, as static files from the web role or a CDN, with its own strict Content-Security-Policy.
+- **UI-15** Generic screens never fetch more than the listed fields (`fields=` from metadata), so wide entities stay fast in lists.
+
+* **UI-16** Generic list, detail and form screens work down to a 360 px wide screen, so staff can use the admin on phones and tablets in the field. Wide tables switch to a card layout on small screens.
+* **UI-17** Forms warn before leaving with unsaved changes, keep a local draft of long forms, and support keyboard shortcuts for save, new and search.
+* **UI-18** On a 412 conflict (API-13) the form shows who changed the record and what changed, and lets the user reload or re-apply their edits.
+* **UI-19** Every route has an error boundary with a retry action. Network errors retry with backoff and show an offline banner instead of a blank screen.
+* **UI-20** Supported browsers: the last two versions of Chrome, Edge, Firefox and Safari, including Safari on iOS. The same policy applies to the site.
+* **UI-21** Client errors and Core Web Vitals from real users are sent to the error-reporter contract (OBS-06), sampled and without personal data.
+
+- **UI-22** Hashed admin assets from the previous release stay available (CDN or a retained folder) for at least 24 hours after a deploy, and the admin reloads itself on a chunk-load error, so open tabs survive rolling deploys.
+
+### 16.2 Public site (server-side rendering)
+
+Public pages are rendered on the server by a separate app, `apps/site`, built on TanStack Start. It shares React, TanStack Router, TanStack Query and the generated client with the admin UI, so components and data hooks are reused.
+
+- **SITE-01** SSR is on for every public route by default. A route MAY switch to client rendering. Build-time prerendering is not used, because HTML baked into an image cannot be purged on publish.
+- **SITE-02** The site reads data only through the BieberKit API with the generated client. It holds no database, Valkey or storage credentials. Server-side calls use the internal API address in `SITE_API_URL`.
+- **SITE-03** Same origin: the load balancer sends `/api/*` to the web role, /admin/\* to the admin static files, and everything else to the site. The `__Host-` session cookie then works for signed-in visitors without cross-domain cookies.
+- **SITE-04** React Server Components are not used. Server functions are limited to forms that forward to the API, with CSRF protection.
+- **SITE-05** Drafts are visible only in preview mode, opened from the admin UI with a short-lived signed token. Preview responses are marked `noindex` and never cached.
+- **SITE-06** TanStack Start is pinned and its advisories are watched with the same fast path as Better Auth (AUTH-08). Version 1.0 shipped on 2026-10-13 and has already needed a security update.
+- **SITE-07** Other renderers (Astro, Nuxt, Next.js) can be used as headless clients of the same public API, preview tokens and revalidation webhooks. They are supported but not scaffolded.
+- **SITE-08** The site does not load Ant Design or the admin bundle. It uses Tailwind CSS 4 and shadcn/ui components on Base UI, installed from the registry as editable source, so every project can own its look.
+- **SITE-09** `bieberkit dev` starts the site dev server next to the API and the admin UI. New env keys: `SITE_URL`, `SITE_API_URL`, `SITE_SERVICE_TOKEN`, `SITE_REVALIDATE_SECRET` (secrets).
+
+Site performance:
+
+- **SITE-10** A page loads its data from one composition endpoint (API-10), so a typical server render makes a single, usually cached, API call over keep-alive connections.
+- **SITE-11** HTML streams to the browser as soon as the shell is ready. Slow sections (related items, comments) render behind Suspense boundaries without delaying the first byte.
+- **SITE-12** Pages that change rarely (home, landing pages, policies) are rendered on first request and kept at the CDN until a publish event purges them.
+- **SITE-13** Interactive parts load only where used. Content pages ship no client JavaScript beyond hydration of the interactive components on them.
+- **SITE-14** Site themes are packages or registry items that provide layouts and block renderers. Switching theme never touches content.
+
+* **SITE-15** Public forms (contact, newsletter, lead capture) post through the API, use a honeypot field and rate limits by default, and MAY add a CAPTCHA driver.
+* **SITE-16** Analytics and marketing scripts load only after consent from a built-in consent banner, and consent is stored by the `privacy` plugin (PDP-02).
+* **SITE-17** Custom 404 and 500 pages and a maintenance mode switch, all editable in the admin UI and returning the correct status codes (503 with `Retry-After` for maintenance).
+
+- **SITE-18** A response rendered with a visitor's session, and any response that sets a cookie, is sent with `Cache-Control: private, no-store`. Shared caches store only pages rendered without reading the session, and the CDN cache key ignores cookies. Personal parts of a public page (greeting, member price, cart) load on the client from `/api/*`, which is never publicly cacheable. A generated test fails when a cacheable route reads the session during SSR.
+
+Alternatives considered:
+
+| Option | Why it is not the default |
+| --- | --- |
+| Astro 6 | Strong for content sites, but adds a second component model beside React. Usable as a headless client. |
+| Next.js 16 | Heavy security advisory load in 2026 and the React Server Components remote code execution of December 2025. |
+| `@fastify/react` inside the web role | Puts page rendering in the API process and its scaling. Smaller community. |
+| Admin-style SPA with prerendering | Fails for dynamic pages and fresh content. |
+
+### 16.3 SEO
+
+- **SEO-01** Every public route sets its head: title, meta description, canonical URL, Open Graph and Twitter card tags, robots. A `seoHead()` helper builds them from the `seo` plugin fields and falls back to the entity title and excerpt.
+- **SEO-02** Locales use a URL prefix (`/vi/`, `/en/`, `/zh/`) or one domain per locale. Every localized page links its alternates with `hreflang`, plus `x-default`.
+- **SEO-03** Slugs are generated per locale with Vietnamese diacritics transliterated (`khach-hang`), kept unique, and old slugs turn into 301 redirects automatically.
+- **SEO-04** JSON-LD helpers for Organization, WebSite, Article, Product, BreadcrumbList and FAQPage.
+- **SEO-05** `sitemap.xml` (an index plus one file per entity type, with `lastmod`) is regenerated by a job on publish and served by the site. `robots.txt` is set per environment, and non-production environments always send `noindex`.
+- **SEO-06** Redirects managed in the admin UI (`redirects` plugin) apply before rendering. Missing pages return 404 or 410, never 200.
+- **SEO-07** Public HTML is cached with `Cache-Control: s-maxage` and `stale-while-revalidate`, tagged by entity. This cache lives at the CDN or reverse proxy, never inside site replicas, so all replicas see one state. A publish event purges it through a purge driver (generic webhook or Cloudflare).
+- **SEO-08** Images go through the `media` plugin, which generates the variants declared in config (widths, WebP or AVIF) in the worker role after upload. The transform endpoint serves only declared variants, so arbitrary sizes cannot be requested to exhaust CPU. Pages use them with responsive `srcset`, explicit width and height, and lazy loading below the fold.
+- **SEO-09** Core Web Vitals budgets at the 75th percentile: LCP under 2.5 s, INP under 200 ms, CLS under 0.1. Lighthouse CI checks the `cms` home and article pages on every release candidate.
+
+### 16.4 Design tokens
+
+- **TOK-01** Brand tokens (colors, fonts, radius, spacing, dark mode) are declared once in `bieberkit.config.ts`.
+- **TOK-02** `@bieberkit/tokens` compiles them into an Ant Design theme for the admin and CSS variables plus a Tailwind theme for the site, so both stay on brand without double configuration.
+- **TOK-03** The default font stack covers Latin, Vietnamese and Chinese.
+
+### 16.5 Block content editor
+
+- **CNT-01** Rich content is stored as versioned block JSON, never as raw HTML. Blocks include heading, paragraph, list, quote, image, gallery, video embed, table, call to action, and custom blocks declared by plugins.
+- **CNT-02** `@bieberkit/content` defines the block schema and one set of React renderers used by both the admin preview and the site, so preview matches production.
+- **CNT-03** Rendered output is sanitized: links get safe `rel` values, embeds come only from an allowlist, and raw HTML blocks are off by default.
+- **CNT-04** The editor engine (Lexical or Tiptap, both MIT at their core) is chosen by a spike in Phase 0, based on block support, collaboration readiness, Vietnamese input method handling and bundle size.
+
+* **CNT-05** `@bieberkit/content` also ships a framework-free HTML serializer, used for emails, RSS feeds and headless renderers (SITE-07).
+
+### 16.6 App structure
+
+```text
+apps/admin/src/
+├── main.tsx       boots admin-core with the UI adapter and plugin admin entries
+├── pages/         custom pages that replace or extend generated screens
+├── widgets/       custom field widgets and dashboard widgets
+├── blocks/        registry blocks installed as source
+└── i18n/          project translation overrides
+
+apps/site/src/
+├── routes/        TanStack Start file routes ($locale, preview, sitemap)
+├── layouts/       header, footer, page shells
+├── blocks/        content block renderers that override the theme's
+├── components/    shadcn/ui components installed from the registry
+├── theme.css      Tailwind theme generated from tokens (TOK-02)
+└── server/        composition calls through the generated client only
+```
+
+- **FE-01** Neither app imports server code. They share only `packages/client`, the `@bieberkit/content` renderers and the design tokens.
+- **FE-02** Generated screens are configured through entity metadata first. A custom page is the escape hatch, not the starting point.
+
+### 16.7 Metadata contract
+
+`/api/v1/_meta` is the contract between the server and every admin UI adapter. Adapters learn about entities from this document and nothing else.
+
+- **META-01** The response carries a `schemaVersion`. A breaking change to its shape bumps the version, and admin-core supports the current and the previous version.
+- **META-02** It describes entities (fields with type, label per locale, validation, widget hints, visibility rules), actions and transitions, list and form layouts, menus, dashboards, enabled features, and the permissions of the current user.
+- **META-03** It is computed per tenant, role set and deployment version, cached with an ETag, and invalidated when roles, plugins or the deployment change.
+- **META-04** It never contains data rows, secrets or fields the user cannot read.
+- **META-05** Its JSON Schema is published with every release, so third-party adapters and tools can validate against it.
+
+## 17. Security requirements
+
+BieberKit targets OWASP ASVS 5.0 Level 2 for generated projects and covers the OWASP Top 10:2025, including the new categories for software supply chain failures and mishandled exceptional conditions. Each requirement below is tested in CI or checked by `bieberkit check`.
+
+### 17.1 Application
+
+- **SEC-01** Security headers on by default: strict Content-Security-Policy (hash-based with strict-dynamic on cacheable site pages, per-response nonces only on uncached personal pages, script-src 'self' with hashes for the static admin), HSTS, `frame-ancestors 'none'`, `Referrer-Policy: strict-origin-when-cross-origin`, `X-Content-Type-Options: nosniff`, a restrictive Permissions-Policy.
+- **SEC-02** CORS uses an explicit origin allowlist. Wildcards and the `null` origin are rejected.
+- **SEC-03** CSRF protection for cookie sessions: Fetch Metadata (`Sec-Fetch-Site`) as the primary check and a signed double-submit token bound to the session. State never changes through `GET`.
+- **SEC-04** All input is validated by schema. Unknown fields are rejected on write.
+- **SEC-05** Queries are built only through the ORM or parameterized SQL. String-built SQL is reported by `bieberkit check`.
+- **SEC-06** A built-in `http.fetch` helper for outbound calls blocks private, loopback and metadata IP ranges unless an allowlist permits them (SSRF).
+- **SEC-07** Errors return RFC 9457 problems without stack traces in production. Unexpected exceptions are logged with a trace id and never crash other requests.
+- **SEC-08** Sensitive fields declared `encrypted: true` are encrypted at rest with keys derived from `APP_KEY`, with rotation through `APP_KEY_PREVIOUS`.
+- **SEC-09** Logs redact secrets, tokens, passwords and fields marked `pii: true`.
+- **SEC-10** Rate limits are stored in Valkey or the database so they hold across replicas, and use the client IP resolved through `TRUST_PROXY`.
+
+### 17.2 Supply chain
+
+- **SEC-11** pnpm settings in the framework and in generated projects: dependency build scripts blocked unless allowlisted, exotic sub-dependencies blocked, `minimumReleaseAge` of 10080 minutes (7 days) with no blanket exclusion, not even for `@bieberkit/*`. A security fast path (AUTH-08, SITE-06) adds a temporary exclusion for the exact fixed version and removes it after 7 days, and `trustPolicy: no-downgrade`.
+- **SEC-12** CI installs with `--frozen-lockfile` and never runs lifecycle scripts of unreviewed packages.
+- **SEC-13** Third-party GitHub Actions are pinned by commit SHA.
+- **SEC-14** Agent configuration (`AGENTS.md`, `CLAUDE.md`, `.claude/`, `.agents/`, skill folders) is treated as code: changes need maintainer review and are listed in CODEOWNERS.
+
+### 17.3 Releases
+
+- **SEC-15** Packages are published only by npm trusted publishing (OIDC) from a dedicated release workflow, which adds provenance automatically. No long-lived npm token exists.
+- **SEC-16** The release workflow runs only on protected tags, never on `pull_request_target`, shares no cache with pull request workflows, grants `id-token: write` to the publish job only, and waits for manual approval in a protected environment.
+- **SEC-17** These rules come from the May 2026 TanStack incident, where a poisoned Actions cache let an attacker publish through a legitimate trusted publisher without stealing a long-lived token: attacker code ran in the release workflow through a poisoned Actions cache and extracted the short-lived OIDC token from runner memory.
+
+- **SEC-21** No job that holds `id-token: write` runs dependency installs, builds or tests. The publish job only downloads artifacts that earlier jobs built and attested.
+
+### 17.4 Containers
+
+- **SEC-18** Runtime images use Docker Hardened Images, run as a non-root user with a read-only root filesystem, pin the base image by digest, and ship an SBOM and provenance attestation.
+- **SEC-19** CI scans images with Trivy and fails on fixable critical or high vulnerabilities.
+
+### 17.5 Disclosure
+
+- **SEC-20** `SECURITY.md` describes private vulnerability reporting through GitHub, a response within 7 days, and coordinated disclosure within 90 days.
+
+### 17.6 Personal data
+
+Vietnam's Personal Data Protection Law (No. 91/2025/QH15) and Decree 356/2025/ND-CP took effect on 2026-01-01 and give people the right to know, consent, access, correct and request deletion of their data. BieberKit gives projects the technical building blocks. Legal compliance stays the responsibility of each project owner.
+
+- **PDP-01** Fields holding personal data are marked `pii: true`. `bieberkit check` produces a data inventory of every such field, the entity holding it and its retention rule.
+- **PDP-02** The `privacy` plugin records consent per purpose with time and source, and supports withdrawal.
+- **PDP-03** Data subject requests (access, correction, deletion) are tracked as records with due dates. Access produces a machine-readable export. Deletion anonymizes `pii` fields and keeps the audit trail.
+- **PDP-04** Entities MAY declare `retention` (for example 24 months after last activity). A scheduled job anonymizes or deletes expired records.
+- **PDP-05** Access to `pii` fields is audit-logged, and the audit log can be exported to support breach investigation and notification.
+
+- **PDP-06** Audit diffs never keep personal data in clear text. Values of `pii` fields are encrypted with a per-person key, and a deletion request destroys that key, so old audit rows become unreadable without being edited (crypto-shredding). The rest of each audit entry stays intact.
+
+## 18. Performance and scalability requirements
+
+BieberKit scales by adding stateless replicas of each process role. The targets below are initial and will be validated with benchmarks in Phase 1 before they become release gates.
+
+### 18.1 Initial targets
+
+Reference setup: one web replica with 1 vCPU and 1 GB of memory, PostgreSQL on a separate host, 25-row list with one relation.
+
+| Measure | Target |
+| --- | --- |
+| p95 latency, entity list endpoint | under 50 ms |
+| p95 latency, entity get endpoint | under 20 ms |
+| Framework overhead over raw Fastify on a hello route | under 15% throughput loss |
+| Cold start of the web role | under 2 s |
+| Idle memory of the web role | under 150 MB |
+| Admin initial JavaScript, compressed | under 400 KB |
+| p95 time to first byte, cached public page | under 100 ms |
+| p95 time to first byte, uncached public page | under 400 ms |
+| Client JavaScript on a content page, compressed | under 100 KB |
+
+### 18.2 Requirements
+
+- **PERF-01** No process keeps state that another replica needs: sessions, rate limits, locks, cache and files live in shared stores (P6).
+- **PERF-02** One Node.js process per container. Scale with replicas, not with the cluster module or PM2 inside the container.
+- **PERF-03** `--max-old-space-size` is set to about 75% of the container memory limit through NODE\_OPTIONS in the generated compose files and Helm values.
+- **PERF-04** Generated list endpoints load relations in batches. Tests fail when a list endpoint issues one query per row.
+- **PERF-05** Exports, imports, PDF generation and bulk updates run in the worker role, never inside a web request.
+- **PERF-06** Response serialization uses compiled schemas.
+- **PERF-07** Static admin assets and public CMS pages are cacheable at a CDN with explicit cache headers.
+- **PERF-08** A k6 load test of the reference endpoints runs in CI on every release candidate and fails when a target regresses by more than 10%.
+
+## 19. Deployment
+
+A project ships as one server image that runs as web, worker, scheduler or migrate, plus a small site image when the public site is enabled. Moving from one VPS to Kubernetes changes configuration only, never application code.
+
+The server image scales by role and the site image serves public pages.
+
+- Load balancer (TLS, compression, routing): `/api/*` goes to the server image, all other paths go to the site image.
+- Server image, four roles: `web` x N (scaled by latency), `worker` x M (scaled by queue depth), `scheduler` x 1 (exactly one), `migrate` job (before rollout).
+- Site image: `site` x K, server-side rendering through the API.
+- Shared stores: PostgreSQL or MySQL through PgBouncer or ProxySQL, Valkey or Redis (section 15), S3, R2 or MinIO (user files, signed URLs).
+
+The load balancer sends API calls to the web role and page requests to the site. Only the server roles touch the database, Valkey and object storage, and each role scales on its own signal.
+
+### 19.1 Image
+
+```dockerfile
+# syntax=docker/dockerfile:1
+FROM ghcr.io/pnpm/pnpm:12 AS build
+RUN pnpm runtime set node 26 -g
+WORKDIR /app
+COPY pnpm-lock.yaml pnpm-workspace.yaml ./
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm fetch
+COPY . .
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --offline --frozen-lockfile
+RUN pnpm exec bieberkit build
+RUN pnpm deploy --filter=@app/server --prod /out
+RUN cp -r apps/admin/dist /out/public/admin
+
+FROM dhi.io/node:26 AS runtime
+WORKDIR /app
+ENV NODE_ENV=production
+COPY --from=build /out .
+EXPOSE 3000
+ENTRYPOINT ["node", "dist/main.js"]
+CMD ["web"]
+```
+
+- **DEP-01** `pnpm fetch` runs before the source copy, so dependency layers stay cached until the lockfile changes.
+- **DEP-02** `pnpm deploy --prod` produces a self-contained folder without devDependencies or TypeScript sources. The server package lists dist in its files field, so a gitignored build output is still included.
+- **DEP-03** The entrypoint calls `node` directly, never `pnpm start` or `npm start`, so SIGTERM reaches the application.
+- **DEP-04** Build caches are shared only between trusted builds (SEC-16). Base images are pinned by digest (SEC-18).
+- **DEP-05** The role is the container command: `web`, `worker --queues=critical,default`, `scheduler`, `migrate`.
+
+* **DEP-06** The admin build output (`apps/admin/dist`) is copied into the server image under `public/admin`, so the web role can serve it when no CDN is used.
+
+### 19.2 Generated deployment files
+
+| File | Purpose |
+| --- | --- |
+| `Dockerfile`, `.dockerignore` | Image above |
+| `compose.yaml` | Local services for development |
+| `compose.prod.yaml` | Single-server production: proxy, web, worker, scheduler, migrate, database, Valkey |
+| Helm chart (`bieberkit deploy:helm`) | Kubernetes deployments with probes, preStop hook, migrate job, autoscaling |
+| apps/site/Dockerfile | Public site image (Nitro Node server on dhi.io/node:26), generated when the site is enabled |
+
+### 19.3 Health endpoints
+
+| Endpoint | Checks | Used for |
+| --- | --- | --- |
+| `/health/live` | Event loop responds. No external dependencies | Restart a stuck process |
+| `/health/ready` | Process booted and not shutting down. Dependency health goes to metrics and bieberkit doctor, so a short database blip does not pull every pod out at once | Send or stop traffic |
+| `/health/startup` | Boot sequence finished | Delay the other probes during slow starts |
+
+### 19.4 Graceful shutdown
+
+1. On SIGTERM, `/health/ready` starts returning 503.
+2. Wait a short drain delay (default 5 s) so the load balancer stops routing new requests.
+3. Stop accepting new connections. Since Node.js 19, `server.close()` also closes idle keep-alive connections, so no custom code is needed.
+4. Wait for in-flight requests up to a timeout (default 20 s).
+5. Workers stop taking jobs and let running jobs finish within the same budget. Unfinished jobs return to the queue.
+6. Run plugin `onShutdown` hooks in reverse boot order, then close database and Valkey pools.
+7. Exit with code 0, or 1 if the timeout was hit.
+
+The orchestrator's grace period (for example `terminationGracePeriodSeconds`) MUST be longer than the drain delay plus the shutdown timeout.
+
+### 19.5 Rollout order
+
+1. Build and scan the image, then push it to the registry.
+2. Run the `migrate` role once and wait for success. Migrations are backward compatible (DATA-08).
+3. Roll out `web` and `worker` gradually.
+4. Replace `scheduler` with a stop-then-start strategy, so two schedulers never overlap.
+
+### 19.6 Deployment targets
+
+| Scale | Runs on | Provided by BieberKit |
+| --- | --- | --- |
+| Small | One VPS with Docker Compose and Caddy | `compose.prod.yaml` |
+| Medium | Several VPS with Kamal or Docker Swarm | Image, env template, deploy notes |
+| Large | Kubernetes, web scaled on CPU, workers scaled on queue depth | Helm chart |
+
+### 19.7 Public site
+
+- The site ships as its own image and runs as a stateless service that scales on CPU and latency, like the web role.
+- The load balancer routes `/api/*` to web, /admin/\* to the admin static files, and all other paths to the site (SITE-03).
+- The site exposes `/health` and follows the same graceful shutdown rules as the server roles.
+- Rollout order: migrate, then web and worker, then the site, so the site never calls an API version older than it expects.
+
+### 19.8 Backups and recovery
+
+- **DEP-07** `compose.prod.yaml` includes a backup service that dumps the database daily, encrypts the dump and uploads it to a separate bucket. Retention defaults to 7 daily, 4 weekly and 6 monthly copies.
+- **DEP-08** Object storage buckets SHOULD have versioning enabled. The docs explain how for S3, R2 and MinIO.
+- **DEP-09** `bieberkit backup:verify` restores the latest dump into a throwaway container and runs migrations and health checks against it. The docs recommend running it weekly.
+- **DEP-10** The deployment guide states target recovery figures for the reference setup: at most 24 hours of data loss with daily dumps, less with point-in-time recovery on managed databases.
+
+## 20. Observability
+
+Every process writes JSON logs to stdout, exports OpenTelemetry traces when an endpoint is configured, and exposes Prometheus metrics on a separate port.
+
+- **OBS-01** Logs use pino. Each line carries `time`, `level`, `msg`, `role`, `requestId`, `traceId`, `spanId`, and `tenantId` and `userId` when known.
+- **OBS-02** Traces cover HTTP requests, database queries, cache calls, queue dispatch and job execution, with trace context carried from the request into the jobs it creates.
+- **OBS-03** Metrics: HTTP duration histogram by route and status, event loop lag, heap usage, database pool usage, queue depth and job duration by queue, cache hit ratio.
+- **OBS-04** The metrics port is never exposed through the public load balancer.
+- **OBS-05** The audit log is a database table separate from application logs, append-only for the application role, and viewable in the admin UI.
+- **OBS-06** Unhandled errors are reported with the request or job context through an error-reporter contract. A Sentry-compatible driver is optional.
+
+## 21. Testing strategy
+
+Tests run against real databases in containers, and a large share of tests is generated from entity definitions so that security rules are checked for every entity automatically.
+
+| Layer | Tool | Scope | Runs on |
+| --- | --- | --- | --- |
+| Unit | Vitest 4 | Pure functions, services with fakes | Every push |
+| Module integration | Vitest 4, Testcontainers | One module booted alone against PostgreSQL, MySQL and SQLite | Every push |
+| Generated contract | `@bieberkit/testing` | Each entity: permissions, field masks, tenant isolation, validation, pagination limits | Every push |
+| End to end | Playwright | Login, CRUD in the admin UI, uploads, one flow per template | Pull requests to main |
+| Upgrade | `examples/` apps | `bieberkit upgrade` and codemods on sample apps from the previous minor and major | Release candidates |
+| Load | k6 | Reference endpoints in section 18 | Release candidates |
+| Headers and rules | `bieberkit check` | File headers, boundaries, env access, destructive migrations | Every push and pre-commit |
+| Component | Vitest 4 Browser Mode | admin-core hooks, UI adapter components, block renderers, site components | Every push |
+| Accessibility and SEO | Playwright with axe, Lighthouse CI | Generic admin screens against WCAG 2.2 AA (UI-07), cms site pages against SEO-09 | Pull requests to main |
+
+- **TST-01** Coverage targets: 90% lines for `@bieberkit/core`, `data`, `http` and `auth`. 80% for other packages and first-party plugins.
+- **TST-02** `@bieberkit/testing` provides `createTestApp({ modules })`, entity factories, `actingAs(user, roles)` and `withTenant(tenant)`.
+- **TST-03** A test that needs a network call outside the test containers fails, so tests stay deterministic.
+
+## 22. AI-assisted development
+
+BieberKit is built with AI coding agents and is meant to be used with them. The main lever is design (P1, P3, P10), not prompt files: one pattern per task, types that reject wrong code, and fast checks the agent can run itself.
+
+### 22.1 Shipped to every project
+
+| Item | Content |
+| --- | --- |
+| `AGENTS.md` | Hand-written and short: commands, folder rules, things never to do, where the docs are. No architecture essay. |
+| `CLAUDE.md` | One line that points to `AGENTS.md` |
+| Agent Skills | `bieberkit-add-entity`, `bieberkit-add-module`, `bieberkit-add-workflow`, `bieberkit-write-tests`, `bieberkit-upgrade`, in the open Agent Skills format |
+| Bundled docs | `node_modules/@bieberkit/core/docs/*.md` and an `llms.txt` index, matching the installed version |
+| `bieberkit mcp` | Development-only MCP server: list modules, entities, fields, permissions, routes and workflows, read recent errors and logs, validate an entity definition, run `bieberkit check` |
+
+### 22.2 Rules
+
+- **AI-01** `AGENTS.md` stays short and is written by a human. A 2026 ETH Zurich study found that LLM-generated context files slightly lowered agent success and raised cost by over 20%, while human-written ones helped only marginally.
+- **AI-02** Every CLI error and check violation has a stable code, the fix in one line and a docs link, so an agent can repair its own mistake.
+- **AI-03** Every CLI command supports `--json`.
+- **AI-04** The MCP server is off in production builds and binds only to localhost.
+
+### 22.3 Building BieberKit itself with AI
+
+1. Write an ADR and a short module spec before code. Split the work into small tasks.
+2. The maintainer designs and reviews the sensitive core by hand: public API of `defineEntity` and `definePlugin`, authentication, authorization, tenant isolation, release pipeline.
+3. Agents write tests from the spec first. The maintainer reviews the tests, then agents implement.
+4. An API report of each package's public surface is committed. Any change to it shows in the diff and needs a changeset.
+5. A second, independent AI review runs on each pull request. The maintainer makes the final call and merges nothing they cannot explain.
+6. A real pilot project is built in parallel with the framework from Phase 1.
+
+## 23. Licensing and mandatory file headers
+
+BieberKit is licensed under the Apache License 2.0. Every file in the framework repository that can hold a comment MUST start with a header that names the file, describes it, and states the author Bieber Kieu (kieutrongthien@gmail.com), the copyright and the license.
+
+### 23.1 License files and metadata
+
+- `LICENSE` holds the full Apache License 2.0 text, at the repository root and inside every published package.
+- `NOTICE` at the root reads:
+
+```text
+BieberKit
+Copyright 2026 Bieber Kieu <kieutrongthien@gmail.com>
+
+This product includes software developed by Bieber Kieu.
+```
+
+- Every `package.json` sets `"license": "Apache-2.0"` and `"author": "Bieber Kieu <kieutrongthien@gmail.com>"`.
+- Contributions are accepted under the same license (Apache 2.0, section 5) with a Developer Certificate of Origin `Signed-off-by` line on each commit.
+
+### 23.2 Header for TypeScript, JavaScript and CSS
+
+```ts
+/**
+ * BieberKit
+ *
+ * @file        packages/core/src/kernel.ts
+ * @description Boots modules and plugins and manages the application lifecycle.
+ * @author      Bieber Kieu <kieutrongthien@gmail.com>
+ * @copyright   Copyright (c) 2026 Bieber Kieu
+ * @license     Apache-2.0
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+```
+
+### 23.3 Header for hash-comment files
+
+Used for YAML, Dockerfile, shell scripts, `.env.example`, `.gitignore`, `.npmrc` and TOML. The license paragraph is the same as above, prefixed with ` #  `.
+
+```yaml
+# BieberKit
+#
+# @file        templates/blank/compose.yaml
+# @description Local development services: database and Valkey.
+# @author      Bieber Kieu <kieutrongthien@gmail.com>
+# @copyright   Copyright (c) 2026 Bieber Kieu
+# @license     Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# ... (same license paragraph as 23.2)
+#
+# SPDX-License-Identifier: Apache-2.0
+```
+
+Other comment styles: Markdown and HTML use one `<!-- ... -->` block, SQL uses `--` lines.
+
+### 23.4 Rules
+
+- **HDR-01** The header is the first content of the file. Exceptions that must stay first: a shebang (`#!/usr/bin/env node`) and a Dockerfile `# syntax=` directive. The header follows directly after them.
+- **HDR-02** `@file` is the path relative to the repository root. `@description` is one sentence about what the file does, never empty.
+- **HDR-03** The copyright year is the year the file was created and is not bumped every year.
+- **HDR-04** The `@author` line for Bieber Kieu always comes first. Maintainers MAY add further `@author` lines for substantial contributions.
+- **HDR-05** Generated files that allow comments (for example the typed client) carry the header plus a `@generated` tag and the command that generated them.
+- **HDR-06** Code samples in the documentation and in this specification omit headers for brevity. Files created from those samples still need them.
+
+### 23.5 Exempt files
+
+| File type | Reason | Where authorship is stated instead |
+| --- | --- | --- |
+| JSON (`package.json`, `tsconfig.json`, `turbo.json`) | No comment syntax | `author` and `license` fields where the format allows |
+| Lockfiles | Generated by pnpm | Not applicable |
+| `LICENSE`, `NOTICE` | Legal text | The files themselves |
+| Images, fonts, other binaries | No comment syntax | `NOTICE` and asset credits in `docs/` |
+| Vendored third-party files | Must keep their original notice | Their own header, plus an entry in `NOTICE` |
+
+### 23.6 Enforcement
+
+- `bieberkit check headers` (in the repository: `pnpm check:headers`) verifies presence, field order, path, non-empty description and SPDX line.
+- It runs in the pre-commit hook and in CI. CI fails on any violation.
+- `--fix` inserts a header with the correct path. It leaves the description for the author to write, and CI fails until it is filled.
+
+### 23.7 Headers in generated projects
+
+- Files the scaffolder creates in a user's project carry the same header layout, with the project name, the project author from `--author` or git config, and the project's license from `bieberkit.config.ts` (default `UNLICENSED`).
+- Files copied in from the BieberKit registry keep the BieberKit header, because Apache 2.0 section 4 requires keeping copyright notices. A user who changes such a file adds a `@modified-by` line.
+
+## 24. Open source governance, releases and support
+
+BieberKit has one maintainer, Bieber Kieu, who makes final decisions. Process exists to keep that sustainable: small scope, automated releases, and a contribution policy that protects review time.
+
+### 24.1 Contributions
+
+- **GOV-01** Issue first. A pull request needs a linked issue that a maintainer has accepted, except for typo and documentation fixes.
+- **GOV-02** AI use is allowed and must be disclosed in the pull request. The author must be able to explain every change. Pull requests without an accepted issue, or that the author cannot explain, are closed.
+- **GOV-03** Every commit carries a DCO `Signed-off-by` line.
+- **GOV-04** The Contributor Covenant is the code of conduct.
+- **GOV-05** Pull requests from outside collaborators may be limited in repository settings when review load requires it.
+
+### 24.2 Versioning and releases
+
+- All `@bieberkit/*` packages share one version and are released together (release train), so `bieberkit upgrade` moves one number.
+- Semantic Versioning. Changes are recorded with changesets, and changelogs are generated from them.
+- A public API is deprecated in a minor release before it is removed in the next major. Deprecations log a warning with the replacement.
+- Every breaking change ships a codemod run by `bieberkit upgrade`, tested against `examples/`.
+- Releases follow SEC-15 to SEC-17.
+
+### 24.3 Support policy
+
+| Line | Support |
+| --- | --- |
+| Current major | Features, fixes, security fixes |
+| Previous major | Security fixes for 6 months after the next major ships |
+| Node.js | Active and maintenance LTS lines only. Node.js 24 until its end of life on 2028-04-30 |
+| Databases | Versions in section 9.1 that are still supported upstream |
+
+### 24.4 Repository files
+
+`README.md`, `LICENSE`, `NOTICE`, `CONTRIBUTING.md`, `SECURITY.md`, `CODE_OF_CONDUCT.md`, `AGENTS.md`, `CLAUDE.md`, `CODEOWNERS`, issue and pull request templates. All carry headers where the format allows (section 23).
+
+## 25. Roadmap
+
+BieberKit reaches 1.0 in four phases. A phase ends only when its gate is met, and the core is proven on a real pilot project before any business plugin is built.
+
+| Phase | Duration | Scope | Gate |
+| --- | --- | --- | --- |
+| 0. Foundations | 2 to 3 weeks | Spikes and ADRs, repository, CI, headers, release pipeline | ADRs accepted |
+| 1. Core MVP | 2 to 3 months | Kernel, data, HTTP, auth, CLI, blank template, pilot project | Pilot live in production |
+| 2. Plugins and templates | 2 to 3 months | cms, crm, saas, admin renderer, public site, registry | All three dialects green |
+| 3. Hardening and 1.0 | Before 1.0 | Security review, docs, MCP, Helm, load tests | 1.0 released |
+
+Durations are rough estimates for one maintainer working with AI agents. Phase 3 has no estimate until Phase 2 ends. The independent review judged the full scope at about three times what one maintainer can harden for 1.0. The scope is kept on purpose, so these estimates are optimistic and the phase gates are what protect quality.
+
+Gate criteria:
+
+- **ADRs accepted.** Decisions recorded for ORM, plugin manifest, `defineEntity` API, auth, queue drivers and release pipeline. Header checker and trusted publishing work end to end.
+- **Pilot live in production.** One real project runs on the `blank` template with web, worker and scheduler roles behind a load balancer.
+- **All three dialects green.** The full test suite, including generated permission and tenant tests, passes on PostgreSQL, MySQL and SQLite for every first-party plugin.
+- **1.0 released.** Security review against section 17 done, performance targets in section 18 met, documentation and upgrade codemods published.
+
+## 26. Risks and open questions
+
+The largest risk is scope: a framework with many plugins and three dialects can outgrow one maintainer. The mitigations below keep the core small and push work to automation.
+
+| Risk | Impact | Mitigation |
+| --- | --- | --- |
+| Scope grows faster than one maintainer can review | Stalled releases, burnout | Small core (P4), issue-first policy, plugins outside core, release train |
+| Three dialects triple test and bug surface | Slower releases | Tier 2 for SQLite, dialect-free core (DATA-01), CI matrix from day one |
+| CASL to MikroORM condition translator: @ucast/sql has a MikroORM module but may not support version 7 | Wrong rows returned if buggy | Evaluate @ucast/sql in Phase 0, otherwise an own translator limited to a small operator set, with generated permission tests for every entity |
+| Better Auth ships many security advisories | Auth vulnerabilities in projects | Pinned minimum version, Renovate fast path, advisory watch |
+| npm supply-chain attacks | Compromised builds or releases | SEC-11 to SEC-17 |
+| Over-abstraction in `defineEntity` | Hard to express unusual cases | Escape hatches to raw MikroORM entities and custom routes, tested in examples |
+| Upstream breaking changes (MikroORM, Fastify, Ant Design) | Forced majors | Drivers behind contracts (P12), ORM-independent field DSL (10.6), foundation libraries pinned and covered by upgrade tests |
+| Bus factor of one | Project stops if the maintainer stops | Docs and ADRs in the repository, automated release, Apache 2.0 allows forks |
+| TanStack Start is young (1.0 in October 2026) | Breaking changes or vulnerabilities in public sites | Site isolated from data stores (SITE-02), pinned versions, headless contract allows another renderer |
+| Admin UI adapter contract designed too narrowly around Ant Design | Other adapters impossible without core changes | Build a small second adapter as a test fixture in Phase 2 to prove the contract |
+| Several core libraries rely on one main maintainer (MikroORM, CASL, BentoCache, tsdown) | Slow fixes or abandonment upstream | Drivers are replaceable through contracts. Foundation libraries are pinned, sponsored, and forked for critical fixes if needed |
+| Full v1 scope (three dialects, SSR site, workflows, admin adapters) is about three times what one maintainer can harden (independent review) | Later 1.0, or a 1.0 with weak spots | Strict phase gates, MySQL and site hardened after the PostgreSQL core is stable, AI agents for tests and docs, no release before its gate is met |
+
+Open questions:
+
+- [ ] Reserve the `@bieberkit` npm scope, the `bieberkit` and `create-bieberkit` package names, and the GitHub organization.
+- [ ] Confirm with the employer that BieberKit is a personal project and can be published, if any part is built during work time or for company projects.
+- [ ] Verify that Ant Design 6 ships a complete `vi_VN` locale, or plan to contribute one.
+- [ ] Decide whether MariaDB is officially supported or best effort.
+- [ ] Choose the docs site generator and hosting.
+- [ ] Decide the default license for generated projects (`UNLICENSED` today).
+- [ ] Validate the performance targets in section 18 with Phase 1 benchmarks.
+
+## Document history
+
+| Version | Date | Changes |
+| --- | --- | --- |
+| 0.8 | 2026-11-22 | Independent review fixes: private caching for session-rendered pages, versioned plugin migrations, per-request tenant and cross-tenant reference checks, separate cache Valkey, Better Auth integration rules, unordered outbox with versions, honest cache guarantees, static plugin manifests, collation semantics, integer money, Vietnamese search, crypto-shredded audit, supply-chain fixes, P12 narrowed, MySQL 8.4, 15 minor fixes. Scope kept as is |
+| 0.7 | 2026-11-21 | Structure, part 2: write path and outbox flow, durable workflows, metadata contract, site composition, generated files. Fixes: commit before response, synchronous cache purge after commit, extension tables for plugin fields |
+| 0.6 | 2026-11-21 | Structure: package layers, project configuration, request pipeline, app structure, tenant resolution, job context, standard columns, validator conformance, generated types, outbox ordering |
+| 0.5 | 2026-11-21 | Foundation review: ports and adapters principle, schema pipeline with Ajv and Zod Mini, module structure and error model, BentoCache, Oxlint and Oxfmt, tsdown, Node.js 26 by default with 24.12 minimum |
+| 0.4 | 2026-11-21 | Review fixes: concurrency control, bulk and aggregate APIs, money and sequences, import and export, personal data, backups, mobile admin, conflict handling, site forms and consent |
+| 0.3 | 2026-11-21 | Headless admin core with UI adapters, design tokens, block content, read path performance, actions and state machines, realtime, search, webhooks |
+| 0.2 | 2026-11-21 | Public site with server-side rendering and SEO |
+| 0.1 | 2026-11-21 | First complete draft |
+
+## References
+
+Versions and dates in this specification were checked on 2026-11-21 and should be re-checked before each phase.
+
+- [MikroORM: defining entities with defineEntity](https://mikro-orm.io/docs/define-entity)
+- [Drizzle ORM: schema declaration per dialect](https://orm.drizzle.team/docs/sql-schema-declaration)
+- [pnpm: working with Docker](https://pnpm.io/docker)
+- [pnpm: deploy command](https://pnpm.io/cli/deploy)
+- [Docker: free Docker Hardened Images](https://www.docker.com/blog/docker-hardened-images-for-every-developer/)
+- [npm: trusted publishers](https://docs.npmjs.com/trusted-publishers)
+- [TanStack advisory GHSA-g7cv-rxg3-hmpx (May 2026 compromise)](https://github.com/TanStack/router/security/advisories/GHSA-g7cv-rxg3-hmpx)
+- [Anthropic: donating Agent Skills to the Agentic AI Foundation](https://www.anthropic.com/news/donating-agent-skills-to-the-agentic-ai-foundation)
+- [Gloaguen et al., Evaluating AGENTS.md (arXiv 2602.11988)](https://arxiv.org/abs/2602.11988)
+- [unstorage drivers](https://unstorage.unjs.io/drivers)
+- [AdonisJS Drive on FlyDrive](https://docs.adonisjs.com/guides/digging-deeper/drive)
+- [Apache License 2.0](http://www.apache.org/licenses/LICENSE-2.0)
+
+* [TanStack Start 1.0 is stable](https://tanstack.com/blog/tanstack-start-1-0)
+* [TanStack Start: SEO guide](https://tanstack.com/start/latest/docs/framework/react/guide/seo)
+* [Astro 6 release](https://astro.build/blog/astro-6)
+
+- [Vietnam Personal Data Protection Law 91/2025/QH15](https://thuvienphapluat.vn/van-ban/Cong-nghe-thong-tin/Luat-Bao-ve-du-lieu-ca-nhan-2025-91-2025-QH15-625628.aspx)
+- [PwC: Decree 356/2025/ND-CP on personal data protection](https://www.pwc.com/vn/vn/publications/2026/20260128-new-rules-personal-data-protection.pdf)
+
+* [Oxlint: type-aware linting stable](https://oxc.rs/blog/2026-07-22-type-aware-linting-stable)
+* [BentoCache](https://www.npmjs.com/package/bentocache)
+* [tsdown](https://socket.dev/npm/package/tsdown/overview/0.22.0)
+* [CASL releases](https://github.com/stalniy/casl/releases)

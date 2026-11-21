@@ -1,0 +1,47 @@
+{
+  "name": "@bieberkit/testing",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Test app, factories and actingAs helpers.",
+  "keywords": [
+    "bieberkit"
+  ],
+  "license": "Apache-2.0",
+  "author": "Bieber Kieu <kieutrongthien@gmail.com>",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "@bieberkit/source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=24.12"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@bieberkit/core": "workspace:*",
+    "@bieberkit/http": "workspace:*",
+    "@bieberkit/data": "workspace:*",
+    "@bieberkit/auth": "workspace:*"
+  },
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "./package.json": "./package.json"
+    }
+  }
+}

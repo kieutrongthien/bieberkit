@@ -1,0 +1,40 @@
+{
+  "name": "bieberkit-monorepo",
+  "private": true,
+  "description": "BieberKit framework monorepo.",
+  "license": "Apache-2.0",
+  "author": "Bieber Kieu <kieutrongthien@gmail.com>",
+  "type": "module",
+  "engines": {
+    "node": ">=24.12",
+    "pnpm": ">=12"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "typecheck": "turbo run typecheck && tsc --noEmit -p tsconfig.json",
+    "lint": "oxlint --type-aware",
+    "format": "oxfmt",
+    "format:check": "oxfmt --check",
+    "test": "vitest run",
+    "check": "pnpm check:headers && pnpm check:layers && pnpm check:skills",
+    "check:headers": "node tools/check-headers.ts",
+    "check:layers": "node tools/check-layers.ts",
+    "check:skills": "node tools/sync-skills.ts --check",
+    "sync:skills": "node tools/sync-skills.ts",
+    "changeset": "changeset"
+  },
+  "packageManager": "pnpm@12.21.0",
+  "devDependencies": {
+    "@arethetypeswrong/cli": "0.18.5",
+    "@changesets/cli": "3.0.3",
+    "@types/node": "^24.19.2",
+    "oxfmt": "0.78.0",
+    "oxlint": "1.93.0",
+    "oxlint-tsgolint": "7.0.2007",
+    "publint": "0.3.25",
+    "tsdown": "0.23.7",
+    "turbo": "^2.11.11",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.12"
+  }
+}
