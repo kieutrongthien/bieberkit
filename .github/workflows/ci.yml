@@ -20,6 +20,8 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
+# Pull request and main checks. Release is a separate workflow (release.yml).
+# Every third-party action is pinned by commit SHA with its tag in a comment (SEC-13). Renovate keeps them current.
 name: CI
 
 on:
@@ -46,15 +48,16 @@ jobs:
         # Node.js 26 LTS is the default. Node.js 24 stays until its end of life on 2028-04-30.
         node: [26, 24]
     steps:
-      # SEC-13: Renovate (helpers:pinGitHubActionDigests) pins these to commit SHAs.
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
-      - uses: pnpm/setup@v1
+      # install: false, because the action's own install is not the frozen one below (SEC-12).
+      - uses: pnpm/setup@731dfb6463bbd11c11fd0ee11fe00ed0e36d48a1 # v3.2.0
         with:
           runtime: node@${{ matrix.node }}
           cache: true
+          install: false
 
       # SEC-12: frozen lockfile, dependency build scripts blocked unless allowlisted.
       - run: pnpm install --frozen-lockfile
@@ -64,3 +67,106 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm build
       - run: pnpm test
+
+  packages:
+    name: Packages and API report
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/setup@731dfb6463bbd11c11fd0ee11fe00ed0e36d48a1 # v3.2.0
+        with:
+          runtime: node@26
+          cache: true
+          install: false
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      # The committed API reports must match the build (spec 22.3, step 4).
+      - run: pnpm check:api
+      # Pack every package and run publint and attw (esm-only profile) on the tarballs (ADR 0014).
+      - run: pnpm check:packages
+
+  changeset:
+    name: Changeset for API changes
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: pnpm/setup@731dfb6463bbd11c11fd0ee11fe00ed0e36d48a1 # v3.2.0
+        with:
+          runtime: node@26
+          cache: false
+          install: false
+      # An existing API report that changed needs a changeset. The tool reads only git and Node.js built-ins.
+      - name: Require a changeset when an API report changed
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: node tools/api-report.ts --changeset-since "origin/$BASE_REF"
+
+  workflows:
+    name: Workflow lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # The linters are containers pinned by digest, so no third-party action is added to this workflow (ADR 0014).
+      # rhysd/actionlint 1.7.12
+      - name: actionlint
+        run: >-
+          docker run --rm --user "$(id -u):$(id -g)" -v "$PWD":/repo -w /repo
+          rhysd/actionlint@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667
+          -color=false .github/workflows/*.yml
+      # zizmor 1.32.0. Offline audits only, so it needs no token.
+      - name: zizmor
+        run: >-
+          docker run --rm -v "$PWD":/repo -w /repo
+          ghcr.io/zizmorcore/zizmor@sha256:3014cc8f68f663935f69b3c3e0e41f5ce102b268d97db13db0f62208747f860d
+          --no-online-audits --persona pedantic --format plain .github/workflows
+
+  services:
+    name: Database services
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # PostgreSQL, MySQL and Valkey for the integration tests of later phases (spec 9.1, section 21).
+    # The images are pinned by digest. The credentials exist only for this job.
+    services:
+      postgres:
+        image: postgres:15@sha256:10f9e886f772e9d6484350b043bcf990ead67ae5d9988ddce265d72a299055d5
+        env:
+          POSTGRES_PASSWORD: ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 12
+      mysql:
+        image: mysql:8.4@sha256:a81d043930e51745522bd5c430961cf8286f0a23f0a9a2a6e0108f7ea71b0902
+        env:
+          MYSQL_ROOT_PASSWORD: ci
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -pci" --health-interval 5s --health-timeout 5s --health-retries 20
+      valkey:
+        image: valkey/valkey:8@sha256:5032c4dd7abe08d6fd9382054608183e2bf1f7e3895ef619b8784698454325f7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "valkey-cli ping" --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      DATABASE_URL_POSTGRES: postgres://postgres:ci@127.0.0.1:5432/postgres
+      DATABASE_URL_MYSQL: mysql://root:ci@127.0.0.1:3306/mysql
+      REDIS_URL: redis://127.0.0.1:6379
+    steps:
+      - name: The three services answer on their ports
+        run: |
+          for port in 5432 3306 6379; do
+            timeout 10 bash -c "exec 3<>/dev/tcp/127.0.0.1/$port" && echo "port $port open"
+          done
