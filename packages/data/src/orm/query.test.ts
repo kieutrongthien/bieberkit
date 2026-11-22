@@ -282,13 +282,18 @@ describeDialects('DATA-07 the index rule', ({ open }) => {
 
   it('a direction that is not asc or desc is DATA_QUERY_INVALID', async () => {
     const { db, schemas } = await setup(open, 5);
+    const sort = [{ field: 'code', direction: 'up' }];
     // @ts-expect-error not a direction
-    const error = await failureOf(() =>
-      inTenant(db, TENANT_A, (em) => listPage(em, schemas.Customer, { sort: [{ field: 'code', direction: 'up' }] })),
-    );
+    const error = await failureOf(() => inTenant(db, TENANT_A, (em) => listPage(em, schemas.Customer, { sort })));
     expect(error.code).toBe('DATA_QUERY_INVALID');
   });
 });
+
+/** The codes of the customers of tenant A that a filter keeps, in order. */
+const codes = async (db: Database, schemas: CrmSchemas, where: Record<string, unknown>): Promise<unknown[]> =>
+  (await inTenant(db, TENANT_A, (em) => listPage(em, schemas.Customer, { where, sort: [{ field: 'code' }] }))).rows.map(
+    (row) => row['code'],
+  );
 
 describeDialects('DATA-21 filters on compared fields', ({ open }) => {
   async function named(): Promise<{ db: Database; schemas: CrmSchemas }> {
@@ -305,10 +310,6 @@ describeDialects('DATA-21 filters on compared fields', ({ open }) => {
     );
     return { db, schemas };
   }
-  const codes = async (db: Database, schemas: CrmSchemas, where: Record<string, unknown>): Promise<unknown[]> =>
-    (
-      await inTenant(db, TENANT_A, (em) => listPage(em, schemas.Customer, { where, sort: [{ field: 'code' }] }))
-    ).rows.map((row) => row['code']);
 
   it('an equal value matches whatever the case and the accents', async () => {
     const { db, schemas } = await named();

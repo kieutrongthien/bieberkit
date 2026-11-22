@@ -57,6 +57,8 @@ export interface ActionDef {
 /** The escape hatch of ADR 0009: extra indexes and property metadata merged into the generated ORM schema. */
 export interface OrmOverride {
   readonly indexes?: readonly { readonly properties: readonly string[]; readonly name?: string }[];
+  /** Composite unique constraints, by property names. Field flags cover the single column ones. */
+  readonly uniques?: readonly { readonly properties: readonly string[]; readonly name?: string }[];
   readonly properties?: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
 }
 

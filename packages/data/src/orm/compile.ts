@@ -26,8 +26,9 @@ import { BigIntType, DateTimeType, EntitySchema } from '@mikro-orm/core';
 import { requestContext } from '@bieberkit/core';
 import { dataError } from '../errors.ts';
 import { uuid7 } from '../keys/uuid7.ts';
-import { snake, standardColumns, tableConstraints } from '../schema/define-entity.ts';
+import { defineEntity, snake, standardColumns, tableConstraints } from '../schema/define-entity.ts';
 import type { EntityDef } from '../schema/define-entity.ts';
+import { Field, f } from '../schema/fields.ts';
 import type { FieldDef } from '../schema/fields.ts';
 import { fold } from '../text/fold.ts';
 import type { Compare } from '../text/fold.ts';
@@ -45,6 +46,58 @@ export interface CompileOptions {
 }
 
 type Property = Record<string, unknown>;
+
+const DEFINITIONS = new WeakMap<object, EntityDef<string>>();
+const TRANSLATIONS = new WeakMap<object, OrmSchema>();
+
+/** The schema that holds the translations of `schema`, if it has localized fields. */
+export function translationSchemaOf(schema: object): OrmSchema | undefined {
+  return TRANSLATIONS.get(schema);
+}
+
+/** The definition that a schema was compiled from, including the translation entities that the compiler adds. */
+export function entityOfSchema(schema: object): EntityDef<string> {
+  const def = DEFINITIONS.get(schema);
+  if (def === undefined) {
+    throw dataError(
+      'DATA_QUERY_INVALID',
+      400,
+      'This schema was not made by compileEntities.',
+      'Pass a schema from the list that compileEntities returned.',
+    );
+  }
+  return def;
+}
+
+/** The name of the entity that holds the translations of `entityName` (DATA-17). */
+export function translationEntityName(entityName: string): string {
+  return `${entityName}Translation`;
+}
+
+/** The entity of the translations of `def`, or `undefined` when no field is localized. It stays inside the rules of `defineEntity`. */
+function translationOf(def: EntityDef<string>, tenant: boolean): EntityDef<string> | undefined {
+  const localized = Object.entries(def.fields).filter(([, field]) => field.localized === true);
+  if (localized.length === 0) return undefined;
+  const copies: Record<string, Field> = {};
+  for (const [name, field] of localized) {
+    const { localized: _l, unique: _u, index: _i, searchable: _s, default: _d, computed: _c, ...rest } = field;
+    copies[name] = new Field({ ...rest, optional: true });
+  }
+  return defineEntity({
+    name: translationEntityName(def.name),
+    table: `${def.table}_i18n`,
+    tenant,
+    fields: { id: f.id(), record: f.belongsTo(() => def), locale: f.string({ max: 16 }), ...copies },
+    orm: {
+      uniques: [
+        {
+          name: `${def.table}_i18n_record_locale_uq`,
+          properties: [...(tenant ? ['tenantId'] : []), 'record', 'locale'],
+        },
+      ],
+    },
+  });
+}
 
 const DATETIME_PRECISION = 3;
 
@@ -225,8 +278,10 @@ function backRelation(owner: EntityDef<string>, field: string, target: EntityDef
  */
 export function compileEntities(defs: readonly EntityDef<string>[], options: CompileOptions = {}): OrmSchema[] {
   const shared = (options.tenancy ?? 'shared-schema') === 'shared-schema';
+  const translations = defs.flatMap((def) => translationOf(def, shared && def.tenant) ?? []);
+  const everything = [...defs, ...translations];
   const byName = new Map<string, EntityDef<string>>();
-  for (const def of defs) {
+  for (const def of everything) {
     if (byName.has(def.name)) invalid(def.name, 'it is listed twice.', 'List each entity once.');
     byName.set(def.name, def);
   }
@@ -246,7 +301,7 @@ export function compileEntities(defs: readonly EntityDef<string>[], options: Com
     return found;
   };
 
-  for (const def of defs) {
+  for (const def of everything) {
     const tenant = tenantOf(def);
     const props = standardProperties(def, tenant);
     const columnOfProperty = new Map<string, string>();
@@ -313,6 +368,11 @@ export function compileEntities(defs: readonly EntityDef<string>[], options: Com
         name: index.name ?? `${def.table}_${index.properties.map(snake).join('_')}_idx`,
         properties: [...index.properties],
       });
+    for (const unique of def.orm.uniques ?? [])
+      uniques.push({
+        name: unique.name ?? `${def.table}_${unique.properties.map(snake).join('_')}_uq`,
+        properties: [...unique.properties],
+      });
     for (const [property, extra] of Object.entries(def.orm.properties ?? {}))
       props[property] = { ...props[property], ...extra };
 
@@ -332,11 +392,19 @@ export function compileEntities(defs: readonly EntityDef<string>[], options: Com
       indexes,
       filters,
     } as never);
+    DEFINITIONS.set(schema, def);
     compiled.set(def.name, { schema, def, tenant });
   }
 
+  for (const translation of translations) {
+    const owner = byName.get(translation.name.slice(0, -'Translation'.length));
+    const base = owner === undefined ? undefined : schemaOf(owner.name);
+    const own = schemaOf(translation.name);
+    if (base !== undefined && own !== undefined) TRANSLATIONS.set(base, own);
+  }
+
   return [
-    ...defs.map((def) => schemaOf(def.name)).filter((schema): schema is OrmSchema => schema !== undefined),
+    ...everything.map((def) => schemaOf(def.name)).filter((schema): schema is OrmSchema => schema !== undefined),
     ...(options.raw ?? []),
   ];
 }

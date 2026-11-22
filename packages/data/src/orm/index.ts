@@ -36,3 +36,7 @@ export { restore, softDelete } from './softdelete.ts';
 export { currentTenantId, runAsTenant } from './tenant.ts';
 export type { AuditSink, SystemScopeEntry } from './tenant.ts';
 export { expectVersion } from './version.ts';
+export { listPage, queryableFields } from './query.ts';
+export type { ListOptions, Page, SortOption } from './query.ts';
+export { setTranslation, translationName } from './localize.ts';
+export { toApiRow, toOrmData } from './mapper.ts';

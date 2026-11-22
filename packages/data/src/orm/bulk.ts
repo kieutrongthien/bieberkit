@@ -23,6 +23,7 @@
  */
 
 import type { EntityManager } from '@mikro-orm/core';
+import { ReferenceKind } from '@mikro-orm/core';
 import { raw } from '@mikro-orm/core';
 import { requestContext } from '@bieberkit/core';
 import { uuid7 } from '../keys/uuid7.ts';
@@ -44,16 +45,28 @@ export async function bulkInsert(em: EntityManager, schema: OrmSchema, rows: rea
   const tenant = 'tenantId' in meta.properties ? requireTenant() : undefined;
   const user = requestContext.get()?.userId;
   const now = new Date();
-  const prepared = rows.map((row) => ({
-    id: uuid7(),
-    version: 1,
-    createdAt: now,
-    updatedAt: now,
-    ...(user === undefined ? {} : { createdBy: user, updatedBy: user }),
-    ...row,
-    ...(tenant === undefined || (isSystemScope() && row['tenantId'] !== undefined) ? {} : { tenantId: tenant }),
-    ...shadowValues(shadows, row),
-  }));
+  const prepared = rows.map((row) => {
+    const made: Row = {
+      id: uuid7(),
+      version: 1,
+      createdAt: now,
+      updatedAt: now,
+      ...(user === undefined ? {} : { createdBy: user, updatedBy: user }),
+      ...row,
+      ...(tenant === undefined || (isSystemScope() && row['tenantId'] !== undefined) ? {} : { tenantId: tenant }),
+      ...shadowValues(shadows, row),
+    };
+    return made;
+  });
+  // `insertMany` of MikroORM 7.2.9 gives the shared `tenant_id` column to the first row only when a relation also uses it,
+  // so a table with a composite tenant key is inserted one row at a time. The other tables go in chunks.
+  const composite = Object.values(meta.properties).some(
+    (property) => property.kind === ReferenceKind.MANY_TO_ONE && (property.joinColumns?.length ?? 0) > 1,
+  );
+  if (composite) {
+    for (const row of prepared) await em.insert(schema, row);
+    return;
+  }
   for (let start = 0; start < prepared.length; start += CHUNK) {
     await em.insertMany(schema, prepared.slice(start, start + CHUNK));
   }

@@ -43,6 +43,12 @@ async function failureOf(run: () => Promise<unknown>): Promise<DataError> {
   throw new Error('Expected a DataError.');
 }
 
+/** The property names of the translation schema, as compiled for a tenancy mode. */
+const properties = (tenancy: 'single' | 'shared-schema'): string[] =>
+  Object.keys(
+    Object(Reflect.get(Object(Reflect.get(compileEntities([Page], { tenancy })[1] ?? {}, 'meta')), 'properties')),
+  );
+
 describe('DATA-17 the translation schema', () => {
   it('an entity with localized fields compiles to the entity and its translation, in that order', () => {
     const schemas = compileEntities([Page]);
@@ -60,10 +66,6 @@ describe('DATA-17 the translation schema', () => {
   });
 
   it('the translation has its own tenant column only when the entity has one, and the foreign key follows', () => {
-    const properties = (tenancy: 'single' | 'shared-schema') =>
-      Object.keys(
-        Object(Reflect.get(Object(Reflect.get(compileEntities([Page], { tenancy })[1] ?? {}, 'meta')), 'properties')),
-      );
     expect(properties('shared-schema')).toEqual(
       expect.arrayContaining(['tenantId', 'record', 'locale', 'title', 'body']),
     );
@@ -219,7 +221,7 @@ describeDialects('DATA-17 reading with a locale', ({ open }) => {
     const { db, schemas, ids } = await setup(open);
     await inTenant(db, TENANT_A, (em) => setTranslation(em, schemas.Page, ids[0] ?? '', 'en', { title: 'Page 0' }));
     await inTenant(db, TENANT_A, async (em) => {
-      (await em.findOneOrFail(schemas.Page, { id: ids[0] ?? '' }))['slug'] = 'renamed';
+      (await em.findOneOrFail(schemas.Page, { id: ids[0] ?? '' }))['slug'] = 'a-renamed';
       await em.flush();
     });
     const [row] = (await inTenant(db, TENANT_A, (em) => listPage(em, schemas.Page, { sort: [{ field: 'slug' }] })))

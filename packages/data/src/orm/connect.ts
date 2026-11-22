@@ -49,6 +49,8 @@ export interface DatabaseOptions {
   /** The CASL read rule that decides which referenced ids a user may see (DATA-20). */
   readonly references?: ReferenceVisibility;
   readonly logger?: Logger;
+  /** Receives the text of every query. For tests that count queries (PERF-04). */
+  readonly queryLog?: (sql: string) => void;
 }
 
 /** The MikroORM instance, whichever driver it runs on. */
@@ -148,6 +150,14 @@ export function resolveConnection(env: DatabaseEnv): ResolvedConnection {
   return { dialect: primary.dialect, location: primary.location, readLocations };
 }
 
+/** MikroORM logs `[query] sql [took 1 ms]`. The callback gets the sql only. */
+function queryLogger(sink: (sql: string) => void): (message: string) => void {
+  return (message) => {
+    const match = /^\[query\]\s*([\s\S]*?)(?:\s*\[took [\s\S]*)?$/.exec(message);
+    if (match?.[1] !== undefined) sink(match[1]);
+  };
+}
+
 /**
  * Connects and returns the database. Every dialect runs in UTC, and the global EntityManager is switched off, so a request
  * can only reach the database through its own fork (DATA-04, DATA-05). Only the driver of the chosen dialect is loaded.
@@ -163,6 +173,9 @@ export async function createDatabase(env: DatabaseEnv, options: DatabaseOptions)
     // The class extends the EntityManager of every SQL driver, and MikroORM types it per driver.
     // oxlint-disable-next-line typescript/no-unsafe-type-assertion
     entityManager: BieberEntityManager as never,
+    ...(options.queryLog === undefined
+      ? {}
+      : { debug: ['query'] as ['query'], colors: false, logger: queryLogger(options.queryLog) }),
     subscribers: [new DataSubscriber(options.references)],
   } as const;
   const pool = { min: 0, max: env.DB_POOL_MAX };
