@@ -75,10 +75,11 @@ export function defineModule(input: ModuleInput): ModuleDef {
 
 /** Registers the services of a module in the container. A name used twice is `CORE_SERVICE_DUPLICATE`. */
 export function registerModule(container: Container, def: ModuleDef): void {
-  for (const [name, registration] of Object.entries(def.services)) {
+  for (const name of Object.keys(def.services)) {
+    const registration: unknown = Reflect.get(def.services, name);
     if (registration === undefined) continue;
-    // `ServiceDefs` ties each name to its own registration type, which `Object.entries` cannot keep.
+    // `ServiceDefs` ties each name to its own registration type, which `Object.keys` cannot keep.
     // oxlint-disable-next-line typescript/no-unsafe-type-assertion
-    container.register(name as ServiceName, registration);
+    container.register(name as ServiceName, registration as Registration<ServiceName>);
   }
 }
