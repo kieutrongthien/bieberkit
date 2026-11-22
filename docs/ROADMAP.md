@@ -140,13 +140,14 @@ Done when: a test app boots a module and a plugin graph, fails on a missing env 
 
 Depends on: M1.1.
 
-- [ ] **[D]** Field DSL `f.*`: id, string, email, oneOf, decimal, money, sequence, createdAt, updatedAt, belongsTo, hasMany, hasOne, state, computed (§10.1, MOD-08, MOD-11, MOD-12)
-- [ ] **[D]** `defineEntity` compiling to MikroORM metadata, JSON Schema 2020-12, Zod 4 Mini and TypeScript types (SCH-01 to SCH-04)
-- [ ] Unicode NFC normalization at the validation boundary; code point length semantics; shared fixtures through Ajv and Zod Mini fail CI on disagreement (SCH-03, SCH-05)
+- [x] **[D]** Field DSL `f.*`: id, string, email, oneOf, decimal, money, sequence, createdAt, updatedAt, belongsTo, hasMany, hasOne, state, computed (§10.1, MOD-08, MOD-11, MOD-12)
+- [x] **[D]** `defineEntity` compiling to JSON Schema 2020-12, Zod 4 Mini and TypeScript types (SCH-01 to SCH-04)
+- [ ] **[D]** `defineEntity` compiling to MikroORM metadata (SCH-01, ADR 0009)
+- [x] Unicode NFC normalization at the validation boundary; code point length semantics; shared fixtures through Ajv and Zod Mini fail CI on disagreement (SCH-03, SCH-05)
 - [ ] Write helpers that add shadow column values for bulk writes, and a `bieberkit check` rule that flags direct `nativeUpdate` or `insert` on entities with compared fields (DATA-21, ADR 0009)
-- [ ] `f.custom` takes schema values only, with a bundle size test that fails when a whole validator library is pulled into the client (SCH-07, ADR 0009)
+- [x] `f.custom` takes schema values only, with a bundle size test that fails when a whole validator library is pulled into the client (SCH-07, ADR 0009)
 - [ ] Standalone Ajv and fast-json-stringify modules emitted at build (SCH-06, PERF-06)
-- [ ] Standard columns and entity options: `version`, `created_by`, `updated_by`, `deleted_at`, `deleted_token` (DATA-18)
+- [ ] Standard columns and entity options (`standardColumns` and `tableConstraints` are done, the ORM columns are not): `version`, `created_by`, `updated_by`, `deleted_at`, `deleted_token` (DATA-18)
 - [x] UUIDv7 keys, native storage per dialect (DATA-03, DATA-14)
 - [x] UTC timestamps (DATA-04); request context per request and per job (DATA-05)
 - [ ] Pagination limits, keyset cursor, `withTotal` (DATA-06, DATA-11); index required for filter and sort fields (DATA-07)

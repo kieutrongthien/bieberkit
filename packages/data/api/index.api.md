@@ -28,6 +28,7 @@
 Generated from the built declaration files by `pnpm api:update`. Do not edit by hand. A change here is a change to the public API and needs a changeset (spec section 22.3).
 
 ```ts
+import { A as SchemaValue, C as ColumnDef, D as FieldDef, E as FieldBuilders, F as codePointLength, I as fold, L as nfc, M as TransitionDef, N as f, O as FieldKind, P as Compare, S as tableConstraints, T as Field, _ as StandardColumn, a as UpdateInput, b as snake, c as AdminOptions, d as EntityDef, f as EntityOptions, g as Permissions, h as OrmOverride, i as Row, j as StateOptions, k as ResetEvery, l as ApiOptions, m as FieldLike, n as EntityRegistry, p as Feature, s as ActionDef, t as CreateInput, u as ConstraintDef, v as TableConstraints, w as ComputedFn, x as standardColumns, y as defineEntity } from "./registry-ByPyP6V3.js";
 import { BkError } from "@bieberkit/core";
 export declare class DataError extends BkError {}
 export declare function dataError(code: string, status: number, message: string, fix: string, cause?: unknown): DataError;
@@ -40,10 +41,6 @@ export declare function uuid7ToBytes(id: string): Uint8Array;
 export declare function uuid7FromBytes(bytes: Uint8Array): string;
 export declare function createUuid7(options?: Uuid7Options): () => string;
 export declare const uuid7: () => string;
-type Compare = "exact" | "ci" | "ci_ai";
-export declare function nfc(text: string): string;
-export declare function fold(mode: Compare, text: string): string;
-export declare function codePointLength(text: string): number;
 export declare const SAFE_MAX: bigint;
 export declare function assertSafeScaled(value: bigint, label: string): void;
 export declare function minorUnitOf(currency: string): number;
@@ -58,5 +55,5 @@ export declare function pageSize(requested: unknown, fallback?: number): number;
 export declare function encodeCursor(position: readonly CursorValue[]): string;
 export declare function decodeCursor(cursor: string): readonly CursorValue[];
 export declare const packageName = "@bieberkit/data";
-export type { Compare, CursorValue, Uuid7Options };
+export { type ActionDef, type AdminOptions, type ApiOptions, type ColumnDef, type Compare, type ComputedFn, type ConstraintDef, type CreateInput, type CursorValue, type EntityDef, type EntityOptions, type EntityRegistry, type Feature, Field, type FieldBuilders, type FieldDef, type FieldKind, type FieldLike, type OrmOverride, type Permissions, type ResetEvery, type Row, type SchemaValue, type StandardColumn, type StateOptions, type TableConstraints, type TransitionDef, type UpdateInput, type Uuid7Options, codePointLength, defineEntity, f, fold, nfc, snake, standardColumns, tableConstraints };
 ```
