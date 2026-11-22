@@ -102,7 +102,7 @@ function isPlain(value: unknown): value is Row {
   return typeof value === 'object' && value !== null && Object.getPrototypeOf(value) === Object.prototype;
 }
 
-function knownFields(schema: OrmSchema): Map<string, Known> {
+export function knownFields(schema: OrmSchema): Map<string, Known> {
   const def = entityOfSchema(schema);
   const known = new Map<string, Known>();
   const standard = (name: string, instant: boolean): void =>
@@ -200,7 +200,7 @@ function valueOf(field: Known, mode: 'ci' | 'ci_ai' | undefined, value: unknown)
 }
 
 /** Checks every field of a filter against the index rule, and turns compared fields into lookups on their shadow column. */
-function translateWhere(schema: OrmSchema, known: ReadonlyMap<string, Known>, where: unknown): Row {
+export function translateWhere(schema: OrmSchema, known: ReadonlyMap<string, Known>, where: unknown): Row {
   if (!isPlain(where)) return queryInvalid('A filter must be an object.', 'Write the filter as { field: value }.');
   const def = entityOfSchema(schema);
   const out: Row = {};

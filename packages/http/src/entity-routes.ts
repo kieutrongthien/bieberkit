@@ -24,6 +24,7 @@
 
 import { DataError, dataError } from '@bieberkit/data';
 import {
+  aggregate,
   emitEvent,
   entityEventName,
   entityOfSchema,
@@ -411,6 +412,95 @@ export function entityRoutes(schema: OrmSchema, context: EntityRoutesContext): R
             },
           };
         }),
+    });
+  }
+
+  // The aggregate route: counts and sums by group, for dashboards (API-15). It is only for entities that have a field declared
+  // `.aggregatable()`, and it reads through the same filters as a list.
+  if (def.api.list === true && Object.values(def.fields).some((field) => field.aggregatable === true)) {
+    const list = '^[A-Za-z][A-Za-z0-9]*(,[A-Za-z][A-Za-z0-9]*)*$';
+    const query = listQuery(reader, false);
+    routes.push({
+      method: 'GET',
+      url: `${base}/aggregate`,
+      permission: permissionOf(def, 'read'),
+      schema: {
+        query: {
+          ...query,
+          properties: {
+            groupBy: { type: 'string', pattern: list },
+            sum: { type: 'string', pattern: list },
+            count: { type: 'boolean' },
+          },
+          patternProperties: {
+            '^filter\\[[A-Za-z][A-Za-z0-9]*\\]\\[(eq|ne|in|lt|lte|gt|gte|null)\\]$': { type: 'string' },
+          },
+        },
+        response: {
+          200: {
+            type: 'object',
+            properties: {
+              data: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    group: { type: 'object', additionalProperties: true },
+                    count: { type: 'integer' },
+                    sum: { type: 'object', additionalProperties: true },
+                  },
+                },
+              },
+              meta: {
+                type: 'object',
+                properties: {
+                  groupBy: { type: 'array', items: { type: 'string' } },
+                  sum: { type: 'array', items: { type: 'string' } },
+                  count: { type: 'boolean' },
+                },
+              },
+            },
+          },
+        },
+      },
+      handler: async (ctx) => {
+        const groupKeys = namesOf(textOf(ctx.query['groupBy']));
+        const sumKeys = namesOf(textOf(ctx.query['sum']));
+        const nameOf = (key: string): string => reader.byKey.get(key)?.name ?? key;
+        // A field with a mask is read only by a caller who may read it, in a group and in a sum as in a list (AUTHZ-03).
+        for (const name of [...groupKeys, ...sumKeys].map(nameOf)) {
+          const mask = def.permissions.fields?.[name]?.read;
+          if (mask !== undefined && !(await ctx.can(mask))) {
+            throw new HttpError(
+              'HTTP_FORBIDDEN',
+              403,
+              'You may not read this field.',
+              `The permission ${mask} is needed.`,
+            );
+          }
+        }
+        const count = ctx.query['count'] === true ? true : ctx.query['count'] === false ? false : undefined;
+        const result = await runInUnitOfWork(db, (em) =>
+          aggregate(em, schema, {
+            groupBy: groupKeys.map(nameOf),
+            sum: sumKeys.map(nameOf),
+            where: whereOf(ctx.query, reader),
+            ...(count === undefined ? {} : { count }),
+          }),
+        );
+        const keyOf = (name: string): string =>
+          [...reader.byKey.values()].find((field) => field.name === name)?.key ?? name;
+        return {
+          data: result.rows.map((row) => ({
+            group: Object.fromEntries(Object.entries(row.group).map(([name, value]) => [keyOf(name), value])),
+            ...(row.count === undefined ? {} : { count: row.count }),
+            ...(row.sum === undefined
+              ? {}
+              : { sum: Object.fromEntries(Object.entries(row.sum).map(([name, value]) => [keyOf(name), value])) }),
+          })),
+          meta: { groupBy: groupKeys, sum: sumKeys, count: count ?? sumKeys.length === 0 },
+        };
+      },
     });
   }
 

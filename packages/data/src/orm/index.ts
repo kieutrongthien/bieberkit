@@ -22,6 +22,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+export { aggregate } from './aggregate.ts';
+export type { AggregateOptions, AggregateResult, AggregateRow } from './aggregate.ts';
 export { auditTableSink, recordAudit } from './audit.ts';
 export type { AuditEntry } from './audit.ts';
 export {

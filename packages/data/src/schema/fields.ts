@@ -78,6 +78,7 @@ export interface FieldDef {
   readonly unique?: true;
   readonly index?: true;
   readonly searchable?: true;
+  readonly aggregatable?: true;
   readonly localized?: true;
   readonly inline?: true;
   readonly default?: unknown;
@@ -109,6 +110,7 @@ interface Chain<Self> {
   unique(): Self;
   index(): Self;
   searchable(): Self;
+  aggregatable(): Self;
   localized(): Self;
 }
 
@@ -179,6 +181,18 @@ const SCALAR_KINDS: ReadonlySet<FieldKind> = new Set<FieldKind>([
   'money',
 ]);
 const TEXT_KINDS: ReadonlySet<FieldKind> = new Set<FieldKind>(['string', 'text', 'email']);
+/** What can be grouped by (all) or summed (`int` and `decimal`). Money needs a sum for each currency, and an instant needs a bucket: both come later. */
+const AGGREGATABLE_KINDS: ReadonlySet<FieldKind> = new Set<FieldKind>([
+  'string',
+  'email',
+  'oneOf',
+  'boolean',
+  'date',
+  'int',
+  'decimal',
+  'belongsTo',
+  'state',
+]);
 
 function invalid(message: string, fix: string): never {
   throw dataError('DATA_FIELD_INVALID', 500, message, fix);
@@ -253,6 +267,17 @@ export class Field {
   searchable(): Field {
     if (!TEXT_KINDS.has(this.def.kind)) this.#reject('.searchable()');
     return this.#with({ searchable: true });
+  }
+
+  /** The field may be grouped by, or summed, in the aggregate endpoint (API-15). */
+  aggregatable(): Field {
+    if (!AGGREGATABLE_KINDS.has(this.def.kind)) this.#reject('.aggregatable()');
+    if (this.def.computed?.stored === false)
+      invalid(
+        'A computed field that is not stored cannot be aggregated.',
+        'Pass { stored: true } to .computed(), or remove .aggregatable().',
+      );
+    return this.#with({ aggregatable: true });
   }
 
   localized(): Field {
