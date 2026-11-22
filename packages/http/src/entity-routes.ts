@@ -33,6 +33,7 @@ import {
   runInUnitOfWork,
   softDelete,
   toApiRow,
+  transition,
   toOrmData,
 } from '@bieberkit/data/orm';
 import type { Database, OrmSchema } from '@bieberkit/data/orm';
@@ -56,6 +57,8 @@ export interface EntityRoutesContext {
 }
 
 const MAX_PAGE_ROWS = 10_000;
+const MAX_BULK = 500;
+const MAX_BULK_INLINE = 100;
 const DEFAULT_PAGE_SIZE = 25;
 const MAX_PAGE_SIZE = 100;
 const FILTER = /^filter\[([A-Za-z][A-Za-z0-9]*)\]\[(eq|ne|in|lt|lte|gt|gte|null)\]$/;
@@ -301,11 +304,11 @@ export function entityRoutes(schema: OrmSchema, context: EntityRoutesContext): R
   const reader = readerOf(def, context);
   const base = pathOf(def);
   const { db } = context;
-  const row = rowSchema(def);
+  const rowShape = rowSchema(def);
   const withIncludes: JsonSchema = {
-    ...row,
+    ...rowShape,
     properties: {
-      ...asRow(row['properties']),
+      ...asRow(rowShape['properties']),
       ...Object.fromEntries(
         [...reader.includes].map(([name, target]) => [
           name,
@@ -438,6 +441,7 @@ export function entityRoutes(schema: OrmSchema, context: EntityRoutesContext): R
       method: 'POST',
       url: base,
       permission: permissionOf(def, 'create'),
+      idempotent: true,
       schema: { body: toJsonSchema(def, 'create'), response: { 201: single } },
       handler: (ctx) =>
         runInUnitOfWork(db, async (em) => {
@@ -523,6 +527,213 @@ export function entityRoutes(schema: OrmSchema, context: EntityRoutesContext): R
       },
     });
   }
+
+  // The transitions of a state field are routes of their own (MOD-06). The body is the input of the transition, which `transition`
+  // checks against the schema that the transition declares.
+  const machine = Object.values(def.fields).find((field) => field.kind === 'state' && field.transitions !== undefined);
+  const transitions = machine?.transitions ?? {};
+  const anyApi = Object.values(def.api).some((on) => on === true);
+  if (anyApi) {
+    for (const [name, declared] of Object.entries(transitions)) {
+      routes.push({
+        method: 'POST',
+        url: `${base}/:id/actions/${name}`,
+        permission: declared.permission ?? permissionOf(def, 'update'),
+        schema: { params: idParams, body: {}, response: { 200: single } },
+        handler: (ctx) => {
+          const id = String(ctx.params['id']);
+          const expected = ifMatchOf(ctx);
+          const empty =
+            ctx.body === undefined ||
+            (typeof ctx.body === 'object' && ctx.body !== null && Object.keys(ctx.body).length === 0);
+          return withCurrent(db, schema, id, () =>
+            runInUnitOfWork(db, async (em) => {
+              const found = await em.findOne(schema, { id });
+              if (found === null) throw recordNotFound();
+              expectVersion(found, expected);
+              await transition(em, schema, found, name, empty ? undefined : ctx.body);
+              await em.flush();
+              return { data: toApiRow(schema, found) };
+            }),
+          );
+        },
+      });
+    }
+  }
+
+  // One route for the bulk operations (API-14, API-17). It needs `read`, and the handler asks for the permission of the operation.
+  if (def.api.update === true || def.api.delete === true || (anyApi && Object.keys(transitions).length > 0)) {
+    const { $schema: _s, $id: _i, ...patch } = toJsonSchema(def, 'update');
+    const item: JsonSchema = {
+      type: 'object',
+      properties: { id: { type: 'string', format: 'uuid' }, version: { type: 'integer', minimum: 1 } },
+      required: ['id', 'version'],
+      additionalProperties: false,
+    };
+    const operations = [
+      ...(def.api.update === true ? ['update'] : []),
+      ...(def.api.delete === true ? ['delete'] : []),
+      ...(Object.keys(transitions).length > 0 ? ['transition'] : []),
+    ];
+    routes.push({
+      method: 'POST',
+      url: `${base}/bulk`,
+      permission: permissionOf(def, 'read'),
+      schema: {
+        body: {
+          type: 'object',
+          properties: {
+            operation: { enum: operations },
+            items: { type: 'array', minItems: 1, maxItems: MAX_BULK, items: item },
+            data: patch,
+            transition: { type: 'string' },
+            input: {},
+          },
+          required: ['operation', 'items'],
+          additionalProperties: false,
+        },
+        response: {
+          200: {
+            type: 'object',
+            properties: {
+              data: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    id: { type: 'string' },
+                    status: { enum: ['ok', 'conflict', 'not_found', 'invalid'] },
+                    version: { type: 'integer' },
+                    error: { type: 'object', properties: { code: { type: 'string' }, message: { type: 'string' } } },
+                  },
+                },
+              },
+              meta: {
+                type: 'object',
+                properties: {
+                  requested: { type: 'integer' },
+                  succeeded: { type: 'integer' },
+                  failed: { type: 'integer' },
+                },
+              },
+            },
+          },
+        },
+      },
+      handler: (ctx) => bulk(ctx),
+    });
+  }
+
+  async function bulk(ctx: RouteContext): Promise<unknown> {
+    const body = asRow(ctx.body);
+    const operation = String(body['operation']);
+    const requested = (Array.isArray(body['items']) ? body['items'] : []).map(asRow);
+    const ids = requested.map((entry) => String(entry['id']));
+    if (new Set(ids).size !== ids.length) {
+      throw new ValidationFailed([
+        { path: 'body.items', keyword: 'uniqueItems', message: 'must not name a record twice' },
+      ]);
+    }
+    const name = textOf(body['transition']);
+    const declared = name === undefined ? undefined : transitions[name];
+    let permission: string;
+    if (operation === 'update') {
+      if (body['data'] === undefined)
+        throw new ValidationFailed([{ path: 'body.data', keyword: 'required', message: 'an update needs data' }]);
+      permission = permissionOf(def, 'update');
+    } else if (operation === 'delete') {
+      permission = permissionOf(def, 'delete');
+    } else {
+      if (declared === undefined)
+        throw new ValidationFailed([
+          {
+            path: 'body.transition',
+            keyword: 'enum',
+            message: `must be one of ${Object.keys(transitions).join(', ')}`,
+          },
+        ]);
+      permission = declared.permission ?? permissionOf(def, 'update');
+    }
+    if (!(await ctx.can(permission))) {
+      throw new HttpError('HTTP_FORBIDDEN', 403, 'You may not do this.', `The permission ${permission} is needed.`);
+    }
+    if (requested.length > MAX_BULK_INLINE) {
+      throw new HttpError(
+        'HTTP_BULK_TOO_LARGE',
+        422,
+        `${requested.length} items are more than ${MAX_BULK_INLINE}.`,
+        `Send up to ${MAX_BULK_INLINE} items. Larger batches run as a queued job, which needs the queue of M1.5.`,
+      );
+    }
+    return runInUnitOfWork(db, async (em) => {
+      const found = await em.find(schema, { id: { $in: ids } });
+      const byId = new Map(found.map((record) => [String(record['id']), record]));
+      const outcomes: { id: string; status: string; version?: number; error?: { code: string; message: string } }[] =
+        [];
+      const saved: { id: string; row: Row }[] = [];
+      for (const entry of requested) {
+        const id = String(entry['id']);
+        const row = byId.get(id);
+        if (row === undefined) {
+          outcomes.push({ id, status: 'not_found' });
+          continue;
+        }
+        try {
+          expectVersion(row, Number(entry['version']));
+        } catch (error) {
+          if (!(error instanceof DataError)) throw error;
+          const version = typeof row['version'] === 'number' ? row['version'] : undefined;
+          outcomes.push({
+            id,
+            status: 'conflict',
+            ...(version === undefined ? {} : { version }),
+            error: { code: error.code, message: error.safeMessage },
+          });
+          continue;
+        }
+        const next = (typeof row['version'] === 'number' ? row['version'] : 0) + 1;
+        try {
+          if (operation === 'update') {
+            const data = asRow(body['data']);
+            em.assign(row, toOrmData(schema, data, 'update'));
+            emitEvent(em, {
+              name: event('updated'),
+              payload: { id, fields: Object.keys(data) },
+              record: { entity: def.name, id, version: next },
+            });
+            recordAudit(em, {
+              action: `${def.name}.update`,
+              entity: def.name,
+              recordId: id,
+              data: { fields: Object.keys(data) },
+            });
+          } else if (operation === 'delete') {
+            emitEvent(em, { name: event('deleted'), payload: { id }, record: { entity: def.name, id, version: next } });
+            recordAudit(em, { action: `${def.name}.delete`, entity: def.name, recordId: id });
+            if (def.softDelete) softDelete(em, row);
+            else em.remove(row);
+          } else {
+            await transition(em, schema, row, String(name), body['input']);
+          }
+        } catch (error) {
+          if (!(error instanceof DataError)) throw error;
+          outcomes.push({ id, status: 'invalid', error: { code: error.code, message: error.safeMessage } });
+          continue;
+        }
+        saved.push({ id, row });
+        outcomes.push({ id, status: 'ok' });
+      }
+      await em.flush();
+      for (const outcome of outcomes) {
+        const row = saved.find((item) => item.id === outcome.id)?.row;
+        const version = row === undefined ? undefined : row['version'];
+        if (outcome.status === 'ok' && operation !== 'delete' && typeof version === 'number') outcome.version = version;
+      }
+      const succeeded = outcomes.filter((outcome) => outcome.status === 'ok').length;
+      return { data: outcomes, meta: { requested: requested.length, succeeded, failed: requested.length - succeeded } };
+    });
+  }
+
   return routes;
 }
 

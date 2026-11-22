@@ -54,6 +54,8 @@ export interface RouteContext {
   status(code: number): void;
   /** Sets a header of the answer. */
   header(name: string, value: string): void;
+  /** Whether the caller has `permission`, for a check that depends on the request, such as the operation of a bulk call. */
+  can(permission: string): Promise<boolean>;
 }
 
 export interface RouteDef {
@@ -63,6 +65,16 @@ export interface RouteDef {
   readonly permission?: string;
   readonly public?: true;
   readonly schema: RouteSchema;
+  /** A POST route that honors `Idempotency-Key` (spec 13.1). */
+  readonly idempotent?: true;
+  /** Marks the route as deprecated, with the dates that clients are told (API-16). Dates are `YYYY-MM-DD`. */
+  readonly deprecated?: { readonly since?: string; readonly sunset?: string; readonly link?: string };
+  /** For a public GET: how long a shared cache keeps the answer, and the tags that purge it (API-09). */
+  readonly cache?: {
+    readonly sMaxAge: number;
+    readonly staleWhileRevalidate?: number;
+    readonly tags?: readonly string[];
+  };
   /** Returns the body of the answer, or a promise of it. */
   handler(ctx: RouteContext): unknown;
 }

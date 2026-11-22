@@ -40,6 +40,9 @@
     "@bieberkit/data": "workspace:*",
     "fastify": "5.12.8"
   },
+  "devDependencies": {
+    "zod": "4.6.7"
+  },
   "engines": {
     "node": ">=24.12"
   }

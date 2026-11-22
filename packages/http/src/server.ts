@@ -30,6 +30,8 @@ import type { Logger } from '@bieberkit/core';
 import { createAjv, issuesOf } from '@bieberkit/data/build';
 import { normalizeInput } from '@bieberkit/data/schema';
 import type { AjvError, AjvInstance } from '@bieberkit/data/build';
+import { createMemoryIdempotencyStore } from './idempotency.ts';
+import type { IdempotencyStore } from './idempotency.ts';
 import { HttpError, ValidationFailed, describeError } from './problem.ts';
 import type { Authenticator, Authorizer, Principal, RateLimiter, RequestInfo, TenantResolver } from './ports.ts';
 import { METHODS } from './route.ts';
@@ -79,6 +81,8 @@ export interface HttpServerOptions {
   readonly requestTimeoutMs?: number;
   /** Milliseconds. Defaults to 65 000, above the 60 seconds that load balancers commonly wait. */
   readonly keepAliveTimeoutMs?: number;
+  /** Where the answers of idempotent requests are kept. Defaults to a memory store, which is for one process. */
+  readonly idempotencyStore?: IdempotencyStore;
   /** Called for an error that is a bug of ours (a 5xx), after it was logged (OBS-06). */
   readonly onError?: (error: unknown, context: ErrorContext) => void;
 }
@@ -128,9 +132,66 @@ interface RequestState {
   tenantId: string | undefined;
   status: number | undefined;
   readonly headers: Record<string, string>;
+  /** The key of an idempotent request that is running, so that its answer is kept. */
+  idempotencyKey: string | undefined;
+  replayed: boolean;
 }
 
 type Compiled = ((data: unknown) => boolean) & { errors?: AjvError[] | null };
+
+/** `Deprecation`, `Sunset` and `Link` for a deprecated route (API-16, RFC 9745 and RFC 8594). */
+function announceDeprecation(reply: FastifyReply, deprecated: NonNullable<RouteDef['deprecated']>): void {
+  void reply.header(
+    'deprecation',
+    deprecated.since === undefined ? 'true' : `@${Date.parse(`${deprecated.since}T00:00:00Z`) / 1000}`,
+  );
+  if (deprecated.sunset !== undefined)
+    void reply.header('sunset', new Date(`${deprecated.sunset}T00:00:00Z`).toUTCString());
+  if (deprecated.link !== undefined) void reply.header('link', `<${deprecated.link}>; rel="deprecation"`);
+}
+
+/** What a shared cache may do with a public answer, and the tags that purge it (API-09). */
+function announceCache(reply: FastifyReply, cache: NonNullable<RouteDef['cache']>): void {
+  const stale =
+    cache.staleWhileRevalidate === undefined ? '' : `, stale-while-revalidate=${cache.staleWhileRevalidate}`;
+  void reply.header('cache-control', `public, s-maxage=${cache.sMaxAge}${stale}`);
+  if (cache.tags !== undefined && cache.tags.length > 0) void reply.header('cache-tag', cache.tags.join(','));
+}
+
+const whole = (value: number | undefined): boolean => value === undefined || (Number.isInteger(value) && value >= 0);
+
+const DAY = /^\d{4}-\d{2}-\d{2}$/;
+const isDay = (value: string): boolean => {
+  const time = Date.parse(`${value}T00:00:00Z`);
+  return DAY.test(value) && !Number.isNaN(time) && new Date(time).toISOString().startsWith(value);
+};
+
+/** Why the options of a route for deprecation, caching or idempotency are not allowed, or `undefined`. */
+function optionProblem(route: RouteDef): string | undefined {
+  if (route.idempotent === true && route.method !== 'POST') return 'only a POST route can be idempotent.';
+  const deprecated = route.deprecated;
+  if (deprecated !== undefined) {
+    if (deprecated.since !== undefined && !isDay(deprecated.since))
+      return 'deprecated.since is not a date (YYYY-MM-DD).';
+    if (deprecated.sunset !== undefined && !isDay(deprecated.sunset))
+      return 'deprecated.sunset is not a date (YYYY-MM-DD).';
+    if (deprecated.since !== undefined && deprecated.sunset !== undefined && deprecated.sunset < deprecated.since) {
+      return 'deprecated.sunset is before deprecated.since.';
+    }
+    if (deprecated.link !== undefined && !/^(https:\/\/|\/)\S+$/.test(deprecated.link))
+      return 'deprecated.link is not an https url or a path.';
+  }
+  const cache = route.cache;
+  if (cache !== undefined) {
+    if (route.method !== 'GET' || route.public !== true)
+      return 'cache is only for a public GET, because a shared cache must not keep an answer that depends on the caller.';
+    if (!whole(cache.sMaxAge) || !whole(cache.staleWhileRevalidate))
+      return 'the times of cache are whole numbers of seconds, 0 or more.';
+    if ((cache.tags ?? []).some((tag) => tag.trim() === '' || /[,\s]/.test(tag)))
+      return 'a cache tag is not blank and has no comma or space.';
+  }
+  return undefined;
+}
 
 /** A weak ETag made of the body: the same answer has the same tag (API-08). */
 function weakEtag(body: string): string {
@@ -232,7 +293,14 @@ function pickInfo(request: FastifyRequest): RequestInfo {
 function stateOf(map: WeakMap<FastifyRequest, RequestState>, request: FastifyRequest): RequestState {
   let state = map.get(request);
   if (state === undefined) {
-    state = { principal: undefined, tenantId: undefined, status: undefined, headers: {} };
+    state = {
+      principal: undefined,
+      tenantId: undefined,
+      status: undefined,
+      headers: {},
+      idempotencyKey: undefined,
+      replayed: false,
+    };
     map.set(request, state);
   }
   return state;
@@ -356,18 +424,21 @@ export function createHttpServer(env: HttpEnv, options: HttpServerOptions = {}):
   });
 
   // Stage 8: the permission of the route, then the plugin hooks of `beforeHandler`.
-  app.addHook('preHandler', async (request) => {
+  app.addHook('preHandler', async (request, reply) => {
     const route = routeStateOf(request);
-    if (route === undefined || route.internal) return;
+    if (route === undefined || route.internal) return undefined;
     const permission = route.def.permission;
     if (permission !== undefined) {
       const { principal } = stateOf(requests, request);
-      if (principal === undefined) return;
+      if (principal === undefined) return undefined;
       const allowed = (await options.authorizer?.can(principal, permission, pickInfo(request))) === true;
       if (!allowed)
         throw new HttpError('HTTP_FORBIDDEN', 403, 'You may not do this.', `The permission ${permission} is needed.`);
     }
+    const replay = await beginIdempotent(request, reply, route);
+    if (replay) return reply;
     await run('beforeHandler', stageContext(request));
+    return undefined;
   });
 
   // Stage 10: the plugin hooks of `afterHandler`, and the rule that a success is only ever written through a schema.
@@ -389,24 +460,92 @@ export function createHttpServer(env: HttpEnv, options: HttpServerOptions = {}):
 
   // Stage 11 (ETag and cache headers) is slice 2. While the server drains, every answer ends its connection, so a client that keeps
   // connections alive does not hold the shutdown open.
-  app.addHook('onSend', (request, reply, payload, done) => {
+  app.addHook('onSend', async (request, reply, payload) => {
     if (draining) void reply.header('connection', 'close');
-    if (
-      request.method === 'GET' &&
-      reply.statusCode === 200 &&
-      typeof payload === 'string' &&
-      routeStateOf(request)?.internal !== true
-    ) {
+    const route = routeStateOf(request);
+    const def = route?.def;
+    if (def?.deprecated !== undefined) announceDeprecation(reply, def.deprecated);
+    const ok =
+      request.method === 'GET' && reply.statusCode === 200 && typeof payload === 'string' && route?.internal !== true;
+    if (ok && def?.cache !== undefined) announceCache(reply, def.cache);
+    if (ok) {
       if (reply.getHeader('etag') === undefined) void reply.header('etag', weakEtag(payload));
       if (reply.getHeader('cache-control') === undefined) void reply.header('cache-control', 'private, no-cache');
       if (matches(request.headers['if-none-match'], String(reply.getHeader('etag')))) {
         void reply.code(304).removeHeader('content-type').removeHeader('content-length');
-        done(null, '');
-        return;
+        return '';
       }
     }
-    done(null, payload);
+    await finishIdempotent(request, reply, payload);
+    return payload;
   });
+
+  const idempotency = options.idempotencyStore ?? createMemoryIdempotencyStore();
+
+  /** `Idempotency-Key` (spec 13.1). Returns true when the stored answer was sent and the handler must not run. */
+  async function beginIdempotent(request: FastifyRequest, reply: FastifyReply, route: RouteState): Promise<boolean> {
+    const raw = request.headers['idempotency-key'];
+    if (route.def.idempotent !== true || raw === undefined) return false;
+    const key = Array.isArray(raw) ? raw[0] : raw;
+    if (key === undefined || !/^[\x21-\x7e]{1,255}$/.test(key)) {
+      throw new HttpError(
+        'HTTP_IDEMPOTENCY_KEY_INVALID',
+        400,
+        'The Idempotency-Key is not valid.',
+        'Use 1 to 255 visible characters.',
+      );
+    }
+    const state = stateOf(requests, request);
+    const scope = `${state.principal?.id ?? 'anonymous'}\u0000${route.def.method} ${route.def.url}\u0000${key}`;
+    const fingerprint = createHash('sha256')
+      .update(`${request.url}\n${JSON.stringify(request.body ?? null)}`)
+      .digest('hex');
+    const begun = await idempotency.begin(scope, fingerprint);
+    if (begun.state === 'mismatch') {
+      throw new HttpError(
+        'HTTP_IDEMPOTENCY_KEY_REUSED',
+        422,
+        'This Idempotency-Key was used for another request.',
+        'Use a new key for a new request.',
+      );
+    }
+    if (begun.state === 'busy') {
+      throw new HttpError(
+        'HTTP_IDEMPOTENCY_IN_PROGRESS',
+        409,
+        'The first request with this key is still running.',
+        'Wait, then send it again.',
+      );
+    }
+    if (begun.state === 'new') {
+      state.idempotencyKey = scope;
+      return false;
+    }
+    state.replayed = true;
+    void reply
+      .code(begun.response.status)
+      .headers({ ...begun.response.headers, 'idempotency-replayed': 'true' })
+      .send(begun.response.body);
+    return true;
+  }
+
+  /** Keeps the answer of a request that succeeded, and forgets the key of one that did not. */
+  async function finishIdempotent(request: FastifyRequest, reply: FastifyReply, payload: unknown): Promise<void> {
+    const state = stateOf(requests, request);
+    const scope = state.idempotencyKey;
+    if (scope === undefined || state.replayed) return;
+    state.idempotencyKey = undefined;
+    if (reply.statusCode >= 200 && reply.statusCode < 300 && typeof payload === 'string') {
+      const headers: Record<string, string> = {};
+      for (const name of ['content-type', 'location', 'etag']) {
+        const value = reply.getHeader(name);
+        if (typeof value === 'string') headers[name] = value;
+      }
+      await idempotency.complete(scope, { status: reply.statusCode, headers, body: payload });
+    } else {
+      await idempotency.abandon(scope);
+    }
+  }
 
   // Stage 12: one log line, then the plugin hooks of `onResponse`. Nothing here can change an answer that was sent.
   app.addHook('onResponse', async (request, reply) => {
@@ -468,6 +607,8 @@ export function createHttpServer(env: HttpEnv, options: HttpServerOptions = {}):
       if (route.permission !== undefined && route.permission.trim() === '')
         invalidRoute(route, 'the permission is blank.');
     }
+    const optionError = optionProblem(route);
+    if (optionError !== undefined) invalidRoute(route, optionError);
     const statuses = Object.keys(route.schema.response).map(Number);
     if (!statuses.some((status) => status >= 200 && status < 300))
       invalidRoute(route, 'it has no response schema for a 2xx status (API-01).');
@@ -516,6 +657,9 @@ export function createHttpServer(env: HttpEnv, options: HttpServerOptions = {}):
           header: (name, value) => {
             current.headers[name] = value;
           },
+          can: async (permission) =>
+            current.principal !== undefined &&
+            (await options.authorizer?.can(current.principal, permission, pickInfo(request))) === true,
         };
         const result: unknown = await route.handler(context);
         for (const [name, value] of Object.entries(current.headers)) void reply.header(name, value);
