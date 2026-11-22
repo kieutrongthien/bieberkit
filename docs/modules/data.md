@@ -138,35 +138,66 @@ Reads `DB_CONNECTION`, `DATABASE_URL`, `DATABASE_READ_URLS` and `DB_POOL_MAX` th
 
 Tests sit next to the code and are named after the IDs above. Pure helpers need no database. The ORM tests use `describeDialects`, so every one runs on SQLite locally and on PostgreSQL and MySQL where the URLs exist. Negative controls: a non-UUID id on every dialect, two SQLite connections writing, a cursor with one changed byte, a money value above the safe range. Coverage gate: 90 percent of lines for `packages/data/src` (TST-01).
 
-## Proposals for the maintainer-designed parts **[D]**
+## The maintainer-designed API **[D]**
 
-Everything below is a proposal. Slice 2 and 3 tests are written after you answer.
+Decided on 2026-11-22 (see Decisions). Slice 2 tests come first and wait for the maintainer's review, then the code.
 
 ### Field DSL (slice 2)
 
-Descriptors are immutable data (ADR 0009). Each builder returns a `Field`, and the chain methods below return a new one.
+Descriptors are immutable data (ADR 0009). Each builder returns a `Field`, and every chain method returns a new one. Builders check their own options and throw `DATA_FIELD_INVALID`.
 
 ```ts
-f.id()                                          // UUIDv7 primary key
-f.string({ min?, max, compare?: 'exact' | 'ci' | 'ci_ai' })
+f.id()                                          // UUIDv7 primary key, declared once as `id`
+f.string({ min?, max, compare?: 'exact' | 'ci' | 'ci_ai' })   // max 1 to 4096 code points
+f.text({ max? })                                // long text, up to 65535 code points, never indexed or unique
 f.email()                                       // string, max 254, compare 'ci'
-f.oneOf(values)                                 // string union, stored as varchar, never a database enum
-f.decimal({ precision, scale })                 // scaled bigint (DATA-22)
+f.oneOf(values)                                 // string union, varchar, never a database enum
+f.int({ min?, max? })                           // 32-bit integer, default range -2147483648 to 2147483647
+f.boolean()
+f.date()                                        // calendar date, text 'YYYY-MM-DD', no time zone
+f.dateTime()                                    // an instant, UTC
+f.decimal({ precision, scale })                 // precision 1 to 15, scale 0 to precision; scaled bigint (DATA-22)
 f.money({ currency })                           // <name>_minor bigint + <name>_currency (MOD-11)
-f.sequence({ pattern, resetEvery? })            // document number, e.g. 'PO-{yyyy}-{seq:5}' (MOD-12)
-f.createdAt()  f.updatedAt()                    // UTC
-f.belongsTo(() => Entity)                       // many to one, composite FK when both are tenant scoped
+f.sequence({ pattern, resetEvery? })            // document number, e.g. 'PO-{yyyy}-{seq:5}', resetEvery 'year' | 'month' | 'never' (MOD-12)
+f.createdAt()  f.updatedAt()                    // UTC, named createdAt and updatedAt
+f.belongsTo(() => Entity)                       // many to one, API key is <name>Id
 f.hasOne(() => Entity)                          // one to one, the key is on the other side
 f.hasMany(() => Entity).inline()                // collection, .inline() saves it with the parent (MOD-09)
 f.state({ initial, transitions })               // state machine column (MOD-06, MOD-07)
-f.custom({ column, jsonSchema, zod, tsType, admin })   // the only new kind in v1 (SCH-07)
+f.custom({ column, jsonSchema, zod, tsType, admin })   // the only new kind in v1, `zod` is a schema value (SCH-07)
 
-// chain methods on any field
+// chain methods
 .optional()  .unique()  .index()  .default(value)  .searchable()  .localized()
-.computed(fn, { stored?: boolean })             // MOD-08: on save and stored, or on read
+.computed(fn, { stored?: boolean })             // MOD-08
 ```
 
-Entity options besides the spec example: `tenant`, `softDelete`, `features: ['attachments', 'comments', 'timeline', 'tags']`, `actions`, `orm: { indexes, properties }`.
+Rules the builders and `defineEntity` enforce, each with a test:
+
+- `.unique()` and `.index()` are refused on `f.text`, `f.hasMany`, `f.hasOne` and on a computed field that is not stored. `.localized()` is allowed only on `f.string`, `f.text` and `f.email`, and not together with `.unique()`. `.searchable()` only on those three. `.default()` must fit the kind (`f.oneOf` default must be one of the values) and is refused on `f.id`, `f.money`, `f.sequence`, `f.createdAt`, `f.updatedAt`, `f.state` and relations.
+- `f.custom` refuses a function for `zod` with `DATA_FIELD_CUSTOM_CALLBACK` (SCH-07).
+- `f.sequence` needs a `{seq:N}` token with N from 1 to 12 and accepts `{yyyy}`, `{yy}` and `{mm}`. It is unique and read only.
+
+`defineEntity` options besides the spec example: `tenant`, `softDelete`, `features`, `actions`, `permissions`, `api`, `admin`, `label` and `orm: { indexes, properties }`.
+
+**Entity checks.** The name is `module.Entity` (`crm.Customer`). The table is snake case, at most 40 characters. Field names are camel case. Exactly one `id: f.id()`. The reserved names `tenantId`, `version`, `createdBy`, `updatedBy`, `deletedAt` and `deletedToken` cannot be used, and neither can a name that collides with a generated column (`<name>Cmp`, `<name>Minor`, `<name>Currency`, `<name>Id` of a relation). References in `permissions.fields`, `admin` and `unique` must name existing fields. Errors are `DATA_ENTITY_INVALID` with the entity and field in the message. The result is deeply frozen.
+
+**Standard columns (DATA-18).** `id` is declared by `f.id()`. Always added: `version`, `created_at`, `updated_at`, `created_by`, `updated_by`. `tenant: true` adds `tenant_id`. `softDelete: true` adds `deleted_at` and `deleted_token`. `f.createdAt()` and `f.updatedAt()` are optional declarations of the two columns, and the columns exist either way.
+
+**Expansions that do not need an ORM.** `standardColumns(def)` and `tableConstraints(def)` are pure functions in the root export, so the ORM compiler, the migration checker and the docs share them. A `.unique()` field gives a unique constraint on `[tenant_id?, <column>, deleted_token?]`, a `.index()` field gives an index on `[tenant_id?, <column>]`, a tenant entity gets `UNIQUE (tenant_id, id)` (DATA-26), and an identifier longer than 63 characters is cut and ends with an 8 character hash. A compared field (`ci`, `ci_ai`) uses its shadow column `<column>_cmp` in the constraints.
+
+### Schema compilers (slice 2, `@bieberkit/data/schema`)
+
+```ts
+toJsonSchema(def, mode: 'create' | 'update' | 'read'): JsonSchema      // draft 2020-12
+toZodMini(def, mode: 'create' | 'update' | 'read'): ZodMiniType        // zod/mini
+normalizeInput(value: unknown): unknown                                // NFC on every string, deep (SCH-05)
+generateRegistrySource(defs, options): string                          // the EntityRegistry types, marked @generated (SCH-04)
+```
+
+- **API shape** (the same in both compilers and in the registry types): a relation `owner` appears as `ownerId` (UUID text), a decimal as text (`"12.30"`), money as `{ amount: "12.30", currency: "USD" }` where `currency` may be omitted on input and defaults to the field's currency, a date as `YYYY-MM-DD`, an instant as an ISO 8601 text in UTC, a state, sequence or computed field as read only text or its base type.
+- **create** takes the writable fields. A field is required unless it is optional or has a default. Server fields (`id`, standard columns, `sequence`, `state`, computed, `createdAt`, `updatedAt`) are not accepted. **update** takes the same fields, all optional, and needs at least one. **read** has everything the API returns: `id`, `version`, `createdAt`, `updatedAt`, `createdBy`, `updatedBy`, `deletedAt` for soft delete, and all declared fields. `tenantId`, `deletedToken` and shadow columns never leave the server. Unknown keys are refused (`additionalProperties: false`), and an optional field in `read` is `T | null`.
+- `toZodMini` builds the same rules and applies NFC to every string before checking, so NFD input is accepted and comes out as NFC. With Ajv the caller runs `normalizeInput` first. Both count code points (SCH-03).
+- `generateRegistrySource` writes `interface EntityRegistry { '<name>': { row; create; update } }` and `Row<N>`, `CreateInput<N>` and `UpdateInput<N>` read from it. `Row` is the read shape above.
 
 ### Tenant model (slice 3)
 
@@ -176,16 +207,25 @@ Entity options besides the spec example: `tenant`, `softDelete`, `features: ['at
 - `asSystem(reason, fn)` disables the filter inside `fn`, writes an audit entry with the reason, and is the only way to do it. A blank reason is `DATA_SYSTEM_SCOPE_REASON`.
 - Every write checks that each referenced id is visible under the filter (DATA-20). The CASL read rule joins that check when `@bieberkit/auth` provides it, through a small `ReferenceVisibility` port that data defines and auth implements.
 
-## Open questions
+## Decisions
 
-Each has my recommendation. Answer or change them, and slices 2 and 3 start from that.
+Taken on 2026-11-22 on the nine open questions of the first draft, with reasons.
 
-1. **Field kinds beyond the roadmap list.** The roadmap lists 14 kinds and ADR 0009 allows `f.custom` as the only extra. There is no integer, boolean, date or long text, which nearly every real entity needs. _Recommend_ adding `f.int({ min?, max? })`, `f.boolean()`, `f.date()`, `f.dateTime()` and `f.text({ max? })` to the core list, and keeping `f.custom` for the rare rest. The alternative is `f.custom` for each of them, which costs every entity a column, a JSON Schema and a Zod value.
-2. **A page size above 100.** _Recommend_ clamping to 100 and returning the real size in `meta`, which keeps old clients working. Rejecting with 400 is stricter.
-3. **State machine writes (MOD-07).** _Recommend_ that the state column is writable only by a generated `transition(record, name, input)` service call, validated against `from`, with the entity hook rejecting any other change of that column (`DATA_STATE_DIRECT_WRITE`). Creation sets `initial` and nothing else.
-4. **Sequences (MOD-12).** _Recommend_ one counter table `bieberkit_sequences (tenant_id, name, period, value)` incremented inside the saving transaction with an atomic update and its row lock (`UPDATE ... RETURNING` on PostgreSQL and SQLite, `LAST_INSERT_ID(value + 1)` on MySQL). The lock serializes writers, so numbers are unique and gap-free, and a rolled back save releases its number. Throughput on one counter is limited by that lock, which suits document numbers.
-5. **Localized fields (DATA-17).** _Recommend_ one translation table per entity, `<table>_i18n (tenant_id, record_id, locale, <localized fields>)` with a composite FK to the entity and a unique `(record_id, locale)`.
-6. **Generic features (MOD-13).** Attachments, comments, timeline and tags in shared tables must point at any entity, so the record id cannot be a foreign key. _Recommend_ columns `tenant_id`, `entity`, `record_id` with an index and no foreign key, plus a service-level check that the record exists under the tenant filter on every write. The database then cannot reject a stray row, which is a loss against DATA-20, so the alternative is one feature table per entity, at the cost of many generated tables. Which one?
-7. **Computed fields.** A `computed` function is code, so the descriptor holds a function, which cannot go to the client. _Recommend_ that the client and admin treat a computed field as read only data from the server, and that `stored: true` is the default only when the field is filtered or sorted by an API route.
-8. **Rounding.** _Recommend_ round half away from zero, once on save (MOD-11), through `toMinor`. Banker's rounding is the alternative, and finance users sometimes expect it.
-9. **The unsigned cursor.** _Recommend_ leaving it unsigned (decision above). A signed cursor adds a secret to rotate for no security gain, since a forged cursor only picks a position the user could already page to.
+1. **Field kinds: add `int`, `boolean`, `date`, `dateTime` and `text`.** Nearly every real entity needs them, and `f.custom` for each would cost a column, a JSON Schema and a Zod value per field. `f.custom` stays for the rare rest. `f.int` is 32 bit, because a larger whole number is a `f.decimal` with scale 0 and the same safe range rules.
+2. **A page size above 100: clamp to 100.** Done in slice 1 (`pageSize`). The response carries the real size in `meta`, so a client can notice.
+3. **State machine writes: only through a generated `transition` call.** The state column is written by `transition(record, name, input)` after checking `from`, and a hook rejects any other change of it (`DATA_STATE_DIRECT_WRITE`). Creation sets `initial` and nothing else. The descriptor in slice 2 only holds `initial` and `transitions`.
+4. **Sequences: one counter table.** `bieberkit_sequences (tenant_id, name, period, value)`, incremented inside the saving transaction by an atomic update that holds the row lock (`UPDATE ... RETURNING` on PostgreSQL and SQLite, `LAST_INSERT_ID(value + 1)` on MySQL). Writers queue on that row, so numbers are unique and gap free, and a rolled back save gives its number back. Slice 6.
+5. **Localized fields: one translation table per entity.** `<table>_i18n (tenant_id, record_id, locale, <localized fields>)`, a composite foreign key to the entity and a unique `(record_id, locale)`. Slice 4.
+6. **Generic features: shared tables without a foreign key.** `bieberkit_attachments`, `_comments`, `_timeline` and `_tags` carry `tenant_id`, `entity` and `record_id`, an index on those three, and no foreign key, because one column cannot reference every table. One table per entity and feature would multiply generated tables and migrations for every plugin entity. The cost is that the database cannot reject a stray row, so the feature service reads the parent record under the tenant filter on every write and copies the parent's `tenant_id`, never the caller's. A contract test covers it. Slice 6.
+7. **Computed fields: read only for clients, calculated on read unless `stored: true`.** The descriptor holds the function, which never reaches the client. `bieberkit check` requires `stored: true` for a computed field used in a filter or a sort (DATA-07).
+8. **Rounding: half away from zero, once on save.** Done in slice 1 (`toMinor`, `toScaled`).
+9. **The cursor stays unsigned.** Done in slice 1. A forged cursor only picks a position the user could already reach, and a signing key would be one more secret to rotate.
+
+Other calls made while writing the slice 2 tests, marked for review:
+
+- **`id` is declared by `f.id()`, the rest of the standard columns are automatic.** DATA-18 says standard columns are never added by hand, and the spec example declares `id`, `createdAt` and `updatedAt`. This reconciles them: `id` is declared, `f.createdAt()` and `f.updatedAt()` only name columns that exist anyway.
+- **Relations appear in the API as `<name>Id`.** It matches DATA-20 (`customerId`) and keeps the foreign key visible.
+- **`Row` is the read shape of the API (JSON safe)**, not the ORM object, so one type serves server code and clients.
+- **Entity files import `@bieberkit/data` only.** The root exports descriptors and the pure expansions without Zod, Ajv or MikroORM. The compilers are at `@bieberkit/data/schema`, and the ORM at `@bieberkit/data/orm`.
+- **A bundle size test (SCH-07)** uses `rolldown`, which `tsdown` already brings, as a development dependency.
+- **Codes:** `DATA_FIELD_INVALID`, `DATA_FIELD_CUSTOM_CALLBACK`, `DATA_ENTITY_INVALID`.
