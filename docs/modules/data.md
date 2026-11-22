@@ -369,3 +369,12 @@ DatabaseOptions.queryLog?: (sql: string) => void  // for tests that count querie
 | `DATA_SORT_INVALID`      | 400    | Sort by a field that is always set, such as a required field or `createdAt`     |
 | `DATA_LOCALE_INVALID`    | 400    | Use a language tag such as `vi` or `pt-BR`                                      |
 | `DATA_FIELD_INVALID`     | 500    | Only localized fields have translations (also raised by builders)               |
+
+### Found while implementing slice 4
+
+All of it about MikroORM 7.2.9.
+
+- **A relation on a composite tenant key cannot be filtered by its id.** `{ record: id }` becomes a row value comparison that SQLite refuses. The translation code asks for `{ record: { id } }`, which joins the owner table and keeps the tenant filter.
+- **`insertMany` gives the shared `tenant_id` column to the first row only** when a relation uses the same column, so the rows after it fail the foreign key. `bulkInsert` inserts a table that has a composite tenant key one row at a time, and every other table in chunks of 500.
+- **A bigint column comes out of `toObject` as text.** `toApiRow` reads it from a bigint or a string.
+- **`strategy: 'select-in'`** is set on every page read. The default may join a to-one relation into the same query, which is fine, but the rule of DATA-10 is one batched query per relation, and a join of a collection would multiply the rows of a page.

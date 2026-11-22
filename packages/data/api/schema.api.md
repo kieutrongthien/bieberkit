@@ -29,8 +29,8 @@ Generated from the built declaration files by `pnpm api:update`. Do not edit by 
 
 ```ts
 import * as z from "zod/mini";
-import { C as ResetEvery, D as f, E as TransitionDef, S as FieldKind, T as StateOptions, _ as ColumnDef, a as EntityDef, b as FieldBuilders, c as FieldLike, d as StandardColumn, f as TableConstraints, g as tableConstraints, h as standardColumns, i as ConstraintDef, l as OrmOverride, m as snake, n as AdminOptions, o as EntityOptions, p as defineEntity, r as ApiOptions, s as Feature, t as ActionDef, u as Permissions, v as ComputedFn, w as SchemaValue, x as FieldDef, y as Field } from "./define-entity-fSi6hSbi.js";
-import { a as UpdateInput, i as Row, n as EntityRegistry, o as generateRegistrySource, r as RegistryOptions, t as CreateInput } from "./registry-CGVHQuS7.js";
+import { C as ResetEvery, D as f, E as TransitionDef, S as FieldKind, T as StateOptions, _ as ColumnDef, a as EntityDef, b as FieldBuilders, c as FieldLike, d as StandardColumn, f as TableConstraints, g as tableConstraints, h as standardColumns, i as ConstraintDef, l as OrmOverride, m as snake, n as AdminOptions, o as EntityOptions, p as defineEntity, r as ApiOptions, s as Feature, t as ActionDef, u as Permissions, v as ComputedFn, w as SchemaValue, x as FieldDef, y as Field } from "./define-entity-B93nbOOC.js";
+import { a as UpdateInput, i as Row, n as EntityRegistry, o as generateRegistrySource, r as RegistryOptions, t as CreateInput } from "./registry-CxjCK9gx.js";
 type SchemaMode = "create" | "update" | "read";
 interface ApiField {
   readonly key: string;

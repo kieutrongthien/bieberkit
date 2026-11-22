@@ -220,6 +220,10 @@ interface OrmOverride {
     readonly properties: readonly string[];
     readonly name?: string;
   }[];
+  readonly uniques?: readonly {
+    readonly properties: readonly string[];
+    readonly name?: string;
+  }[];
   readonly properties?: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
 }
 interface FieldLike {

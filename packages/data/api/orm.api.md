@@ -33,16 +33,16 @@ import { Dialect, Logger } from "@bieberkit/core";
 import { EntityData, EntityManager, EntityName, EntityProperty, EntitySchema, FilterOptions, FilterQuery, FindOneOptions, FindOptions, IDatabaseDriver, MikroORM, NativeInsertUpdateOptions, Platform, Primary, RequiredEntityData, Type, UpdateOptions } from "@mikro-orm/core";
 import { SqlEntityManager } from "@mikro-orm/sql";
 import { SqliteDialect } from "kysely";
-import { a as EntityDef } from "./define-entity-fSi6hSbi.js";
+import { a as EntityDef } from "./define-entity-B93nbOOC.js";
 type OrmSchema = EntitySchema<Record<string, unknown>>;
 interface CompileOptions {
   readonly tenancy?: "single" | "shared-schema";
   readonly raw?: readonly OrmSchema[];
 }
 export declare function compileEntities(defs: readonly EntityDef<string>[], options?: CompileOptions): OrmSchema[];
-type Row = Record<string, unknown>;
-export declare function bulkInsert(em: EntityManager, schema: OrmSchema, rows: readonly Row[]): Promise<void>;
-export declare function bulkUpdate(em: EntityManager, schema: OrmSchema, where: Row, data: Row): Promise<number>;
+type Row$3 = Record<string, unknown>;
+export declare function bulkInsert(em: EntityManager, schema: OrmSchema, rows: readonly Row$3[]): Promise<void>;
+export declare function bulkUpdate(em: EntityManager, schema: OrmSchema, where: Row$3, data: Row$3): Promise<number>;
 interface ReferenceVisibility {
   visible(entity: string, ids: readonly string[]): Promise<readonly string[]>;
 }
@@ -69,6 +69,7 @@ interface DatabaseOptions {
   readonly audit?: AuditSink;
   readonly references?: ReferenceVisibility;
   readonly logger?: Logger;
+  readonly queryLog?: (sql: string) => void;
 }
 type Orm = MikroORM<IDatabaseDriver, EntityManager, readonly EntitySchema[]>;
 interface Database {
@@ -112,5 +113,34 @@ export declare function restore(em: EntityManager, row: Record<string, unknown>)
 export declare function expectVersion(row: {
   readonly version?: unknown;
 }, expected: number | string): void;
-export type { AuditSink, CompileOptions, Database, DatabaseEnv, DatabaseOptions, Orm, OrmSchema, ReferenceVisibility, ResolvedConnection, SqliteOptions, SystemScopeEntry };
+type Row$2 = Record<string, unknown>;
+interface SortOption {
+  readonly field: string;
+  readonly direction?: "asc" | "desc";
+}
+interface ListOptions {
+  readonly where?: Row$2;
+  readonly sort?: readonly SortOption[];
+  readonly limit?: unknown;
+  readonly cursor?: string;
+  readonly withTotal?: boolean;
+  readonly select?: readonly string[];
+  readonly populate?: readonly string[];
+  readonly locale?: string;
+}
+interface Page {
+  readonly rows: Row$2[];
+  readonly limit: number;
+  readonly nextCursor: string | null;
+  readonly total?: number;
+}
+export declare function queryableFields(schema: OrmSchema): readonly string[];
+export declare function listPage(em: EntityManager, schema: OrmSchema, options?: ListOptions): Promise<Page>;
+type Row$1 = Record<string, unknown>;
+export declare function translationName(entityName: string): string;
+export declare function setTranslation(em: EntityManager, schema: OrmSchema, recordId: string, locale: string, values: Row$1): Promise<void>;
+type Row = Record<string, unknown>;
+export declare function toApiRow(schema: OrmSchema, row: Row): Row;
+export declare function toOrmData(schema: OrmSchema, input: Row, _mode: "create" | "update"): Row;
+export type { AuditSink, CompileOptions, Database, DatabaseEnv, DatabaseOptions, ListOptions, Orm, OrmSchema, Page, ReferenceVisibility, ResolvedConnection, SortOption, SqliteOptions, SystemScopeEntry };
 ```
