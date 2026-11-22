@@ -130,3 +130,59 @@ In `packages/auth/src`: `registry.test.ts`, `ability.test.ts` (with the language
 - **`@mikro-orm/core` is a dependency of this package.** The three tables are ORM schemas, like the framework tables of `@bieberkit/data`. It is the same version as `@bieberkit/data` (7.2.9), and no new third party library comes with it. `@casl/ability` 7.1.3 is the one that ADR 0013 and the P9 line name.
 - **The matrix found a weak spot of the first design of the mutants.** The tenant fault cannot be a wrapper over the authorizer, because the tenant filter of the rows lives in the data layer. The sixth mutant is `tenant-blind-grants`: the roles of every tenant grant. The tenant filter of the rows has its own tests in `@bieberkit/data`. Each mutant is caught by the cases that are meant to catch it: `conditions:*`, `mask-hidden`, `mask-write-rejected`, `read-does-not-grant-write`, `unsupported-denies:*` and `tenant-isolation-roles`.
 - **An empty update is a validation error for everyone.** The schema refuses `{}` before the permission is asked, so the case `update-empty-payload` of ADR 0013 is an update that names no masked field, by a caller who may only read.
+
+## Slice B: authentication (proposed on 2026-11-23)
+
+Who the caller is. Better Auth 1.7.25 (pinned exactly, AUTH-11) runs on the EntityManager of the request through its own Kysely adapter (ADR 0012), and plugs into the ports of `@bieberkit/http`. The plan is in the roadmap item M1.4. Passkeys, TOTP, magic link, API keys and `requireMfa` are slice C.
+
+### Public API (slice B)
+
+```ts
+createAuth(options: CreateAuthOptions): AuthInstance          // betterAuth(...) with the fixed options of ADR 0012
+interface CreateAuthOptions {
+  db: Database; dialect: Dialect; secret: string /* 32 characters or more */; baseUrl: string; trustedOrigins?: readonly string[];
+  limits?: AuthLimits; mail?: { sendVerification?(mail: AuthMail): Promise<void>; sendResetPassword?(mail: AuthMail): Promise<void> }
+}
+interface AuthMail { to: string; url: string; token: string }
+interface AuthLimits { signIn?: Limit2; signUp?: Limit2; passwordReset?: Limit2 }   // Limit2 = { perIp?: Limit; perAccount?: Limit }; Limit = { window: number /* seconds */; max: number }
+
+registerAuthRoutes(server: HttpServer, options: { auth: AuthInstance; db: Database }): void   // mounts /api/auth, one transaction per change, audit and outbox
+createAuthenticator(auth: AuthInstance): Authenticator                                         // the cookie to a Principal { via: 'cookie', sessionId }
+createTenantResolver(options: { db: Database }): TenantResolver                                // X-Tenant checked against the roles of the user (DATA-19)
+checkAuthDrift(options: BetterAuthOptions, metadata: Record<string, DriftEntity>): string[]    // AUTH-10; [] when the entities and Better Auth agree
+driftEntities(db: Database): Record<string, DriftEntity>
+
+AuthUser, AuthSession, AuthAccount, AuthVerification, AuthRateLimit                           // ORM schemas of auth_users, auth_sessions, auth_accounts, auth_verifications, auth_rate_limits
+```
+
+`@bieberkit/data/orm` gains `requestKysely(db)`. `@bieberkit/http` gains `HttpServer.mount({ prefix, handler })`, with `handler(request: Request): Promise<Response>`.
+
+### Rules
+
+1. **One Kysely for the request.** `requestKysely(db)` is a proxy whose every call goes to `em.getKysely(...)` of the EntityManager in the async context (a fork outside a request), with `tableNamingStrategy: 'entity'`, `columnNamingStrategy: 'property'`, `convertValues`, `processOnCreateHooks` and `processOnUpdateHooks`. Inside a transaction, `transaction()` returns an object whose `execute(cb)` calls `cb` with the same Kysely, so a nested transaction joins (ADR 0012, decision 2). Outside one it is a real transaction.
+2. **Tables.** `authUser`, `authSession`, `authAccount`, `authVerification` and `authRateLimit` are the model names, `auth_users` and the rest the tables, made by steps 0.2.0 of the plugin `@bieberkit/auth` and described by ORM schemas. Ids are UUIDv7 from `advanced.database.generateId`, the type refuses text that is not a UUID, `account.accountId` is the column `external_account_ref`, and deleting a user deletes its sessions and accounts.
+3. **Cookie (AUTH-01).** `__Host-bk_session`, `HttpOnly`, `Secure`, `SameSite=Lax`, `Path=/`, no `Domain`, and `useSecureCookies` is not set.
+4. **Client IP (AUTH-10).** The mount removes the `x-bk-client-ip` of the request, sets its own from the address that `TRUST_PROXY` resolved, and Better Auth reads only that header. An `X-Forwarded-For` that the proxy setting does not trust has no effect.
+5. **A request is one unit.** A change (not a GET) under `/api/auth` runs in a unit of work with a transaction. A status below 400 commits it, together with the audit entry (`auth.user.signed-up`, `auth.session.created`, `auth.session.revoked`, `auth.password.reset`, `auth.email.verified`) and the outbox event of the same name. Any other status rolls everything back. A failed sign-in writes `auth.signin.failed` in a transaction of its own.
+6. **Limits survive a rollback (AUTH-06).** The counters are written through a fork with no transaction. Per IP, Better Auth's rules for sign-in, sign-up and the password reset. Per account, a counter that is keyed by the hash of the address and the path, so the address is never stored in clear text. Over the limit is 429 with `Retry-After`. Defaults: sign-in 5 per 60 s per IP and 10 per 15 min per account, sign-up 5 per 60 s per IP, reset 3 per 15 min per IP and per account.
+7. **The principal.** `createAuthenticator` reads the cookie with `getSession`, gives `{ id, kind: 'user', via: 'cookie', sessionId }`, and does not touch the database when there is no cookie. A missing, unknown, expired or revoked session is no principal.
+8. **The tenant (DATA-19).** `X-Tenant` is taken only for a principal, must be a UUID (`AUTH_TENANT_INVALID`, 400), and the user must have a role in it (`AUTH_TENANT_FORBIDDEN`, 403). No header is no tenant. Nothing comes from the session.
+9. **Passwords (AUTH-04).** 8 to 128 characters, no composition rules, scrypt as Better Auth hashes it. Verification and reset mails are the callbacks of `mail`, because the mail contract is M1.5. Sign-up does not sign the user in until the email is verified only when the project asks (`requireEmailVerification` is off by default).
+10. **Configuration comes in.** `createAuth` reads no environment (P8). A `secret` of fewer than 32 characters is `AUTH_CONFIG_INVALID`. Telemetry is off, and a test fails if the option is missing.
+11. **Drift (AUTH-10).** `checkAuthDrift` compares `getAuthTables(options)` with the ORM metadata: the property exists, nullability and unique agree. It runs as a test on every change of the options and of the Better Auth version.
+
+### Errors of slice B
+
+| Code                    | Status | Fix                                                         |
+| ----------------------- | ------ | ----------------------------------------------------------- |
+| `AUTH_CONFIG_INVALID`   | 500    | The secret has 32 characters or more, the base URL is a URL |
+| `AUTH_TENANT_INVALID`   | 400    | `X-Tenant` is the UUID of a tenant                          |
+| `AUTH_TENANT_FORBIDDEN` | 403    | The user has no role in this tenant                         |
+
+### Tests (red until implemented)
+
+`packages/data/src/orm/request-kysely.dialects.test.ts`, `packages/http/src/mount.test.ts`, and in `packages/auth/src`: `tables.dialects.test.ts`, `flows.dialects.test.ts`, `limits.dialects.test.ts`, `authenticator.dialects.test.ts`, `tenant.dialects.test.ts`, `end-to-end.dialects.test.ts`, `config.test.ts`, `drift.test.ts`.
+
+### Left out of slice B
+
+Organizations and teams (the plugin needs its spike), Valkey for sessions and counters (M1.5), the breached-password check, OAuth providers, and everything of slice C.

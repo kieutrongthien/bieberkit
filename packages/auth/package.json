@@ -45,11 +45,13 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
+    "@better-auth/kysely-adapter": "1.7.25",
     "@bieberkit/core": "workspace:*",
     "@bieberkit/data": "workspace:*",
     "@bieberkit/http": "workspace:*",
     "@casl/ability": "7.1.3",
-    "@mikro-orm/core": "7.2.9"
+    "@mikro-orm/core": "7.2.9",
+    "better-auth": "1.7.25"
   },
   "engines": {
     "node": ">=24.12"

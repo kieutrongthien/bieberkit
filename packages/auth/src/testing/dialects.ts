@@ -51,7 +51,7 @@ export interface AuthDialectContext {
 const ENV_NAME = { postgres: 'DATABASE_URL_POSTGRES', mysql: 'DATABASE_URL_MYSQL' } as const;
 const env = (url: string, dialect: Dialect) =>
   ({ DB_CONNECTION: dialect, DATABASE_URL: url, DATABASE_READ_URLS: [], DB_POOL_MAX: 5 }) as const;
-const STEP_TABLES = /bieberkit_|audit_log|auth_roles|auth_role_permissions|auth_user_roles/;
+const STEP_TABLES = /bieberkit_|audit_log|\bauth_/;
 
 async function provision(dialect: 'postgres' | 'mysql', serverUrl: string) {
   const name = `bk_auth_${randomBytes(6).toString('hex')}`;
