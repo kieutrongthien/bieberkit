@@ -285,3 +285,56 @@ The permission is `permissions.<action>` of the entity, and when it is missing `
 - **`q=` text search** waits for the search contract (§15.7). The parameter is refused until then.
 - **Field masks and permission conditions** are M1.4. The routes ask for the permission only.
 - **`hasMany` and `hasOne`** are not in the row shape yet, so `include` takes `belongsTo` relations only.
+
+## Slice 3: transitions, bulk, idempotency, deprecation and cache headers
+
+Designed on 2026-11-23. None of it is maintainer-designed (MOD-06, API-09, API-14, API-16, API-17 and §13.1 decide it). Slice 2 was merged into `main` before it started.
+
+**Left for a later slice:** the aggregate endpoint (API-15) and the custom `actions` of an entity. Aggregation needs a new modifier `.aggregatable()` in the field DSL and an aggregation in the data layer that applies the tenant filter by hand, and the DSL is maintainer-designed. A custom action has no declared result schema in `ActionDef`, so its answer could not go through a schema (API-01).
+
+### Public API
+
+```ts
+// RouteDef gains
+idempotent?: true                                              // POST only
+deprecated?: { since?: string; sunset?: string; link?: string }  // dates are YYYY-MM-DD
+cache?: { sMaxAge: number; staleWhileRevalidate?: number; tags?: readonly string[] }   // public GET only
+// RouteContext gains
+can(permission: string): Promise<boolean>                      // the authorizer, for a check that depends on the request
+// HttpServerOptions gains
+idempotencyStore?: IdempotencyStore                            // defaults to a memory store, for one process
+
+interface IdempotencyStore {
+  begin(key: string, fingerprint: string): Promise<{ state: 'new' } | { state: 'replay'; response: StoredResponse } | { state: 'mismatch' } | { state: 'busy' }>
+  complete(key: string, response: StoredResponse): Promise<void>
+  abandon(key: string): Promise<void>
+}
+createMemoryIdempotencyStore(options?: { ttlMs?: number; now?: () => number }): IdempotencyStore
+```
+
+### Rules
+
+- **Transition routes (MOD-06).** An entity with a state field gets `POST /<resource>/:id/actions/<transition>` for each transition, when its `api` has any operation on. The permission is the one of the transition, and `update` of the entity when the transition has none. `If-Match` is required, as for an update (API-13). The body is the input of the transition, checked by the schema that the transition declares (422 `DATA_TRANSITION_INPUT_INVALID`), and an empty body is no input. The answer is the row after the transition. The event, the audit entry and the timeline entry are the ones of `transition` in the data layer, written in the same transaction.
+- **Bulk (API-14, API-17).** `POST /<resource>/bulk` takes `{ operation: 'update' | 'delete' | 'transition', items: [{ id, version }], data?, transition?, input? }`. It has up to 500 items (400 above that, and an id twice is 400). The route needs `read`, and the handler asks `ctx.can` for what the operation needs (`update`, `delete`, or the permission of the transition), so a user may bulk delete without being allowed to update. Every item carries the version that the client read. The answer is 200 `{ data: [{ id, status, version?, error? }], meta: { requested, succeeded, failed } }`, with `status` one of `ok`, `conflict` (a stale version, with the current version), `not_found` and `invalid` (a transition that does not start from the state of the row, or a bad input). The rows that are `ok` are saved in one transaction with their events and audit entries, so a failure of the database stops the whole request and nothing is saved.
+- **More than 100 rows are refused for now.** The spec runs them as a queued job (API-14, PERF-05). The queue is M1.5, so 101 to 500 items are 422 `HTTP_BULK_TOO_LARGE`, which says so. Running them inline would break the rule that a web request does not do long work.
+- **`Idempotency-Key` (§13.1).** A POST route with `idempotent: true` honors the header when it is sent (1 to 255 visible characters, else 400). The key is kept per principal, method, url and key. The first request runs. A later one with the same key and the same body gets the stored answer with `Idempotency-Replayed: true`. The same key with another body is 422 `HTTP_IDEMPOTENCY_KEY_REUSED`, and the same key while the first request is still running is 409 `HTTP_IDEMPOTENCY_IN_PROGRESS`. Only a 2xx answer is stored: a request that failed can be sent again with the same key. The create route of every entity is idempotent. The memory store is for one process, and a shared store arrives with the cache of M1.5.
+- **Deprecation (API-16).** A deprecated route sends `Deprecation: @<unix seconds of since>` (RFC 9745), `Sunset: <HTTP date>` (RFC 8594) and `Link: <link>; rel="deprecation"`, for the fields that are set, on every answer. The OpenAPI document of slice 4 lists the route as deprecated.
+- **Cache headers (API-09).** A public GET with `cache` answers `Cache-Control: public, s-maxage=<n>, stale-while-revalidate=<m>` and `Cache-Tag: a,b`, instead of `private, no-cache`. A route that has `cache` and is not public, or is not a GET, is refused at registration, because a shared cache must never hold an answer that depends on who asked.
+
+### Found while implementing slice 3
+
+- **A replay is sent from a hook.** The stored answer is sent in `preHandler`, after validation and authorization, and the hook returns the reply so that the handler does not run. `onSend` keeps the answer of a request that ran, and it is `async`, so the answer is stored before the client can see it and retry.
+- **Only a 2xx answer is stored.** A 4xx or 5xx abandons the key, so a request that failed for a wrong body or a crash can be sent again with the same key. A request that fails validation never claims the key.
+- **A date needs two checks.** `2026-13-45` matches the shape of a date, and `Date.parse` is `NaN` for it, which `toISOString` turns into a `RangeError`.
+- **`Date.parse` of the day gives the second of the deprecation.** `Deprecation: @<unix seconds>` is the day at 00:00 UTC.
+- **A body schema of `{}` accepts no body and any body.** The transition routes use it, because the shape of the input belongs to the transition and not to the route.
+- **A bulk request is one `find` and one flush.** The rows come with one query by `id in (...)`, each item is checked against its own version, and the changes of the rows that passed go to the database together.
+
+### Errors of slice 3
+
+| Code                           | Status | Fix                                                              |
+| ------------------------------ | ------ | ---------------------------------------------------------------- |
+| `HTTP_BULK_TOO_LARGE`          | 422    | Send up to 100 items until the queue exists                      |
+| `HTTP_IDEMPOTENCY_KEY_INVALID` | 400    | Use 1 to 255 visible characters                                  |
+| `HTTP_IDEMPOTENCY_KEY_REUSED`  | 422    | The key was used for another request. Use a new key              |
+| `HTTP_IDEMPOTENCY_IN_PROGRESS` | 409    | The first request with this key is still running. Wait and retry |

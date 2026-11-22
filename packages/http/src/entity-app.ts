@@ -22,6 +22,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import * as z from 'zod/mini';
 import { createDatabase, compileEntities } from '@bieberkit/data/orm';
 import type { Database } from '@bieberkit/data/orm';
 import type { OrmSchema } from '@bieberkit/data/orm';
@@ -58,7 +59,18 @@ export const Account: EntityDef<'crm.Account'> = defineEntity({
     note: f.text({ max: 500 }).optional(),
     since: f.date().optional(),
     number: f.sequence({ pattern: 'ACC-{seq:4}' }),
-    status: f.state({ initial: 'new', transitions: { open: { from: ['new'], to: 'open' } } }),
+    status: f.state({
+      initial: 'new',
+      transitions: {
+        open: { from: ['new'], to: 'open' },
+        close: {
+          from: ['open'],
+          to: 'closed',
+          permission: 'crm.account.close',
+          input: z.object({ reason: z.string().check(z.minLength(3)) }),
+        },
+      },
+    }),
     owner: f.belongsTo(() => Person).optional(),
   },
   permissions: {
