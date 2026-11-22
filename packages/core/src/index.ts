@@ -42,3 +42,4 @@ export type {
   EnvValues,
   IntOptions,
 } from './config/env.ts';
+export { parseEnvFile, readEnvFile, withEnvFile } from './config/env-file.ts';

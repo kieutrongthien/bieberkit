@@ -54,6 +54,7 @@ function defineEnv<T>(keys: { [K in keyof T]: EnvKeyBuilder<T[K]> }): EnvSchema<
 function mergeEnv(owners: readonly EnvOwner[]): EnvSchema<Record<string, unknown>>
 function readEnv<T>(schema: EnvSchema<T>, source: EnvSource): T          // throws EnvValidationError
 function parseEnvFile(text: string): EnvSource
+function readEnvFile(path: string): EnvSource                            // a missing file gives {}
 function withEnvFile(real: EnvSource, file: EnvSource): EnvSource        // real values win (CFG-03)
 function redact<T>(schema: EnvSchema<T>, values: T): Record<string, unknown>
 function assertProductionSafe(values: CoreEnv): void                     // CFG-07, throws ConfigError
