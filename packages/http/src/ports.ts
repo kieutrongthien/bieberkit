@@ -26,6 +26,10 @@
 export interface Principal {
   readonly id: string;
   readonly kind: 'user' | 'apiKey' | 'service';
+  /** How the caller proved who it is. `cookie` is what a browser attaches by itself, so a state change needs the CSRF check (SEC-03). Unset counts as `cookie`. */
+  readonly via?: 'cookie' | 'token';
+  /** The id of the session, which the CSRF token is bound to. */
+  readonly sessionId?: string;
 }
 
 /** What a port may know about the request. The body is not read yet when most ports run. */

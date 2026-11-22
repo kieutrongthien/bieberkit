@@ -32,7 +32,10 @@ import { normalizeInput } from '@bieberkit/data/schema';
 import type { AjvError, AjvInstance } from '@bieberkit/data/build';
 import { createMemoryIdempotencyStore } from './idempotency.ts';
 import type { IdempotencyStore } from './idempotency.ts';
+import type { CsrfProtection } from './csrf.ts';
 import { HttpError, ValidationFailed, describeError } from './problem.ts';
+import { CORS_EXPOSED, CORS_HEADERS, CORS_METHODS, securityConfig, securityHeaders } from './security.ts';
+import type { CorsOptions } from './security.ts';
 import type { Authenticator, Authorizer, Principal, RateLimiter, RequestInfo, TenantResolver } from './ports.ts';
 import { METHODS } from './route.ts';
 import type { RouteContext, RouteDef } from './route.ts';
@@ -83,6 +86,12 @@ export interface HttpServerOptions {
   readonly requestTimeoutMs?: number;
   /** Milliseconds. Defaults to 65 000, above the 60 seconds that load balancers commonly wait. */
   readonly keepAliveTimeoutMs?: number;
+  /** Replaces or removes (`false`) a security header (SEC-01). */
+  readonly headers?: Readonly<Record<string, string | false>>;
+  /** The origins that a browser may call the API from (SEC-02). With none, no other origin is allowed. */
+  readonly cors?: CorsOptions;
+  /** The CSRF token (SEC-03). Without it, only a request from the same origin may change state for a signed in browser. */
+  readonly csrf?: CsrfProtection;
   /** Where the answers of idempotent requests are kept. Defaults to a memory store, which is for one process. */
   readonly idempotencyStore?: IdempotencyStore;
   /** Called for an error that is a bug of ours (a 5xx), after it was logged (OBS-06). */
@@ -118,6 +127,7 @@ export interface HttpServer {
   routes(): readonly RouteDef[];
   /** Whether the document of the API is public: always outside production, and with `API_DOCS_PUBLIC` in it (API-06). */
   readonly docsPublic: boolean;
+  readonly csrf: CsrfProtection | undefined;
 }
 
 const DEFAULT_BODY_LIMIT = 1_048_576;
@@ -322,6 +332,7 @@ export function createHttpServer(env: HttpEnv, options: HttpServerOptions = {}):
   const requestTimeoutMs = checkLimit('requestTimeoutMs', options.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT, 0);
   const keepAliveTimeoutMs = checkLimit('keepAliveTimeoutMs', options.keepAliveTimeoutMs ?? DEFAULT_KEEP_ALIVE, 0);
   const showFix = env.APP_ENV !== 'production';
+  const security = securityConfig(options.headers, options.cors);
 
   const app = Fastify({
     loggerInstance: fastifyLogger(logger),
@@ -365,6 +376,29 @@ export function createHttpServer(env: HttpEnv, options: HttpServerOptions = {}):
     );
   });
 
+  // A preflight is answered before authentication and rate limiting, because a browser sends it with no credentials (SEC-02).
+  app.addHook('onRequest', async (request, reply) => {
+    const origin = request.headers['origin'];
+    const wanted = request.headers['access-control-request-method'];
+    if (request.method !== 'OPTIONS' || origin === undefined || wanted === undefined) return undefined;
+    const method = Array.isArray(wanted) ? wanted[0] : wanted;
+    if (!security.origins.has(origin) || !(CORS_METHODS as readonly string[]).includes(String(method).toUpperCase())) {
+      throw new HttpError(
+        'HTTP_CORS_DENIED',
+        403,
+        'This origin may not call the API.',
+        'Add the origin to the CORS list of the server.',
+      );
+    }
+    void reply
+      .code(204)
+      .header('access-control-allow-methods', CORS_METHODS.join(', '))
+      .header('access-control-allow-headers', CORS_HEADERS.join(', '))
+      .header('access-control-max-age', String(security.maxAgeSeconds))
+      .send();
+    return reply;
+  });
+
   // Stages 2 to 6, for every route except the probes of the server itself.
   app.addHook('onRequest', async (request) => {
     if (routeStateOf(request)?.internal === true) return;
@@ -384,7 +418,8 @@ export function createHttpServer(env: HttpEnv, options: HttpServerOptions = {}):
       ...(state.tenantId === undefined ? {} : { tenantId: state.tenantId }),
       ...(state.principal === undefined ? {} : { userId: state.principal.id }),
     });
-    // Stage 6 is the CSRF check of slice 5. Its place is here, after the principal is known and before any plugin hook.
+    // Stage 6: CSRF, after the principal is known and before any plugin hook (SEC-03).
+    checkCsrf(request, state.principal);
   });
 
   const stageContext = (request: FastifyRequest, result?: unknown): StageContext => {
@@ -469,6 +504,23 @@ export function createHttpServer(env: HttpEnv, options: HttpServerOptions = {}):
   // connections alive does not hold the shutdown open.
   app.addHook('onSend', async (request, reply, payload) => {
     if (draining) void reply.header('connection', 'close');
+    for (const [name, value] of securityHeaders(
+      security,
+      env.APP_ENV === 'production' || request.protocol === 'https',
+    )) {
+      if (reply.getHeader(name) === undefined) void reply.header(name, value);
+    }
+    if (security.cors) {
+      const vary = reply.getHeader('vary');
+      void reply.header('vary', typeof vary === 'string' && vary !== '' ? `${vary}, Origin` : 'Origin');
+      const origin = request.headers['origin'];
+      if (origin !== undefined && security.origins.has(origin)) {
+        void reply
+          .header('access-control-allow-origin', origin)
+          .header('access-control-expose-headers', CORS_EXPOSED.join(', '));
+        if (security.credentials) void reply.header('access-control-allow-credentials', 'true');
+      }
+    }
     const route = routeStateOf(request);
     const def = route?.def;
     if (def?.deprecated !== undefined) announceDeprecation(reply, def.deprecated);
@@ -486,6 +538,31 @@ export function createHttpServer(env: HttpEnv, options: HttpServerOptions = {}):
     await finishIdempotent(request, reply, payload);
     return payload;
   });
+
+  /** SEC-03: a state change by a browser that signed in with a cookie must come from the same origin, or carry a token of its session. */
+  function checkCsrf(request: FastifyRequest, principal: Principal | undefined): void {
+    if (principal === undefined || !['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method)) return;
+    if (principal.kind === 'service' || principal.via === 'token') return;
+    if (request.headers['sec-fetch-site'] === 'same-origin') return;
+    const origin = request.headers['origin'];
+    const own = `${request.protocol}://${request.host}`;
+    const originOk = origin === undefined || origin === own || security.origins.has(origin);
+    const given = request.headers['x-csrf-token'];
+    const token = Array.isArray(given) ? given[0] : given;
+    const tokenOk =
+      token !== undefined &&
+      principal.sessionId !== undefined &&
+      options.csrf !== undefined &&
+      options.csrf.verify(token, principal.sessionId);
+    if (!originOk || !tokenOk) {
+      throw new HttpError(
+        'HTTP_CSRF_FAILED',
+        403,
+        'This request does not come from this site.',
+        'Send X-CSRF-Token from GET /api/v1/csrf, or call from the same origin.',
+      );
+    }
+  }
 
   const idempotency = options.idempotencyStore ?? createMemoryIdempotencyStore();
 
@@ -751,5 +828,6 @@ export function createHttpServer(env: HttpEnv, options: HttpServerOptions = {}):
     settings: { bodyLimit, requestTimeoutMs, keepAliveTimeoutMs },
     routes: () => [...added],
     docsPublic: env.APP_ENV !== 'production' || env.API_DOCS_PUBLIC,
+    csrf: options.csrf,
   };
 }

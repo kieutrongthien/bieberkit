@@ -25,6 +25,11 @@
 /** npm name of this package. */
 export const packageName = '@bieberkit/http';
 
+export { createCsrf, registerCsrfToken } from './csrf.ts';
+export type { CsrfProtection } from './csrf.ts';
+export { createHttpFetch, HttpFetchError, isBlockedAddress } from './http-fetch.ts';
+export type { HttpFetch, HttpFetchInit, HttpFetchOptions, ResolvedAddress } from './http-fetch.ts';
+export type { CorsOptions } from './security.ts';
 export { entityRoutes, registerEntityRoutes } from './entity-routes.ts';
 export type { EntityRoutesContext } from './entity-routes.ts';
 export { META_SCHEMA, registerMeta } from './meta.ts';
