@@ -63,3 +63,5 @@ export type {
   ServiceRegistry,
   ServiceScope,
 } from './container/container.ts';
+export { createLifecycle, exitCode } from './lifecycle/lifecycle.ts';
+export type { Hook, HookFailure, Lifecycle, LifecycleOptions, Phase, StopResult } from './lifecycle/lifecycle.ts';
