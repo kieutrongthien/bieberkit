@@ -50,7 +50,9 @@ It does not hold HTTP routes, authorization rules or the admin UI. It reads conf
 | 3. **[D]** ORM and tenant | `EntityDef` to MikroORM, composite tenant FKs, shadow columns and write helpers, tenant filter, `asSystem()`, reference checks, `version`, soft delete | After slice 2                 |
 | 4. Queries                | Keyset, `withTotal`, read-only path, index rule, `.localized()`                                                                                        | After slice 3                 |
 | 5. Migrations             | Snapshot diff, `migrate:*`, destructive detection, plugin runner, `MIGRATE_DATABASE_URL`                                                               | After slice 3                 |
-| 6. Outbox and domain      | Outbox, audit log, features, state machines, standalone Ajv and serializers                                                                            | After slice 5                 |
+| 6. Outbox and audit       | Outbox table and dispatcher, processed ids, audit log append-only for the application role, the framework tables as plugin steps                       | After slice 5                 |
+| 7. Domain                 | State machines, sequences, features (attachments, comments, timeline, tags)                                                                            | After slice 6                 |
+| 8. Build output           | Standalone Ajv validators and fast-json-stringify serializers                                                                                          | After slice 7                 |
 
 ## Public API of slice 1 (Foundation)
 
@@ -468,3 +470,79 @@ All of it about MikroORM 7.2.9.
 - **A migration lock.** Two `migrate` runs at once are stopped by the primary key of the ledger and by the table of MikroORM on PostgreSQL and SQLite. MySQL has no transactional DDL, so a lock (`get_lock`) belongs to the deploy of M1.8 where one run is guaranteed (DATA-25 says once per deploy).
 - **Row level security policies and the append-only grants of `audit_log`** (DATA-25) come with the audit table of slice 6.
 - **The `migrate:*` commands** are the CLI of M1.8. This slice is the library they call.
+
+## Slice 6: outbox and audit log
+
+Designed on 2026-11-23. None of it is maintainer-designed (MOD-18, OBS-05, DATA-25 and ADR 0010 decide the model). The roadmap item of slice 6 is split in three: this slice, the domain parts (state machines, sequences, features) as slice 7, and the standalone Ajv and serializer modules as slice 8. The slicing table above says so.
+
+### The framework tables are plugin steps
+
+`@bieberkit/data` owns four tables. They are created by `dataMigrationSteps`, the steps of the plugin `@bieberkit/data` (DATA-24), run by the migrate role before the project migrations. They are never in the snapshot of a project, because a project does not pass them to `openMigrator`. One step makes one table or one index, so a MySQL step is one DDL statement.
+
+| Table                        | Columns                                                                                                                                                                                                                                                                                              |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bieberkit_outbox`           | `id` uuid, `tenant_id` uuid null, `event`, `event_version`, `entity` null, `record_id` uuid null, `record_version` null, `payload` text (JSON), `idempotency_key` null, `request_id` null, `user_id` uuid null, `created_at` and `available_at` as epoch milliseconds, `attempts`, `last_error` null |
+| `bieberkit_outbox_processed` | `(subscriber, event_id)` primary key, `processed_at` epoch milliseconds                                                                                                                                                                                                                              |
+| `audit_log`                  | `id` uuid, `tenant_id` uuid null, `at` instant, `actor_id` uuid null, `request_id` null, `action`, `entity` null, `record_id` uuid null, `reason` null, `data` text (JSON) null                                                                                                                      |
+
+The ORM maps them with hand written schemas (`frameworkEntities`) that `createDatabase` adds to the entities of the project. Their tenant column is the property `tenant`, not `tenantId`, so the tenant hooks of `DataSubscriber` leave it alone: an audit row of a failed login has no tenant, and the dispatcher reads every tenant. A drift between a step and a schema fails the tests, which write through the ORM into tables that the steps made.
+
+### Public API (`@bieberkit/data/orm`)
+
+```ts
+emitEvent(em, event: OutboxEvent): void                 // adds a row to the unit of work: it commits with the data (MOD-03, §7.5)
+interface OutboxEvent { name: string; version?: number; payload: unknown; record?: { entity: string; id: string; version?: number }; idempotencyKey?: string }
+
+recordAudit(em, entry: AuditEntry): void                // the same, for the audit log (OBS-05)
+interface AuditEntry { action: string; entity?: string; recordId?: string; reason?: string; data?: unknown; tenantId?: string }
+
+createOutboxDispatcher(db, options: { publisher: OutboxPublisher; batchSize?: number; pollMs?: number; maxBackoffMs?: number; logger?: Logger }): OutboxDispatcher
+interface OutboxPublisher { publish(message: OutboxMessage, trx: Transaction<StepDatabase>): Promise<void> }
+interface OutboxDispatcher { dispatchOnce(): Promise<DispatchResult>; start(): void; wake(): void; stop(): Promise<void> }
+interface OutboxMessage { id; jobId: string /* 'ob-<id>' */; name; version; tenantId?; userId?; requestId?; entity?; recordId?; recordVersion?; payload; idempotencyKey?; createdAt: Date }
+outboxLag(db): Promise<{ pending: number; oldestAgeMs: number | null; failing: number }>
+
+processOnce(db, subscriber, eventId, handler: (em) => Promise<void>): Promise<boolean>   // false when this subscriber already handled the event
+purgeProcessed(db, options?: { olderThanMs?: number }): Promise<number>                  // default 7 days
+
+dataMigrationSteps: readonly PluginMigrationStep[]      // plugin '@bieberkit/data'
+grantAuditLog(trx, dialect, role: string): Promise<void> // PostgreSQL and MySQL: only select and insert on audit_log for the application role (DATA-25)
+DatabaseOptions.audit?: AuditSink | 'table'             // 'table' writes the use of asSystem into audit_log (AUTHZ-05)
+```
+
+### Rules
+
+- **Same transaction (§7.5).** `emitEvent` and `recordAudit` only add an entity to the unit of work. The flush that writes the data writes them, in one transaction, and a rolled back flush leaves neither. They take the tenant, the user and the request id from the request context.
+- **Dispatch (MOD-18, ADR 0010 rule 4).** `dispatchOnce` runs one transaction: it claims up to 100 due rows in the order of the index (`available_at, created_at, id`) with `FOR UPDATE SKIP LOCKED` on PostgreSQL and MySQL (SQLite has one writer, so `BEGIN IMMEDIATE` is the lock), calls `publisher.publish(message, trx)` for each, and deletes them. The transaction is the same one that the `database` queue driver inserts its job in (rule 5). On MySQL a row is deleted by its own primary key, and a deadlock (error 1213) is retried up to five times. The delivery is at least once and has no order. Every message carries `recordVersion`, so a subscriber can ignore an older event.
+- **A poison row does not block the rest.** When `publish` throws for a row, the transaction is rolled back, and in a new one that row gets `attempts + 1`, `last_error` and `available_at` in the future (one second doubled for each attempt, at most one hour). The next call goes on with the other rows. `outboxLag(db).failing` counts rows with attempts.
+- **`jobId` (Q-01).** `jobId` is `ob-<id>`, stable across redeliveries, so the queue can deduplicate.
+- **Run loop.** `start` polls every `pollMs` (1000) and `wake` ends the wait at once. On PostgreSQL a `LISTEN/NOTIFY` listener would call `wake`. It needs the `pg` package as a dependency of its own, so it comes with the queue package and its ADR line (P9). `stop` waits for the batch in progress.
+- **Processed ids (MOD-18).** `processOnce` inserts `(subscriber, event_id)` and runs the handler in the same transaction. A second call returns `false` and does not run the handler. A handler that throws rolls the marker back, so the next delivery runs it again. `purgeProcessed` deletes markers older than seven days.
+- **Append only (DATA-25, OBS-05).** The audit log cannot be changed in four places: the unit of work refuses an update or a delete of an audit row (`DATA_AUDIT_APPEND_ONLY`), SQLite triggers abort `update` and `delete`, and on PostgreSQL and MySQL `grantAuditLog` gives the application role `select` and `insert` only. The migrate role runs it with the name of the application role, which `bieberkit migrate` reads from `DATABASE_URL`.
+- **`asSystem` (AUTHZ-05).** With `audit: 'table'` the sink writes the entry in a transaction of its own, before the function runs, so a failed function still leaves its record. If the write fails the scope does not start.
+
+### Errors of slice 6
+
+| Code                     | Status | Fix                                                                         |
+| ------------------------ | ------ | --------------------------------------------------------------------------- |
+| `DATA_AUDIT_APPEND_ONLY` | 500    | The audit log is never changed. Write a new entry that corrects the old one |
+| `DATA_OUTBOX_INVALID`    | 500    | An event has a blank name, a version below 1 or a payload that is not JSON  |
+| `DATA_AUDIT_INVALID`     | 500    | An audit entry has no action, or data that is not JSON                      |
+
+### Found while implementing slice 6
+
+All of it about MikroORM 7.2.9 and the databases.
+
+- **The claim must be in index order on MySQL.** With `order by created_at, id` and a range on `available_at`, MySQL sorts the rows with a filesort and locks every due row that it read, so a second dispatcher skips all of them. Ordering by the whole index (`available_at, created_at, id`) lets it stop after the batch and lock only that. A test holds the first two rows and expects the next call to take the other two.
+- **`kyselyOf` must not be called inside a transaction on SQLite.** There is one connection, so a second statement outside the transaction waits for it. A handler of `processOnce` writes through its `em`, which is bound to the transaction.
+- **`sum(case ...)` for the count of failed rows.** MySQL has no `filter (where ...)`.
+- **A drift test compares the steps with the schemas.** `getUpdateSchemaSQL` after the steps must name neither the outbox nor the audit table.
+- **The default of `audit` stays a log line.** A project that has not made the framework tables would fail on the first `asSystem`, so `'table'` is chosen on purpose.
+- **MySQL cannot take one table out of a database-wide grant.** `grantAuditLog` grants `select` and `insert`, and the application role must not hold `update` or `delete` on the whole database (DATA-25).
+
+### Left out
+
+- **`LISTEN/NOTIFY`** (see Run loop) and the metrics export. `outboxLag` returns the numbers. The observability package turns them into the metric.
+- **Reading the audit log** for the admin UI. It needs the permission model, so it comes with the `audit-log` plugin of M1.8. Until then a reader filters on the tenant itself.
+- **Encrypted `pii` values in audit data** (PDP-06) come with the privacy work. `data` holds what the caller gives.
+- **An audit entry for every row change** is written by the services and the generated routes of M1.3, which know the action. This slice gives them the table and the call.

@@ -31,6 +31,9 @@ import { DIALECTS } from '@bieberkit/core';
 import type { Dialect } from '@bieberkit/core';
 import { afterAll, describe, inject, it } from 'vitest';
 import { createDatabase } from '../orm/connect.ts';
+import { DATA_PLUGIN, dataMigrationSteps } from '../orm/framework.ts';
+import { kyselyOf } from '../orm/internals.ts';
+import { runPluginMigrations } from '../orm/plugin-migrate.ts';
 import type { Database, DatabaseOptions } from '../orm/connect.ts';
 
 declare module 'vitest' {
@@ -43,6 +46,14 @@ export interface DialectContext {
   readonly dialect: Dialect;
   /** A new, empty database that is dropped after the suite: its connection URL (a file path on SQLite), and nothing created in it. */
   readonly emptyDatabase: () => Promise<{ readonly dialect: Dialect; readonly url: string }>;
+  /**
+   * Like `open`, but the framework tables (outbox, processed ids, audit log) are made by `dataMigrationSteps`, the way a deploy
+   * makes them, and only the tables of `entities` come from the schema. So a test sees the tables that production has.
+   */
+  readonly openFramework: (
+    entities?: readonly EntitySchema[],
+    options?: Omit<DatabaseOptions, 'entities'>,
+  ) => Promise<Database>;
   /**
    * Opens a database of its own for this suite: a temporary file on SQLite, a new database on the server for PostgreSQL
    * and MySQL. The schema of `entities` is created. Everything is closed and dropped after the suite.
@@ -122,6 +133,22 @@ export function describeDialects(name: string, suite: (context: DialectContext) 
           const created = await provision(dialect, serverUrl);
           cleanups.push(created.drop);
           return { dialect, url: created.url };
+        },
+        openFramework: async (entities = [], options = {}) => {
+          const { url } = await context.emptyDatabase();
+          const database = await createDatabase(env(url, dialect), { ...options, entities });
+          cleanups.push(() => database.close());
+          await runPluginMigrations(await kyselyOf(database.orm.em), dialect, dataMigrationSteps, {
+            pluginOrder: [DATA_PLUGIN],
+          });
+          // The tables of the project come from the schema. The framework tables are already there, made by the steps.
+          const ddl = await database.orm.schema.getCreateSchemaSQL();
+          const own = ddl
+            .split(';')
+            .map((text) => text.trim())
+            .filter((text) => text !== '' && !/bieberkit_outbox|audit_log/.test(text));
+          for (const text of own) await database.orm.em.getConnection().execute(text);
+          return database;
         },
         open: async (entities, options = {}) => {
           const { url } = await context.emptyDatabase();
