@@ -65,6 +65,8 @@ export interface RouteDef {
   readonly permission?: string;
   readonly public?: true;
   readonly schema: RouteSchema;
+  /** The route needs `If-Match` (API-13). The handler checks it. This tells the document of the API. */
+  readonly requiresIfMatch?: true;
   /** A POST route that honors `Idempotency-Key` (spec 13.1). */
   readonly idempotent?: true;
   /** Marks the route as deprecated, with the dates that clients are told (API-16). Dates are `YYYY-MM-DD`. */

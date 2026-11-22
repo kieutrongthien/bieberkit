@@ -74,13 +74,13 @@ const OPERATORS: Readonly<Record<string, string>> = {
 const STANDARD_KEYS = ['id', 'version', 'createdAt', 'updatedAt', 'createdBy', 'updatedBy'] as const;
 
 /** `crm.Customer` on `crm_customers`: module `crm`, resource `customers`. */
-function pathOf(def: EntityDef<string>): string {
+export function pathOf(def: EntityDef<string>): string {
   const module = def.name.slice(0, def.name.indexOf('.'));
   const table = def.table.startsWith(`${module}_`) ? def.table.slice(module.length + 1) : def.table;
   return `/api/v1/${module}/${table.replaceAll('_', '-')}`;
 }
 
-function permissionOf(def: EntityDef<string>, action: 'read' | 'create' | 'update' | 'delete'): string {
+export function permissionOf(def: EntityDef<string>, action: 'read' | 'create' | 'update' | 'delete'): string {
   const own = def.permissions[action];
   return own ?? entityEventName(def.name, action);
 }
@@ -461,6 +461,7 @@ export function entityRoutes(schema: OrmSchema, context: EntityRoutesContext): R
     routes.push({
       method: 'PATCH',
       url: `${base}/:id`,
+      requiresIfMatch: true,
       permission: permissionOf(def, 'update'),
       schema: { params: idParams, body: toJsonSchema(def, 'update'), response: { 200: single } },
       handler: (ctx) => {
@@ -497,6 +498,7 @@ export function entityRoutes(schema: OrmSchema, context: EntityRoutesContext): R
     routes.push({
       method: 'DELETE',
       url: `${base}/:id`,
+      requiresIfMatch: true,
       permission: permissionOf(def, 'delete'),
       schema: { params: idParams, response: { 204: { type: 'null' } } },
       handler: (ctx) => {
@@ -538,6 +540,7 @@ export function entityRoutes(schema: OrmSchema, context: EntityRoutesContext): R
       routes.push({
         method: 'POST',
         url: `${base}/:id/actions/${name}`,
+        requiresIfMatch: true,
         permission: declared.permission ?? permissionOf(def, 'update'),
         schema: { params: idParams, body: {}, response: { 200: single } },
         handler: (ctx) => {

@@ -43,6 +43,8 @@ export interface HttpEnv {
   readonly APP_ENV: 'development' | 'test' | 'production';
   readonly APP_PORT: number;
   readonly TRUST_PROXY: boolean | number;
+  /** Whether `openapi.json` is public in production (API-06). */
+  readonly API_DOCS_PUBLIC: boolean;
 }
 
 export interface ErrorContext {
@@ -112,6 +114,10 @@ export interface HttpServer {
   /** The steps of spec 19.4. `timedOut` becomes the exit code. */
   stop(options?: { drainMs?: number; timeoutMs?: number }): Promise<{ timedOut: boolean }>;
   readonly settings: Readonly<{ bodyLimit: number; requestTimeoutMs: number; keepAliveTimeoutMs: number }>;
+  /** The routes that were added with `route`, in the order they were added. The probes of the server are not among them. */
+  routes(): readonly RouteDef[];
+  /** Whether the document of the API is public: always outside production, and with `API_DOCS_PUBLIC` in it (API-06). */
+  readonly docsPublic: boolean;
 }
 
 const DEFAULT_BODY_LIMIT = 1_048_576;
@@ -335,6 +341,7 @@ export function createHttpServer(env: HttpEnv, options: HttpServerOptions = {}):
   const requests = new WeakMap<FastifyRequest, RequestState>();
   const hooks: Record<StageName, StageHook[]> = { afterAuth: [], beforeHandler: [], afterHandler: [], onResponse: [] };
   const known = new Set<string>();
+  const added: RouteDef[] = [];
   let started = false;
   let draining = false;
   let ready = false;
@@ -634,6 +641,7 @@ export function createHttpServer(env: HttpEnv, options: HttpServerOptions = {}):
     for (const [status, schema] of Object.entries(route.schema.response))
       compileOrRefuse(strictAjv, schema, `response ${status}`);
     known.add(key);
+    if (!internal) added.push(route);
     app.route({
       method: route.method,
       url: route.url,
@@ -741,5 +749,7 @@ export function createHttpServer(env: HttpEnv, options: HttpServerOptions = {}):
       return { timedOut: outcome === 'timeout' };
     },
     settings: { bodyLimit, requestTimeoutMs, keepAliveTimeoutMs },
+    routes: () => [...added],
+    docsPublic: env.APP_ENV !== 'production' || env.API_DOCS_PUBLIC,
   };
 }

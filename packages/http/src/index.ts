@@ -27,6 +27,9 @@ export const packageName = '@bieberkit/http';
 
 export { entityRoutes, registerEntityRoutes } from './entity-routes.ts';
 export type { EntityRoutesContext } from './entity-routes.ts';
+export { META_SCHEMA, registerMeta } from './meta.ts';
+export { openApiDocument, registerOpenApi } from './openapi.ts';
+export type { OpenApiDocument, OpenApiInfo } from './openapi.ts';
 export { registerHttp } from './lifecycle.ts';
 export type { RegisterHttpOptions } from './lifecycle.ts';
 export type {
