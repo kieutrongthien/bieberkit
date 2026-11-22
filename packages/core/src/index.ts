@@ -77,3 +77,5 @@ export type {
   ModuleEmitter,
   OnOptions,
 } from './events/events.ts';
+export { parseRole, ROLES } from './roles/roles.ts';
+export type { Role } from './roles/roles.ts';
