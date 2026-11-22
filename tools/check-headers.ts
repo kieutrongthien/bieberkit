@@ -55,7 +55,7 @@ interface Violation {
 }
 
 const ROOT = resolve(import.meta.dirname, '..');
-const SKIP_DIRS = new Set(['node_modules', 'dist', '.git', '.turbo', 'coverage', '.bieberkit', 'build']);
+const SKIP_DIRS = new Set(['node_modules', 'dist', '.git', '.turbo', 'coverage', '.bieberkit', 'build', '.codegraph']);
 const args = process.argv.slice(2);
 const flags = new Set(args.filter((a) => a.startsWith('--')));
 const fileArgs = args.filter((a) => !a.startsWith('--'));
