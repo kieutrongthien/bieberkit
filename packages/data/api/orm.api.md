@@ -28,12 +28,12 @@
 Generated from the built declaration files by `pnpm api:update`. Do not edit by hand. A change here is a change to the public API and needs a changeset (spec section 22.3).
 
 ```ts
-import "./errors-Bn-3jo6Z.js";
 import { Dialect, Logger } from "@bieberkit/core";
 import { EntityData, EntityManager, EntityName, EntityProperty, EntitySchema, FilterOptions, FilterQuery, FindOneOptions, FindOptions, IDatabaseDriver, MikroORM, NativeInsertUpdateOptions, Platform, Primary, RequiredEntityData, Type, UpdateOptions } from "@mikro-orm/core";
+import { Kysely, RawBuilder, SqliteDialect } from "kysely";
 import { SqlEntityManager } from "@mikro-orm/sql";
-import { SqliteDialect } from "kysely";
 import { a as EntityDef } from "./define-entity-B93nbOOC.js";
+import { n as StepDatabase, t as PluginMigrationStep, u as DestructiveFinding } from "./steps-BowZpLj1.js";
 type OrmSchema = EntitySchema<Record<string, unknown>>;
 interface CompileOptions {
   readonly tenancy?: "single" | "shared-schema";
@@ -84,10 +84,62 @@ interface ResolvedConnection {
   readonly location: string;
   readonly readLocations: readonly string[];
 }
-export declare function resolveConnection(env: DatabaseEnv): ResolvedConnection;
+export declare function resolveConnection(env: DatabaseEnv, variable?: string): ResolvedConnection;
 export declare function createDatabase(env: DatabaseEnv, options: DatabaseOptions): Promise<Database>;
 export declare function currentEntityManager(): EntityManager | undefined;
 export declare function runInUnitOfWork<T>(db: Database, fn: (em: EntityManager) => Promise<T>): Promise<T>;
+interface PluginRefusal {
+  readonly step: string;
+  readonly code: string;
+  readonly message: string;
+}
+interface PluginRun {
+  readonly deployId: string;
+  readonly applied: string[];
+  readonly refused: PluginRefusal[];
+  readonly waiting: string[];
+}
+interface PluginRunOptions {
+  readonly pluginOrder: readonly string[];
+  readonly deployId?: string;
+}
+export declare function runPluginMigrations(db: Kysely<StepDatabase>, dialect: Dialect, steps: readonly PluginMigrationStep[], options: PluginRunOptions): Promise<PluginRun>;
+interface MigrationEnv {
+  readonly DB_CONNECTION: Dialect | undefined;
+  readonly MIGRATE_DATABASE_URL: string | undefined;
+  readonly DB_POOL_MAX: number;
+}
+interface MigratorOptions {
+  readonly entities: readonly EntitySchema[];
+  readonly directory: string;
+  readonly logger?: Logger;
+}
+interface MadeMigration {
+  readonly name: string;
+  readonly path: string;
+  readonly up: readonly string[];
+  readonly down: readonly string[];
+  readonly destructive: readonly DestructiveFinding[];
+}
+interface MigrationStatus {
+  readonly executed: string[];
+  readonly pending: string[];
+}
+interface UpOptions {
+  readonly allowDestructive?: boolean;
+}
+interface Migrator {
+  readonly dialect: Dialect;
+  make(name?: string): Promise<MadeMigration | null>;
+  up(options?: UpOptions): Promise<string[]>;
+  down(): Promise<string[]>;
+  status(): Promise<MigrationStatus>;
+  runPluginSteps(steps: readonly PluginMigrationStep[], options: PluginRunOptions): Promise<PluginRun>;
+  close(): Promise<void>;
+}
+export declare function openMigrator(env: MigrationEnv, options: MigratorOptions): Promise<Migrator>;
+export declare function uuidType(dialect: Dialect): RawBuilder<unknown>;
+export declare function setNotNull(db: Kysely<StepDatabase>, dialect: Dialect, table: string, column: string, type: string): Promise<void>;
 interface SqliteOptions {
   readonly busyTimeoutMs?: number;
 }
@@ -142,5 +194,5 @@ export declare function setTranslation(em: EntityManager, schema: OrmSchema, rec
 type Row = Record<string, unknown>;
 export declare function toApiRow(schema: OrmSchema, row: Row): Row;
 export declare function toOrmData(schema: OrmSchema, input: Row, _mode: "create" | "update"): Row;
-export type { AuditSink, CompileOptions, Database, DatabaseEnv, DatabaseOptions, ListOptions, Orm, OrmSchema, Page, ReferenceVisibility, ResolvedConnection, SortOption, SqliteOptions, SystemScopeEntry };
+export type { AuditSink, CompileOptions, Database, DatabaseEnv, DatabaseOptions, ListOptions, MadeMigration, MigrationEnv, MigrationStatus, Migrator, MigratorOptions, Orm, OrmSchema, Page, PluginRefusal, PluginRun, PluginRunOptions, ReferenceVisibility, ResolvedConnection, SortOption, SqliteOptions, SystemScopeEntry, UpOptions };
 ```

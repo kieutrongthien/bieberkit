@@ -30,7 +30,7 @@ Generated from the built declaration files by `pnpm api:update`. Do not edit by 
 ```ts
 import { A as fold, C as ResetEvery, D as f, E as TransitionDef, O as Compare, S as FieldKind, T as StateOptions, _ as ColumnDef, a as EntityDef, b as FieldBuilders, c as FieldLike, d as StandardColumn, f as TableConstraints, g as tableConstraints, h as standardColumns, i as ConstraintDef, j as nfc, k as codePointLength, l as OrmOverride, m as snake, n as AdminOptions, o as EntityOptions, p as defineEntity, r as ApiOptions, s as Feature, t as ActionDef, u as Permissions, v as ComputedFn, w as SchemaValue, x as FieldDef, y as Field } from "./define-entity-B93nbOOC.js";
 import { a as UpdateInput, i as Row, n as EntityRegistry, t as CreateInput } from "./registry-CxjCK9gx.js";
-import { n as dataError, t as DataError } from "./errors-Bn-3jo6Z.js";
+import { a as compareVersions, c as stepName, d as DestructiveKind, f as detectDestructive, h as dataError, i as StepRisk, l as validateSteps, m as DataError, n as StepDatabase, o as findStepRisks, p as upStatementsOfMigration, r as StepKind, s as orderSteps, t as PluginMigrationStep, u as DestructiveFinding } from "./steps-BowZpLj1.js";
 interface Uuid7Options {
   readonly now?: () => number;
   readonly random?: (bytes: Uint8Array) => void;
@@ -53,6 +53,7 @@ type CursorValue = string | number | bigint | boolean | null;
 export declare function pageSize(requested: unknown, fallback?: number): number;
 export declare function encodeCursor(position: readonly CursorValue[]): string;
 export declare function decodeCursor(cursor: string): readonly CursorValue[];
+export declare function migrationFileName(timestamp: string, name: string | undefined, taken: (candidate: string) => boolean): string;
 export declare const packageName = "@bieberkit/data";
-export { type ActionDef, type AdminOptions, type ApiOptions, type ColumnDef, type Compare, type ComputedFn, type ConstraintDef, type CreateInput, type CursorValue, DataError, type EntityDef, type EntityOptions, type EntityRegistry, type Feature, Field, type FieldBuilders, type FieldDef, type FieldKind, type FieldLike, type OrmOverride, type Permissions, type ResetEvery, type Row, type SchemaValue, type StandardColumn, type StateOptions, type TableConstraints, type TransitionDef, type UpdateInput, type Uuid7Options, codePointLength, dataError, defineEntity, f, fold, nfc, snake, standardColumns, tableConstraints };
+export { type ActionDef, type AdminOptions, type ApiOptions, type ColumnDef, type Compare, type ComputedFn, type ConstraintDef, type CreateInput, type CursorValue, DataError, type DestructiveFinding, type DestructiveKind, type EntityDef, type EntityOptions, type EntityRegistry, type Feature, Field, type FieldBuilders, type FieldDef, type FieldKind, type FieldLike, type OrmOverride, type Permissions, type PluginMigrationStep, type ResetEvery, type Row, type SchemaValue, type StandardColumn, type StateOptions, type StepDatabase, type StepKind, type StepRisk, type TableConstraints, type TransitionDef, type UpdateInput, type Uuid7Options, codePointLength, compareVersions, dataError, defineEntity, detectDestructive, f, findStepRisks, fold, nfc, orderSteps, snake, standardColumns, stepName, tableConstraints, upStatementsOfMigration, validateSteps };
 ```

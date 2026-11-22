@@ -157,9 +157,9 @@ Depends on: M1.1.
 - [x] **[D]** Tenant model: `tenant: true`, global filter, `asSystem()` audited, unique constraints include `tenant_id`, tenant resolution per request (DATA-09, DATA-15, DATA-19, CFG-11)
 - [x] **[D]** Cross-tenant reference checks on writes (spec 0.8 review fix)
 - [x] Optimistic concurrency by `version` and `If-Match` (API-13)
-- [ ] Migrations: snapshot diff per dialect, `migrate:make`, `migrate`, status and rollback, destructive statement detection, expand then contract (DATA-08, §9.3)
-- [ ] Plugin migration runner with `bieberkit_plugin_migrations` and portable schema builder (DATA-24): step format, `deploy_id` guard, `uuidType` and `setNotNull` helpers, SQLite rebuilds with foreign keys off, and a `bieberkit check` rule for MySQL steps (DATA-08, DATA-27, ADR 0011)
-- [ ] `MIGRATE_DATABASE_URL` used only by the migrate role (DATA-25)
+- [x] Migrations: snapshot diff per dialect, `make`, `up`, `down` and `status` of `openMigrator`, destructive statement detection, expand then contract (DATA-08, §9.3). The `migrate:*` commands wait for the CLI of M1.8
+- [x] Plugin migration runner with `bieberkit_plugin_migrations` and portable schema builder (DATA-24): step format, `deploy_id` guard, `uuidType` and `setNotNull` helpers, SQLite rebuilds with foreign keys off (DATA-08, DATA-27, ADR 0011). The `bieberkit check` rules are the functions `findStepRisks` and `detectDestructive`, and wait for the CLI of M1.8
+- [x] `MIGRATE_DATABASE_URL` used only by the migrate role (DATA-25)
 - [ ] Outbox table, same-transaction write, dispatcher with SKIP LOCKED batches of 100, versioned events, per-subscriber processed ids, 7 day cleanup, lag metric (MOD-18, §7.5)
 - [ ] Outbox dispatcher on MySQL and MariaDB deletes rows one at a time by primary key and retries on deadlock. With the `database` queue driver the job insert joins the dispatcher's transaction (MOD-18, ADR 0010)
 - [ ] Audit log table, append-only for the app role, written in the same transaction (OBS-05, AUTHZ-05)
@@ -268,6 +268,7 @@ Done when: `pnpm create bieberkit@latest demo --yes` boots, migrates, seeds an a
 
 Depends on: M1.7. Built and hardened first, as every other template relies on them (§12).
 
+- [ ] CLI commands `migrate:make`, `migrate`, `migrate:status` and `migrate:rollback` over `openMigrator`, a lock so that one migrate run is guaranteed, and the `bieberkit check` rules from `detectDestructive` and `findStepRisks` (DATA-08, DATA-25, DATA-27)
 - [ ] Plugins: `users`, `roles`, `auth-ui`, `settings`, `audit-log`, `notifications`, `media`
 - [ ] `templates/blank/template.ts` with plugin list, seeders and menu order; administrator account and base roles seeded (§12)
 - [ ] Thin admin slice: `@bieberkit/admin-core` metadata loading, routing, permissions; `@bieberkit/admin-antd` login, generic list and form, no more (UI-01, UI-02, UI-10)
