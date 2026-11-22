@@ -69,7 +69,7 @@ Option A with T1. This follows three choices the maintainer made on 2026-11-22: 
 
 ## Evidence
 
-Spike on 2026-11-22 on Node.js 26.13.1, MikroORM 7.2.11, Zod 4.6.7, Ajv 8.20.0, CASL 7.1.3, TypeScript 7.0.2. Sources are throwaway and in the scratchpad of that session, not in the repository.
+Spike on 2026-11-22 on Node.js 26.13.1 (the ORM, validator and bulk write checks were repeated on Node.js 24.12.0 with identical results), MikroORM 7.2.11, Zod 4.6.7, Ajv 8.20.0, CASL 7.1.3, TypeScript 7.0.2. Sources are throwaway and in the scratchpad of that session, not in the repository.
 
 **ORM compiler** (descriptors for id, string with unique and `ci_ai`, email, oneOf, money, decimal, custom, belongsTo, createdAt, updatedAt; options `tenant` and `softDelete`). All ten checks passed on PostgreSQL 15, MySQL 8.4 and SQLite:
 
@@ -159,4 +159,4 @@ Made in spec 0.8.3, in the same pull request as this ADR:
 - The authorization ADR reuses the CASL subject and field names defined here.
 - A `bieberkit check` rule and a contract test for bulk writes on entities with compared fields.
 - Re-measure serialization on the k6 reference endpoints (roadmap M1.9) before changing the spec wording.
-- The spike sources are archived outside the repository, in `bieberkit-spikes/` next to it, with a README. The Node.js 24.12 run in ADR 0008 needs them.
+- The spike sources are archived outside the repository, in `bieberkit-spikes/` next to it, with a README. They were used for the Node.js 24.12 run.

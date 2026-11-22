@@ -57,7 +57,7 @@ Option A, with MikroORM pinned to an exact 7.2.x version, and these rules. Each 
 
 ## Evidence
 
-Spike on 2026-11-22. Sources are throwaway and outside the repository. Environment: the whole spike ran twice, on Node.js 22.23.2 and on Node.js 26.13.1 (the default of this project), with identical results. Node.js 24 was not run. MikroORM 7.2.11, containers `postgres:15` (15.20), `postgres:18` (18.7), `mysql:8.4` (8.4.13), `mariadb:11` (11.8.9), and SQLite 3.54.1.
+Spike on 2026-11-22. Sources are throwaway and outside the repository. Environment: the whole spike ran on Node.js 22.23.2, 24.12.0 (the minimum) and 26.13.1 (the default of this project), with identical results on all three. MikroORM 7.2.11, containers `postgres:15` (15.20), `postgres:18` (18.7), `mysql:8.4` (8.4.13), `mariadb:11` (11.8.9), and SQLite 3.54.1.
 
 | Check                                                                           | PG 15  | PG 18   | MySQL 8.4    | MariaDB 11   | SQLite                        |
 | ------------------------------------------------------------------------------- | ------ | ------- | ------------ | ------------ | ----------------------------- |
@@ -106,7 +106,7 @@ Made in spec 0.8.2, in the same pull request as this ADR:
 
 ## Follow-ups
 
-- Node.js 26 is covered. Run the spike once on Node.js 24.12 (the minimum) before Phase 1 starts.
+- Done: the spike also passes on Node.js 24.12.0 (the minimum), with the same results as on 22 and 26.
 - The `defineEntity` ADR (roadmap M0.2) decides how to meet `isolatedDeclarations`.
 - The queue ADR reuses the `SKIP LOCKED` result.
 - Keep the spike sources if you want them: they are in the scratchpad of the session that ran it and may be cleared.

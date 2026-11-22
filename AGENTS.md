@@ -48,7 +48,7 @@ Imports point downward only. `pnpm check:layers` enforces it from `tools/lib/lay
 
 1. Tools: `bieberkit` (cli), `create-bieberkit`, `@bieberkit/mcp`
 2. Product: admin-core, admin-antd, site-kit, tokens, content, testing
-3. Contracts: http, data, auth, queue, cache, storage, mail, search
+3. Contracts: http, data, auth, queue, cache, storage, mail, search, log
 4. Foundation: core. Node.js built-ins only, no runtime dependencies (PKG-04)
 
 Driver libraries (BullMQ, BentoCache, FlyDrive, mail transports, search engines) are imported only inside `src/adapters/<driver>/` of a contract package and exported as a subpath, for example `@bieberkit/cache/bentocache`.
@@ -63,7 +63,7 @@ Driver libraries (BullMQ, BentoCache, FlyDrive, mail transports, search engines)
 
 ## Every file needs the header
 
-Spec section 23. Copy the header from a file of the same kind, set `@file` to the repo-relative path, write a one-sentence `@description`, and use the year the file was created. JSON, lockfiles, `LICENSE`, `NOTICE` and binaries are exempt. In Markdown with frontmatter (`SKILL.md`), the header comes right after the frontmatter.
+Spec section 23. Copy the header from a file of the same kind, set `@file` to the repo-relative path, write a one-sentence `@description`, and use the year the file was created. JSON, lockfiles, `LICENSE`, `NOTICE` and binaries are exempt. In Markdown with frontmatter (`SKILL.md`), the header comes after the frontmatter, and blank lines between them are allowed (formatters add one).
 
 ## Rules agents often break
 
