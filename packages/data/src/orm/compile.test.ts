@@ -26,6 +26,7 @@ import { EntitySchema } from '@mikro-orm/core';
 import { describe, expect, it } from 'vitest';
 import { DataError } from '../errors.ts';
 import { defineEntity, f, snake, tableConstraints } from '../schema/index.ts';
+import type { EntityDef } from '../schema/index.ts';
 import { Contact, Customer, User } from '../testing/sample-entities.ts';
 import { compileEntities } from './compile.ts';
 
@@ -92,12 +93,12 @@ describe('compileEntities result', () => {
   });
 
   it('works for definitions that refer to each other', () => {
-    const A = defineEntity({
+    const A: EntityDef<'cyc.A'> = defineEntity({
       name: 'cyc.A',
       table: 'cyc_a',
       fields: { id: f.id(), other: f.belongsTo(() => B).optional() },
     });
-    const B = defineEntity({
+    const B: EntityDef<'cyc.B'> = defineEntity({
       name: 'cyc.B',
       table: 'cyc_b',
       fields: { id: f.id(), other: f.belongsTo(() => A).optional() },
@@ -263,13 +264,13 @@ describe('DATA-20 relations', () => {
   });
 
   it('hasMany and hasOne point at the only relation of the target that points back', () => {
-    const Order = defineEntity({
+    const Order: EntityDef<'shop.Order'> = defineEntity({
       name: 'shop.Order',
       table: 'shop_orders',
       tenant: true,
       fields: { id: f.id(), lines: f.hasMany(() => Line) },
     });
-    const Line = defineEntity({
+    const Line: EntityDef<'shop.Line'> = defineEntity({
       name: 'shop.Line',
       table: 'shop_lines',
       tenant: true,
@@ -278,12 +279,12 @@ describe('DATA-20 relations', () => {
     const [order] = compiled(Order, Line);
     expect(order?.properties['lines']).toMatchObject({ kind: '1:m', mappedBy: 'order' });
 
-    const Account = defineEntity({
+    const Account: EntityDef<'acc.Account'> = defineEntity({
       name: 'acc.Account',
       table: 'acc_accounts',
       fields: { id: f.id(), profile: f.hasOne(() => Profile) },
     });
-    const Profile = defineEntity({
+    const Profile: EntityDef<'acc.Profile'> = defineEntity({
       name: 'acc.Profile',
       table: 'acc_profiles',
       fields: { id: f.id(), account: f.belongsTo(() => Account).unique() },
@@ -300,12 +301,12 @@ describe('DATA-20 relations', () => {
     const Kid = defineEntity({ name: 'p.Kid', table: 'p_kids', fields: { id: f.id(), name: f.string({ max: 5 }) } });
     expect(failure(() => compileEntities([Parent, Kid])).message).toContain('p.Kid');
 
-    const Twin = defineEntity({
+    const Twin: EntityDef<'p.Twin'> = defineEntity({
       name: 'p.Twin',
       table: 'p_twins',
       fields: { id: f.id(), a: f.belongsTo(() => Parent2), b: f.belongsTo(() => Parent2) },
     });
-    const Parent2 = defineEntity({
+    const Parent2: EntityDef<'p.Parent2'> = defineEntity({
       name: 'p.Parent2',
       table: 'p_parents2',
       fields: { id: f.id(), twins: f.hasMany(() => Twin) },

@@ -83,6 +83,15 @@ export class Uuid7Type extends Type<string | null, string | Uint8Array | null> {
     return canonical(value);
   }
 
+  /**
+   * Two values are the same id when their canonical text is the same, whether each is a string or bytes. Without this,
+   * a row read as bytes and the same id converted to bytes again are compared as objects, and every update rewrites the key columns.
+   */
+  override compareValues(a: string | Uint8Array | null, b: string | Uint8Array | null): boolean {
+    if (a === null || b === null) return a === b;
+    return canonical(a) === canonical(b);
+  }
+
   override compareAsType(): string {
     return 'string';
   }

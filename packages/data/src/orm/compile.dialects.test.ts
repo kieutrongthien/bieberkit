@@ -22,7 +22,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, expect, it } from 'vitest';
+import { expect, it } from 'vitest';
 import { requestContext } from '@bieberkit/core';
 import type { Dialect } from '@bieberkit/core';
 import { defineEntity, f } from '../schema/index.ts';

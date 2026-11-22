@@ -22,7 +22,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, expect, it } from 'vitest';
+import { expect, it } from 'vitest';
 import { DataError } from '../errors.ts';
 import { crmSchemas, inTenant, seedUser, TENANT_A, TENANT_B } from '../testing/crm.ts';
 import { describeDialects } from '../testing/dialects.ts';
@@ -173,6 +173,6 @@ describeDialects('DATA-21 the guard against a write that skips the shadow column
 
   it('an entity without a compared field is not guarded', async () => {
     const { schemas, db } = await setup();
-    await expect(runInUnitOfWork(db, (em) => em.nativeUpdate(schemas.User, {}, { name: 'Anyone' }))).resolves.toBe(0);
+    await expect(runInUnitOfWork(db, (em) => em.nativeUpdate(schemas.User, {}, { name: 'Anyone' }))).resolves.toBe(1);
   });
 });

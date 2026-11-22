@@ -22,8 +22,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+export { bulkInsert, bulkUpdate } from './bulk.ts';
+export { compileEntities } from './compile.ts';
+export type { CompileOptions, OrmSchema } from './compile.ts';
 export { createDatabase, currentEntityManager, resolveConnection, runInUnitOfWork } from './connect.ts';
 export type { Database, DatabaseEnv, DatabaseOptions, Orm, ResolvedConnection } from './connect.ts';
 export { createSqliteDialect } from './sqlite.ts';
 export type { SqliteOptions } from './sqlite.ts';
 export { Uuid7Type } from './uuid7-type.ts';
+export { BieberEntityManager } from './entity-manager.ts';
+export type { ReferenceVisibility } from './references.ts';
+export { restore, softDelete } from './softdelete.ts';
+export { currentTenantId, runAsTenant } from './tenant.ts';
+export type { AuditSink, SystemScopeEntry } from './tenant.ts';
+export { expectVersion } from './version.ts';

@@ -58,6 +58,7 @@
     "@mikro-orm/core": "7.2.9",
     "@mikro-orm/mysql": "7.2.9",
     "@mikro-orm/postgresql": "7.2.9",
+    "@mikro-orm/sql": "7.2.9",
     "@mikro-orm/sqlite": "7.2.9",
     "ajv": "8.20.0",
     "ajv-formats": "3.0.1",

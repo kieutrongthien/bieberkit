@@ -22,7 +22,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, expect, it } from 'vitest';
+import { expect, it } from 'vitest';
 import { DataError } from '../errors.ts';
 import { crmSchemas, inTenant, seedCustomer, seedUser, TENANT_A, TENANT_B } from '../testing/crm.ts';
 import { describeDialects } from '../testing/dialects.ts';

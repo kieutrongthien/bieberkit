@@ -98,7 +98,9 @@ describeDialects('DATA-09 the tenant filter', ({ open }) => {
   it('find, count and findOne only see the rows of the tenant of the request', async () => {
     const { db, schemas, b1, a1 } = await seeded(open);
     expect(
-      (await inTenant(db, TENANT_A, (em) => em.find(schemas.Customer, {}))).map((row) => row['code']).toSorted(),
+      (await inTenant(db, TENANT_A, (em) => em.find(schemas.Customer, {})))
+        .map((row) => String(row['code']))
+        .toSorted(),
     ).toEqual(['A1', 'A2']);
     expect(await inTenant(db, TENANT_B, (em) => em.count(schemas.Customer, {}))).toBe(1);
     expect(await inTenant(db, TENANT_A, (em) => em.findOne(schemas.Customer, { id: b1 }))).toBeNull();
@@ -125,7 +127,7 @@ describeDialects('DATA-09 the tenant filter', ({ open }) => {
   it('a relation to a global entity is loaded without a tenant', async () => {
     const { db, schemas, a1 } = await seeded(open);
     const row = await inTenant(db, TENANT_A, (em) =>
-      em.findOneOrFail(schemas.Customer, { id: a1 }, { populate: ['owner'] }),
+      em.findOneOrFail(schemas.Customer, { id: a1 }, { populate: ['*'] }),
     );
     expect(Reflect.get(Object(row['owner']), 'name')).toBe('Owner');
   });
@@ -148,7 +150,7 @@ describeDialects('DATA-09 the tenant filter', ({ open }) => {
           await new Promise((resolve) => setTimeout(resolve, 1));
         }
         await em.flush();
-        return (await em.find(schemas.Customer, {})).map((row) => `${String(row['name'])}`);
+        return (await em.find(schemas.Customer, {})).map((row) => String(row['name']));
       });
     const [a, b] = await Promise.all([work(TENANT_A, 'Alpha', 10), work(TENANT_B, 'Beta', 10)]);
     expect(a?.every((name) => name === 'Alpha' || name === 'Lê Văn')).toBe(true);
@@ -244,19 +246,20 @@ describeDialects('DATA-09 no way around the filter inside a handler', ({ open })
   });
 });
 
-describeDialects('DATA-09 asSystem', ({ open }) => {
-  const sink = () => {
-    const entries: SystemScopeEntry[] = [];
-    return { entries, record: (entry: SystemScopeEntry): void => void entries.push(entry) };
-  };
+/** An audit sink that keeps what it was given. */
+const sink = () => {
+  const entries: SystemScopeEntry[] = [];
+  return { entries, record: (entry: SystemScopeEntry): void => void entries.push(entry) };
+};
 
+describeDialects('DATA-09 asSystem', ({ open }) => {
   it('reads across tenants, and records who did it and why', async () => {
     const audit = sink();
     const { db, schemas } = await seeded(open, audit);
     const rows = await requestContext.run({ requestId: 'r9', userId: 'u9' }, () =>
       db.asSystem('nightly report', () => runInUnitOfWork(db, (em) => em.find(schemas.Customer, {}))),
     );
-    expect(rows.map((row) => row['code']).toSorted()).toEqual(['A1', 'A2', 'B1']);
+    expect(rows.map((row) => String(row['code'])).toSorted()).toEqual(['A1', 'A2', 'B1']);
     expect(audit.entries).toHaveLength(1);
     expect(audit.entries[0]).toMatchObject({ reason: 'nightly report', requestId: 'r9', userId: 'u9' });
     expect(audit.entries[0]?.at).toBeInstanceOf(Date);

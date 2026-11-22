@@ -24,9 +24,15 @@
 
 import { AsyncLocalStorage } from 'node:async_hooks';
 import type { EntityManager, EntitySchema, IDatabaseDriver, MikroORM } from '@mikro-orm/core';
-import type { Dialect } from '@bieberkit/core';
+import { createLogger } from '@bieberkit/core';
+import type { Dialect, Logger } from '@bieberkit/core';
 import { dataError } from '../errors.ts';
+import { BieberEntityManager } from './entity-manager.ts';
+import type { ReferenceVisibility } from './references.ts';
 import { createSqliteDialect } from './sqlite.ts';
+import { DataSubscriber } from './subscriber.ts';
+import { openSystemScope } from './tenant.ts';
+import type { AuditSink, SystemScopeEntry } from './tenant.ts';
 
 /** The keys of `CoreEnv` that this module reads. Core validates them, so nothing here reads `process.env` (P8). */
 export interface DatabaseEnv {
@@ -38,6 +44,11 @@ export interface DatabaseEnv {
 
 export interface DatabaseOptions {
   readonly entities: readonly EntitySchema[];
+  /** Where `asSystem` records its use. Defaults to a `warn` line through `logger`, until the audit log of slice 6. */
+  readonly audit?: AuditSink;
+  /** The CASL read rule that decides which referenced ids a user may see (DATA-20). */
+  readonly references?: ReferenceVisibility;
+  readonly logger?: Logger;
 }
 
 /** The MikroORM instance, whichever driver it runs on. */
@@ -48,6 +59,11 @@ export interface Database {
   readonly orm: Orm;
   /** A new EntityManager with an empty identity map. Use `runInUnitOfWork` for a request or a job. */
   fork(): EntityManager;
+  /**
+   * Runs `fn` with the tenant filter switched off, after recording `reason` in the audit sink (DATA-09). A blank reason is refused,
+   * and if the sink fails the scope does not start.
+   */
+  asSystem<T>(reason: string, fn: () => Promise<T>): Promise<T>;
   close(): Promise<void>;
 }
 
@@ -144,6 +160,10 @@ export async function createDatabase(env: DatabaseEnv, options: DatabaseOptions)
     allowGlobalContext: false,
     ensureDatabase: false,
     discovery: { warnWhenNoEntities: false },
+    // The class extends the EntityManager of every SQL driver, and MikroORM types it per driver.
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion
+    entityManager: BieberEntityManager as never,
+    subscribers: [new DataSubscriber(options.references)],
   } as const;
   const pool = { min: 0, max: env.DB_POOL_MAX };
   const replicas = resolved.readLocations.map((clientUrl) => ({ clientUrl }));
@@ -164,10 +184,15 @@ export async function createDatabase(env: DatabaseEnv, options: DatabaseOptions)
     const { MikroORM: Orm, MySqlDriver } = await import('@mikro-orm/mysql');
     orm = await Orm.init({ ...common, driver: MySqlDriver, clientUrl: resolved.location, pool, replicas });
   }
+  const logger = options.logger ?? createLogger({ level: 'info', role: 'data' });
+  const sink: AuditSink = options.audit ?? {
+    record: (entry: SystemScopeEntry) => logger.warn('tenant filter switched off', { ...entry }),
+  };
   return {
     dialect: resolved.dialect,
     orm,
     fork: () => orm.em.fork(),
+    asSystem: (reason, fn) => openSystemScope(reason, sink, fn),
     close: () => orm.close(),
   };
 }
