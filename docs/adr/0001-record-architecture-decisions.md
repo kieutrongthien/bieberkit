@@ -35,11 +35,11 @@ BieberKit has one maintainer and is built largely with AI coding agents. Agents 
 
 ## Options
 
-| Option | For | Against |
-| --- | --- | --- |
-| ADRs in `docs/adr/` | Versioned with the code, reviewed in pull requests, readable by agents | Some writing effort per decision |
-| Decisions only in the spec | One document | Loses the options and the reasons, so decisions get reopened |
-| Issues or discussions | Easy to start | Outside the repository, hard for agents to find |
+| Option                     | For                                                                    | Against                                                      |
+| -------------------------- | ---------------------------------------------------------------------- | ------------------------------------------------------------ |
+| ADRs in `docs/adr/`        | Versioned with the code, reviewed in pull requests, readable by agents | Some writing effort per decision                             |
+| Decisions only in the spec | One document                                                           | Loses the options and the reasons, so decisions get reopened |
+| Issues or discussions      | Easy to start                                                          | Outside the repository, hard for agents to find              |
 
 ## Decision
 

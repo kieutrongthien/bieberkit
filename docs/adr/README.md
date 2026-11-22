@@ -30,28 +30,28 @@ Status values: `Proposed`, `Accepted`, `Rejected`, `Superseded by NNNN`. Only th
 
 ## Index
 
-| No. | Title | Status |
-| --- | --- | --- |
-| [0001](0001-record-architecture-decisions.md) | Record architecture decisions | Accepted |
-| [0002](0002-formatter-oxfmt.md) | Formatter: Oxfmt, with conditions | Accepted |
-| [0003](0003-logging-binding.md) | Logging: a port in core, pino behind a contract package | Accepted |
-| [0004](0004-content-editor.md) | Content editor: Tiptap 3 | Accepted |
-| [0005](0005-mariadb-support-level.md) | MariaDB support level | Accepted |
-| [0006](0006-docs-site.md) | Documentation site generator and hosting | Accepted |
-| [0007](0007-generated-project-license.md) | Default license of generated projects | Accepted |
+| No.                                           | Title                                                   | Status   |
+| --------------------------------------------- | ------------------------------------------------------- | -------- |
+| [0001](0001-record-architecture-decisions.md) | Record architecture decisions                           | Accepted |
+| [0002](0002-formatter-oxfmt.md)               | Formatter: Oxfmt, with conditions                       | Accepted |
+| [0003](0003-logging-binding.md)               | Logging: a port in core, pino behind a contract package | Accepted |
+| [0004](0004-content-editor.md)                | Content editor: Tiptap 3                                | Accepted |
+| [0005](0005-mariadb-support-level.md)         | MariaDB support level                                   | Accepted |
+| [0006](0006-docs-site.md)                     | Documentation site generator and hosting                | Accepted |
+| [0007](0007-generated-project-license.md)     | Default license of generated projects                   | Accepted |
 
 ## Needed for the Phase 0 gate
 
 The gate "ADRs accepted" (spec section 25) needs decisions on the items below. Spikes that feed them are listed in spec section 26.
 
-| Topic | Questions to settle |
-| --- | --- |
-| ORM and dialects | MikroORM 7 `defineEntity` on PostgreSQL, MySQL 8.4 and SQLite, support tiers, collation and money handling |
-| Plugin manifest | Static manifest in `package.json` (PLG-07), resolution order, collisions, per-plugin migrations (DATA-24) |
-| `defineEntity` API | Field DSL, compilation to MikroORM metadata, JSON Schema, Zod Mini and CASL, escape hatches |
-| Authentication | Better Auth through a MikroORM adapter that shares the request transaction, on all three dialects |
-| Authorization | CASL rules to SQL: `@ucast/sql` on MikroORM 7, or an own translator with a small operator set |
-| Queue drivers | BullMQ on Valkey and the database driver behind one contract, outbox dispatch |
-| Release pipeline | npm trusted publishing, protected tags, no shared cache, `id-token: write` only on the publish job (SEC-15 to SEC-21) |
-| Content editor | Lexical or Tiptap for block JSON content (spec section 16.5) |
-| Formatter | Oxfmt, or the Biome formatter as fallback |
+| Topic              | Questions to settle                                                                                                   |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------- |
+| ORM and dialects   | MikroORM 7 `defineEntity` on PostgreSQL, MySQL 8.4 and SQLite, support tiers, collation and money handling            |
+| Plugin manifest    | Static manifest in `package.json` (PLG-07), resolution order, collisions, per-plugin migrations (DATA-24)             |
+| `defineEntity` API | Field DSL, compilation to MikroORM metadata, JSON Schema, Zod Mini and CASL, escape hatches                           |
+| Authentication     | Better Auth through a MikroORM adapter that shares the request transaction, on all three dialects                     |
+| Authorization      | CASL rules to SQL: `@ucast/sql` on MikroORM 7, or an own translator with a small operator set                         |
+| Queue drivers      | BullMQ on Valkey and the database driver behind one contract, outbox dispatch                                         |
+| Release pipeline   | npm trusted publishing, protected tags, no shared cache, `id-token: write` only on the publish job (SEC-15 to SEC-21) |
+| Content editor     | Lexical or Tiptap for block JSON content (spec section 16.5)                                                          |
+| Formatter          | Oxfmt, or the Biome formatter as fallback                                                                             |

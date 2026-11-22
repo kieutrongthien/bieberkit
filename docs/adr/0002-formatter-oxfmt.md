@@ -38,12 +38,12 @@ The spike ran both tools on the repository at commit `f176ffb`.
 
 ## Options
 
-| Option | For | Against |
-| --- | --- | --- |
-| A. Keep Oxfmt | Same Oxc toolchain as Oxlint and tsdown. Already configured and pinned. Formats TypeScript, JSON and Markdown tables | 0.x: output may change between releases, so each bump can reformat many files |
-| B. Biome formatter 2.6.8 | Past 1.0, MIT OR Apache-2.0. Also formats TypeScript, JSON and Markdown | A second toolchain beside Oxlint. Replaces a working setup with no gain shown by the spike |
-| C. Prettier | Most widely used | Not in the baseline. Slower, and not part of the Oxc toolchain. Not evaluated in the spike |
-| D. No formatter | Nothing to maintain | Agent-written code drifts in style, and reviews fill with style comments |
+| Option                   | For                                                                                                                  | Against                                                                                    |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| A. Keep Oxfmt            | Same Oxc toolchain as Oxlint and tsdown. Already configured and pinned. Formats TypeScript, JSON and Markdown tables | 0.x: output may change between releases, so each bump can reformat many files              |
+| B. Biome formatter 2.6.8 | Past 1.0, MIT OR Apache-2.0. Also formats TypeScript, JSON and Markdown                                              | A second toolchain beside Oxlint. Replaces a working setup with no gain shown by the spike |
+| C. Prettier              | Most widely used                                                                                                     | Not in the baseline. Slower, and not part of the Oxc toolchain. Not evaluated in the spike |
+| D. No formatter          | Nothing to maintain                                                                                                  | Agent-written code drifts in style, and reviews fill with style comments                   |
 
 ## Decision
 

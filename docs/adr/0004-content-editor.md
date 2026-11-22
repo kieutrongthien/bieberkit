@@ -36,11 +36,11 @@ CNT-04 asks for a Phase 0 spike that chooses between Lexical and Tiptap on four 
 
 ## Options
 
-| Option | For | Against |
-| --- | --- | --- |
+| Option                    | For                                                                                                                             | Against                                                                                                                                                   |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | A. Tiptap 3 (ProseMirror) | Document model is a typed node tree close to a block list. `@tiptap/html` renders on the server. 70+ MIT extensions. Stable 3.x | Run by a company that sells a cloud product. Collaboration and document history are sold as paid cloud features, so we would self-host Yjs and Hocuspocus |
-| B. Lexical 0.x | Maintained by Meta, MIT, no commercial product around it. `@lexical/yjs` for collaboration | Pre-1.0 (0.53.0), so API changes are expected. Custom blocks are `DecoratorNode` classes, usually rendered with React |
-| C. Write our own | Full control | Contenteditable and input method handling are the hard part. Not feasible for one maintainer |
+| B. Lexical 0.x            | Maintained by Meta, MIT, no commercial product around it. `@lexical/yjs` for collaboration                                      | Pre-1.0 (0.53.0), so API changes are expected. Custom blocks are `DecoratorNode` classes, usually rendered with React                                     |
+| C. Write our own          | Full control                                                                                                                    | Contenteditable and input method handling are the hard part. Not feasible for one maintainer                                                              |
 
 ## Decision
 
@@ -52,13 +52,13 @@ Reasons: it is past 1.0, its document model maps onto the block schema with less
 
 All measured on 2026-11-22 in a scratch project outside the repository, with esbuild, minified, production React 19, gzip level 9. Scripts are not committed because they were throwaway.
 
-| Bundle | Minified | Gzip |
-| --- | --- | --- |
-| React 19 and react-dom, empty render | 222,731 B | 68,861 B |
-| Lexical 0.53.0 with rich text, list, link, table, history | 708,714 B | 227,102 B |
-| Tiptap 3.35.0 with StarterKit and table | 683,279 B | 214,104 B |
-| Editor only (bundle minus React), Lexical | | about 158 KB |
-| Editor only (bundle minus React), Tiptap | | about 145 KB |
+| Bundle                                                    | Minified  | Gzip         |
+| --------------------------------------------------------- | --------- | ------------ |
+| React 19 and react-dom, empty render                      | 222,731 B | 68,861 B     |
+| Lexical 0.53.0 with rich text, list, link, table, history | 708,714 B | 227,102 B    |
+| Tiptap 3.35.0 with StarterKit and table                   | 683,279 B | 214,104 B    |
+| Editor only (bundle minus React), Lexical                 |           | about 158 KB |
+| Editor only (bundle minus React), Tiptap                  |           | about 145 KB |
 
 The difference is about 13 KB gzip. Either editor is a large share of the 400 KB admin budget in section 18.1 (the spec does not say whether that figure is gzip or raw), so the editor should load as a lazy chunk with either choice (UI-12).
 

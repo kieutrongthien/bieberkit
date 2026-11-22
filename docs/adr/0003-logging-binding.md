@@ -38,12 +38,12 @@ Core still has to log before any adapter exists. Boot step 2 (spec 7.2) fails on
 
 ## Options
 
-| Option | For | Against |
-| --- | --- | --- |
-| A. Port in core, new contract package `@bieberkit/log` with pino under `@bieberkit/log/pino` | Follows PKG-02 and PKG-03 exactly. Every role can use it. Core keeps PKG-04. Replaceable by another adapter (P12) | A 19th package. Needs spec 4.1 and 4.3 edits and a layer entry in `tools/lib/layers.ts` |
-| B. Port in core, pino adapter as a subpath of `@bieberkit/http` | No new package. Fastify 5.12.8 already depends on pino (`^9.14.0 \|\| ^10.1.0`), so no new transitive dependency | Worker, scheduler and migrate would import the HTTP package to log. Couples logging to one contract |
-| C. Import pino in core | Simplest wiring | Breaks PKG-04. Needs a spec change to a rule that exists to keep the kernel dependency free |
-| D. Drop pino, write our own JSON logger | No dependency | Re-implements redaction, child loggers and serializers, and changes the baseline (section 3) and OBS-01. Fastify then needs a pino-shaped adapter anyway |
+| Option                                                                                       | For                                                                                                               | Against                                                                                                                                                  |
+| -------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A. Port in core, new contract package `@bieberkit/log` with pino under `@bieberkit/log/pino` | Follows PKG-02 and PKG-03 exactly. Every role can use it. Core keeps PKG-04. Replaceable by another adapter (P12) | A 19th package. Needs spec 4.1 and 4.3 edits and a layer entry in `tools/lib/layers.ts`                                                                  |
+| B. Port in core, pino adapter as a subpath of `@bieberkit/http`                              | No new package. Fastify 5.12.8 already depends on pino (`^9.14.0 \|\| ^10.1.0`), so no new transitive dependency  | Worker, scheduler and migrate would import the HTTP package to log. Couples logging to one contract                                                      |
+| C. Import pino in core                                                                       | Simplest wiring                                                                                                   | Breaks PKG-04. Needs a spec change to a rule that exists to keep the kernel dependency free                                                              |
+| D. Drop pino, write our own JSON logger                                                      | No dependency                                                                                                     | Re-implements redaction, child loggers and serializers, and changes the baseline (section 3) and OBS-01. Fastify then needs a pino-shaped adapter anyway |
 
 ## Decision
 

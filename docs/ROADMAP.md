@@ -41,12 +41,12 @@ Legend: **[M]** maintainer only, **[D]** maintainer-designed area, `ID` a spec r
 
 ## Status
 
-| Phase | Gate | State |
-| --- | --- | --- |
-| 0. Foundations | ADRs accepted | In progress, scaffold done |
-| 1. Core MVP | Pilot live in production | Not started |
-| 2. Plugins and templates | All three dialects green | Not started |
-| 3. Hardening and 1.0 | 1.0 released | Not started |
+| Phase                    | Gate                     | State                      |
+| ------------------------ | ------------------------ | -------------------------- |
+| 0. Foundations           | ADRs accepted            | In progress, scaffold done |
+| 1. Core MVP              | Pilot live in production | Not started                |
+| 2. Plugins and templates | All three dialects green | Not started                |
+| 3. Hardening and 1.0     | 1.0 released             | Not started                |
 
 Order inside Phase 1 follows the package layers (PKG-01): foundation, contracts, product, tools. Each milestone only depends on earlier ones.
 

@@ -40,11 +40,11 @@ The risk table in spec section 26 already says the full v1 scope is about three 
 
 ## Options
 
-| Option | For | Against |
-| --- | --- | --- |
-| A. Not supported | No work. Honest | Excludes users who only have MariaDB |
-| B. Best effort | No CI cost. Reports are welcome and cheap fixes are taken. Can be promoted later | Users may read "best effort" as "works". Needs clear wording in the docs |
-| C. Tier 2 with CI | Real guarantee | A fourth database in the CI matrix and in M2.7, plus a separate driver, with one maintainer |
+| Option            | For                                                                              | Against                                                                                     |
+| ----------------- | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| A. Not supported  | No work. Honest                                                                  | Excludes users who only have MariaDB                                                        |
+| B. Best effort    | No CI cost. Reports are welcome and cheap fixes are taken. Can be promoted later | Users may read "best effort" as "works". Needs clear wording in the docs                    |
+| C. Tier 2 with CI | Real guarantee                                                                   | A fourth database in the CI matrix and in M2.7, plus a separate driver, with one maintainer |
 
 ## Decision
 

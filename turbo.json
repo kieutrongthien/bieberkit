@@ -2,25 +2,12 @@
   "$schema": "https://turborepo.com/schema.json",
   "tasks": {
     "build": {
-      "dependsOn": [
-        "^build"
-      ],
-      "inputs": [
-        "src/**",
-        "tsdown.config.ts",
-        "package.json",
-        "tsconfig.json"
-      ],
-      "outputs": [
-        "dist/**"
-      ]
+      "dependsOn": ["^build"],
+      "inputs": ["src/**", "tsdown.config.ts", "package.json", "tsconfig.json"],
+      "outputs": ["dist/**"]
     },
     "typecheck": {
-      "inputs": [
-        "src/**",
-        "tsconfig.json",
-        "../../tsconfig.base.json"
-      ],
+      "inputs": ["src/**", "tsconfig.json", "../../tsconfig.base.json"],
       "outputs": []
     }
   }

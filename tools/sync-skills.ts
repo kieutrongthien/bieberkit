@@ -79,7 +79,9 @@ function main(): void {
     process.exitCode = 1;
     return;
   }
-  process.stdout.write(CHECK ? `check:skills ok (${sourceFiles.length} files)\n` : `synced ${sourceFiles.length} skill files\n`);
+  process.stdout.write(
+    CHECK ? `check:skills ok (${sourceFiles.length} files)\n` : `synced ${sourceFiles.length} skill files\n`,
+  );
 }
 
 main();

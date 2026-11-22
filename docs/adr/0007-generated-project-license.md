@@ -36,12 +36,12 @@ The scaffolder writes `license` into `bieberkit.config.ts` and into the header o
 
 ## Options
 
-| Option | For | Against |
-| --- | --- | --- |
+| Option                                                                      | For                                                                                                              | Against                                                                                               |
+| --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
 | A. `UNLICENSED` default, `--license <SPDX id>` flag and prompt to change it | Safe for private business code: grants nothing, the owner decides. Matches npm's convention for private packages | An open-source user must set a flag. A published package with `UNLICENSED` cannot be reused by others |
-| B. Apache-2.0 default | Same as the framework. Open by default | Publishes private business code by default, which is the wrong failure for most users |
-| C. MIT default | Short and common | Same problem as B, and a second license in the ecosystem |
-| D. No default, always ask | Forces a conscious choice | `--yes` means "accept defaults, never prompt" (spec 5.1), so it would need a default anyway |
+| B. Apache-2.0 default                                                       | Same as the framework. Open by default                                                                           | Publishes private business code by default, which is the wrong failure for most users                 |
+| C. MIT default                                                              | Short and common                                                                                                 | Same problem as B, and a second license in the ecosystem                                              |
+| D. No default, always ask                                                   | Forces a conscious choice                                                                                        | `--yes` means "accept defaults, never prompt" (spec 5.1), so it would need a default anyway           |
 
 ## Decision
 

@@ -40,10 +40,10 @@ Include the affected package and version, steps to reproduce, and the impact you
 
 ## Supported versions
 
-| Line | Security fixes |
-| --- | --- |
-| Current major | Yes |
+| Line           | Security fixes                          |
+| -------------- | --------------------------------------- |
+| Current major  | Yes                                     |
 | Previous major | For 6 months after the next major ships |
-| Older | No |
+| Older          | No                                      |
 
 BieberKit has no published release yet.

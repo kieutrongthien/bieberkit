@@ -3,12 +3,8 @@
     "target": "esnext",
     "module": "nodenext",
     "moduleResolution": "nodenext",
-    "lib": [
-      "esnext"
-    ],
-    "types": [
-      "node"
-    ],
+    "lib": ["esnext"],
+    "types": ["node"],
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": true,
@@ -21,9 +17,7 @@
     "declaration": true,
     "rewriteRelativeImportExtensions": true,
     "resolveJsonModule": true,
-    "customConditions": [
-      "@bieberkit/source"
-    ],
+    "customConditions": ["@bieberkit/source"],
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "noEmit": true

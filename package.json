@@ -5,10 +5,6 @@
   "license": "Apache-2.0",
   "author": "Bieber Kieu <kieutrongthien@gmail.com>",
   "type": "module",
-  "engines": {
-    "node": ">=24.12",
-    "pnpm": ">=12"
-  },
   "scripts": {
     "build": "turbo run build",
     "typecheck": "turbo run typecheck && tsc --noEmit -p tsconfig.json",
@@ -23,7 +19,6 @@
     "sync:skills": "node tools/sync-skills.ts",
     "changeset": "changeset"
   },
-  "packageManager": "pnpm@12.21.0",
   "devDependencies": {
     "@arethetypeswrong/cli": "0.18.5",
     "@changesets/cli": "3.0.3",
@@ -36,5 +31,10 @@
     "turbo": "^2.11.11",
     "typescript": "^7.0.2",
     "vitest": "^4.1.12"
-  }
+  },
+  "engines": {
+    "node": ">=24.12",
+    "pnpm": ">=12"
+  },
+  "packageManager": "pnpm@12.21.0"
 }

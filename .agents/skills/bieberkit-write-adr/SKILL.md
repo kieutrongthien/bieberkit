@@ -2,6 +2,7 @@
 name: bieberkit-write-adr
 description: Write an architecture decision record in docs/adr for BieberKit. Use before changing anything in the technology baseline, adding a runtime dependency, adding a package, or when a task says "ADR", "decision" or "spike result".
 ---
+
 <!--
   BieberKit
 

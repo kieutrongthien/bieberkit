@@ -30,11 +30,7 @@ export default defineConfig({
     conditions: ['@bieberkit/source'],
   },
   test: {
-    include: [
-      'packages/*/src/**/*.test.{ts,tsx}',
-      'plugins/*/src/**/*.test.{ts,tsx}',
-      'tools/**/*.test.ts',
-    ],
+    include: ['packages/*/src/**/*.test.{ts,tsx}', 'plugins/*/src/**/*.test.{ts,tsx}', 'tools/**/*.test.ts'],
     passWithNoTests: true,
   },
 });

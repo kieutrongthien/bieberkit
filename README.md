@@ -38,16 +38,16 @@ Node.js 26 LTS (24.12 or later), TypeScript 7 with erasable syntax only, pnpm 12
 
 ## Repository
 
-| Path | Content |
-| --- | --- |
-| `packages/` | Framework packages (`@bieberkit/*`, `bieberkit`, `create-bieberkit`) |
-| `plugins/` | First-party plugins (`@bieberkit/plugin-*`) |
-| `templates/` | Starter templates: blank, cms, crm, saas |
-| `registry/` | Copy-in UI blocks and module recipes |
-| `skills/` | Agent Skills shipped into generated projects |
-| `docs/` | Specification, ADRs, module specs |
-| `examples/` | Sample apps for upgrade and compatibility tests |
-| `tools/` | Header checker, layer checker, skill sync, bootstrap |
+| Path         | Content                                                              |
+| ------------ | -------------------------------------------------------------------- |
+| `packages/`  | Framework packages (`@bieberkit/*`, `bieberkit`, `create-bieberkit`) |
+| `plugins/`   | First-party plugins (`@bieberkit/plugin-*`)                          |
+| `templates/` | Starter templates: blank, cms, crm, saas                             |
+| `registry/`  | Copy-in UI blocks and module recipes                                 |
+| `skills/`    | Agent Skills shipped into generated projects                         |
+| `docs/`      | Specification, ADRs, module specs                                    |
+| `examples/`  | Sample apps for upgrade and compatibility tests                      |
+| `tools/`     | Header checker, layer checker, skill sync, bootstrap                 |
 
 ## Development
 

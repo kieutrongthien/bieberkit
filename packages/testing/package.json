@@ -8,6 +8,9 @@
   ],
   "license": "Apache-2.0",
   "author": "Bieber Kieu <kieutrongthien@gmail.com>",
+  "files": [
+    "dist"
+  ],
   "type": "module",
   "sideEffects": false,
   "exports": {
@@ -18,30 +21,27 @@
     },
     "./package.json": "./package.json"
   },
-  "files": [
-    "dist"
-  ],
-  "engines": {
-    "node": ">=24.12"
-  },
-  "scripts": {
-    "build": "tsdown",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
-  },
-  "dependencies": {
-    "@bieberkit/core": "workspace:*",
-    "@bieberkit/http": "workspace:*",
-    "@bieberkit/data": "workspace:*",
-    "@bieberkit/auth": "workspace:*"
-  },
   "publishConfig": {
-    "access": "public",
     "exports": {
       ".": {
         "types": "./dist/index.d.ts",
         "default": "./dist/index.js"
       },
       "./package.json": "./package.json"
-    }
+    },
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@bieberkit/auth": "workspace:*",
+    "@bieberkit/core": "workspace:*",
+    "@bieberkit/data": "workspace:*",
+    "@bieberkit/http": "workspace:*"
+  },
+  "engines": {
+    "node": ">=24.12"
   }
 }

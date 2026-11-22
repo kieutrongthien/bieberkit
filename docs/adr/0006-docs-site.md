@@ -38,20 +38,20 @@ The site is a build-time tool and is not shipped to users, so it carries no runt
 
 ## Options
 
-| Option | For | Against |
-| --- | --- | --- |
-| A. Starlight (Astro) | Built-in i18n and search. Plugins exist for `llms.txt` (`starlight-llms-txt` 0.12.0) and versioning (`starlight-versions` 0.10.2). Starlight 0.43.1, active | Astro is a third front-end toolchain beside the admin (Vite and React) and the site (TanStack Start). Starlight is 0.x |
-| B. VitePress | Simple, fast, stable 1.6.4 | Vue-based. No first-party versioning or `llms.txt` plugin was checked |
-| C. Docusaurus | Versioning and i18n are core features. React. 3.10.2 | Heavy, with a large dependency tree to keep under `minimumReleaseAge` |
-| D. Nextra | React | Last published 2025-12-04, so it is the least active of the five |
-| E. Build on TanStack Start | One stack for everything | We would write search, versioning and sidebar ourselves, which is a project by itself |
+| Option                     | For                                                                                                                                                         | Against                                                                                                                |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| A. Starlight (Astro)       | Built-in i18n and search. Plugins exist for `llms.txt` (`starlight-llms-txt` 0.12.0) and versioning (`starlight-versions` 0.10.2). Starlight 0.43.1, active | Astro is a third front-end toolchain beside the admin (Vite and React) and the site (TanStack Start). Starlight is 0.x |
+| B. VitePress               | Simple, fast, stable 1.6.4                                                                                                                                  | Vue-based. No first-party versioning or `llms.txt` plugin was checked                                                  |
+| C. Docusaurus              | Versioning and i18n are core features. React. 3.10.2                                                                                                        | Heavy, with a large dependency tree to keep under `minimumReleaseAge`                                                  |
+| D. Nextra                  | React                                                                                                                                                       | Last published 2025-12-04, so it is the least active of the five                                                       |
+| E. Build on TanStack Start | One stack for everything                                                                                                                                    | We would write search, versioning and sidebar ourselves, which is a project by itself                                  |
 
 Hosting is a second choice:
 
-| Host | For | Against |
-| --- | --- | --- |
-| GitHub Pages | Free, same place as the code | Deploy needs a workflow, and its deploy step uses `id-token: write`. Allowed only if the build and the deploy are separate jobs |
-| Cloudflare Pages with Git integration | No GitHub workflow and no token in the repository. The build runs on the host. Global CDN | Another vendor and account |
+| Host                                  | For                                                                                       | Against                                                                                                                         |
+| ------------------------------------- | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| GitHub Pages                          | Free, same place as the code                                                              | Deploy needs a workflow, and its deploy step uses `id-token: write`. Allowed only if the build and the deploy are separate jobs |
+| Cloudflare Pages with Git integration | No GitHub workflow and no token in the repository. The build runs on the host. Global CDN | Another vendor and account                                                                                                      |
 
 ## Decision
 

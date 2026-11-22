@@ -3,9 +3,5 @@
   "compilerOptions": {
     "isolatedDeclarations": false
   },
-  "include": [
-    "tools/**/*.ts",
-    "vitest.config.ts",
-    "packages/*/tsdown.config.ts"
-  ]
+  "include": ["tools/**/*.ts", "vitest.config.ts", "packages/*/tsdown.config.ts"]
 }

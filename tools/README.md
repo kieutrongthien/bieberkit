@@ -26,11 +26,11 @@
 
 Scripts for working on this repository. They are written in erasable TypeScript and run directly with `node`, no build step. They are never imported by packages.
 
-| Command | Script | Purpose |
-| --- | --- | --- |
-| `pnpm check:headers` | `check-headers.ts` | File headers (spec section 23). `--fix`, `--staged`, `--json`, `--claude-hook` |
-| `pnpm check:layers` | `check-layers.ts` | Package layers and driver imports (PKG-01 to PKG-04) |
-| `pnpm sync:skills` | `sync-skills.ts` | Mirrors `.agents/skills` into `.claude/skills`. `--check` for CI |
-| `sh tools/bootstrap.sh` | `bootstrap.sh` | First-time setup of a checkout |
+| Command                 | Script             | Purpose                                                                        |
+| ----------------------- | ------------------ | ------------------------------------------------------------------------------ |
+| `pnpm check:headers`    | `check-headers.ts` | File headers (spec section 23). `--fix`, `--staged`, `--json`, `--claude-hook` |
+| `pnpm check:layers`     | `check-layers.ts`  | Package layers and driver imports (PKG-01 to PKG-04)                           |
+| `pnpm sync:skills`      | `sync-skills.ts`   | Mirrors `.agents/skills` into `.claude/skills`. `--check` for CI               |
+| `sh tools/bootstrap.sh` | `bootstrap.sh`     | First-time setup of a checkout                                                 |
 
 Every violation prints a stable code (for example `HDR003`, `LAY002`, `SKL001`) and a one-line fix (AI-02).

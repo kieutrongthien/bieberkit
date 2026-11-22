@@ -2,6 +2,7 @@
 name: bieberkit-file-headers
 description: Write or repair the mandatory Apache 2.0 file header that every BieberKit file needs. Use when creating any new file, when pnpm check:headers fails, or when moving or renaming files.
 ---
+
 <!--
   BieberKit
 
@@ -32,13 +33,13 @@ Every file that can hold a comment starts with the header from spec section 23. 
 
 ## Which comment style
 
-| Files | Style |
-| --- | --- |
-| `.ts` `.tsx` `.js` `.mjs` `.cjs` `.css` | `/** ... */` block, lines start with ` * ` |
-| `.yaml` `.yml` `.toml` `.sh`, `Dockerfile`, `.gitignore`, `.editorconfig`, `CODEOWNERS`, `.githooks/*` | `#` lines |
-| `.md` `.mdx` `.html` | one `<!-- ... -->` block, lines indented two spaces |
-| `.sql` | `--` lines |
-| JSON, lockfiles, `LICENSE`, `NOTICE`, images, fonts | exempt, no header |
+| Files                                                                                                  | Style                                               |
+| ------------------------------------------------------------------------------------------------------ | --------------------------------------------------- |
+| `.ts` `.tsx` `.js` `.mjs` `.cjs` `.css`                                                                | `/** ... */` block, lines start with `*`            |
+| `.yaml` `.yml` `.toml` `.sh`, `Dockerfile`, `.gitignore`, `.editorconfig`, `CODEOWNERS`, `.githooks/*` | `#` lines                                           |
+| `.md` `.mdx` `.html`                                                                                   | one `<!-- ... -->` block, lines indented two spaces |
+| `.sql`                                                                                                 | `--` lines                                          |
+| JSON, lockfiles, `LICENSE`, `NOTICE`, images, fonts                                                    | exempt, no header                                   |
 
 The header goes first. Only a shebang, a Dockerfile `# syntax=` line or Markdown frontmatter may come before it.
 

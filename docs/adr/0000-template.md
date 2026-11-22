@@ -36,9 +36,9 @@ The problem, the constraints from the spec, and why a decision is needed now.
 ## Options
 
 | Option | For | Against |
-| --- | --- | --- |
-| A | | |
-| B | | |
+| ------ | --- | ------- |
+| A      |     |         |
+| B      |     |         |
 
 ## Decision
 

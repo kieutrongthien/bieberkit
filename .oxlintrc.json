@@ -1,13 +1,6 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": [
-    "typescript",
-    "unicorn",
-    "import",
-    "node",
-    "promise",
-    "vitest"
-  ],
+  "plugins": ["typescript", "unicorn", "import", "node", "promise", "vitest"],
   "categories": {
     "correctness": "error",
     "suspicious": "warn"
@@ -21,20 +14,12 @@
   },
   "overrides": [
     {
-      "files": [
-        "packages/core/src/config/**",
-        "tools/**",
-        "**/*.config.ts"
-      ],
+      "files": ["packages/core/src/config/**", "tools/**", "**/*.config.ts"],
       "rules": {
         "node/no-process-env": "off",
         "no-console": "off"
       }
     }
   ],
-  "ignorePatterns": [
-    "**/dist/**",
-    "**/coverage/**",
-    "**/.bieberkit/**"
-  ]
+  "ignorePatterns": ["**/dist/**", "**/coverage/**", "**/.bieberkit/**"]
 }
