@@ -99,9 +99,13 @@ export function normalize(dts: string): string {
   return out.length === 0 ? '' : `${out.join('\n')}\n`;
 }
 
-/** `index.d.ts` becomes `index.api.md`. */
+/**
+ * `index.d.ts` becomes `index.api.md`. A shared chunk that the bundler named with a content hash, such as
+ * `define-entity-fSi6hSbi.d.ts`, loses the hash, so its report keeps its name when the code changes.
+ */
 export function reportFileName(dtsFile: string): string {
-  return `${dtsFile.replace(/\.d\.ts$/, '')}.api.md`;
+  const name = dtsFile.replace(/\.d\.ts$/, '').replace(/-(?=[\w-]{0,7}[A-Z0-9])[\w-]{8}$/, '');
+  return `${name}.api.md`;
 }
 
 export interface RenderInput {

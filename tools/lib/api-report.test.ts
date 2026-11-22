@@ -76,6 +76,18 @@ describe('API report', () => {
     expect(reportFileName('cli.d.ts')).toBe('cli.api.md');
   });
 
+  it('drops the content hash of a shared chunk, so the report keeps its name', () => {
+    expect(reportFileName('define-entity-fSi6hSbi.d.ts')).toBe('define-entity.api.md');
+    expect(reportFileName('errors-Bn-3jo6Z.d.ts')).toBe('errors.api.md');
+    expect(reportFileName('registry-CGVHQuS7.d.ts')).toBe('registry.api.md');
+  });
+
+  it('keeps a real name that only looks like one with a hash', () => {
+    expect(reportFileName('build-filename.d.ts')).toBe('build-filename.api.md');
+    expect(reportFileName('orm.d.ts')).toBe('orm.api.md');
+    expect(reportFileName('plugin-seo-pages.d.ts')).toBe('plugin-seo-pages.api.md');
+  });
+
   it('renders a Markdown file with the header, the @generated tag and the declarations in a code block', () => {
     const text = render({
       packageName: '@bieberkit/core',
