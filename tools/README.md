@@ -34,6 +34,7 @@ Scripts for working on this repository. They are written in erasable TypeScript 
 | `pnpm check:workflows`              | `check-workflows.ts` | Workflow rules SEC-15, SEC-16 and SEC-21 (ADR 0014). actionlint and zizmor run in CI                       |
 | `pnpm check:api`, `pnpm api:update` | `api-report.ts`      | API report of each package, checked against the built `.d.ts` files. Run `pnpm build` first                |
 | `pnpm check:packages`               | `check-packages.ts`  | Packs every package and runs publint and `attw --profile esm-only` on the tarballs. Run `pnpm build` first |
+| `node tools/release-order.ts`       | `release-order.ts`   | Publish order of the packages (layer, then name), written next to the tarballs by the release build job    |
 | `sh tools/bootstrap.sh`             | `bootstrap.sh`       | First-time setup of a checkout                                                                             |
 
 Every violation prints a stable code (for example `HDR003`, `LAY002`, `SKL001`) and a one-line fix (AI-02).

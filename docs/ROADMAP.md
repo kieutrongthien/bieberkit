@@ -93,15 +93,15 @@ Done when: every ADR above has status `Accepted` and the spec §3 table matches 
 
 ### M0.3 CI and release pipeline
 
-- [ ] **[D]** `.github/workflows/ci.yml` runs `pnpm install --frozen-lockfile`, `check`, `typecheck`, `lint`, `format:check`, `test`, `build` on Node.js 26 and 24 (SEC-12, §3)
-- [ ] Third-party Actions pinned by commit SHA (SEC-13), and Renovate keeps the SHAs current (ADR 0014)
-- [ ] `publint` and `attw` run per package in CI (§3). `attw` runs with `--profile esm-only` (ADR 0014)
-- [ ] `actionlint`, `zizmor` and `tools/check-workflows.ts` run in `pnpm check` (SEC-13, SEC-15, SEC-16, SEC-21, ADR 0014)
-- [ ] API report per package committed, diff shows in pull requests, changeset required on change (§22.3 step 4)
-- [ ] **[D]** Release workflow: protected tags, manual approval environment, trusted publishing with provenance, no PR cache sharing, no install or build in the job holding `id-token: write` (SEC-15, SEC-16, SEC-21). Three jobs (`verify`, `build`, `publish`), tarballs packed once and checked by checksum, layer order, a rerun skips existing versions (ADR 0014)
-- [ ] **[D]** Dry-run release publishes a throwaway package end to end
-- [ ] Renovate rules: 7 day release age, fast path for Better Auth and TanStack Start advisories (AUTH-08, SITE-06)
-- [ ] Database service containers (PostgreSQL, MySQL, Valkey) available to CI for later phases (TST, §9.1)
+- [ ] **[D]** `.github/workflows/ci.yml` runs `pnpm install --frozen-lockfile`, `check`, `typecheck`, `lint`, `format:check`, `test`, `build` on Node.js 26 and 24 (SEC-12, §3). Written, pinned and linted, and the same commands pass locally on Node.js 24.12 and 26. Tick after the first run on GitHub
+- [x] Third-party Actions pinned by commit SHA (SEC-13). Every SHA was checked against its tag with `git ls-remote`, and zizmor reports no unpinned action
+- [x] `publint` and `attw` run per package in CI (§3). `attw` runs with `--profile esm-only` (ADR 0014). `pnpm check:packages` passes on the 18 tarballs, and the `packages` job runs it
+- [x] `tools/check-workflows.ts` runs in `pnpm check`, and `actionlint` and `zizmor` run in CI as containers pinned by digest (SEC-13, SEC-15, SEC-16, SEC-21, ADR 0014). Tests and negative controls pass
+- [x] API report per package committed, diff shows in pull requests, changeset required on change (§22.3 step 4). `pnpm check:api`, `pnpm api:update` and the `changeset` job, with tests and a negative control
+- [ ] **[D]** Release workflow: protected tags, manual approval environment, trusted publishing with provenance, no PR cache sharing, no install or build in the job holding `id-token: write` (SEC-15, SEC-16, SEC-21). Three jobs (`verify`, `build`, `publish`), tarballs packed once and checked by checksum, layer order, a rerun skips existing versions (ADR 0014). Written and linted, and its publish script ran against a local registry (partial run, rerun, tamper check). Tick after the dry run on GitHub
+- [ ] **[D]** Dry-run release publishes a throwaway package end to end. The steps are in `docs/releasing.md` and need the organization, the npm scope and the trusted publishers, which the maintainer sets up
+- [ ] Renovate rules: 7 day release age, fast path for Better Auth and TanStack Start advisories (AUTH-08, SITE-06). `renovate.json` is written and valid against the published schema. Tick after the Renovate app runs on the repository. Renovate keeps the action SHAs current (ADR 0014)
+- [ ] Database service containers (PostgreSQL, MySQL, Valkey) available to CI for later phases (TST, §9.1). The `services` job is written with the images pinned by digest. Tick after the first run on GitHub
 - [x] Format the repository once with Oxfmt in its own commit, list it in `.git-blame-ignore-revs`, and let the header checker accept blank lines after Markdown frontmatter, with a test named `HDR-01`. `pnpm format:check` must pass before the CI item above can be ticked (HDR-01, ADR 0002)
 
 Done when: the header checker and trusted publishing work end to end (spec §25 gate text).
