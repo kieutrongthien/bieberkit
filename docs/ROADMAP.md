@@ -146,7 +146,7 @@ Depends on: M1.1.
 - [x] Unicode NFC normalization at the validation boundary; code point length semantics; shared fixtures through Ajv and Zod Mini fail CI on disagreement (SCH-03, SCH-05)
 - [ ] Write helpers that add shadow column values for bulk writes (done: `bulkInsert`, `bulkUpdate`, and a runtime guard `DATA_SHADOW_STALE`), and a `bieberkit check` rule that flags direct `nativeUpdate` or `insert` on entities with compared fields (waits for the CLI of M1.8) (DATA-21, ADR 0009)
 - [x] `f.custom` takes schema values only, with a bundle size test that fails when a whole validator library is pulled into the client (SCH-07, ADR 0009)
-- [ ] Standalone Ajv and fast-json-stringify modules emitted at build (SCH-06, PERF-06)
+- [x] Standalone Ajv and fast-json-stringify modules emitted at build (SCH-06, PERF-06). The command `bieberkit build` that writes them waits for the CLI of M1.8
 - [x] Standard columns and entity options: `version`, `created_by`, `updated_by`, `deleted_at`, `deleted_token` (DATA-18)
 - [x] UUIDv7 keys, native storage per dialect (DATA-03, DATA-14)
 - [x] UTC timestamps (DATA-04); request context per request and per job (DATA-05)
@@ -269,7 +269,7 @@ Done when: `pnpm create bieberkit@latest demo --yes` boots, migrates, seeds an a
 
 Depends on: M1.7. Built and hardened first, as every other template relies on them (§12).
 
-- [ ] CLI commands `migrate:make`, `migrate`, `migrate:status` and `migrate:rollback` over `openMigrator`, a lock so that one migrate run is guaranteed, and the `bieberkit check` rules from `detectDestructive` and `findStepRisks` (DATA-08, DATA-25, DATA-27)
+- [ ] CLI commands `migrate:make`, `migrate`, `migrate:status` and `migrate:rollback` over `openMigrator`, `bieberkit build` over `writeStandalone`, a lock so that one migrate run is guaranteed, and the `bieberkit check` rules from `detectDestructive` and `findStepRisks` (DATA-08, DATA-25, DATA-27)
 - [ ] Plugins: `users`, `roles`, `auth-ui`, `settings`, `audit-log`, `notifications`, `media`
 - [ ] `templates/blank/template.ts` with plugin list, seeders and menu order; administrator account and base roles seeded (§12)
 - [ ] Thin admin slice: `@bieberkit/admin-core` metadata loading, routing, permissions; `@bieberkit/admin-antd` login, generic list and form, no more (UI-01, UI-02, UI-10)
