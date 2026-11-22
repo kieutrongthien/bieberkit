@@ -30,3 +30,5 @@ export const packageName = '@bieberkit/data';
 export { DataError, dataError } from './errors.ts';
 export { createUuid7, isUuid, uuid7, uuid7FromBytes, uuid7ToBytes } from './keys/uuid7.ts';
 export type { Uuid7Options } from './keys/uuid7.ts';
+export { codePointLength, fold, nfc } from './text/fold.ts';
+export type { Compare } from './text/fold.ts';
