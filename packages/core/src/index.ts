@@ -26,3 +26,6 @@
 
 /** npm name of this package. */
 export const packageName = '@bieberkit/core';
+
+export { BkError, ConfigError, ContainerError, EnvValidationError, toBkError } from './errors/errors.ts';
+export type { BkErrorOptions, EnvProblem, ErrorBody } from './errors/errors.ts';
