@@ -58,12 +58,13 @@ Option A with T1. This follows three choices the maintainer made on 2026-11-22: 
 2. **Types.** Row, create and update types come from `EntityRegistry`, an interface that `bieberkit dev` and `build` generate into `.bieberkit/types/` and that each published package ships in its `.d.ts` (marked `@generated`, HDR-05). `Row<'crm.Customer'>` reads from it.
 3. **Compilers.** Pure functions from `EntityDef` to: MikroORM `EntitySchema` options, JSON Schema 2020-12 (create, update and read), Zod 4 Mini (create, update and read), CASL subject and field mask, and the registry source. The ORM compiler builds the `EntitySchema` options object directly and does not use MikroORM's `p.` builder.
 4. **Package layout.** Subpaths of `@bieberkit/data`: `./schema` (descriptors, JSON Schema, Zod Mini, NFC step) and `./orm` (the only module that imports MikroORM). The CASL compiler lives in `@bieberkit/auth`. Entity files import only `@bieberkit/data`, never the ORM.
-5. **Standard options.** `tenant` and `softDelete` add the DATA-18 columns. Every unique constraint gains `tenant_id` and `deleted_token`. A tenant entity also gets `UNIQUE (tenant_id, id)`, and relations between tenant entities use composite FKs onto it (ADR 0008). `compare: 'ci' | 'ci_ai'` adds a hidden shadow column filled by entity hooks on create and update. `f.money` expands to `<name>_minor` (bigint) and `<name>_currency`, and `f.decimal` to a scaled bigint, both limited to the safe integer range.
+5. **Standard options.** `tenant` and `softDelete` add the DATA-18 columns. Every unique constraint gains `tenant_id` and `deleted_token`. A tenant entity also gets `UNIQUE (tenant_id, id)`, and relations between tenant entities use composite FKs onto it (ADR 0008). `compare: 'ci' | 'ci_ai'` adds a hidden shadow column filled by entity hooks on create and update. Bulk writes (`nativeUpdate`, `insert`) skip those hooks, so the data layer provides write helpers that add the shadow values, and `bieberkit check` flags direct calls on entities that have compared fields. `f.money` expands to `<name>_minor` (bigint) and `<name>_currency`, and `f.decimal` to a scaled bigint, both limited to the safe integer range.
 6. **Validation.** One NFC step runs before both validators (SCH-05). Both Ajv and Zod then use their default length rules, which already count code points. The shared fixture test of SCH-03 stays required.
 7. **Relations.** `f.belongsTo(() => Entity)` takes a thunk. The ORM compiler resolves targets through a registry map, because MikroORM rejects a string target.
 8. **Escape hatches.** (a) `orm: { indexes, properties }` is merged into the generated metadata. (b) A hand-written MikroORM `EntitySchema` lives in its own `*.orm.ts` file and is registered next to the generated ones. Generated entities can point at it through a descriptor stub, and it gets no route or admin screen unless it declares `expose`. `bieberkit check` reports both uses.
 9. **New field kinds.** Only `f.custom({ column, jsonSchema, zod, tsType, admin })`, where `zod` is a **schema value**, not a callback that receives `z`. A callback defeats tree-shaking (see Evidence). A `defineFieldType` registry is rejected for v1.
-10. **Compile timing.** ORM metadata, JSON Schema and Zod are built at boot. Ajv validators are emitted as standalone modules at build (SCH-06).
+10. **Compile timing.** ORM metadata, JSON Schema and Zod are built at boot. Ajv validators and serializers are emitted as standalone modules at build (SCH-06).
+11. **Dependencies.** `zod`, `ajv`, `ajv-formats`, `@casl/ability` and `fast-json-stringify` (see Evidence). The maintainer accepted `ajv-formats` on 2026-11-22. Generated standalone validators `require` it at runtime, so it ships in the web role. If it is ever dropped, the three formats in use (`uuid`, `email`, `date-time`) can be replaced with `ajv.addFormat` entries without touching entity definitions.
 
 ## Evidence
 
@@ -108,16 +109,31 @@ The callback receives the whole `z` namespace, so the bundler keeps all of Zod. 
 
 Typed errors work through the registry: a wrong `tier` and a wrong currency fail, and `Row<'crm.Customer'>['email']` resolves. Absolute times are small because TypeScript 7 is native, so the gain is mostly headroom as projects grow.
 
-**Dependencies (P9):** `zod` 4.6.7 (MIT, one package, modified 2026-10-12). `ajv` 8.20.0 (MIT, 5 packages, modified 2026-04-24). `ajv-formats` 3.0.1 (MIT, last published 2024-03-30, so it is the least active). `@casl/ability` 7.1.3 (MIT, modified 2026-11-13). None has an install script. `fast-json-stringify` 7.3.9 (MIT) was not exercised. Maintainers are to be confirmed before acceptance.
+**Dependencies (P9):** `zod` 4.6.7 (MIT, one package, modified 2026-10-12). `ajv` 8.20.0 (MIT, 5 packages, modified 2026-04-24). `ajv-formats` 3.0.1 (MIT, last published 2024-03-30, so it is the least active; peer dependency `ajv ^8.0.0`, which Ajv 8.20.0 satisfies; shares its main maintainer with Ajv). `@casl/ability` 7.1.3 (MIT, modified 2026-11-13). None has an install script. `fast-json-stringify` 7.3.9 (MIT, modified 2026-11-21) is the serializer Fastify uses for response schemas. Maintainers are to be confirmed before acceptance.
 
-**Not tested:** HTTP routes, OpenAPI and `fast-json-stringify` output; admin and `_meta` output; `f.state`, `f.sequence`, `hasMany().inline()`, `features`, `.localized()` and `extends`; Zod to JSON Schema conversion for custom routes (SCH-01); PostgreSQL 18 and MariaDB for this compiler; and bulk updates through the query builder, which skip entity hooks and so would not refresh the shadow columns.
+**Checks added after the first draft (same day, Node.js 26.13.1):**
+
+| Check                                                                | Result                                                                                                                                                                                                                            |
+| -------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ORM compiler on PostgreSQL 18 and MariaDB 11, the ten checks above   | 10 of 10 on both                                                                                                                                                                                                                  |
+| `nativeUpdate` on an entity with an `ci_ai` field                    | The shadow column stays stale on all five engines (PostgreSQL 15 and 18, MySQL 8.4, MariaDB 11, SQLite)                                                                                                                           |
+| `insert` without a helper                                            | The shadow column is `NULL` on all five                                                                                                                                                                                           |
+| The same two calls through a helper that adds the folded value       | Correct on all five                                                                                                                                                                                                               |
+| `fast-json-stringify` on the generated read schema                   | Drops fields that are not in the schema (`passwordHash`, nested `credit.secret`), keeps Vietnamese text, and writes required properties first. Standalone mode works (8.2 KB, requires only `fast-json-stringify/lib/serializer`) |
+| Serialization speed against `JSON.stringify`, warmed up, median of 3 | fast-json-stringify is slower: 1.4 times for 1 row, 2.5 times for 20 rows, 3.1 times for 1,000 rows (777 µs against 253 µs)                                                                                                       |
+| Zod to JSON Schema for custom routes (SCH-01)                        | `toJSONSchema` with `draft-2020-12` gives a schema that Ajv compiles and applies correctly. It also converts the entity create schema that contains the NFC transform                                                             |
+| What the standalone Ajv module needs at runtime                      | `ajv/dist/runtime/ucs2length` and `ajv-formats/dist/formats`                                                                                                                                                                      |
+
+The serializer result matters for wording: its value is the field whitelist (API-01), not speed. The spec says it is the fastest path (section 3, section 10.6). That is a micro-benchmark of one row shape, so the k6 run in M1.9 should confirm it before the wording changes.
+
+**Not tested:** HTTP routes, OpenAPI output and Fastify integration; admin and `_meta` output; `f.state`, `f.sequence`, `hasMany().inline()`, `features`, `.localized()` and `extends`.
 
 ## Consequences
 
 - Easier: one definition drives every output. The client imports no ORM. Types stay fast as projects grow. Unusual cases have two exits.
 - Harder: we own the compilers, the registry generator and a contract test that runs the fixtures through Ajv and Zod on every change. Text writes must go through entities or recompute the shadow columns.
 - Constraint: entity files must stay free of ORM imports, and raw entities go in separate files.
-- Risk: `ajv-formats` is stale. If we keep Ajv we either add our own format checks (uuid, email, date-time) or accept the dependency. This is not decided here.
+- Accepted risk: `ajv-formats` has had no release since 2024-03. The replacement path is described in decision 11.
 - Ruled out: callbacks that receive `z`, MikroORM's `defineEntity` as the public API, and a field-type registry in v1.
 
 ## Spec changes
@@ -126,6 +142,9 @@ To apply when the maintainer accepts this ADR:
 
 - Section 10.1: the example uses `export const Customer: EntityDef<'crm.Customer'> = defineEntity({...})`.
 - Section 10.2 and 10.6: point at this ADR. Mention the subpath split in 10.6.
+- Section 3 (Fastify row) and 10.6 (output table): replace "fastest" with the field whitelist and standalone loading, unless M1.9 shows otherwise.
+- SCH-06: say that standalone validators need Ajv's runtime helpers and `ajv-formats` in the web role.
+- DATA-21: bulk writes must go through helpers that add the shadow values.
 - SCH-03: state that Ajv and Zod 4 Mini both count code points by default, so only the NFC step is needed.
 - SCH-04: name `EntityRegistry`, `EntityDef<Name>` and `Row`, `CreateInput`, `UpdateInput`.
 - New SCH-07: `f.custom` takes schema values, never callbacks that receive a library namespace.
@@ -137,6 +156,6 @@ To apply when the maintainer accepts this ADR:
 - Spikes or ADRs for `f.state`, `f.sequence`, `hasMany().inline()`, `features`, `.localized()` and `extends`.
 - Entity-to-API shape for `f.money` (`{ amount, currency }`) and `f.decimal` (string), in the HTTP work.
 - The authorization ADR reuses the CASL subject and field names defined here.
-- A decision on `ajv-formats` before M1.2.
-- A test that bulk updates keep the shadow columns correct, or a rule that forbids them for compared fields.
-- The spike sources are in the scratchpad of the session that ran them and may be cleared. The maintainer decides whether to keep them.
+- A `bieberkit check` rule and a contract test for bulk writes on entities with compared fields.
+- Re-measure serialization on the k6 reference endpoints (roadmap M1.9) before changing the spec wording.
+- The spike sources are archived outside the repository, in `bieberkit-spikes/` next to it, with a README. The Node.js 24.12 run in ADR 0008 needs them.
