@@ -2,7 +2,7 @@
  * BieberKit
  *
  * @file        packages/data/src/testing/ajv.ts
- * @description Test support: an Ajv 2020 instance configured as the build will configure it, with the formats the schemas use.
+ * @description The Ajv instance of the contract tests, which is the one the build emits (SCH-03, SCH-06).
  * @author      Bieber Kieu <kieutrongthien@gmail.com>
  * @copyright   Copyright (c) 2026 Bieber Kieu
  * @license     Apache-2.0
@@ -22,21 +22,5 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import AjvModule from 'ajv/dist/2020.js';
-import formatsModule from 'ajv-formats';
-
-// Both packages are CommonJS. Node gives their `module.exports` as the default import, and each also has the same value as `.default`.
-const Ajv: typeof AjvModule.default = AjvModule.default;
-const addFormats: typeof formatsModule.default = formatsModule.default;
-
-export type AjvInstance = InstanceType<typeof Ajv>;
-
-/**
- * Strict mode, every error reported, and union types such as `["string", "null"]` allowed, because an optional field is
- * `null` or its value. The standalone validators emitted at build use the same options (SCH-06).
- */
-export function createAjv(): AjvInstance {
-  const ajv = new Ajv({ strict: true, allErrors: true, allowUnionTypes: true });
-  addFormats(ajv);
-  return ajv;
-}
+export { createAjv } from '../build/ajv.ts';
+export type { AjvInstance } from '../build/ajv.ts';
