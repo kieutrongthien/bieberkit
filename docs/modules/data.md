@@ -603,3 +603,63 @@ All of it about MikroORM 7.2.9 and the databases.
 - **The permission check and the route** (`POST .../actions/<name>`) are in M1.3 and M1.4. `transitionOf` and `availableTransitions` are what they call.
 - **`actions`** (buttons that are not transitions, MOD-06) are handlers of the route layer. The data layer has nothing to add.
 - **Tenant timezone for the date in a pattern.** It is UTC. A tenant setting can pass `now` later.
+
+## Slice 8: record features
+
+Designed on 2026-11-23. None of it is maintainer-designed (MOD-13 and decision 6 above decide the model). This slice is built on the branch of slice 7, which was not merged yet.
+
+### Four generic tables
+
+`features: ['attachments', 'comments', 'timeline', 'tags']` on an entity (MOD-13) turns on shared tables that every entity uses, so a plugin entity adds no table and no migration. They are framework tables: steps of `dataMigrationSteps` (version 0.3.0) and schemas of `frameworkEntities`. Every row has `tenant_id`, `entity` and `record_id`, and an index on those three. There is no foreign key, because one column cannot point at every table (decision 6). `tenant_id` is never null: an entity without a tenant uses the nil UUID, so a unique index can hold.
+
+| Table                   | Columns besides `id`, `tenant_id`, `entity`, `record_id`                                            |
+| ----------------------- | --------------------------------------------------------------------------------------------------- |
+| `bieberkit_comments`    | `body` text, `created_at`, `created_by`                                                             |
+| `bieberkit_tags`        | `tag` (64 code points), `created_at`, `created_by`. Unique on `(tenant_id, entity, record_id, tag)` |
+| `bieberkit_attachments` | `storage_key` (512), `name` (255), `content_type` (255), `size` bigint, `created_at`, `created_by`  |
+| `bieberkit_timeline`    | `type` (100), `data` text (JSON) null, `at`, `actor_id`                                             |
+
+### Public API (`@bieberkit/data/orm`)
+
+```ts
+addComment(em, schema, recordId, { body }): Promise<CommentRow>        listComments(em, schema, recordId, page?): Promise<FeaturePage<CommentRow>>      deleteComment(em, schema, recordId, commentId): Promise<boolean>
+addTag(em, schema, recordId, tag): Promise<TagRow>                     listTags(em, schema, recordId, page?): Promise<FeaturePage<TagRow>>              removeTag(em, schema, recordId, tag): Promise<boolean>
+addAttachment(em, schema, recordId, { key, name, contentType, size }): Promise<AttachmentRow>   listAttachments(...)                                   removeAttachment(em, schema, recordId, attachmentId): Promise<boolean>
+addTimeline(em, schema, recordId, { type, data? }): Promise<TimelineRow>                         listTimeline(...)
+interface FeaturePage<T> { rows: T[]; limit: number; nextCursor: string | null }   // page = { limit?, cursor? }
+```
+
+### Rules
+
+- **The parent is read under the filters, on every call (decision 6).** The service loads the record with `em.findOne`, so the tenant filter and the soft delete filter apply. A record that is not visible, of another tenant, deleted or missing is `DATA_RECORD_NOT_FOUND` (404), which does not tell the two cases apart. Nothing runs without a tenant (`DATA_TENANT_REQUIRED`). Inside `asSystem` the parent of any tenant is visible.
+- **The tenant is the parent's, never the caller's.** No function takes a tenant. A row is written with the `tenantId` of the parent, and a list reads only rows with that tenant, so a stray row that someone inserted by hand for another tenant is not returned (the contract test of decision 6).
+- **The feature must be on.** An entity that did not list the feature gets `DATA_FEATURE_DISABLED` (500, a bug of the caller).
+- **The record's permissions apply.** The route asks the ability for `read` or `update` on the record before it calls these functions (§14.2). The data layer checks that the record is visible, and nothing more.
+- **Adding does not flush.** Like `emitEvent`, an `add*` call adds to the unit of work, so the row commits with the rest of the transaction. The returned row already has its `id` and its dates.
+- **Lists.** Rows come in the order of their ids, which is the order of creation (DATA-03). The page size follows `pageSize` (DATA-06: 25 by default, at most 100). The cursor is the id of the last row, and a row after it is `id > cursor` (decision 9: unsigned).
+- **Tags.** A tag is NFC text, trimmed, with 1 to 64 code points. Adding a tag that exists returns it and writes nothing. Case does not matter: `VIP` and `vip` are one tag, and the first spelling is kept. The unique index and the lookups use `tag_key`, the tag folded by `fold('ci')` (DATA-21), because MySQL compares text without case and PostgreSQL and SQLite with it.
+- **Attachments are metadata.** The file is in the storage of M1.5, and `key` is the key it gave. `size` is a whole number of bytes from 0 to the safe maximum.
+- **The timeline** has what happened to the record. `transition` adds an entry of type `transition` with `{ name, from, to }` when the entity has the feature.
+
+### Errors of slice 8
+
+| Code                    | Status | Fix                                                                      |
+| ----------------------- | ------ | ------------------------------------------------------------------------ |
+| `DATA_FEATURE_DISABLED` | 500    | Add the feature to `features` of the entity                              |
+| `DATA_RECORD_NOT_FOUND` | 404    | The record does not exist for this tenant                                |
+| `DATA_FEATURE_INVALID`  | 400    | A comment, tag or attachment has a blank or too long part, or a bad size |
+
+### Found while implementing slice 8
+
+All of it about the databases.
+
+- **MySQL compares text without case.** The first test of two tags `Vip` and `vip` failed on MySQL only: its default collation made them equal in the unique index and in `findOne`. The tag now has a `tag_key`, folded the way a `ci` field is (DATA-21), and the index and the lookups use it on every dialect.
+- **A hand written schema needs its properties spelled out.** Spreading helper objects into `EntitySchema` made MikroORM lose the entity type, so each of the four schemas lists its columns.
+- **The nil tenant keeps the unique index honest.** `NULL` values are distinct in a unique index on PostgreSQL, MySQL and SQLite, so a global entity would have allowed the same tag twice with a null tenant.
+- **A test of the drift between steps and schemas covers the four tables** with no further code: it looks for any statement about a table that starts with `bieberkit_`.
+
+### Left out
+
+- **Events for comments and tags** (for notifications) come with the notifications plugin of M1.8. The route can call `emitEvent`.
+- **Editing a comment.** A comment is added or deleted. An edit with history is a product decision for the admin.
+- **Deleting the rows of a deleted record.** A soft deleted record keeps its features. A hard delete is a job of the retention work (PDP).
