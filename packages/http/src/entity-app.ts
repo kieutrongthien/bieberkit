@@ -52,8 +52,9 @@ export const Account: EntityDef<'crm.Account'> = defineEntity({
     code: f.string({ max: 20 }).unique(),
     name: f.string({ min: 1, max: 100, compare: 'ci_ai' }).index(),
     email: f.email().optional().unique(),
-    tier: f.oneOf(['basic', 'gold', 'vip']).default('basic').index(),
-    visits: f.int({ min: 0 }).default(0).index(),
+    tier: f.oneOf(['basic', 'gold', 'vip']).default('basic').index().aggregatable(),
+    visits: f.int({ min: 0 }).default(0).index().aggregatable(),
+    credit: f.decimal({ precision: 12, scale: 2 }).optional().aggregatable(),
     active: f.boolean().default(true),
     balance: f.money({ currency: 'VND' }).optional(),
     note: f.text({ max: 500 }).optional(),
@@ -71,14 +72,20 @@ export const Account: EntityDef<'crm.Account'> = defineEntity({
         },
       },
     }),
-    owner: f.belongsTo(() => Person).optional(),
+    owner: f
+      .belongsTo(() => Person)
+      .optional()
+      .aggregatable(),
   },
   permissions: {
     read: 'crm.account.read',
     create: 'crm.account.create',
     update: 'crm.account.update',
     delete: 'crm.account.delete',
-    fields: { note: { read: 'crm.account.read-note', update: 'crm.account.edit-note' } },
+    fields: {
+      note: { read: 'crm.account.read-note', update: 'crm.account.edit-note' },
+      visits: { read: 'crm.account.read-visits' },
+    },
   },
   api: { list: true, get: true, create: true, update: true, delete: true },
 });

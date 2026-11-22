@@ -520,3 +520,7 @@ An outbound `fetch` that webhooks and integrations use.
 - **`BlockList` does the ranges.** `node:net` has subnets for IPv4 and IPv6 and no dependency is needed. An IPv4 address inside an IPv6 one is turned into IPv4 first, because `BlockList` does not look inside it.
 - **A literal address is checked before the socket exists.** Node does not call `lookup` for `127.0.0.1` or `[::1]`, so the guard checks a literal itself. The numbers `2130706433` and `0x7f.1` are made `127.0.0.1` by the URL parser, and are refused as that.
 - **The check of CORS and the check of CSRF share the list of origins.** An origin that may call the API may also carry a token, and nothing else may.
+
+## The aggregate route (API-15)
+
+`GET /<resource>/aggregate?groupBy=tier&sum=visits,credit&count=true&filter[...]` answers `{ data: [{ group, count?, sum? }], meta: { groupBy, sum, count } }`. It exists for an entity that has `api.list` and at least one field declared `.aggregatable()`, and it needs the `read` permission. It uses the keys of the API (`ownerId` for a relation) and the filters of a list, and the data layer applies the tenant filter and the soft delete. A field that has a read mask (`permissions.fields.<name>.read`) can be grouped or summed only by a caller who may read it, as in a list, and the answer is 403 otherwise. `_meta` marks such a field with `aggregatable: true`. Conditions of the ability on rows (CASL) arrive with M1.4, and apply to this route as they do to a list. See the section "API-15" of `docs/modules/data.md` for the rules of the aggregation.

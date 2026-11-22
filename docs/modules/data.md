@@ -729,3 +729,31 @@ interface ValidationIssue { path: string; keyword: string; message: string }   /
 - **The command** `bieberkit build` that calls `writeStandalone` is the CLI of M1.8. This slice is the library.
 - **Validators of custom route schemas.** They come from Zod through JSON Schema (SCH-01) and are the route layer's, in M1.3.
 - **A benchmark** of the boot time. The k6 and boot measurements are M1.9.
+
+## API-15: aggregations and `.aggregatable()`
+
+Added on 2026-11-23, after the maintainer asked for the design to be judged and approved (the field DSL is maintainer-designed, so this is the one place where that approval is recorded). It is the data side of the aggregate endpoint of M1.3.
+
+### The modifier
+
+`.aggregatable()` on a field says that the aggregate endpoint may group by it or sum it. It is allowed on `string`, `email`, `oneOf`, `boolean`, `date`, `int`, `decimal`, `belongsTo` and `state`, and on a computed field only when it is stored. It is refused on `id`, `text`, `money`, `dateTime`, `createdAt`, `updatedAt`, `sequence` and the relations to many, with `DATA_FIELD_INVALID`. Like `.searchable()` it changes no schema: the JSON Schema, the Zod schema and the table are the same.
+
+- **Why money and dateTime are left out.** A sum of money has to be made for each currency, because a row may carry another currency than the field's, and a group by an instant needs a bucket (day, month). Both are real needs, and each is a design of its own. Until then a client sums an `int` or a `decimal`, and groups by a `date`.
+- **Why a flag and not "every indexed field".** An index says that a filter is fast. Whether a dashboard may count by a field is a question about the data: a customer's tax number can be indexed, and nobody should be able to group customers by it.
+
+### `aggregate(em, schema, options)` in `@bieberkit/data/orm`
+
+```ts
+aggregate(em, schema, { groupBy?: string[]; sum?: string[]; count?: boolean; where?: Row; maxGroups?: number }): Promise<{ rows: { group: Row; count?: number; sum?: Row }[] }>
+```
+
+- It reads through `applyFilters` of the entity manager, which adds the tenant filter and the soft delete, and refuses to run without a tenant outside `asSystem` (DATA-09, DATA-19). A query builder does not apply them by itself.
+- At most 3 fields to group by and 5 to sum, each named once, each declared `.aggregatable()`. A sum is of an `int` or a `decimal`. Anything else is `DATA_AGGREGATE_INVALID` (400). `count` is the default when nothing is summed.
+- The sum of an `int` is a number, the sum of a `decimal` is text with its scale, and a group with no value has `null`. A relation comes back as the id of the row, and a boolean as a boolean, on every dialect.
+- More than `maxGroups` (1000) groups is `DATA_AGGREGATE_TOO_MANY` (400), so a dashboard never pulls a table. The groups come back sorted by their values, empty first, in the same order on every database (a database sorts empty values in its own way, so the sort is done after the read).
+- `where` is the filter of a list: indexed fields only.
+
+| Code                      | Status | Fix                                                               |
+| ------------------------- | ------ | ----------------------------------------------------------------- |
+| `DATA_AGGREGATE_INVALID`  | 400    | Declare the field with `.aggregatable()` and use a kind that fits |
+| `DATA_AGGREGATE_TOO_MANY` | 400    | Group by something coarser, or filter first                       |

@@ -496,3 +496,47 @@ describe('chain methods', () => {
     });
   });
 });
+
+describe('API-15 .aggregatable()', () => {
+  interface Aggregatable {
+    readonly def: { readonly aggregatable?: true };
+    aggregatable(): Aggregatable;
+  }
+  const allowed: [string, () => Aggregatable][] = [
+    ['int', () => f.int()],
+    ['decimal', () => f.decimal({ precision: 10, scale: 2 })],
+    ['string', () => f.string({ max: 10 })],
+    ['email', () => f.email()],
+    ['oneOf', () => f.oneOf(['a', 'b'])],
+    ['boolean', () => f.boolean()],
+    ['date', () => f.date()],
+    ['belongsTo', () => f.belongsTo(() => Target)],
+    ['state', () => f.state({ initial: 'a', transitions: { go: { from: ['a'], to: 'b' } } })],
+  ];
+
+  it.each(allowed)('API-15 a %s field can be declared aggregatable', (_kind, make) => {
+    expect(make().aggregatable().def.aggregatable).toBe(true);
+    expect(make().def.aggregatable).toBeUndefined();
+  });
+
+  it.each([
+    ['id', () => f.id()],
+    ['text', () => f.text({ max: 100 })],
+    ['money', () => f.money({ currency: 'VND' })],
+    ['dateTime', () => f.dateTime()],
+    ['createdAt', () => f.createdAt()],
+    ['sequence', () => f.sequence({ pattern: 'A-{seq:3}' })],
+  ])('API-15 a %s field cannot', (_kind, make) => {
+    expect(codeOf(() => make().aggregatable())).toBe('DATA_FIELD_INVALID');
+  });
+
+  it('API-15 a computed field can only if it is stored', () => {
+    expect(codeOf(() => f.int().computed(fn).aggregatable())).toBe('DATA_FIELD_INVALID');
+    expect(f.int().computed(fn, { stored: true }).aggregatable().def.aggregatable).toBe(true);
+  });
+
+  it('API-15 it keeps the other modifiers, and changes nothing about the schemas', () => {
+    const field = f.int().index().aggregatable();
+    expect(field.def).toMatchObject({ index: true, aggregatable: true });
+  });
+});
