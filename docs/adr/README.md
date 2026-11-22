@@ -44,6 +44,7 @@ Status values: `Proposed`, `Accepted`, `Rejected`, `Superseded by NNNN`. Only th
 | [0010](0010-queue-drivers.md)                  | Queue drivers: BullMQ on Valkey and a database driver   | Proposed |
 | [0011](0011-plugin-manifest-and-migrations.md) | Plugin manifest, resolver and per-plugin migrations     | Proposed |
 | [0012](0012-authentication.md)                 | Authentication: Better Auth on MikroORM's Kysely        | Proposed |
+| [0013](0013-authorization.md)                  | Authorization: an own CASL to MikroORM translator       | Proposed |
 
 ## Needed for the Phase 0 gate
 
