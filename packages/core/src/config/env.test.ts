@@ -24,7 +24,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { ConfigError, EnvValidationError } from '../errors/errors.ts';
-import { defineEnv, describeEnv, env, mergeEnv, readEnv, redact } from './env.ts';
+import { collectSecrets, defineEnv, describeEnv, env, mergeEnv, readEnv, redact } from './env.ts';
 
 const schema = defineEnv({
   PORT: env.int({ min: 1, max: 65535 }).default(3000).describe('HTTP port'),
@@ -168,6 +168,12 @@ describe('CFG-05 redaction', () => {
     expect(safe['SIGNING_KEY']).toBe('[redacted]');
     expect(safe['PORT']).toBe(3000);
     expect(JSON.stringify(safe)).not.toContain(valid.SIGNING_KEY);
+  });
+
+  it('CFG-05 collectSecrets lists the values to hide from log lines, and skips unset ones', () => {
+    expect(collectSecrets(schema, readEnv(schema, valid))).toEqual([valid.SIGNING_KEY]);
+    const unset = defineEnv({ TOKEN: env.string().secret().optional() });
+    expect(collectSecrets(unset, readEnv(unset, {}))).toEqual([]);
   });
 
   it('CFG-05 an invalid secret never appears in the error', () => {

@@ -57,6 +57,7 @@ function readEnv<T>(schema: EnvSchema<T>, source: EnvSource): T          // thro
 function parseEnvFile(text: string): EnvSource
 function readEnvFile(path: string): EnvSource                            // a missing file gives {}
 function withEnvFile(real: EnvSource, file: EnvSource): EnvSource        // real values win (CFG-03)
+function collectSecrets(schema: EnvSchema<unknown>, values: object): string[]   // for createLogger({ secrets })
 function redact(schema: EnvSchema<unknown>, values: object): Record<string, unknown>
 function readCoreEnv(source: EnvSource, options?: { extra?: readonly EnvOwner[] }): { env: CoreEnv; extra: Record<string, unknown>; warnings: string[] }
 function assertProductionSafe(values: CoreEnv): void                     // CFG-07, throws ConfigError

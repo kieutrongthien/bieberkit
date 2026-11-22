@@ -269,6 +269,16 @@ export function redact(schema: EnvSchema<unknown>, values: object): Record<strin
   return out;
 }
 
+/** The values of the secret keys, to pass to `createLogger({ secrets })` so no log line shows them (CFG-05). */
+export function collectSecrets(schema: EnvSchema<unknown>, values: object): string[] {
+  const found: string[] = [];
+  for (const [name, def] of Object.entries(schema.keys)) {
+    const value: unknown = Reflect.get(values, name);
+    if (def.secret && typeof value === 'string' && value !== '') found.push(value);
+  }
+  return found;
+}
+
 /** Rows for `.env.example`. A secret never shows its value or its default (CFG-06). */
 export function describeEnv<T>(schema: EnvSchema<T>): readonly EnvDescription[] {
   return Object.entries(schema.keys).map(([key, def]) => ({

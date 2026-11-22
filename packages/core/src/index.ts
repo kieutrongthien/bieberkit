@@ -30,7 +30,7 @@ export const packageName = '@bieberkit/core';
 export { BkError, ConfigError, ContainerError, EnvValidationError, toBkError } from './errors/errors.ts';
 export type { BkErrorOptions, EnvProblem, ErrorBody } from './errors/errors.ts';
 
-export { defineEnv, describeEnv, env, mergeEnv, readEnv, redact } from './config/env.ts';
+export { collectSecrets, defineEnv, describeEnv, env, mergeEnv, readEnv, redact } from './config/env.ts';
 export type {
   EnvCustomParse,
   EnvDescription,
@@ -50,3 +50,7 @@ export { loadEnv } from './config/load-env.ts';
 export type { LoadEnvOptions } from './config/load-env.ts';
 export { LOG_LEVELS } from './logging/levels.ts';
 export type { LogLevel } from './logging/levels.ts';
+export { createLogger } from './logging/logger.ts';
+export type { LogFields, Logger, LoggerOptions } from './logging/logger.ts';
+export { requestContext } from './logging/request-context.ts';
+export type { RequestContext } from './logging/request-context.ts';
