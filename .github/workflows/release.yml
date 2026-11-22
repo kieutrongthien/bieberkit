@@ -1,0 +1,131 @@
+# BieberKit
+#
+# @file        .github/workflows/release.yml
+# @description Release: verify the tag, build and pack once, publish the tarballs with npm trusted publishing (SEC-15, SEC-16, SEC-21).
+# @author      Bieber Kieu <kieutrongthien@gmail.com>
+# @copyright   Copyright (c) 2026 Bieber Kieu
+# @license     Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
+
+# Starts only from a version tag, which a repository ruleset protects (docs/releasing.md). The job that holds
+# id-token: write installs nothing, builds nothing and tests nothing: it publishes the tarballs that the build job
+# made and checksummed. tools/check-workflows.ts enforces these rules in pnpm check (ADR 0014).
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+
+permissions: {}
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Verify the tag
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: The tagged commit is on main, and the tag matches the version
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main
+          version="$(node -p "require('./package.json').version")"
+          test "v$version" = "$TAG"
+
+  build:
+    name: Build, test and pack
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # No cache anywhere in this workflow (SEC-16), and no install by the action (SEC-12).
+      - uses: pnpm/setup@731dfb6463bbd11c11fd0ee11fe00ed0e36d48a1 # v3.2.0
+        with:
+          runtime: node@26
+          cache: false
+          install: false
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm check
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - run: pnpm test
+      - run: pnpm build
+      - run: pnpm check:api
+      - run: pnpm check:packages
+      - name: Pack every package, record the publish order and the checksums
+        run: |
+          mkdir -p artifacts
+          pnpm --filter "./packages/*" exec pnpm pack --pack-destination "$GITHUB_WORKSPACE/artifacts"
+          node tools/release-order.ts > artifacts/PUBLISH_ORDER
+          cd artifacts
+          tarballs=(./*.tgz)
+          test "${#tarballs[@]}" = "$(wc -l < PUBLISH_ORDER)"
+          sha256sum ./*.tgz ./PUBLISH_ORDER > SHA256SUMS
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-tarballs
+          path: artifacts/
+          retention-days: 7
+          if-no-files-found: error
+
+  publish:
+    name: Publish with trusted publishing
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: release
+    permissions:
+      contents: read
+      id-token: write # the OIDC token for npm trusted publishing. This job installs, builds and tests nothing (SEC-21).
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release-tarballs
+          path: artifacts
+      # No registry-url: setup-node would set NODE_AUTH_TOKEN, which overrides the OIDC exchange (SEC-15).
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '26'
+          package-manager-cache: false
+      - name: Publish in layer order, skipping versions that already exist
+        working-directory: artifacts
+        run: |
+          # npm trusted publishing needs npm 11.5.1 or later.
+          test "$(printf '%s\n' 11.5.1 "$(npm -v)" | sort -V | head -n 1)" = "11.5.1"
+          sha256sum --check SHA256SUMS
+          while IFS="$(printf '\t')" read -r name version file; do
+            if npm view "$name@$version" version >/dev/null 2>&1; then
+              echo "skip $name@$version, already published"
+              continue
+            fi
+            npm publish "./$file" --access public
+          done < PUBLISH_ORDER
