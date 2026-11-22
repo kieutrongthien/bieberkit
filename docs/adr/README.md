@@ -45,6 +45,7 @@ Status values: `Proposed`, `Accepted`, `Rejected`, `Superseded by NNNN`. Only th
 | [0011](0011-plugin-manifest-and-migrations.md) | Plugin manifest, resolver and per-plugin migrations     | Proposed |
 | [0012](0012-authentication.md)                 | Authentication: Better Auth on MikroORM's Kysely        | Proposed |
 | [0013](0013-authorization.md)                  | Authorization: an own CASL to MikroORM translator       | Proposed |
+| [0014](0014-release-pipeline.md)               | Release pipeline: trusted publishing from tarballs      | Proposed |
 
 ## Needed for the Phase 0 gate
 
