@@ -32,15 +32,26 @@ export default defineConfig({
   test: {
     include: ['packages/*/src/**/*.test.{ts,tsx}', 'plugins/*/src/**/*.test.{ts,tsx}', 'tools/**/*.test.ts'],
     passWithNoTests: true,
+    // Database URLs for the dialect suites of @bieberkit/data (packages/data/src/testing). The `services` job of ci.yml sets
+    // them, and locally they point at throwaway containers. With BK_REQUIRE_DIALECTS=all a missing URL fails the run.
+    // This file is the one place where tests read the environment, as a config file (P8 covers application code).
+    provide: {
+      dialectUrls: {
+        postgres: process.env['DATABASE_URL_POSTGRES'] ?? '',
+        mysql: process.env['DATABASE_URL_MYSQL'] ?? '',
+        require: process.env['BK_REQUIRE_DIALECTS'] ?? '',
+      },
+    },
     // `pnpm test:coverage`. TST-01: 90 percent of lines for core, data, http and auth, 80 percent for the rest.
     // Each package gets its threshold when it reaches Phase 1.
     coverage: {
       provider: 'v8',
       include: ['packages/*/src/**/*.ts'],
-      exclude: ['**/*.test.ts', '**/*.d.ts'],
+      exclude: ['**/*.test.ts', '**/*.d.ts', 'packages/*/src/testing/**'],
       reporter: ['text-summary', 'text'],
       thresholds: {
         'packages/core/src/**': { lines: 90 },
+        'packages/data/src/**': { lines: 90 },
       },
     },
   },

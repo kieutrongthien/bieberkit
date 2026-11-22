@@ -147,8 +147,8 @@ Depends on: M1.1.
 - [ ] `f.custom` takes schema values only, with a bundle size test that fails when a whole validator library is pulled into the client (SCH-07, ADR 0009)
 - [ ] Standalone Ajv and fast-json-stringify modules emitted at build (SCH-06, PERF-06)
 - [ ] Standard columns and entity options: `version`, `created_by`, `updated_by`, `deleted_at`, `deleted_token` (DATA-18)
-- [ ] UUIDv7 keys, native storage per dialect (DATA-03, DATA-14)
-- [ ] UTC timestamps (DATA-04); request context per request and per job (DATA-05)
+- [x] UUIDv7 keys, native storage per dialect (DATA-03, DATA-14)
+- [x] UTC timestamps (DATA-04); request context per request and per job (DATA-05)
 - [ ] Pagination limits, keyset cursor, `withTotal` (DATA-06, DATA-11); index required for filter and sort fields (DATA-07)
 - [ ] Read-only query path with batched relations (DATA-10, PERF-04)
 - [ ] Soft delete with unique indexes including `deleted_token` (DATA-16)
@@ -164,6 +164,7 @@ Depends on: M1.1.
 - [ ] Audit log table, append-only for the app role, written in the same transaction (OBS-05, AUTHZ-05)
 - [ ] Features `attachments`, `comments`, `timeline`, `tags` as generic tables (MOD-13)
 - [ ] State machines: `f.state` transitions validated on the server, never through plain update (MOD-06, MOD-07)
+- [ ] Upgrade MikroORM from 7.2.9 to 7.2.11 after 2026-11-27 (`minimumReleaseAge`) and rerun the dialect suites
 - [ ] Integration tests green on PostgreSQL, MySQL and SQLite (§9.1)
 
 Done when: one sample entity round-trips on all three dialects, generates a migration, enforces tenant isolation and a stale-version 412.

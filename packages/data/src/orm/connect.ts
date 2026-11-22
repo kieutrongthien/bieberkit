@@ -143,6 +143,7 @@ export async function createDatabase(env: DatabaseEnv, options: DatabaseOptions)
     forceUtcTimezone: true,
     allowGlobalContext: false,
     ensureDatabase: false,
+    discovery: { warnWhenNoEntities: false },
   } as const;
   const pool = { min: 0, max: env.DB_POOL_MAX };
   const replicas = resolved.readLocations.map((clientUrl) => ({ clientUrl }));

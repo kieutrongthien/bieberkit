@@ -28,5 +28,35 @@
 Generated from the built declaration files by `pnpm api:update`. Do not edit by hand. A change here is a change to the public API and needs a changeset (spec section 22.3).
 
 ```ts
+import { BkError } from "@bieberkit/core";
+export declare class DataError extends BkError {}
+export declare function dataError(code: string, status: number, message: string, fix: string, cause?: unknown): DataError;
+interface Uuid7Options {
+  readonly now?: () => number;
+  readonly random?: (bytes: Uint8Array) => void;
+}
+export declare function isUuid(value: unknown): value is string;
+export declare function uuid7ToBytes(id: string): Uint8Array;
+export declare function uuid7FromBytes(bytes: Uint8Array): string;
+export declare function createUuid7(options?: Uuid7Options): () => string;
+export declare const uuid7: () => string;
+type Compare = "exact" | "ci" | "ci_ai";
+export declare function nfc(text: string): string;
+export declare function fold(mode: Compare, text: string): string;
+export declare function codePointLength(text: string): number;
+export declare const SAFE_MAX: bigint;
+export declare function assertSafeScaled(value: bigint, label: string): void;
+export declare function minorUnitOf(currency: string): number;
+export declare function toScaled(value: string, scale: number): bigint;
+export declare function fromScaled(scaled: bigint, scale: number): string;
+export declare function toMinor(amount: string, currency: string): bigint;
+export declare function fromMinor(minor: bigint, currency: string): string;
+export declare const MAX_PAGE_SIZE = 100;
+export declare const DEFAULT_PAGE_SIZE = 25;
+type CursorValue = string | number | bigint | boolean | null;
+export declare function pageSize(requested: unknown, fallback?: number): number;
+export declare function encodeCursor(position: readonly CursorValue[]): string;
+export declare function decodeCursor(cursor: string): readonly CursorValue[];
 export declare const packageName = "@bieberkit/data";
+export type { Compare, CursorValue, Uuid7Options };
 ```

@@ -27,7 +27,7 @@
 - Package: `@bieberkit/data`
 - Layer: contracts (imports `@bieberkit/core` only)
 - Spec sections: 9 (data layer), 10 (entities), ADR 0008, ADR 0009, ADR 0011, ADR 0010
-- Status: Draft. Slice 1 is the part marked **Foundation**. Everything marked **[D]** is a proposal for the maintainer to design (AGENTS.md, Workflow 6) and gets no code until you approve it.
+- Status: Slice 1 (Foundation) is implemented. Slices 2 and later are proposals. Everything marked **[D]** is a proposal for the maintainer to design (AGENTS.md, Workflow 6) and gets no code until you approve it.
 
 ## Purpose
 
@@ -80,10 +80,12 @@ function decodeCursor(cursor: string): readonly CursorValue[]                   
 
 // @bieberkit/data/orm  (imports MikroORM)
 const Uuid7Type: Type<string, Buffer | string>                                                   // uuid on PostgreSQL, binary(16) on MySQL, blob on SQLite
+function resolveConnection(env: DatabaseEnv): { dialect: Dialect; location: string; readLocations: readonly string[] }   // pure; the dialect comes from the URL scheme
 function createDatabase(env: DatabaseEnv, options: { entities: readonly EntitySchema[] }): Promise<Database>
-interface Database { readonly dialect: Dialect; readonly orm: MikroORM; fork(): EntityManager; close(): Promise<void> }
+interface Database { readonly dialect: Dialect; readonly orm: Orm; fork(): EntityManager; close(): Promise<void> }
 function runInUnitOfWork<T>(db: Database, fn: (em: EntityManager) => Promise<T>): Promise<T>     // fork per request or job, tied to requestContext
-function applySqlitePragmas(connection: SqliteConnectionLike): void                              // WAL, synchronous NORMAL, busy_timeout
+function currentEntityManager(): EntityManager | undefined                                       // the EntityManager of the running unit of work
+function createSqliteDialect(location: string, options?: { busyTimeoutMs?: number }): SqliteDialect   // WAL, synchronous NORMAL, busy timeout, BEGIN IMMEDIATE
 
 // packages/data/src/testing  (test support of this package, not exported and not built)
 function describeDialects(name: string, suite: (db: TestDatabase) => void): void                 // runs on SQLite, PostgreSQL, MySQL
@@ -124,7 +126,13 @@ Codes of later slices (proposed): `DATA_TENANT_REQUIRED` (400, DATA-19), `DATA_R
 
 ## Configuration
 
-Reads `DB_CONNECTION`, `DATABASE_URL`, `DATABASE_READ_URLS` and `DB_POOL_MAX` through `CoreEnv`. `MIGRATE_DATABASE_URL` is read only by the migrate role (slice 5). The test harness reads `DATABASE_URL_POSTGRES`, `DATABASE_URL_MYSQL` and `BK_REQUIRE_DIALECTS`, which exist only in tests and in the `services` job of `ci.yml`.
+`DATABASE_URL` forms: `postgres://` and `postgresql://` for PostgreSQL, `mysql://` and `mariadb://` for MySQL, and for SQLite `sqlite:./file.db`, `sqlite:///absolute/file.db`, `file:./file.db`, a plain path, or `:memory:`.
+
+Reads `DB_CONNECTION`, `DATABASE_URL`, `DATABASE_READ_URLS` and `DB_POOL_MAX` through `CoreEnv`. `MIGRATE_DATABASE_URL` is read only by the migrate role (slice 5). The test harness gets `DATABASE_URL_POSTGRES`, `DATABASE_URL_MYSQL` and `BK_REQUIRE_DIALECTS` through Vitest's `provide` in `vitest.config.ts`, the only place that reads them from the environment. They exist only in tests and in the `services` job of `ci.yml`.
+
+## Dependencies
+
+`@mikro-orm/core`, `/sqlite`, `/postgresql` and `/mysql` are pinned to **7.2.9**, not the 7.2.11 of the ADR 0008 spike. 7.2.11 (published 2026-11-20) was inside `minimumReleaseAge` on 2026-11-22, and the rule was not lowered. 7.2.9 is the newest release old enough. `kysely` 0.29.8 and `better-sqlite3` 13.0.3 are the versions MikroORM 7.2.9 already depends on, listed directly because this package imports them. `@types/better-sqlite3` is a development dependency. Upgrade to 7.2.11 once it matures (2026-11-27) and rerun the dialect suites.
 
 ## Tests
 
