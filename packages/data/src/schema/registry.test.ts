@@ -204,6 +204,9 @@ declare module '../index.ts' {
   }
 }
 
+// @ts-expect-error nothing is registered under this name
+const probeMissing = (_value: Row<'nope.Nope'>): void => undefined;
+
 describe('SCH-04 Row, CreateInput and UpdateInput read from the registry', () => {
   const owner = '0190f6b2-7c4e-7000-8000-0123456789ab';
 
@@ -251,9 +254,6 @@ describe('SCH-04 Row, CreateInput and UpdateInput read from the registry', () =>
   });
 
   it('refuses an entity that is not in the registry', () => {
-    // @ts-expect-error nothing is registered under this name
-    type Missing = Row<'nope.Nope'>;
-    const none: Missing | undefined = undefined;
-    expect(none).toBeUndefined();
+    expect(probeMissing).toBeTypeOf('function');
   });
 });

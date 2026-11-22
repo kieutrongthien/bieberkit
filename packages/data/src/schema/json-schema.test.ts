@@ -22,9 +22,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import Ajv2020 from 'ajv/dist/2020.js';
-import addFormats from 'ajv-formats';
 import { describe, expect, it } from 'vitest';
+import { createAjv } from '../testing/ajv.ts';
 import { Asset, Customer, User } from '../testing/sample-entities.ts';
 import { defineEntity } from './define-entity.ts';
 import { f } from './fields.ts';
@@ -33,11 +32,19 @@ import { EMAIL_PATTERN } from './patterns.ts';
 
 type Json = Record<string, unknown>;
 
-const create = toJsonSchema(Customer, 'create') as Json;
-const update = toJsonSchema(Customer, 'update') as Json;
-const read = toJsonSchema(Customer, 'read') as Json;
+const create = toJsonSchema(Customer, 'create');
+const update = toJsonSchema(Customer, 'update');
+const read = toJsonSchema(Customer, 'read');
 
-const props = (schema: Json): Record<string, Json> => schema['properties'] as Record<string, Json>;
+/** `value` as an object, or a failure. Keeps the tests free of casts. */
+function record(value: unknown): Json {
+  if (typeof value === 'object' && value !== null && !Array.isArray(value))
+    return Object.fromEntries(Object.entries(value));
+  throw new Error('Expected an object.');
+}
+
+const props = (schema: Json): Record<string, Json> =>
+  Object.fromEntries(Object.entries(record(schema['properties'])).map(([key, value]) => [key, record(value)]));
 
 describe('toJsonSchema shape', () => {
   it('is a JSON Schema 2020-12 object with an id of its own per entity and mode', () => {
@@ -53,8 +60,8 @@ describe('toJsonSchema shape', () => {
   });
 
   it('is deterministic, and what one call returns cannot change the next', () => {
-    const first = toJsonSchema(Customer, 'create') as Json;
-    (first['properties'] as Json)['injected'] = true;
+    const first = toJsonSchema(Customer, 'create');
+    Reflect.set(Object(Reflect.get(first, 'properties')), 'injected', true);
     expect(toJsonSchema(Customer, 'create')).toEqual(create);
   });
 
@@ -64,8 +71,7 @@ describe('toJsonSchema shape', () => {
   });
 
   it('every schema compiles with Ajv in strict mode, with the formats it uses', () => {
-    const ajv = new Ajv2020({ strict: true, allErrors: true });
-    addFormats(ajv);
+    const ajv = createAjv();
     for (const def of [Customer, User, Asset]) {
       for (const mode of ['create', 'update', 'read'] as const)
         expect(() => ajv.compile(toJsonSchema(def, mode))).not.toThrow();
@@ -154,14 +160,14 @@ describe('create', () => {
   });
 
   it('money allows 15 digits minus the minor unit before the point, so the minor amount stays below 10^15', () => {
-    const usd = (toJsonSchema(createWithMoney('USD'), 'create') as Json)['properties'] as Record<string, Json>;
-    const amount = (usd['price']?.['properties'] as Record<string, Json>)['amount'] as Json;
+    const usd = props(toJsonSchema(createWithMoney('USD'), 'create'));
+    const amount = record(record(usd['price']?.['properties'])['amount']);
     expect(amount['pattern']).toBe('^-?\\d{1,13}(\\.\\d{1,2})?$');
   });
 
   it('an email is checked by a pattern, not by the format keyword, because Ajv and Zod disagree on that format', () => {
     expect(props(create)['email']).not.toHaveProperty('format');
-    const ajv = new Ajv2020({ strict: true });
+    const ajv = createAjv();
     const check = ajv.compile({ type: 'string', pattern: EMAIL_PATTERN });
     for (const ok of ['a@b.co', 'a@b.c', 'a+tag@b.com.vn', 'A@B.CO']) expect(check(ok)).toBe(true);
     for (const bad of [
@@ -193,8 +199,7 @@ describe('create', () => {
     const schema = props(create)['lastSeen'] ?? {};
     expect(schema['format']).toBe('date-time');
     expect(String(schema['pattern'])).toContain('Z');
-    const ajv = new Ajv2020({ strict: true });
-    addFormats(ajv);
+    const ajv = createAjv();
     const check = ajv.compile({ type: 'object', properties: { t: schema } });
     expect(check({ t: '2026-11-22T10:00:00Z' })).toBe(true);
     expect(check({ t: '2026-11-22T10:00:00.123Z' })).toBe(true);
@@ -205,7 +210,7 @@ describe('create', () => {
   });
 
   it('a custom field uses the JSON Schema it was given, and is required unless optional', () => {
-    const asset = toJsonSchema(Asset, 'create') as Json;
+    const asset = toJsonSchema(Asset, 'create');
     expect(props(asset)['tag']).toEqual({ type: 'string', pattern: '^[A-Z]{3}-\\d{4}$' });
     expect(props(asset)['label']).toEqual({ type: ['string', 'null'], maxLength: 50 });
     expect(asset['required']).toEqual(['tag']);

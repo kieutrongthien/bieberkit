@@ -24,6 +24,11 @@
       "types": "./dist/orm.d.ts",
       "default": "./dist/orm.js"
     },
+    "./schema": {
+      "@bieberkit/source": "./src/schema/index.ts",
+      "types": "./dist/schema.d.ts",
+      "default": "./dist/schema.js"
+    },
     "./package.json": "./package.json"
   },
   "publishConfig": {
@@ -35,6 +40,10 @@
       "./orm": {
         "types": "./dist/orm.d.ts",
         "default": "./dist/orm.js"
+      },
+      "./schema": {
+        "types": "./dist/schema.d.ts",
+        "default": "./dist/schema.js"
       },
       "./package.json": "./package.json"
     },

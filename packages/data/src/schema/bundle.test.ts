@@ -87,7 +87,9 @@ describe('SCH-07 client bundle', () => {
   });
 
   it('pulls in no ORM, no Ajv and no database driver (SCH-08)', async () => {
-    const { text } = await bundle('forbidden', entry(''));
+    const { text: withComments } = await bundle('forbidden', entry(''));
+    // The file headers are kept as legal comments, and they mention Ajv in prose, so only the code is searched.
+    const text = withComments.replace(/\/\*[\s\S]*?\*\//g, '');
     for (const name of ['mikro-orm', 'MikroORM', 'better-sqlite3', 'kysely', 'Ajv', 'ajv-formats'])
       expect(text).not.toContain(name);
   });

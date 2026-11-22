@@ -25,7 +25,7 @@
 import { defineConfig } from 'tsdown';
 
 export default defineConfig({
-  entry: { index: 'src/index.ts', orm: 'src/orm/index.ts' },
+  entry: { index: 'src/index.ts', orm: 'src/orm/index.ts', schema: 'src/schema/index.ts' },
   format: 'esm',
   platform: 'node',
   target: 'node24.12',

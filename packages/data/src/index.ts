@@ -35,3 +35,32 @@ export type { Compare } from './text/fold.ts';
 export { assertSafeScaled, fromMinor, fromScaled, minorUnitOf, SAFE_MAX, toMinor, toScaled } from './numbers/scaled.ts';
 export { decodeCursor, DEFAULT_PAGE_SIZE, encodeCursor, MAX_PAGE_SIZE, pageSize } from './query/page.ts';
 export type { CursorValue } from './query/page.ts';
+// Descriptors and the pure expansions only. The compilers (Zod, JSON Schema) are at `@bieberkit/data/schema`, the ORM at `@bieberkit/data/orm`.
+export { defineEntity, snake, standardColumns, tableConstraints } from './schema/define-entity.ts';
+export type {
+  ActionDef,
+  AdminOptions,
+  ApiOptions,
+  ConstraintDef,
+  EntityDef,
+  EntityOptions,
+  Feature,
+  FieldLike,
+  OrmOverride,
+  Permissions,
+  StandardColumn,
+  TableConstraints,
+} from './schema/define-entity.ts';
+export { f, Field } from './schema/fields.ts';
+export type {
+  ColumnDef,
+  ComputedFn,
+  FieldBuilders,
+  FieldDef,
+  FieldKind,
+  ResetEvery,
+  SchemaValue,
+  StateOptions,
+  TransitionDef,
+} from './schema/fields.ts';
+export type { CreateInput, EntityRegistry, Row, UpdateInput } from './schema/registry.ts';

@@ -22,6 +22,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import * as z from 'zod/mini';
 import { describe, expect, it } from 'vitest';
 import { checkContract } from '../testing/contract.ts';
 import type { Fixture } from '../testing/contract.ts';
@@ -183,16 +184,17 @@ describe('SCH-03 the fixtures give the same verdict through Ajv and Zod Mini', (
   });
 });
 
-describe('SCH-03 the suite itself has power: a difference between the validators is reported', () => {
-  const realJson = (mode: 'create' | 'update') =>
-    toJsonSchema(Customer, mode) as { properties: Record<string, object> };
+/** The real JSON Schema of Customer with one property replaced. */
+function withProperty(mode: 'create' | 'update', name: string, schema: object): object {
+  const real = toJsonSchema(Customer, mode);
+  const properties: unknown = Reflect.get(real, 'properties');
+  return { ...real, properties: { ...Object(properties), [name]: schema } };
+}
 
+describe('SCH-03 the suite itself has power: a difference between the validators is reported', () => {
   it('a JSON Schema that allows one character less than Zod is caught', () => {
     const found = checkContract(Customer, customer, {
-      jsonSchema: (mode) => {
-        const schema = realJson(mode);
-        return { ...schema, properties: { ...schema.properties, code: { type: 'string', maxLength: 31 } } };
-      },
+      jsonSchema: (mode) => withProperty(mode, 'code', { type: 'string', maxLength: 31 }),
     });
     expect(found.map((item) => item.fixture)).toContain('code of 32 ASCII');
     expect(found.every((item) => item.ajv !== item.zod || item.ajv !== item.expected)).toBe(true);
@@ -213,13 +215,15 @@ describe('SCH-03 the suite itself has power: a difference between the validators
     expect(found.map((item) => item.fixture)).toContain('code of 32 emoji');
   });
 
-  it('JSON Schema email format instead of the shared pattern is caught on the fixtures that Ajv and Zod used to disagree about', () => {
+  it('the native email rule of Zod instead of the shared pattern is caught on the fixtures that Ajv and Zod used to disagree about', () => {
     const found = checkContract(Customer, customer, {
-      jsonSchema: (mode) => {
-        const schema = realJson(mode);
+      zod: (mode) => {
+        const schema = toZodMini(Customer, mode);
         return {
-          ...schema,
-          properties: { ...schema.properties, email: { type: ['string', 'null'], format: 'email' } },
+          safeParse: (input: unknown) => {
+            const email = typeof input === 'object' && input !== null && 'email' in input ? input.email : undefined;
+            return typeof email === 'string' ? z.email().safeParse(email) : schema.safeParse(input);
+          },
         };
       },
     });

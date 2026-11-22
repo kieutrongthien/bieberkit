@@ -47,6 +47,8 @@ const minimal = (patch: Record<string, unknown> = {}): Input =>
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion
   Object.assign({ name: 'crm.Thing', table: 'crm_things', fields: { id: f.id() } }, patch) as Input;
 
+const columns = (def: EntityDef<string>): string[] => standardColumns(def).map((column) => column.column);
+
 describe('defineEntity result', () => {
   it('keeps the options, with tenant and softDelete off by default', () => {
     const def = defineEntity(minimal());
@@ -102,7 +104,7 @@ describe('defineEntity refuses a bad definition with DATA_ENTITY_INVALID', () =>
     ['crm.customer'],
     ['crm.Customer.x'],
     ['CRM.Customer'],
-    ['crm-x.Customer'],
+    ['crm_x.Customer'],
     ['crm.Cust omer'],
     ['1crm.Customer'],
   ])('the name %j', (name) => {
@@ -111,6 +113,10 @@ describe('defineEntity refuses a bad definition with DATA_ENTITY_INVALID', () =>
 
   it.each([['crm-things'], ['Crm'], [''], ['1things'], ['x'.repeat(41)]])('the table %j', (table) => {
     expect(failure(() => defineEntity(minimal({ table }))).code).toBe('DATA_ENTITY_INVALID');
+  });
+
+  it('a module name may hold dashes, as plugins such as audit-log do', () => {
+    expect(defineEntity(minimal({ name: 'audit-log.Entry' })).name).toBe('audit-log.Entry');
   });
 
   it('a table of exactly 40 characters', () => {
@@ -225,8 +231,6 @@ describe('defineEntity refuses a bad definition with DATA_ENTITY_INVALID', () =>
 });
 
 describe('standardColumns (DATA-18)', () => {
-  const columns = (def: EntityDef<string>): string[] => standardColumns(def).map((column) => column.column);
-
   it('a plain entity has id, version, created_at, updated_at, created_by and updated_by', () => {
     expect(columns(User)).toEqual(['id', 'version', 'created_at', 'updated_at', 'created_by', 'updated_by']);
   });

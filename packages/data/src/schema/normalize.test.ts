@@ -47,7 +47,7 @@ describe('SCH-05 normalizeInput', () => {
   });
 
   it('leaves keys alone, because keys are names of the API and not user text', () => {
-    expect(Object.keys(normalizeInput({ [NFD]: 1 }) as object)).toEqual([NFD]);
+    expect(Object.keys(Object(normalizeInput({ [NFD]: 1 })))).toEqual([NFD]);
   });
 
   it.each([[null], [undefined], [42], [true], [10n], [Number.NaN]])('passes %s through', (value) => {
@@ -57,7 +57,7 @@ describe('SCH-05 normalizeInput', () => {
   it('passes through a Date and other class instances unchanged', () => {
     const date = new Date('2026-11-22T10:00:00Z');
     expect(normalizeInput({ at: date })).toEqual({ at: date });
-    expect((normalizeInput({ at: date }) as { at: Date }).at).toBe(date);
+    expect(Reflect.get(Object(normalizeInput({ at: date })), 'at')).toBe(date);
   });
 
   it('text that is already NFC is returned equal', () => {

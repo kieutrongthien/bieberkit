@@ -22,12 +22,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import Ajv2020 from 'ajv/dist/2020.js';
-import addFormats from 'ajv-formats';
 import type { EntityDef } from '../schema/define-entity.ts';
 import { toJsonSchema } from '../schema/json-schema.ts';
 import { normalizeInput } from '../schema/normalize.ts';
 import { toZodMini } from '../schema/zod-mini.ts';
+import { createAjv } from './ajv.ts';
 
 export type ContractMode = 'create' | 'update';
 
@@ -65,8 +64,7 @@ export function checkContract(
   fixtures: readonly Fixture[],
   overrides: ContractOverrides = {},
 ): Disagreement[] {
-  const ajv = new Ajv2020({ strict: true, allErrors: true });
-  addFormats(ajv);
+  const ajv = createAjv();
   const validators = {
     create: ajv.compile(overrides.jsonSchema?.('create') ?? toJsonSchema(def, 'create')),
     update: ajv.compile(overrides.jsonSchema?.('update') ?? toJsonSchema(def, 'update')),

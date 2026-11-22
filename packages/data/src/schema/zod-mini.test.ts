@@ -89,7 +89,7 @@ describe('create', () => {
     const nfd = 'ế'.repeat(20);
     const result = create.safeParse({ ...valid, code: nfd });
     expect(result.success).toBe(true);
-    expect(result.data?.code).toBe('ế'.repeat(20));
+    expect(result.data?.['code']).toBe('ế'.repeat(20));
     expect(create.safeParse({ ...valid, code: 'ế'.repeat(33) }).success).toBe(false);
   });
 
@@ -238,7 +238,7 @@ describe('use outside the entity API', () => {
   it('the create schema converts to JSON Schema 2020-12 for custom routes, NFC step included (SCH-01)', () => {
     const converted = z.toJSONSchema(create, { target: 'draft-2020-12', io: 'input' });
     expect(converted).toMatchObject({ $schema: 'https://json-schema.org/draft/2020-12/schema', type: 'object' });
-    expect(Object.keys((converted as { properties: object }).properties)).toContain('ownerId');
+    expect(Object.keys(Object(Reflect.get(converted, 'properties')))).toContain('ownerId');
   });
 
   it('refuses a mode that does not exist', () => {

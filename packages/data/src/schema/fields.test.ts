@@ -37,6 +37,8 @@ function codeOf(run: () => unknown): string | undefined {
   return undefined;
 }
 
+const fn = (): number => 1;
+
 const Target = defineEntity({ name: 'test.Target', table: 'test_targets', fields: { id: f.id() } });
 
 describe('descriptors are immutable data', () => {
@@ -67,14 +69,15 @@ describe('f.id', () => {
   });
 
   it('refuses every chain method that makes no sense on a key', () => {
-    for (const apply of [
-      (x: ReturnType<typeof f.id>) => x.optional(),
-      (x) => x.unique(),
-      (x) => x.index(),
-      (x) => x.default('x'),
-      (x) => x.searchable(),
-      (x) => x.localized(),
-    ]) {
+    const attempts: ((field: ReturnType<typeof f.id>) => unknown)[] = [
+      (field) => field.optional(),
+      (field) => field.unique(),
+      (field) => field.index(),
+      (field) => field.default('x'),
+      (field) => field.searchable(),
+      (field) => field.localized(),
+    ];
+    for (const apply of attempts) {
       expect(codeOf(() => apply(f.id()))).toBe('DATA_FIELD_INVALID');
     }
   });
@@ -286,7 +289,7 @@ describe('f.createdAt and f.updatedAt', () => {
   });
 
   it('refuse optional, unique and default, because the server writes them', () => {
-    for (const make of [f.createdAt, f.updatedAt]) {
+    for (const make of [() => f.createdAt(), () => f.updatedAt()]) {
       expect(codeOf(() => make().optional())).toBe('DATA_FIELD_INVALID');
       expect(codeOf(() => make().unique())).toBe('DATA_FIELD_INVALID');
     }
@@ -443,8 +446,6 @@ describe('chain methods', () => {
   });
 
   describe('.computed (MOD-08)', () => {
-    const fn = (): number => 1;
-
     it('keeps the function and defaults stored to false', () => {
       expect(f.int().computed(fn).def.computed).toEqual({ fn, stored: false });
       expect(f.int().computed(fn, { stored: true }).def.computed).toEqual({ fn, stored: true });
