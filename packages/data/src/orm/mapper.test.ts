@@ -170,7 +170,7 @@ describeDialects('toApiRow', ({ open }) => {
       lastSeen: '2026-11-22T10:00:00.123Z',
       visits: 3,
       status: 'new',
-      number: null,
+      number: 'CUS-00001',
       ownerId: owner,
       deletedAt: null,
       createdBy: null,

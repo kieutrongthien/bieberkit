@@ -26,7 +26,7 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync } from 'node:fs
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { sql } from 'kysely';
-import { afterAll, expect, it } from 'vitest';
+import { afterAll, afterEach, expect, it } from 'vitest';
 import { createLogger } from '@bieberkit/core';
 import { DataError } from '../errors.ts';
 import { defineEntity, f } from '../schema/index.ts';
@@ -81,8 +81,8 @@ function messageOf(error: unknown): string {
 
 describeDialects('DATA-08 project migrations', ({ dialect, emptyDatabase }) => {
   const migrators: Migrator[] = [];
-  afterAll(async () => {
-    for (const migrator of migrators) await migrator.close();
+  afterEach(async () => {
+    for (const migrator of migrators.splice(0)) await migrator.close();
   });
 
   /** One database and one folder of migrations. `use` opens a migrator for a version of the entities, like a new release would. */

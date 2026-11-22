@@ -176,15 +176,17 @@ describeDialects('the entities round trip', ({ open }) => {
     expect((await runInUnitOfWork(db, (em) => em.findOneOrFail(schema, { id })))['total']).toBe(50);
   });
 
-  it('a sequence may stay empty until the server numbers it, and a given number is unique per tenant', async () => {
+  it('the server numbers a sequence, and a number that is given is unique per tenant', async () => {
     const schemas = crmSchemas();
     const db = await open(schemas.all);
     const owner = await seedUser(db, schemas);
     await seedCustomer(db, schemas, TENANT_A, owner);
     await seedCustomer(db, schemas, TENANT_A, owner);
-    await seedCustomer(db, schemas, TENANT_A, owner, { number: 'CUS-00001' });
-    await expect(seedCustomer(db, schemas, TENANT_A, owner, { number: 'CUS-00001' })).rejects.toThrow(DUPLICATE);
-    await expect(seedCustomer(db, schemas, TENANT_B, owner, { number: 'CUS-00001' })).resolves.toBeTypeOf('string');
+    const numbers = await rows(db, 'select number from crm_customers order by number');
+    expect(numbers.map((row) => row['number'])).toEqual(['CUS-00001', 'CUS-00002']);
+    await seedCustomer(db, schemas, TENANT_A, owner, { number: 'CUS-00009' });
+    await expect(seedCustomer(db, schemas, TENANT_A, owner, { number: 'CUS-00009' })).rejects.toThrow(DUPLICATE);
+    await expect(seedCustomer(db, schemas, TENANT_B, owner, { number: 'CUS-00009' })).resolves.toBeTypeOf('string');
   });
 });
 

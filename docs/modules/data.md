@@ -51,8 +51,9 @@ It does not hold HTTP routes, authorization rules or the admin UI. It reads conf
 | 4. Queries                | Keyset, `withTotal`, read-only path, index rule, `.localized()`                                                                                        | After slice 3                 |
 | 5. Migrations             | Snapshot diff, `migrate:*`, destructive detection, plugin runner, `MIGRATE_DATABASE_URL`                                                               | After slice 3                 |
 | 6. Outbox and audit       | Outbox table and dispatcher, processed ids, audit log append-only for the application role, the framework tables as plugin steps                       | After slice 5                 |
-| 7. Domain                 | State machines, sequences, features (attachments, comments, timeline, tags)                                                                            | After slice 6                 |
-| 8. Build output           | Standalone Ajv validators and fast-json-stringify serializers                                                                                          | After slice 7                 |
+| 7. State and numbers      | State machines (`transition`, no direct write of a state), sequences (`f.sequence`, gap free per tenant)                                               | After slice 6                 |
+| 8. Features               | Attachments, comments, timeline and tags as generic tables                                                                                             | After slice 7                 |
+| 9. Build output           | Standalone Ajv validators and fast-json-stringify serializers                                                                                          | After slice 8                 |
 
 ## Public API of slice 1 (Foundation)
 
@@ -546,3 +547,59 @@ All of it about MikroORM 7.2.9 and the databases.
 - **Reading the audit log** for the admin UI. It needs the permission model, so it comes with the `audit-log` plugin of M1.8. Until then a reader filters on the tenant itself.
 - **Encrypted `pii` values in audit data** (PDP-06) come with the privacy work. `data` holds what the caller gives.
 - **An audit entry for every row change** is written by the services and the generated routes of M1.3, which know the action. This slice gives them the table and the call.
+
+## Slice 7: state machines and sequences
+
+Designed on 2026-11-23. None of it is maintainer-designed (MOD-06, MOD-07, MOD-12 and decisions 3 and 4 above decide the model). Slice 6 said slice 7 would also hold the features. They are moved to slice 8, so that each slice stays reviewable, and the standalone Ajv modules are slice 9.
+
+### Public API (`@bieberkit/data/orm`)
+
+```ts
+transition(em, schema, row, name, input?): Promise<TransitionResult>   // changes the state of a loaded row, adds an event and an audit entry, does not flush
+interface TransitionResult { name: string; from: string; to: string; event: string }
+availableTransitions(schema, row): readonly { name: string; to: string; permission?: string }[]   // what the row can do now, for the buttons
+transitionOf(schema, name): { from; to; permission?; input? }          // the declaration, for the route that checks the permission first
+
+nextSequence(em, key: { entity: string; field: string; tenantId?: string }, options?: { resetEvery?: ResetEvery; now?: Date }): Promise<number>
+formatSequence(pattern: string, value: number, now?: Date): string    // 'PO-{yyyy}-{seq:5}' and 42 give 'PO-2026-00042'
+```
+
+### State machine rules
+
+- **Created in the initial state (decision 3).** A new row has `initial` in its state field, or nothing, which becomes `initial`. Any other value is `DATA_STATE_DIRECT_WRITE`.
+- **Changed only by `transition` (MOD-07).** The unit of work refuses an update that changes a state field unless `transition` made it (`DATA_STATE_DIRECT_WRITE`, 500: it is a bug of the caller). `nativeUpdate`, `insert` and `insertMany` refuse a state field as they refuse a stale shadow column, and so do `bulkUpdate` and `bulkInsert`.
+- **`transition` checks, then changes.** An unknown name is `DATA_TRANSITION_UNKNOWN` (404). A row whose state is not in `from` is `DATA_TRANSITION_NOT_ALLOWED` (409). `input` is checked against the schema of the transition with the Standard Schema interface that Zod implements, and a refusal is `DATA_TRANSITION_INPUT_INVALID` (422). Input given to a transition that declares none is refused the same way. The permission is not checked here: the route reads `transitionOf(...).permission` and asks the ability before it calls (AUTHZ).
+- **It adds, never flushes.** `transition` sets the state, then adds an outbox event and an audit entry to the unit of work, so the service's flush writes all three in one transaction (§7.5). A stale row fails the flush as `DATA_VERSION_STALE`.
+- **The event** is named `<module>.<resource>.<transition>` from the entity name, for example `crm.customer.qualify` for `crm.Customer`. Its payload is `{ id, transition, from, to, input? }` and its record version is the version after the write. The audit action is `<entity name>.<transition>`, for example `crm.Customer.qualify`, and its data is `{ from, to, input? }`.
+
+### Sequence rules
+
+- **One counter row per tenant, name and period (decision 4).** `bieberkit_sequences (tenant_id, name, period, value)` with those three as the primary key. `name` is `<entity>.<field>`. `period` is `2026` for `resetEvery: 'year'`, `2026-11` for `'month'`, `-` for `'never'`. A global entity uses the nil UUID as its tenant.
+- **Allocation is inside the flush transaction.** A `beforeCreate` hook gives every new row its number when the sequence field is empty. A value that the caller already set is kept, for imports. The counter is raised by an update that takes the row lock and holds it until the commit, so concurrent writers queue, numbers are unique and have no gap, and a rolled back save gives its number back (MOD-12). The row is first added with `insert ... on conflict do nothing` (`insert ignore` on MySQL), then raised by `update ... returning value` (PostgreSQL, SQLite) or `update ... set value = LAST_INSERT_ID(value + 1)` and `select LAST_INSERT_ID()` (MySQL).
+- **The pattern** takes `{yyyy}`, `{yy}`, `{mm}` and one `{seq:N}`. The date is UTC, and a number longer than `N` digits is not cut.
+- **The table is a framework table.** `dataMigrationSteps` gets one more step (version 0.2.0) and `frameworkEntities` one more schema, so `schema.create()` and a deploy agree.
+
+### Errors of slice 7
+
+| Code                            | Status | Fix                                                                     |
+| ------------------------------- | ------ | ----------------------------------------------------------------------- |
+| `DATA_STATE_DIRECT_WRITE`       | 500    | Change a state with `transition`. A new row starts in the initial state |
+| `DATA_TRANSITION_UNKNOWN`       | 404    | The entity has no such transition. Check the name                       |
+| `DATA_TRANSITION_NOT_ALLOWED`   | 409    | The record is not in a state that this transition starts from           |
+| `DATA_TRANSITION_INPUT_INVALID` | 422    | The input does not match the schema of the transition, or it takes none |
+
+### Found while implementing slice 7
+
+All of it about MikroORM 7.2.9 and the databases.
+
+- **One statement takes the number.** A first version inserted the counter row with `insert ignore` and then updated it. Twenty concurrent writers deadlocked on MySQL (a shared lock, then an exclusive one). One upsert does both: `insert ... on conflict do update ... returning` on PostgreSQL and SQLite, and `insert ... on duplicate key update value = LAST_INSERT_ID(value + 1)` followed by `select LAST_INSERT_ID()` on MySQL. The first value is written as `LAST_INSERT_ID(1)`, so one read serves both paths.
+- **`beforeCreate` runs inside the flush transaction**, and `nextSequence` on its `em` joins it. A test saves a row that fails on a unique key after the number was taken, and the next save gets the same number.
+- **The compiler marks the properties.** A state property carries `bkState: { initial }` and a sequence property `bkSequence: { pattern, resetEvery }`. MikroORM keeps unknown options on `meta.properties`, so the subscriber and the entity manager read the markers and need no map from schemas to definitions.
+- **`snake` is for property names.** `snake('Order')` is `_order`, so the event name uses its own conversion of the resource name.
+- **A sequence is now numbered by the server.** Two tests of slice 3 and 4 expected an empty sequence (`number: null`). They now expect `CUS-00001`. A number that is given is still kept.
+
+### Left out
+
+- **The permission check and the route** (`POST .../actions/<name>`) are in M1.3 and M1.4. `transitionOf` and `availableTransitions` are what they call.
+- **`actions`** (buttons that are not transitions, MOD-06) are handlers of the route layer. The data layer has nothing to add.
+- **Tenant timezone for the date in a pattern.** It is UTC. A tenant setting can pass `now` later.

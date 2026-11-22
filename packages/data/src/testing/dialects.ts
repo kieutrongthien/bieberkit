@@ -29,7 +29,7 @@ import { join } from 'node:path';
 import type { EntitySchema } from '@mikro-orm/core';
 import { DIALECTS } from '@bieberkit/core';
 import type { Dialect } from '@bieberkit/core';
-import { afterAll, describe, inject, it } from 'vitest';
+import { afterAll, afterEach, describe, inject, it } from 'vitest';
 import { createDatabase } from '../orm/connect.ts';
 import { DATA_PLUGIN, dataMigrationSteps } from '../orm/framework.ts';
 import { kyselyOf } from '../orm/internals.ts';
@@ -119,6 +119,11 @@ export function describeDialects(name: string, suite: (context: DialectContext) 
     }
     describe(title, () => {
       const cleanups: (() => Promise<void>)[] = [];
+      // A database is closed at the end of its test, so a long suite never holds hundreds of connections (PostgreSQL stops at 100).
+      const closers: (() => Promise<void>)[] = [];
+      afterEach(async () => {
+        for (const close of closers.splice(0)) await close();
+      });
       afterAll(async () => {
         for (const cleanup of cleanups.toReversed()) await cleanup();
       });
@@ -137,7 +142,7 @@ export function describeDialects(name: string, suite: (context: DialectContext) 
         openFramework: async (entities = [], options = {}) => {
           const { url } = await context.emptyDatabase();
           const database = await createDatabase(env(url, dialect), { ...options, entities });
-          cleanups.push(() => database.close());
+          closers.push(() => database.close());
           await runPluginMigrations(await kyselyOf(database.orm.em), dialect, dataMigrationSteps, {
             pluginOrder: [DATA_PLUGIN],
           });
@@ -146,14 +151,14 @@ export function describeDialects(name: string, suite: (context: DialectContext) 
           const own = ddl
             .split(';')
             .map((text) => text.trim())
-            .filter((text) => text !== '' && !/bieberkit_outbox|audit_log/.test(text));
+            .filter((text) => text !== '' && !/bieberkit_outbox|audit_log|bieberkit_sequences/.test(text));
           for (const text of own) await database.orm.em.getConnection().execute(text);
           return database;
         },
         open: async (entities, options = {}) => {
           const { url } = await context.emptyDatabase();
           const database = await createDatabase(env(url, dialect), { ...options, entities });
-          cleanups.push(() => database.close());
+          closers.push(() => database.close());
           await database.orm.schema.create();
           return database;
         },
