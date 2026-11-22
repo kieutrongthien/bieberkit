@@ -43,6 +43,7 @@ Status values: `Proposed`, `Accepted`, `Rejected`, `Superseded by NNNN`. Only th
 | [0009](0009-define-entity-api.md)              | defineEntity and the field DSL                          | Accepted |
 | [0010](0010-queue-drivers.md)                  | Queue drivers: BullMQ on Valkey and a database driver   | Proposed |
 | [0011](0011-plugin-manifest-and-migrations.md) | Plugin manifest, resolver and per-plugin migrations     | Proposed |
+| [0012](0012-authentication.md)                 | Authentication: Better Auth on MikroORM's Kysely        | Proposed |
 
 ## Needed for the Phase 0 gate
 
