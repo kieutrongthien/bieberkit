@@ -24,9 +24,10 @@
 
 # 0006. Documentation site generator and hosting
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-11-22
 - Deciders: Bieber Kieu
+- Decision process: the maintainer asked the implementing agent to choose the best option. The choice stands until the maintainer overrides it with a superseding ADR.
 - Requirements: spec section 22.1 (bundled docs, `llms.txt`), SEC-11 to SEC-14, SEC-21, spec section 26 (open question)
 
 ## Context
@@ -54,7 +55,7 @@ Hosting is a second choice:
 
 ## Decision
 
-Starlight on Cloudflare Pages through its Git integration. Starlight covers the needs with plugins instead of our own code. The Git integration avoids any new workflow and any `id-token: write`, which keeps this decision out of the maintainer-only area.
+Starlight on Cloudflare Pages through its Git integration. Starlight covers the needs with plugins instead of our own code. The Git integration avoids any new workflow and any `id-token: write`, which keeps this decision out of the maintainer-only area. The output is static files, so the host can be changed later without touching the content.
 
 ## Evidence
 
@@ -69,6 +70,8 @@ Not tested: building our `docs/` with any of them, the HTML comment header in Ma
 - Ruled out: docs hosted on a path of the product site.
 
 ## Spec changes
+
+Made in spec 0.8.1, in the same pull request as this ADR.
 
 - Section 3 or 22.1: name the generator and host.
 - Section 26: tick the open question.

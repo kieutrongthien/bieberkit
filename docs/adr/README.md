@@ -33,12 +33,12 @@ Status values: `Proposed`, `Accepted`, `Rejected`, `Superseded by NNNN`. Only th
 | No. | Title | Status |
 | --- | --- | --- |
 | [0001](0001-record-architecture-decisions.md) | Record architecture decisions | Accepted |
-| [0002](0002-formatter-oxfmt.md) | Formatter: Oxfmt, with conditions | Proposed |
-| [0003](0003-logging-binding.md) | Logging: a port in core, pino behind a contract package | Proposed |
-| [0004](0004-content-editor.md) | Content editor: Tiptap, pending a Vietnamese input test | Proposed |
-| [0005](0005-mariadb-support-level.md) | MariaDB support level | Proposed |
-| [0006](0006-docs-site.md) | Documentation site generator and hosting | Proposed |
-| [0007](0007-generated-project-license.md) | Default license of generated projects | Proposed |
+| [0002](0002-formatter-oxfmt.md) | Formatter: Oxfmt, with conditions | Accepted |
+| [0003](0003-logging-binding.md) | Logging: a port in core, pino behind a contract package | Accepted |
+| [0004](0004-content-editor.md) | Content editor: Tiptap 3 | Accepted |
+| [0005](0005-mariadb-support-level.md) | MariaDB support level | Accepted |
+| [0006](0006-docs-site.md) | Documentation site generator and hosting | Accepted |
+| [0007](0007-generated-project-license.md) | Default license of generated projects | Accepted |
 
 ## Needed for the Phase 0 gate
 

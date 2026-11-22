@@ -24,9 +24,10 @@
 
 # 0007. Default license of generated projects
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-11-22
 - Deciders: Bieber Kieu
+- Decision process: the maintainer asked the implementing agent to choose the best option. The choice stands until the maintainer overrides it with a superseding ADR.
 - Requirements: spec section 6, section 8.3, section 23.7, spec section 26 (open question)
 
 ## Context
@@ -57,6 +58,8 @@ Spec 8.3 already shows `license: 'UNLICENSED'`, and 23.7 already says "default `
 - Ruled out: a different default per template.
 
 ## Spec changes
+
+Made in spec 0.8.1, in the same pull request as this ADR.
 
 - Section 5.1: add a `--license` row (values: an SPDX id or `UNLICENSED`, default `UNLICENSED`). It does not exist today.
 - Section 23.7: state that the header and `LICENSE` follow the chosen id.

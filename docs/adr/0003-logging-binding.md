@@ -24,9 +24,10 @@
 
 # 0003. Logging: a port in core, pino behind a contract package
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-11-22
 - Deciders: Bieber Kieu
+- Decision process: the maintainer asked the implementing agent to choose the best option. The choice stands until the maintainer overrides it with a superseding ADR.
 - Requirements: PKG-01, PKG-02, PKG-03, PKG-04, OBS-01, SEC-09, spec section 3 (Logging row)
 
 ## Context
@@ -68,6 +69,8 @@ Option A.
 - Open: where OpenTelemetry binds (OBS-02). It follows the same pattern, but it needs its own ADR.
 
 ## Spec changes
+
+Made in spec 0.8.1, in the same pull request as this ADR.
 
 - Section 4.1: add `log/` to the package tree.
 - Section 4.3: add `log` to the Contracts row.

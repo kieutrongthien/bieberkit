@@ -24,9 +24,10 @@
 
 # 0002. Formatter: Oxfmt, with conditions
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-11-22
 - Deciders: Bieber Kieu
+- Decision process: the maintainer asked the implementing agent to choose the best option. The choice stands until the maintainer overrides it with a superseding ADR.
 - Requirements: spec section 3 (Formatting row), HDR-01, SEC-11
 
 ## Context
@@ -68,6 +69,8 @@ Commands run from the repository root. The changes were reverted afterwards.
 - The formatting commit is large, so it goes in separately and is listed in `.git-blame-ignore-revs`.
 
 ## Spec changes
+
+Made in spec 0.8.1, in the same pull request as this ADR.
 
 - Section 3, Formatting row: replace "The Biome formatter is the fallback if Oxfmt is not stable enough at Phase 0" with "Pinned exactly. The Biome formatter is the fallback (ADR 0002)".
 - Section 23.6 (HDR-01): add that blank lines between a frontmatter block and the header are allowed.

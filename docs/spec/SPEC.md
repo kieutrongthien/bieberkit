@@ -2,7 +2,7 @@
   BieberKit
 
   @file        docs/spec/SPEC.md
-  @description The BieberKit specification, version 0.8: design, requirements and roadmap.
+  @description The BieberKit specification, version 0.8.1: design, requirements and roadmap.
   @author      Bieber Kieu <kieutrongthien@gmail.com>
   @copyright   Copyright (c) 2026 Bieber Kieu
   @license     Apache-2.0
@@ -131,9 +131,10 @@ The baseline below is fixed for version 1. Changing any row requires an ADR (arc
 | Container | Docker, Docker Hardened Images `node:26` | Section 19. |
 | Public site | TanStack Start 1.x on Node.js through Nitro | Server-side rendering for SEO. Shares React, TanStack Router and Query with the admin UI. Section 16.2. |
 | Site styling | Tailwind CSS 4, shadcn/ui on Base UI | Copied in from the registry and owned by the project. |
-| Content editor | Lexical or Tiptap | Chosen by a Phase 0 spike. Content stored as block JSON. Section 16.5. |
+| Content editor | Tiptap 3 | Chosen in ADR 0004. Content stored as block JSON, so the engine can be replaced. Section 16.5. |
 | Lint and type check | Oxlint with type-aware rules (tsgolint on TypeScript 7) | One pass runs lint rules and TypeScript diagnostics on the same program. BieberKit rules ship as an Oxlint plugin used by bieberkit check. |
-| Formatting | Oxfmt | Same Oxc toolchain as Oxlint, Rolldown and Vite. The Biome formatter is the fallback if Oxfmt is not stable enough at Phase 0. |
+| Formatting | Oxfmt | Same Oxc toolchain as Oxlint, Rolldown and Vite. Pinned to an exact version. The Biome formatter is the fallback (ADR 0002). |
+| Docs site | Starlight (Astro) on Cloudflare Pages | ADR 0006. Static output, so the host can change. Built from `docs/`, with `llms.txt` and per-version docs. Section 22.1. |
 | Package build | tsdown, pinned (pre-1.0) | ESM-only packages with exports maps. isolatedDeclarations for fast .d.ts output. publint and attw check every package in CI. |
 
 Dependency policy:
@@ -160,6 +161,7 @@ bieberkit/
 │   ├── storage/     @bieberkit/storage   storage contract on FlyDrive
 │   ├── mail/        @bieberkit/mail      mail contract and drivers
 │   ├── search/      @bieberkit/search    search contract and database driver
+│   ├── log/         @bieberkit/log       logger contract and pino adapter
 │   ├── admin-core/  @bieberkit/admin-core  headless admin: metadata, routing, state
 │   ├── admin-antd/  @bieberkit/admin-antd  default UI adapter on Ant Design
 │   ├── tokens/      @bieberkit/tokens    design tokens to Ant Design and CSS variables
@@ -219,7 +221,7 @@ Layers, top to bottom. Imports point downward only.
 | Tools | `bieberkit` (cli), `create-bieberkit`, `@bieberkit/mcp` | Act on the project, never imported by it |
 | Your project and plugins | | Use foundation libraries through `@bieberkit/*` re-exports |
 | Product | admin-core, admin-antd, site-kit, tokens, content, testing | |
-| Contracts | http, data, auth, queue, cache, storage, mail, search | Driver adapters sit behind them: BullMQ, BentoCache, FlyDrive, mail, search, error reporting, CDN purge |
+| Contracts | http, data, auth, queue, cache, storage, mail, search, log | Driver adapters sit behind them: BullMQ, BentoCache, FlyDrive, mail, search, error reporting, CDN purge |
 | Foundation | `@bieberkit/core` | Kernel, container, config, errors, events, plugin resolver |
 
 Project code and plugins see only BieberKit packages. Tools act on the project but are never imported by it.
@@ -253,6 +255,7 @@ pnpm create bieberkit@latest example-project
 | `--yes` | flag | off | Accept defaults, never prompt |
 | `--json` | flag | off | Print a machine-readable result |
 | --site / --no-site | flag | --site for cms, otherwise --no-site | Include the server-rendered public site app |
+| `--license` | an SPDX identifier or `UNLICENSED` | `UNLICENSED` | License written into `bieberkit.config.ts`, file headers and the `LICENSE` file (ADR 0007) |
 
 Every prompt MUST have an equivalent flag, so CI and AI agents can run the scaffolder without interaction.
 
@@ -501,6 +504,8 @@ BieberKit uses MikroORM 7 because one `defineEntity` definition works on Postgre
 | PostgreSQL 15+ | 1 | Production, multi-tenant SaaS | Full suite |
 | MySQL 8.4 LTS+ | 1 | Production, common shared hosting in Vietnam | Full suite |
 | SQLite 3 | 2 | Development, demos, single-server small apps | Full suite, no load tests |
+
+MariaDB is best effort and not in CI (ADR 0005). The only MySQL-family dialect value in configuration is `mysql`, and the docs call MariaDB untested. Revisit after the Phase 2 gate.
 
 ### 9.2 Rules
 
@@ -1087,7 +1092,7 @@ Alternatives considered:
 - **CNT-01** Rich content is stored as versioned block JSON, never as raw HTML. Blocks include heading, paragraph, list, quote, image, gallery, video embed, table, call to action, and custom blocks declared by plugins.
 - **CNT-02** `@bieberkit/content` defines the block schema and one set of React renderers used by both the admin preview and the site, so preview matches production.
 - **CNT-03** Rendered output is sanitized: links get safe `rel` values, embeds come only from an allowlist, and raw HTML blocks are off by default.
-- **CNT-04** The editor engine (Lexical or Tiptap, both MIT at their core) is chosen by a spike in Phase 0, based on block support, collaboration readiness, Vietnamese input method handling and bundle size.
+- **CNT-04** The editor engine is Tiptap 3 (MIT, ADR 0004). Before the editor ships in M2.3, a manual Vietnamese input test (Telex and VNI) MUST pass. If it fails where Lexical passes, a new ADR supersedes ADR 0004. The editor loads as a lazy chunk.
 
 * **CNT-05** `@bieberkit/content` also ships a framework-free HTML serializer, used for emails, RSS feeds and headless renderers (SITE-07).
 
@@ -1315,7 +1320,7 @@ The orchestrator's grace period (for example `terminationGracePeriodSeconds`) MU
 
 Every process writes JSON logs to stdout, exports OpenTelemetry traces when an endpoint is configured, and exposes Prometheus metrics on a separate port.
 
-- **OBS-01** Logs use pino. Each line carries `time`, `level`, `msg`, `role`, `requestId`, `traceId`, `spanId`, and `tenantId` and `userId` when known.
+- **OBS-01** Logs use pino, bound as in ADR 0003: `@bieberkit/core` owns the `Logger` port, a dependency-free default logger and the request context, and only `@bieberkit/log/pino` imports pino. Each line carries `time`, `level`, `msg`, `role`, `requestId`, `traceId`, `spanId`, and `tenantId` and `userId` when known.
 - **OBS-02** Traces cover HTTP requests, database queries, cache calls, queue dispatch and job execution, with trace context carried from the request into the jobs it creates.
 - **OBS-03** Metrics: HTTP duration histogram by route and status, event loop lag, heap usage, database pool usage, queue depth and job duration by queue, cache hit ratio.
 - **OBS-04** The metrics port is never exposed through the public load balancer.
@@ -1442,7 +1447,7 @@ Other comment styles: Markdown and HTML use one `<!-- ... -->` block, SQL uses `
 
 ### 23.4 Rules
 
-- **HDR-01** The header is the first content of the file. Exceptions that must stay first: a shebang (`#!/usr/bin/env node`) and a Dockerfile `# syntax=` directive. The header follows directly after them.
+- **HDR-01** The header is the first content of the file. Exceptions that must stay first: a shebang (`#!/usr/bin/env node`) and a Dockerfile `# syntax=` directive. The header follows directly after them. In Markdown with frontmatter, the header follows the frontmatter, and blank lines between them are allowed.
 - **HDR-02** `@file` is the path relative to the repository root. `@description` is one sentence about what the file does, never empty.
 - **HDR-03** The copyright year is the year the file was created and is not bumped every year.
 - **HDR-04** The `@author` line for Bieber Kieu always comes first. Maintainers MAY add further `@author` lines for substantial contributions.
@@ -1467,7 +1472,7 @@ Other comment styles: Markdown and HTML use one `<!-- ... -->` block, SQL uses `
 
 ### 23.7 Headers in generated projects
 
-- Files the scaffolder creates in a user's project carry the same header layout, with the project name, the project author from `--author` or git config, and the project's license from `bieberkit.config.ts` (default `UNLICENSED`).
+- Files the scaffolder creates in a user's project carry the same header layout, with the project name, the project author from `--author` or git config, and the project's license from `bieberkit.config.ts` (default `UNLICENSED`, set with `--license`). For a known SPDX identifier the scaffolder also writes the matching `LICENSE` file, and for `UNLICENSED` it writes none.
 - Files copied in from the BieberKit registry keep the BieberKit header, because Apache 2.0 section 4 requires keeping copyright notices. A user who changes such a file adds a `@modified-by` line.
 
 ## 24. Open source governance, releases and support
@@ -1546,16 +1551,17 @@ Open questions:
 
 - [ ] Reserve the `@bieberkit` npm scope, the `bieberkit` and `create-bieberkit` package names, and the GitHub organization.
 - [ ] Confirm with the employer that BieberKit is a personal project and can be published, if any part is built during work time or for company projects.
-- [ ] Verify that Ant Design 6 ships a complete `vi_VN` locale, or plan to contribute one.
-- [ ] Decide whether MariaDB is officially supported or best effort.
-- [ ] Choose the docs site generator and hosting.
-- [ ] Decide the default license for generated projects (`UNLICENSED` today).
+- [x] Verify that Ant Design 6 ships a complete `vi_VN` locale, or plan to contribute one. Checked 2026-11-22 against antd 6.7.1: `vi_VN` lacks 2 of the 207 `en_US` keys (`global.clear`, `Input.otpCell`). The admin adapter overrides those two keys in its `vi` locale and offers them upstream.
+- [x] Decide whether MariaDB is officially supported or best effort. Best effort (ADR 0005).
+- [x] Choose the docs site generator and hosting. Starlight on Cloudflare Pages (ADR 0006).
+- [x] Decide the default license for generated projects. `UNLICENSED`, changeable with `--license` (ADR 0007).
 - [ ] Validate the performance targets in section 18 with Phase 1 benchmarks.
 
 ## Document history
 
 | Version | Date | Changes |
 | --- | --- | --- |
+| 0.8.1 | 2026-11-22 | Phase 0 decisions from ADR 0002 to 0007: Oxfmt kept with a header rule for frontmatter, `@bieberkit/log` package, Tiptap, MariaDB best effort, Starlight on Cloudflare Pages, `--license` flag, three open questions closed |
 | 0.8 | 2026-11-22 | Independent review fixes: private caching for session-rendered pages, versioned plugin migrations, per-request tenant and cross-tenant reference checks, separate cache Valkey, Better Auth integration rules, unordered outbox with versions, honest cache guarantees, static plugin manifests, collation semantics, integer money, Vietnamese search, crypto-shredded audit, supply-chain fixes, P12 narrowed, MySQL 8.4, 15 minor fixes. Scope kept as is |
 | 0.7 | 2026-11-21 | Structure, part 2: write path and outbox flow, durable workflows, metadata contract, site composition, generated files. Fixes: commit before response, synchronous cache purge after commit, extension tables for plugin fields |
 | 0.6 | 2026-11-21 | Structure: package layers, project configuration, request pipeline, app structure, tenant resolution, job context, standard columns, validator conformance, generated types, outbox ordering |

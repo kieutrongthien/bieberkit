@@ -24,9 +24,10 @@
 
 # 0005. MariaDB support level
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-11-22
 - Deciders: Bieber Kieu
+- Decision process: the maintainer asked the implementing agent to choose the best option. The choice stands until the maintainer overrides it with a superseding ADR.
 - Requirements: spec section 9.1, DATA-14, MOD-11, MOD-18, spec section 26 (open question), P9
 
 ## Context
@@ -49,7 +50,7 @@ The risk table in spec section 26 already says the full v1 scope is about three 
 
 Option B for 1.0. The `mysql` dialect is the only MySQL-family value that configuration accepts. The docs state that MariaDB is untested and may work through the MySQL dialect. Revisit after the Phase 2 gate, and promote to Tier 2 only if the maintainer confirms demand and the dialect matrix is stable.
 
-This is a recommendation on partial information. If the maintainer knows that the target hosts offer MariaDB only, option C becomes the better choice and the Tier 1 row for MySQL should be reconsidered.
+Revisit trigger: if the intended hosts turn out to offer MariaDB only, a new ADR moves MariaDB to option C and reconsiders the Tier 1 row for MySQL. The choice is made without that fact because option B costs nothing now and keeps option C open.
 
 ## Evidence
 
@@ -63,6 +64,8 @@ This is a recommendation on partial information. If the maintainer knows that th
 - Ruled out for 1.0: a `mariadb` dialect value in `bieberkit.config.ts`.
 
 ## Spec changes
+
+Made in spec 0.8.1, in the same pull request as this ADR.
 
 - Section 9.1: add a note under the table that MariaDB is best effort and not in CI.
 - Section 26: tick the open question once accepted.

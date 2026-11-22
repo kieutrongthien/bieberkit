@@ -22,11 +22,12 @@
   SPDX-License-Identifier: Apache-2.0
 -->
 
-# 0004. Content editor: Tiptap, pending a Vietnamese input test
+# 0004. Content editor: Tiptap 3
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-11-22
 - Deciders: Bieber Kieu
+- Decision process: the maintainer asked the implementing agent to choose the best option. The choice stands until the maintainer overrides it with a superseding ADR.
 - Requirements: CNT-01 to CNT-05, UI-12, spec section 18.1 (admin initial JS under 400 KB), P9
 
 ## Context
@@ -43,7 +44,7 @@ CNT-04 asks for a Phase 0 spike that chooses between Lexical and Tiptap on four 
 
 ## Decision
 
-Tiptap (option A), on condition that the Vietnamese input test below passes in both engines or fails equally in both. If Tiptap fails and Lexical passes, switch to Lexical.
+Tiptap 3 (option A). The Vietnamese input test below is a gate before the editor ships in M2.3 (CNT-04), not before this decision: the editor is not built until Phase 2, and storage is our own block JSON, so the choice is cheap to reverse. If Tiptap fails the test where Lexical passes, a new ADR supersedes this one.
 
 Reasons: it is past 1.0, its document model maps onto the block schema with less glue, and the measured size is slightly lower. The main risk is commercial drift (see Consequences), not technical.
 
@@ -76,16 +77,18 @@ Not evaluated: block support beyond the basics (custom blocks, galleries, embeds
 - Risk accepted: Tiptap's company could move more features behind a paid plan. Mitigation: the core stays MIT and a fork is possible. Revisit if a feature we ship depends on a paid extension.
 - Runtime dependency line (P9): `@tiptap/*`, reason: block editing. Maintainer: the ueberdosis organization on GitHub (to be confirmed). License: MIT.
 
-## Maintainer test needed before acceptance
+## Vietnamese input test (gate before M2.3)
 
-On a real machine with Telex and VNI (UniKey on Windows, macOS built-in Vietnamese, ibus-bamboo or ibus-unikey on Linux), type the same sentences in the minimal editors in each engine: "Tiếng Việt có dấu", "đường", "nguyễn", "thương mại", correct a tone in the middle of a word, and type inside a table cell and a list item. Record pass or fail per engine and input method in this ADR.
+On a real machine with Telex and VNI (UniKey on Windows, macOS built-in Vietnamese, ibus-bamboo or ibus-unikey on Linux), type the same sentences in the minimal editors in each engine: "Tiếng Việt có dấu", "đường", "nguyễn", "thương mại", correct a tone in the middle of a word, and type inside a table cell and a list item. Record pass or fail per engine and input method in the new ADR or in a note appended here.
 
 ## Spec changes
+
+Made in spec 0.8.1, in the same pull request as this ADR.
 
 - Section 3, Content editor row: replace "Lexical or Tiptap" with the accepted engine.
 - Section 16.5 (CNT-04): state the engine and remove "chosen by a spike".
 
 ## Follow-ups
 
-- The maintainer runs the input test.
+- The maintainer runs the input test before M2.3 starts.
 - A later spike (Phase 2, M2.3) covers custom blocks and the editor-to-block-JSON round trip.

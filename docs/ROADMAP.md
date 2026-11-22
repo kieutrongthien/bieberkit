@@ -82,10 +82,10 @@ Each ADR is written as `Proposed` with the spike result attached. The maintainer
 - [ ] **[M][D]** ADR: authorization. Spike: `@ucast/sql` on MikroORM 7, otherwise an own CASL to ORM translator with a small operator set and generated permission tests (AUTHZ-02, §26)
 - [ ] **[M]** ADR: queue drivers. Spike: BullMQ on Valkey and the `database` driver behind one contract, outbox dispatch with SKIP LOCKED (Q-05, MOD-18)
 - [ ] **[M][D]** ADR: release pipeline, npm trusted publishing, protected tags, no shared cache, `id-token: write` on the publish job only (SEC-15, SEC-16, SEC-21)
-- [ ] **[M]** ADR: content editor, Lexical or Tiptap, judged on block support, Vietnamese input, bundle size (CNT-04)
-- [ ] **[M]** ADR: formatter, Oxfmt or Biome fallback (§3)
-- [ ] **[M]** ADR: where pino binds given `@bieberkit/core` has no runtime dependency (PKG-04, OBS-01)
-- [ ] **[M]** Decide the open questions in spec §26: MariaDB support level, docs site generator and hosting, default license of generated projects, Ant Design 6 `vi_VN` locale check
+- [x] **[M]** ADR: content editor, Lexical or Tiptap, judged on block support, Vietnamese input, bundle size (CNT-04). ADR 0004 picks Tiptap 3. The Vietnamese input test is a gate before M2.3
+- [x] **[M]** ADR: formatter, Oxfmt or Biome fallback (§3). ADR 0002 keeps Oxfmt
+- [x] **[M]** ADR: where pino binds given `@bieberkit/core` has no runtime dependency (PKG-04, OBS-01). ADR 0003: `Logger` port in core, pino in `@bieberkit/log/pino`
+- [x] **[M]** Decide the open questions in spec §26: MariaDB support level, docs site generator and hosting, default license of generated projects, Ant Design 6 `vi_VN` locale check. ADR 0005, 0006, 0007, and the locale check in spec §26
 - [ ] **[M]** Reserve the `@bieberkit` npm scope, the `bieberkit` and `create-bieberkit` names and the GitHub organization; confirm the employer question (§26)
 - [ ] Update `docs/adr/README.md` index for every ADR added
 
@@ -101,6 +101,7 @@ Done when: every ADR above has status `Accepted` and the spec §3 table matches 
 - [ ] **[D]** Dry-run release publishes a throwaway package end to end
 - [ ] Renovate rules: 7 day release age, fast path for Better Auth and TanStack Start advisories (AUTH-08, SITE-06)
 - [ ] Database service containers (PostgreSQL, MySQL, Valkey) available to CI for later phases (TST, §9.1)
+- [ ] Format the repository once with Oxfmt in its own commit, list it in `.git-blame-ignore-revs`, and let the header checker accept blank lines after Markdown frontmatter, with a test named `HDR-01`. `pnpm format:check` must pass before the CI item above can be ticked (HDR-01, ADR 0002)
 
 Done when: the header checker and trusted publishing work end to end (spec §25 gate text).
 
@@ -120,6 +121,7 @@ Depends on: Phase 0 gate. Only Node.js built-ins (PKG-04).
 
 - [ ] **[D]** `defineModule`, `definePlugin`, `defineConfig` with the manifest fields of §11.1 (MOD-01, MOD-02, CFG-08, CFG-09)
 - [ ] `defineEnv` and merged env schema with secret redaction, native `.env` loading, precedence of real env (CFG-01 to CFG-06)
+- [ ] `Logger` port, dependency-free default JSON logger and request context on `AsyncLocalStorage` in core (OBS-01, PKG-04, ADR 0003)
 - [ ] Core env keys of §8.2 with defaults and the production safety checks (CFG-07, APP_SINGLE_NODE)
 - [ ] `process.env` read only in `packages/core/src/config/` (P8, `check` rule)
 - [ ] `BkError` base and subclasses with stable code, HTTP status, safe message (MOD-17)
@@ -228,7 +230,7 @@ Done when: each contract passes its shared driver tests, and switching `QUEUE_DR
 
 Depends on: M1.3, M1.4, M1.5.
 
-- [ ] pino JSON logs with the fields of OBS-01
+- [ ] `@bieberkit/log`: pino adapter under `@bieberkit/log/pino` with SEC-09 redaction, JSON logs with the fields of OBS-01, and a shared contract test run against it and the core default logger (OBS-01, SEC-09, PKG-02, PKG-03, ADR 0003)
 - [ ] OpenTelemetry traces over HTTP, database, cache, queue, jobs with context carried into jobs (OBS-02)
 - [ ] Prometheus metrics on `METRICS_PORT`, not routed publicly (OBS-03, OBS-04)
 - [ ] `@bieberkit/testing`: `createTestApp`, entity factories, `actingAs`, `withTenant` (TST-02)
