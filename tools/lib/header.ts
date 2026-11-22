@@ -102,6 +102,8 @@ export function kindOf(relPath: string): FileKind {
   const name = basename(relPath);
   const ext = extname(name);
   if (EXEMPT_NAMES.has(name) || EXEMPT_EXT.has(ext)) return 'exempt';
+  // The changesets CLI writes these, and their text becomes the changelog, so a header would be printed in it.
+  if (relPath.startsWith('.changeset/') && ext === '.md' && name !== 'README.md') return 'exempt';
   if (relPath.startsWith('.githooks/')) return 'hash';
   if (name === 'Dockerfile' || name.endsWith('.Dockerfile')) return 'hash';
   if (HASH_NAMES.has(name) || HASH_EXT.has(ext)) return 'hash';

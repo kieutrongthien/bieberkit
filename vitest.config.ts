@@ -32,5 +32,16 @@ export default defineConfig({
   test: {
     include: ['packages/*/src/**/*.test.{ts,tsx}', 'plugins/*/src/**/*.test.{ts,tsx}', 'tools/**/*.test.ts'],
     passWithNoTests: true,
+    // `pnpm test:coverage`. TST-01: 90 percent of lines for core, data, http and auth, 80 percent for the rest.
+    // Each package gets its threshold when it reaches Phase 1.
+    coverage: {
+      provider: 'v8',
+      include: ['packages/*/src/**/*.ts'],
+      exclude: ['**/*.test.ts', '**/*.d.ts'],
+      reporter: ['text-summary', 'text'],
+      thresholds: {
+        'packages/core/src/**': { lines: 90 },
+      },
+    },
   },
 });

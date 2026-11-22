@@ -72,4 +72,11 @@ describe('file headers (spec section 23)', () => {
     expect(kindOf('.git-blame-ignore-revs')).toBe('hash');
     expect(kindOf('notes.txt')).toBe('unknown');
   });
+
+  it('exempts changeset files, whose text becomes the changelog, but not the changesets README', () => {
+    expect(kindOf('.changeset/core-foundation.md')).toBe('exempt');
+    expect(kindOf('.changeset/brave-lions-sing.md')).toBe('exempt');
+    expect(kindOf('.changeset/README.md')).toBe('html');
+    expect(kindOf('docs/changeset/notes.md')).toBe('html');
+  });
 });

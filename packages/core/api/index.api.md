@@ -28,5 +28,279 @@
 Generated from the built declaration files by `pnpm api:update`. Do not edit by hand. A change here is a change to the public API and needs a changeset (spec section 22.3).
 
 ```ts
+interface ErrorBody {
+  readonly code: string;
+  readonly status: number;
+  readonly message: string;
+  readonly fix: string;
+}
+interface BkErrorOptions {
+  readonly code: string;
+  readonly status?: number;
+  readonly safeMessage?: string;
+  readonly fix?: string;
+  readonly cause?: unknown;
+}
+export declare class BkError extends Error {
+  readonly code: string;
+  readonly status: number;
+  readonly safeMessage: string;
+  readonly fix: string;
+  constructor(message: string, options: BkErrorOptions);
+  toJSON(): ErrorBody;
+}
+export declare class ConfigError extends BkError {}
+export declare class ContainerError extends BkError {}
+interface EnvProblem {
+  readonly key: string;
+  readonly code: "CFG_ENV_MISSING" | "CFG_ENV_INVALID";
+  readonly message: string;
+  readonly fix: string;
+}
+export declare class EnvValidationError extends ConfigError {
+  readonly problems: readonly EnvProblem[];
+  constructor(problems: readonly EnvProblem[]);
+}
+export declare function toBkError(value: unknown): BkError;
+type EnvKind = "string" | "int" | "boolean" | "enum" | "url" | "base64" | "custom";
+type EnvCustomParse<T> = (raw: string) => {
+  readonly value: T;
+} | undefined;
+type EnvSource = Readonly<Record<string, string | undefined>>;
+interface EnvKeyDef {
+  readonly kind: EnvKind;
+  readonly values?: readonly string[];
+  readonly expected?: string;
+  readonly parse?: EnvCustomParse<unknown>;
+  readonly min?: number;
+  readonly max?: number;
+  readonly hasDefault: boolean;
+  readonly default?: unknown;
+  readonly optional: boolean;
+  readonly secret: boolean;
+  readonly description: string;
+}
+interface EnvKeyBuilder<T> {
+  readonly def: EnvKeyDef;
+  readonly _type?: T;
+  default(value: T): EnvKeyBuilder<T>;
+  optional(): EnvKeyBuilder<T | undefined>;
+  secret(): EnvKeyBuilder<T>;
+  describe(text: string): EnvKeyBuilder<T>;
+}
+interface EnvSchema<T> {
+  readonly keys: Readonly<Record<string, EnvKeyDef>>;
+  readonly _type?: T;
+}
+interface EnvOwner {
+  readonly name: string;
+  readonly prefix?: string;
+  readonly schema: EnvSchema<unknown>;
+}
+interface EnvDescription {
+  readonly key: string;
+  readonly type: EnvKind;
+  readonly required: boolean;
+  readonly default?: string;
+  readonly secret: boolean;
+  readonly description: string;
+  readonly values?: readonly string[];
+  readonly expected?: string;
+}
+interface IntOptions {
+  readonly min?: number;
+  readonly max?: number;
+}
+export declare const env: {
+  string(): EnvKeyBuilder<string>;
+  int(options?: IntOptions): EnvKeyBuilder<number>;
+  boolean(): EnvKeyBuilder<boolean>;
+  enum<V extends string>(values: readonly V[]): EnvKeyBuilder<V>;
+  url(): EnvKeyBuilder<string>;
+  base64(): EnvKeyBuilder<string>;
+  custom<T>(expected: string, parse: EnvCustomParse<T>): EnvKeyBuilder<T>;
+};
+type EnvValues<K extends Record<string, EnvKeyBuilder<unknown>>> = { [P in keyof K]: K[P] extends EnvKeyBuilder<infer T> ? T : never; };
+export declare function defineEnv<K extends Record<string, EnvKeyBuilder<unknown>>>(keys: K): EnvSchema<EnvValues<K>>;
+export declare function mergeEnv(owners: readonly EnvOwner[]): EnvSchema<Record<string, unknown>>;
+export declare function readEnv<T>(schema: EnvSchema<T>, source: EnvSource): T;
+export declare function redact(schema: EnvSchema<unknown>, values: object): Record<string, unknown>;
+export declare function collectSecrets(schema: EnvSchema<unknown>, values: object): string[];
+export declare function describeEnv<T>(schema: EnvSchema<T>): readonly EnvDescription[];
+export declare function parseEnvFile(text: string): EnvSource;
+export declare function withEnvFile(real: EnvSource, file: EnvSource): EnvSource;
+export declare function readEnvFile(path: string): EnvSource;
+export declare const LOG_LEVELS: readonly ["fatal", "error", "warn", "info", "debug", "trace"];
+type LogLevel = (typeof LOG_LEVELS)[number];
+type AppEnv = "development" | "test" | "production";
+interface CoreEnvValues {
+  APP_NAME: string;
+  APP_ENV: AppEnv;
+  APP_URL: string;
+  APP_PORT: number;
+  APP_KEY: string | undefined;
+  APP_KEY_PREVIOUS: string | undefined;
+  APP_SINGLE_NODE: boolean;
+  AUTH_SECRET: string | undefined;
+  LOG_LEVEL: LogLevel;
+  TRUST_PROXY: boolean | number;
+  DB_CONNECTION: "postgres" | "mysql" | "sqlite" | undefined;
+  DATABASE_URL: string | undefined;
+  DATABASE_READ_URLS: readonly string[];
+  MIGRATE_DATABASE_URL: string | undefined;
+  DB_POOL_MAX: number;
+  REDIS_URL: string | undefined;
+  CACHE_REDIS_URL: string | undefined;
+  QUEUE_DRIVER: "sync" | "database" | "redis";
+  CACHE_DRIVER: "memory" | "file" | "database" | "redis";
+  CACHE_PREFIX: string | undefined;
+  STORAGE_DISK: "local" | "s3";
+  STORAGE_LOCAL_ROOT: string;
+  S3_BUCKET: string | undefined;
+  S3_REGION: string | undefined;
+  S3_ENDPOINT: string | undefined;
+  S3_ACCESS_KEY_ID: string | undefined;
+  S3_SECRET_ACCESS_KEY: string | undefined;
+  S3_FORCE_PATH_STYLE: boolean;
+  MAIL_DRIVER: "log" | "smtp";
+  SMTP_URL: string | undefined;
+  MAIL_FROM: string | undefined;
+  OTEL_EXPORTER_OTLP_ENDPOINT: string | undefined;
+  METRICS_PORT: number;
+  API_DOCS_PUBLIC: boolean;
+  SITE_URL: string | undefined;
+  SITE_API_URL: string | undefined;
+  SITE_SERVICE_TOKEN: string | undefined;
+  SITE_REVALIDATE_SECRET: string | undefined;
+}
+interface CoreEnv extends Omit<CoreEnvValues, "APP_KEY" | "AUTH_SECRET" | "CACHE_PREFIX"> {
+  APP_KEY: string;
+  AUTH_SECRET: string;
+  CACHE_PREFIX: string;
+}
+export declare const coreEnv: EnvSchema<CoreEnvValues>;
+interface ReadCoreEnvOptions {
+  readonly extra?: readonly EnvOwner[];
+  readonly random?: () => string;
+}
+interface CoreEnvResult {
+  readonly env: CoreEnv;
+  readonly extra: Readonly<Record<string, unknown>>;
+  readonly warnings: readonly string[];
+}
+export declare function readCoreEnv(source: EnvSource, options?: ReadCoreEnvOptions): CoreEnvResult;
+export declare function assertProductionSafe(values: CoreEnv): void;
+interface LoadEnvOptions extends ReadCoreEnvOptions {
+  readonly source?: EnvSource;
+  readonly envFile?: string | false;
+}
+export declare function loadEnv(options?: LoadEnvOptions): CoreEnvResult;
+type LogFields = Readonly<Record<string, unknown>>;
+interface Logger {
+  readonly level: LogLevel;
+  fatal(message: string, fields?: LogFields): void;
+  error(message: string, fields?: LogFields): void;
+  warn(message: string, fields?: LogFields): void;
+  info(message: string, fields?: LogFields): void;
+  debug(message: string, fields?: LogFields): void;
+  trace(message: string, fields?: LogFields): void;
+  child(bindings: LogFields): Logger;
+}
+interface LoggerOptions {
+  readonly level: LogLevel;
+  readonly role: string;
+  readonly write?: (line: string) => void;
+  readonly secrets?: readonly string[];
+  readonly now?: () => Date;
+}
+export declare function createLogger(options: LoggerOptions): Logger;
+interface RequestContext {
+  requestId: string;
+  traceId?: string;
+  spanId?: string;
+  tenantId?: string;
+  userId?: string;
+}
+export declare const requestContext: {
+  run<T>(context: RequestContext, fn: () => T): T;
+  get(): RequestContext | undefined;
+  update(patch: Partial<RequestContext>): void;
+};
+interface ServiceRegistry {}
+type ServiceName = Extract<keyof ServiceRegistry, string>;
+type ServiceScope = "singleton" | "request" | "transient";
+interface RegistrationBase {
+  readonly deps?: readonly ServiceName[];
+}
+type Registration<N extends ServiceName> = (RegistrationBase & {
+  readonly scope: "singleton";
+  create(services: ServiceRegistry): ServiceRegistry[N] | Promise<ServiceRegistry[N]>;
+}) | (RegistrationBase & {
+  readonly scope: "request" | "transient";
+  create(services: ServiceRegistry): ServiceRegistry[N];
+});
+interface RequestScope {
+  readonly services: ServiceRegistry;
+}
+interface Container {
+  register<N extends ServiceName>(name: N, registration: Registration<N>): void;
+  boot(): Promise<void>;
+  readonly services: ServiceRegistry;
+  createScope(): RequestScope;
+}
+export declare function createContainer(): Container;
+type Phase = "created" | "booting" | "ready" | "stopping" | "stopped";
+type Hook = () => void | Promise<void>;
+interface HookFailure {
+  readonly name: string;
+  readonly error: unknown;
+}
+interface StopResult {
+  readonly timedOut: boolean;
+  readonly failures: readonly HookFailure[];
+  readonly skipped: readonly string[];
+}
+interface LifecycleOptions {
+  readonly logger?: Logger;
+  readonly shutdownTimeoutMs?: number;
+}
+interface Lifecycle {
+  readonly phase: Phase;
+  onBoot(name: string, hook: Hook): void;
+  onShutdown(name: string, hook: Hook): void;
+  boot(): Promise<void>;
+  stop(): Promise<StopResult>;
+}
+export declare function exitCode(result: StopResult): 0 | 1;
+export declare function createLifecycle(options?: LifecycleOptions): Lifecycle;
+interface EventRegistry {}
+type EventName = Extract<keyof EventRegistry, string>;
+type EventHandler<N extends EventName> = (payload: EventRegistry[N]) => void | Promise<void>;
+interface HandlerFailure {
+  readonly handler: string;
+  readonly error: unknown;
+}
+interface EmitResult {
+  readonly delivered: number;
+  readonly failures: readonly HandlerFailure[];
+}
+interface OnOptions {
+  readonly name?: string;
+}
+interface ModuleEmitter {
+  emit<N extends EventName>(name: N, payload: EventRegistry[N]): Promise<EmitResult>;
+}
+interface EventBus {
+  on<N extends EventName>(name: N, handler: EventHandler<N>, options?: OnOptions): () => void;
+  forModule(module: string): ModuleEmitter;
+}
+interface EventBusOptions {
+  readonly logger?: Logger;
+}
+export declare function createEventBus(options?: EventBusOptions): EventBus;
+export declare const ROLES: readonly ["web", "worker", "scheduler", "migrate"];
+type Role = (typeof ROLES)[number];
+export declare function parseRole(argv: readonly string[]): Role;
 export declare const packageName = "@bieberkit/core";
+export type { AppEnv, BkErrorOptions, Container, CoreEnv, CoreEnvResult, CoreEnvValues, EmitResult, EnvCustomParse, EnvDescription, EnvKeyBuilder, EnvKeyDef, EnvKind, EnvOwner, EnvProblem, EnvSchema, EnvSource, EnvValues, ErrorBody, EventBus, EventBusOptions, EventHandler, EventName, EventRegistry, HandlerFailure, Hook, HookFailure, IntOptions, Lifecycle, LifecycleOptions, LoadEnvOptions, LogFields, LogLevel, Logger, LoggerOptions, ModuleEmitter, OnOptions, Phase, ReadCoreEnvOptions, Registration, RequestContext, RequestScope, Role, ServiceName, ServiceRegistry, ServiceScope, StopResult };
 ```
