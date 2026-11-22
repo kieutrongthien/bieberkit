@@ -1426,7 +1426,7 @@ This product includes software developed by Bieber Kieu.
 
 ### 23.3 Header for hash-comment files
 
-Used for YAML, Dockerfile, shell scripts, `.env.example`, `.gitignore`, `.npmrc` and TOML. The license paragraph is the same as above, prefixed with ` #  `.
+Used for YAML, Dockerfile, shell scripts, `.env.example`, `.gitignore`, `.git-blame-ignore-revs`, `.npmrc` and TOML. The license paragraph is the same as above, prefixed with ` #  `.
 
 ```yaml
 # BieberKit

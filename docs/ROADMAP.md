@@ -101,7 +101,7 @@ Done when: every ADR above has status `Accepted` and the spec §3 table matches 
 - [ ] **[D]** Dry-run release publishes a throwaway package end to end
 - [ ] Renovate rules: 7 day release age, fast path for Better Auth and TanStack Start advisories (AUTH-08, SITE-06)
 - [ ] Database service containers (PostgreSQL, MySQL, Valkey) available to CI for later phases (TST, §9.1)
-- [ ] Format the repository once with Oxfmt in its own commit, list it in `.git-blame-ignore-revs`, and let the header checker accept blank lines after Markdown frontmatter, with a test named `HDR-01`. `pnpm format:check` must pass before the CI item above can be ticked (HDR-01, ADR 0002)
+- [x] Format the repository once with Oxfmt in its own commit, list it in `.git-blame-ignore-revs`, and let the header checker accept blank lines after Markdown frontmatter, with a test named `HDR-01`. `pnpm format:check` must pass before the CI item above can be ticked (HDR-01, ADR 0002)
 
 Done when: the header checker and trusted publishing work end to end (spec §25 gate text).
 

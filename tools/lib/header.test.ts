@@ -69,6 +69,7 @@ describe('file headers (spec section 23)', () => {
     expect(kindOf('package.json')).toBe('exempt');
     expect(kindOf('LICENSE')).toBe('exempt');
     expect(kindOf('.githooks/pre-commit')).toBe('hash');
+    expect(kindOf('.git-blame-ignore-revs')).toBe('hash');
     expect(kindOf('notes.txt')).toBe('unknown');
   });
 });

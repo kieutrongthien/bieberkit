@@ -64,6 +64,7 @@ const HASH_NAMES = new Set([
   'CODEOWNERS',
   '.gitignore',
   '.gitattributes',
+  '.git-blame-ignore-revs',
   '.dockerignore',
   '.editorconfig',
   '.npmrc',
