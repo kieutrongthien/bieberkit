@@ -78,6 +78,7 @@ interface RouteContext {
   readonly log: Logger;
   status(code: number): void;
   header(name: string, value: string): void;
+  can(permission: string): Promise<boolean>;
 }
 interface RouteDef {
   readonly method: Method;
@@ -85,9 +86,40 @@ interface RouteDef {
   readonly permission?: string;
   readonly public?: true;
   readonly schema: RouteSchema;
+  readonly idempotent?: true;
+  readonly deprecated?: {
+    readonly since?: string;
+    readonly sunset?: string;
+    readonly link?: string;
+  };
+  readonly cache?: {
+    readonly sMaxAge: number;
+    readonly staleWhileRevalidate?: number;
+    readonly tags?: readonly string[];
+  };
   handler(ctx: RouteContext): unknown;
 }
 export declare function defineRoute(route: RouteDef): RouteDef;
+interface StoredResponse {
+  readonly status: number;
+  readonly headers: Readonly<Record<string, string>>;
+  readonly body: string;
+}
+type IdempotencyBegin = {
+  readonly state: "new";
+} | {
+  readonly state: "replay";
+  readonly response: StoredResponse;
+} | {
+  readonly state: "mismatch";
+} | {
+  readonly state: "busy";
+};
+interface IdempotencyStore {
+  begin(key: string, fingerprint: string): Promise<IdempotencyBegin>;
+  complete(key: string, response: StoredResponse): Promise<void>;
+  abandon(key: string): Promise<void>;
+}
 interface HttpEnv {
   readonly APP_ENV: "development" | "test" | "production";
   readonly APP_PORT: number;
@@ -121,6 +153,7 @@ interface HttpServerOptions {
   readonly bodyLimit?: number;
   readonly requestTimeoutMs?: number;
   readonly keepAliveTimeoutMs?: number;
+  readonly idempotencyStore?: IdempotencyStore;
   readonly onError?: (error: unknown, context: ErrorContext) => void;
 }
 interface InjectOptions {

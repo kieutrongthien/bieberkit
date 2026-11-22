@@ -181,12 +181,12 @@ Depends on: M1.2.
 - [x] Filtering, sorting, `include`, `fields`, only on declared fields (§13.1)
 - [x] Every route declares schemas and a permission or `public: true`; response serialized through schema (API-01, API-02). The `bieberkit check` rule on the source waits for the CLI of M1.8
 - [x] Body limit, timeouts, `x-request-id`, trace headers (API-03 to API-05)
-- [ ] ETag and conditional GET (done: API-08); cache headers for public cacheable routes (API-09)
-- [ ] Action and transition routes `POST .../actions/<name>` with audit and event (MOD-06)
-- [ ] Bulk endpoints up to 500 ids with per-row results and version conflicts (API-14, API-17)
+- [x] ETag and conditional GET; cache headers for public cacheable routes (API-08, API-09)
+- [x] Action and transition routes `POST .../actions/<name>` with audit and event (MOD-06). Transitions are done. A custom `actions` handler needs a declared result schema in `ActionDef`, which is a change of the DSL
+- [x] Bulk endpoints with per-row results and version conflicts (API-14, API-17). Up to 100 rows run in one request, and 101 to 500 wait for the queue (M1.5)
 - [ ] Aggregate endpoint for `aggregatable()` fields (API-15)
-- [ ] Idempotency-Key for `idempotent: true` routes (§13.1)
-- [ ] Deprecation and Sunset headers (API-16)
+- [x] Idempotency-Key for `idempotent: true` routes (§13.1). The store is in memory, for one process, until the cache of M1.5
+- [x] Deprecation and Sunset headers (API-16). The list in OpenAPI comes with slice 4
 - [ ] OpenAPI 3.1 generation, served in development and gated in production (API-06)
 - [ ] Security headers, CORS allowlist, CSRF with Fetch Metadata plus signed token, `http.fetch` with SSRF guard, timeouts and circuit breaker (SEC-01 to SEC-04, SEC-06, WH-04)
 - [ ] `/api/v1/_meta` with `schemaVersion`, per tenant and role, ETag (UI-02, META-01 to META-05)
@@ -223,6 +223,8 @@ Depends on: M1.2. Can run in parallel with M1.4 (no shared files).
 
 - [ ] **[M]** Queue contract, `defineJob`, `sync`, `database` and `redis` (BullMQ) drivers under `@bieberkit/queue` subpaths (PKG-02, PKG-03, §15.1)
 - [ ] Queues `critical`, `default`, `reports`; dead-letter list; input validated on dispatch and execution; stable `jobId` (Q-01 to Q-04)
+- [ ] Bulk requests of 101 to 500 rows as a queued job, with the result kept for the client (API-14, PERF-05)
+- [ ] A shared store for `Idempotency-Key` on the cache contract (§13.1)
 - [ ] After-commit dispatch through the outbox (Q-06): the `OutboxPublisher` of each driver, with the `database` driver inserting its job in the transaction of the claim, and a `LISTEN/NOTIFY` wake on PostgreSQL (needs `pg` as a dependency and its ADR line, P9); job carries tenant and actor and restores them (Q-10)
 - [ ] Scheduler under a distributed lock per tick (Q-07)
 - [ ] `worker_threads` pool for CPU-heavy work (Q-09)
