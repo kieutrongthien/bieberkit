@@ -71,10 +71,13 @@ const requestContext: { run<T>(ctx: RequestContext, fn: () => T): T; get(): Requ
 
 // container
 interface ServiceRegistry {}   // extended by modules: interface ServiceRegistry { pipeline: PipelineService }
+                               // always through the package entry: declare module '@bieberkit/core' { ... }. A deep path would split the interface (checked in the scratch spike of M1.1)
 function createContainer(): Container
 interface Container { register<N extends ServiceName>(name: N, reg: Registration<N>): void; boot(): Promise<void>;
-                      readonly services: ServiceRegistry; createScope(): Scope }
-interface Registration<N> { scope: 'singleton' | 'request' | 'transient'; deps?: readonly ServiceName[]; create(r: ServiceRegistry): ServiceRegistry[N] | Promise<ServiceRegistry[N]> }
+                      readonly services: ServiceRegistry; createScope(): RequestScope }
+type Registration<N> = { scope: 'singleton'; deps?: readonly ServiceName[]; create(r: ServiceRegistry): ServiceRegistry[N] | Promise<ServiceRegistry[N]> }
+                     | { scope: 'request' | 'transient'; deps?: readonly ServiceName[]; create(r: ServiceRegistry): ServiceRegistry[N] }   // only singletons may be async (CORE-08)
+interface RequestScope { readonly services: ServiceRegistry }
 
 // lifecycle
 function createLifecycle(options?: { logger?: Logger; shutdownTimeoutMs?: number }): Lifecycle

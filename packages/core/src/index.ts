@@ -54,3 +54,12 @@ export { createLogger } from './logging/logger.ts';
 export type { LogFields, Logger, LoggerOptions } from './logging/logger.ts';
 export { requestContext } from './logging/request-context.ts';
 export type { RequestContext } from './logging/request-context.ts';
+export { createContainer } from './container/container.ts';
+export type {
+  Container,
+  Registration,
+  RequestScope,
+  ServiceName,
+  ServiceRegistry,
+  ServiceScope,
+} from './container/container.ts';
