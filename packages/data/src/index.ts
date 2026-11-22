@@ -33,3 +33,5 @@ export type { Uuid7Options } from './keys/uuid7.ts';
 export { codePointLength, fold, nfc } from './text/fold.ts';
 export type { Compare } from './text/fold.ts';
 export { assertSafeScaled, fromMinor, fromScaled, minorUnitOf, SAFE_MAX, toMinor, toScaled } from './numbers/scaled.ts';
+export { decodeCursor, DEFAULT_PAGE_SIZE, encodeCursor, MAX_PAGE_SIZE, pageSize } from './query/page.ts';
+export type { CursorValue } from './query/page.ts';
