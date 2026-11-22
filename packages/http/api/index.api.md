@@ -32,9 +32,36 @@ import { BkError, Lifecycle, Logger } from "@bieberkit/core";
 import { Database, OrmSchema } from "@bieberkit/data/orm";
 import { EntityDef, JsonSchema } from "@bieberkit/data/schema";
 import { ValidationIssue } from "@bieberkit/data/build";
+interface StoredResponse {
+  readonly status: number;
+  readonly headers: Readonly<Record<string, string>>;
+  readonly body: string;
+}
+type IdempotencyBegin = {
+  readonly state: "new";
+} | {
+  readonly state: "replay";
+  readonly response: StoredResponse;
+} | {
+  readonly state: "mismatch";
+} | {
+  readonly state: "busy";
+};
+interface IdempotencyStore {
+  begin(key: string, fingerprint: string): Promise<IdempotencyBegin>;
+  complete(key: string, response: StoredResponse): Promise<void>;
+  abandon(key: string): Promise<void>;
+}
+interface CorsOptions {
+  readonly origins: readonly string[];
+  readonly credentials?: boolean;
+  readonly maxAgeSeconds?: number;
+}
 interface Principal {
   readonly id: string;
   readonly kind: "user" | "apiKey" | "service";
+  readonly via?: "cookie" | "token";
+  readonly sessionId?: string;
 }
 interface RequestInfo {
   readonly method: string;
@@ -101,26 +128,6 @@ interface RouteDef {
   handler(ctx: RouteContext): unknown;
 }
 export declare function defineRoute(route: RouteDef): RouteDef;
-interface StoredResponse {
-  readonly status: number;
-  readonly headers: Readonly<Record<string, string>>;
-  readonly body: string;
-}
-type IdempotencyBegin = {
-  readonly state: "new";
-} | {
-  readonly state: "replay";
-  readonly response: StoredResponse;
-} | {
-  readonly state: "mismatch";
-} | {
-  readonly state: "busy";
-};
-interface IdempotencyStore {
-  begin(key: string, fingerprint: string): Promise<IdempotencyBegin>;
-  complete(key: string, response: StoredResponse): Promise<void>;
-  abandon(key: string): Promise<void>;
-}
 interface HttpEnv {
   readonly APP_ENV: "development" | "test" | "production";
   readonly APP_PORT: number;
@@ -155,6 +162,9 @@ interface HttpServerOptions {
   readonly bodyLimit?: number;
   readonly requestTimeoutMs?: number;
   readonly keepAliveTimeoutMs?: number;
+  readonly headers?: Readonly<Record<string, string | false>>;
+  readonly cors?: CorsOptions;
+  readonly csrf?: CsrfProtection;
   readonly idempotencyStore?: IdempotencyStore;
   readonly onError?: (error: unknown, context: ErrorContext) => void;
 }
@@ -194,8 +204,44 @@ interface HttpServer {
   }>;
   routes(): readonly RouteDef[];
   readonly docsPublic: boolean;
+  readonly csrf: CsrfProtection | undefined;
 }
 export declare function createHttpServer(env: HttpEnv, options?: HttpServerOptions): HttpServer;
+interface CsrfProtection {
+  issue(sessionId: string): string;
+  verify(token: string, sessionId: string): boolean;
+}
+export declare function createCsrf(secret: string): CsrfProtection;
+export declare function registerCsrfToken(server: HttpServer): void;
+export declare class HttpFetchError extends BkError {}
+export declare function isBlockedAddress(address: string): boolean;
+interface ResolvedAddress {
+  readonly address: string;
+  readonly family: 4 | 6;
+}
+interface HttpFetchOptions {
+  readonly allow?: readonly string[];
+  readonly connectTimeoutMs?: number;
+  readonly timeoutMs?: number;
+  readonly retries?: number;
+  readonly backoffMs?: number;
+  readonly maxRedirects?: number;
+  readonly maxResponseBytes?: number;
+  readonly failureThreshold?: number;
+  readonly openMs?: number;
+  readonly lookup?: (host: string) => Promise<readonly ResolvedAddress[]>;
+  readonly now?: () => number;
+}
+interface HttpFetchInit {
+  readonly method?: string;
+  readonly headers?: Record<string, string> | Headers | [string, string][];
+  readonly body?: string | Uint8Array;
+  readonly redirect?: "follow" | "manual" | "error";
+}
+interface HttpFetch {
+  fetch(input: string | URL, init?: HttpFetchInit): Promise<Response>;
+}
+export declare function createHttpFetch(options?: HttpFetchOptions): HttpFetch;
 interface EntityRoutesContext {
   readonly db: Database;
   readonly schemas: readonly OrmSchema[];
@@ -250,5 +296,5 @@ interface Problem {
   readonly [extension: string]: unknown;
 }
 export declare const packageName = "@bieberkit/http";
-export type { Authenticator, Authorizer, EntityRoutesContext, ErrorContext, HttpEnv, HttpServer, HttpServerOptions, InjectOptions, InjectResponse, Method, OpenApiDocument, OpenApiInfo, Principal, Problem, RateLimitResult, RateLimiter, RegisterHttpOptions, RequestInfo, RouteContext, RouteDef, RouteSchema, StageContext, StageHook, StageName, TenantResolver };
+export type { Authenticator, Authorizer, CorsOptions, CsrfProtection, EntityRoutesContext, ErrorContext, HttpEnv, HttpFetch, HttpFetchInit, HttpFetchOptions, HttpServer, HttpServerOptions, InjectOptions, InjectResponse, Method, OpenApiDocument, OpenApiInfo, Principal, Problem, RateLimitResult, RateLimiter, RegisterHttpOptions, RequestInfo, ResolvedAddress, RouteContext, RouteDef, RouteSchema, StageContext, StageHook, StageName, TenantResolver };
 ```
