@@ -108,23 +108,26 @@ function locate(url: string, name: string): Located {
   );
 }
 
-/** Picks the dialect and location from validated config. `DB_CONNECTION` may repeat what the URL says, never contradict it. */
-export function resolveConnection(env: DatabaseEnv): ResolvedConnection {
+/**
+ * Picks the dialect and location from validated config. `DB_CONNECTION` may repeat what the URL says, never contradict it.
+ * `variable` is the name that messages give to the URL, because the migrate role connects with `MIGRATE_DATABASE_URL`.
+ */
+export function resolveConnection(env: DatabaseEnv, variable = 'DATABASE_URL'): ResolvedConnection {
   if (env.DATABASE_URL === undefined || env.DATABASE_URL === '') {
     throw dataError(
       'DATA_CONNECTION_MISSING',
       500,
-      'DATABASE_URL is not set.',
-      'Set DATABASE_URL, for example postgres://user:password@localhost:5432/app.',
+      `${variable} is not set.`,
+      `Set ${variable}, for example postgres://user:password@localhost:5432/app.`,
     );
   }
-  const primary = locate(env.DATABASE_URL, 'DATABASE_URL');
+  const primary = locate(env.DATABASE_URL, variable);
   if (env.DB_CONNECTION !== undefined && env.DB_CONNECTION !== primary.dialect) {
     throw dataError(
       'DATA_DIALECT_MISMATCH',
       500,
-      `DB_CONNECTION is ${env.DB_CONNECTION}, but DATABASE_URL points at ${primary.dialect}.`,
-      'Make DB_CONNECTION and the scheme of DATABASE_URL name the same database.',
+      `DB_CONNECTION is ${env.DB_CONNECTION}, but ${variable} points at ${primary.dialect}.`,
+      `Make DB_CONNECTION and the scheme of ${variable} name the same database.`,
     );
   }
   if (env.DATABASE_READ_URLS.length > 0 && primary.dialect === 'sqlite') {
@@ -158,6 +161,39 @@ function queryLogger(sink: (sql: string) => void): (message: string) => void {
   };
 }
 
+/** The settings of MikroORM that the dialects share. Everything else is chosen from the dialect in `initOrm`. */
+export type CommonOrmSettings = Readonly<Record<string, unknown>>;
+
+/**
+ * Starts MikroORM on the driver of the dialect. Only that driver is loaded, so a SQLite project never imports `pg`.
+ * MikroORM types its options per driver, and one settings object cannot be all of them, so the three calls are cast alike.
+ */
+export async function initOrm(resolved: ResolvedConnection, common: CommonOrmSettings, poolMax: number): Promise<Orm> {
+  const pool = { min: 0, max: poolMax };
+  const replicas = resolved.readLocations.map((clientUrl) => ({ clientUrl }));
+  if (resolved.dialect === 'sqlite') {
+    const { MikroORM: Orm, SqliteDriver } = await import('@mikro-orm/sqlite');
+    const settings = {
+      ...common,
+      driver: SqliteDriver,
+      dbName: resolved.location,
+      driverOptions: createSqliteDialect(resolved.location),
+    };
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion
+    return Orm.init(settings as never) as Promise<Orm>;
+  }
+  if (resolved.dialect === 'postgres') {
+    const { MikroORM: Orm, PostgreSqlDriver } = await import('@mikro-orm/postgresql');
+    const settings = { ...common, driver: PostgreSqlDriver, clientUrl: resolved.location, pool, replicas };
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion
+    return Orm.init(settings as never) as Promise<Orm>;
+  }
+  const { MikroORM: Orm, MySqlDriver } = await import('@mikro-orm/mysql');
+  const settings = { ...common, driver: MySqlDriver, clientUrl: resolved.location, pool, replicas };
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion
+  return Orm.init(settings as never) as Promise<Orm>;
+}
+
 /**
  * Connects and returns the database. Every dialect runs in UTC, and the global EntityManager is switched off, so a request
  * can only reach the database through its own fork (DATA-04, DATA-05). Only the driver of the chosen dialect is loaded.
@@ -178,25 +214,7 @@ export async function createDatabase(env: DatabaseEnv, options: DatabaseOptions)
       : { debug: ['query'] as ['query'], colors: false, logger: queryLogger(options.queryLog) }),
     subscribers: [new DataSubscriber(options.references)],
   } as const;
-  const pool = { min: 0, max: env.DB_POOL_MAX };
-  const replicas = resolved.readLocations.map((clientUrl) => ({ clientUrl }));
-
-  let orm: Orm;
-  if (resolved.dialect === 'sqlite') {
-    const { MikroORM: Orm, SqliteDriver } = await import('@mikro-orm/sqlite');
-    orm = await Orm.init({
-      ...common,
-      driver: SqliteDriver,
-      dbName: resolved.location,
-      driverOptions: createSqliteDialect(resolved.location),
-    });
-  } else if (resolved.dialect === 'postgres') {
-    const { MikroORM: Orm, PostgreSqlDriver } = await import('@mikro-orm/postgresql');
-    orm = await Orm.init({ ...common, driver: PostgreSqlDriver, clientUrl: resolved.location, pool, replicas });
-  } else {
-    const { MikroORM: Orm, MySqlDriver } = await import('@mikro-orm/mysql');
-    orm = await Orm.init({ ...common, driver: MySqlDriver, clientUrl: resolved.location, pool, replicas });
-  }
+  const orm = await initOrm(resolved, common, env.DB_POOL_MAX);
   const logger = options.logger ?? createLogger({ level: 'info', role: 'data' });
   const sink: AuditSink = options.audit ?? {
     record: (entry: SystemScopeEntry) => logger.warn('tenant filter switched off', { ...entry }),

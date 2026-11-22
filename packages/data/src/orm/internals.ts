@@ -23,7 +23,11 @@
  */
 
 import { helper } from '@mikro-orm/core';
-import type { EntityMetadata } from '@mikro-orm/core';
+import type { EntityManager, EntityMetadata } from '@mikro-orm/core';
+import { SqlEntityManager } from '@mikro-orm/sql';
+import type { Kysely } from 'kysely';
+import { dataError } from '../errors.ts';
+import type { StepDatabase } from '../migrations/steps.ts';
 
 /** The metadata MikroORM keeps for the class of `entity`. Its name starts with underscores, so it is read here and nowhere else. */
 export function entityMeta(entity: object): EntityMetadata {
@@ -35,4 +39,21 @@ export function entityMeta(entity: object): EntityMetadata {
 export function isNewRow(entity: object): boolean {
   // oxlint-disable-next-line no-underscore-dangle
   return helper(entity).__originalEntityData === undefined;
+}
+
+/**
+ * The Kysely of an EntityManager, for the schema work of migrations. It reaches tables that no entity describes. MySQL opens its
+ * pool on the first query, so one is sent here, and the caller gets a Kysely that is ready.
+ */
+export async function kyselyOf(em: EntityManager): Promise<Kysely<StepDatabase>> {
+  if (!(em instanceof SqlEntityManager)) {
+    throw dataError(
+      'DATA_DRIVER_UNSUPPORTED',
+      500,
+      'This database has no SQL query builder.',
+      'Use PostgreSQL, MySQL or SQLite.',
+    );
+  }
+  await em.getConnection().execute('select 1');
+  return em.getKysely<StepDatabase>();
 }

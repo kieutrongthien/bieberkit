@@ -56,6 +56,7 @@
   "dependencies": {
     "@bieberkit/core": "workspace:*",
     "@mikro-orm/core": "7.2.9",
+    "@mikro-orm/migrations": "7.2.9",
     "@mikro-orm/mysql": "7.2.9",
     "@mikro-orm/postgresql": "7.2.9",
     "@mikro-orm/sql": "7.2.9",

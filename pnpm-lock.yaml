@@ -261,6 +261,9 @@ importers:
       '@mikro-orm/core':
         specifier: 7.2.9
         version: 7.2.9
+      '@mikro-orm/migrations':
+        specifier: 7.2.9
+        version: 7.2.9(@mikro-orm/core@7.2.9)
       '@mikro-orm/mysql':
         specifier: 7.2.9
         version: 7.2.9(@mikro-orm/core@7.2.9)(@types/node@24.19.2)
@@ -508,6 +511,12 @@ packages:
     peerDependenciesMeta:
       dataloader:
         optional: true
+
+  '@mikro-orm/migrations@7.2.9':
+    resolution: {integrity: sha512-dQizpwPQ6jXtOmBMJwV/e0zYoYTeFXYVCs4DeCuyy6b1Zb2JJRxaetjAcFztr4yhoEoowtQv9P0QH5blhGjAmQ==}
+    engines: {node: '>= 22.17.0'}
+    peerDependencies:
+      '@mikro-orm/core': 7.2.9
 
   '@mikro-orm/mysql@7.2.9':
     resolution: {integrity: sha512-CZphIlgXAqc4ntA0Z2CRz5dlsNIN/A/gpXheJGmis2lQKFqSyLevcqS4fODgOyorp0RxNbUWIL9ynZWk8id5Dg==}
@@ -2347,6 +2356,11 @@ snapshots:
       yaml: 2.9.1
 
   '@mikro-orm/core@7.2.9': {}
+
+  '@mikro-orm/migrations@7.2.9(@mikro-orm/core@7.2.9)':
+    dependencies:
+      '@mikro-orm/core': 7.2.9
+      '@mikro-orm/sql': 7.2.9(@mikro-orm/core@7.2.9)
 
   '@mikro-orm/mysql@7.2.9(@mikro-orm/core@7.2.9)(@types/node@24.19.2)':
     dependencies:

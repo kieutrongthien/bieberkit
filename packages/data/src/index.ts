@@ -35,6 +35,11 @@ export type { Compare } from './text/fold.ts';
 export { assertSafeScaled, fromMinor, fromScaled, minorUnitOf, SAFE_MAX, toMinor, toScaled } from './numbers/scaled.ts';
 export { decodeCursor, DEFAULT_PAGE_SIZE, encodeCursor, MAX_PAGE_SIZE, pageSize } from './query/page.ts';
 export type { CursorValue } from './query/page.ts';
+export { detectDestructive, upStatementsOfMigration } from './migrations/destructive.ts';
+export type { DestructiveFinding, DestructiveKind } from './migrations/destructive.ts';
+export { migrationFileName } from './migrations/names.ts';
+export { compareVersions, findStepRisks, orderSteps, stepName, validateSteps } from './migrations/steps.ts';
+export type { PluginMigrationStep, StepDatabase, StepKind, StepRisk } from './migrations/steps.ts';
 // Descriptors and the pure expansions only. The compilers (Zod, JSON Schema) are at `@bieberkit/data/schema`, the ORM at `@bieberkit/data/orm`.
 export { defineEntity, snake, standardColumns, tableConstraints } from './schema/define-entity.ts';
 export type {
