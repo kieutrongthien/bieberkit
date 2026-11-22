@@ -1,10 +1,36 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["config:recommended", "helpers:pinGitHubActionDigests"],
+  "extends": ["config:recommended", "helpers:pinGitHubActionDigests", "docker:pinDigests"],
   "minimumReleaseAge": "7 days",
   "rangeStrategy": "pin",
   "lockFileMaintenance": {
     "enabled": true
   },
-  "labels": ["dependencies"]
+  "labels": ["dependencies"],
+  "vulnerabilityAlerts": {
+    "enabled": true,
+    "labels": ["dependencies", "security"],
+    "minimumReleaseAge": null,
+    "prCreation": "immediate"
+  },
+  "packageRules": [
+    {
+      "description": "AUTH-08 and SITE-06: Better Auth and TanStack Start have shipped security fixes within days of a release. Their pull requests open at once and carry a label. A fix that is younger than seven days needs the manual fast path in docs/releasing.md.",
+      "matchPackageNames": [
+        "better-auth",
+        "@better-auth/**",
+        "@tanstack/react-start",
+        "@tanstack/start-**",
+        "@tanstack/react-router"
+      ],
+      "labels": ["dependencies", "watched"],
+      "prCreation": "immediate"
+    },
+    {
+      "description": "SEC-13: the SHA of a GitHub Action is updated together with the tag in its comment, and a release of an action is still held for seven days.",
+      "matchManagers": ["github-actions"],
+      "pinDigests": true,
+      "labels": ["dependencies", "ci"]
+    }
+  ]
 }
