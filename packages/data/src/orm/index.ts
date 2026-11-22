@@ -64,7 +64,7 @@ export type {
 } from './features.ts';
 export { formatSequence, nextSequence, periodOf } from './sequence.ts';
 export type { SequenceKey, SequenceOptions } from './sequence.ts';
-export { availableTransitions, transition, transitionOf } from './state.ts';
+export { availableTransitions, entityEventName, transition, transitionOf } from './state.ts';
 export type { AvailableTransition, TransitionResult } from './state.ts';
 export { createOutboxDispatcher, emitEvent, outboxLag, processOnce, purgeProcessed } from './outbox.ts';
 export type {
@@ -78,7 +78,7 @@ export type {
   PurgeOptions,
 } from './outbox.ts';
 export { bulkInsert, bulkUpdate } from './bulk.ts';
-export { compileEntities } from './compile.ts';
+export { compileEntities, entityOfSchema } from './compile.ts';
 export type { CompileOptions, OrmSchema } from './compile.ts';
 export { createDatabase, currentEntityManager, resolveConnection, runInUnitOfWork } from './connect.ts';
 export type { Database, DatabaseEnv, DatabaseOptions, Orm, ResolvedConnection } from './connect.ts';

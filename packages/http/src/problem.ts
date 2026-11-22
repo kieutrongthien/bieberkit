@@ -29,6 +29,8 @@ import type { ValidationIssue } from '@bieberkit/data/build';
 /** An error of the HTTP layer: a `BkError` that may also set response headers, as `Retry-After` does. */
 export class HttpError extends BkError {
   readonly headers: Readonly<Record<string, string>>;
+  /** Members that the problem has besides the standard ones, such as `current` for a stale write. */
+  readonly extensions: Readonly<Record<string, unknown>>;
 
   constructor(
     code: string,
@@ -37,9 +39,11 @@ export class HttpError extends BkError {
     fix: string,
     headers: Readonly<Record<string, string>> = {},
     cause?: unknown,
+    extensions: Readonly<Record<string, unknown>> = {},
   ) {
     super(message, { code, status, fix, ...(cause === undefined ? {} : { cause }) });
     this.headers = headers;
+    this.extensions = extensions;
   }
 }
 
@@ -68,6 +72,7 @@ export interface Problem {
   readonly instance: string;
   readonly fix?: string;
   readonly errors?: readonly { readonly path: string; readonly code: string; readonly message: string }[];
+  readonly [extension: string]: unknown;
 }
 
 export interface ProblemContext {
@@ -104,8 +109,24 @@ const FASTIFY_CODES: Readonly<Record<string, { status: number; code: string; det
   FST_ERR_NOT_FOUND: { status: 404, code: 'HTTP_NOT_FOUND', detail: 'There is no such route.' },
 };
 
+/** The refusals of the database, which a client can act on: the same value twice, or a link to a row that is not there. */
+const DATABASE_ERRORS: Readonly<Record<string, { status: number; code: string; detail: string }>> = {
+  UniqueConstraintViolationException: {
+    status: 409,
+    code: 'HTTP_CONFLICT',
+    detail: 'A record with the same value already exists.',
+  },
+  ForeignKeyConstraintViolationException: {
+    status: 409,
+    code: 'HTTP_CONFLICT',
+    detail: 'The record refers to something that does not exist, or that is still in use.',
+  },
+};
+
 function fastifyError(error: unknown): { status: number; code: string; detail: string } | undefined {
   if (typeof error !== 'object' || error === null) return undefined;
+  const name: unknown = Reflect.get(error, 'name');
+  if (typeof name === 'string' && name in DATABASE_ERRORS) return DATABASE_ERRORS[name];
   const code: unknown = Reflect.get(error, 'code');
   if (typeof code === 'string' && code in FASTIFY_CODES) return FASTIFY_CODES[code];
   const status: unknown = Reflect.get(error, 'statusCode');
@@ -152,6 +173,7 @@ export function describeError(error: unknown, context: ProblemContext): Describe
     instance: context.instance,
     ...(context.showFix && fix !== '' ? { fix } : {}),
     ...(error instanceof ValidationFailed ? { errors: error.errors } : {}),
+    ...(error instanceof HttpError ? error.extensions : {}),
   };
   return {
     problem,

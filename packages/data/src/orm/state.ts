@@ -95,8 +95,11 @@ export function availableTransitions(schema: OrmSchema, row: Row): readonly Avai
 /** `PurchaseOrder` gives `purchase_order`: the name of an entity starts with a capital, which `snake` would turn into a leading underscore. */
 const resource = (name: string): string => name.replaceAll(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase();
 
-/** `crm.Customer` and `qualify` give `crm.customer.qualify`. */
-function eventNameOf(entity: string, name: string): string {
+/**
+ * `crm.Customer` and `qualify` give `crm.customer.qualify`: the name of the event of a verb on an entity, which is also the shape of its
+ * permissions. A route that creates, updates or deletes a row names its events `created`, `updated` and `deleted` the same way.
+ */
+export function entityEventName(entity: string, name: string): string {
   const dot = entity.indexOf('.');
   const owner = dot === -1 ? '' : `${entity.slice(0, dot).toLowerCase()}.`;
   return `${owner}${resource(dot === -1 ? entity : entity.slice(dot + 1))}.${name}`;
@@ -165,7 +168,7 @@ export async function transition(
   allowStateChange(row);
   row[machine.field] = declared.to;
   const id = String(row['id']);
-  const event = eventNameOf(machine.entity, name);
+  const event = entityEventName(machine.entity, name);
   const detail = { from, to: declared.to, ...(checked === undefined ? {} : { input: checked }) };
   emitEvent(em, {
     name: event,

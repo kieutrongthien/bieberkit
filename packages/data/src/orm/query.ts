@@ -34,6 +34,8 @@ import { applyTranslations, assertLocale } from './localize.ts';
 
 type Row = Record<string, unknown>;
 
+const MAX_OFFSET = 1_000_000;
+
 export interface SortOption {
   readonly field: string;
   readonly direction?: 'asc' | 'desc';
@@ -46,6 +48,8 @@ export interface ListOptions {
   readonly sort?: readonly SortOption[];
   readonly limit?: unknown;
   readonly cursor?: string;
+  /** Rows to skip, for a page that is named by its number. Not together with `cursor`. At most 1 000 000 (use a cursor beyond a few thousand). */
+  readonly offset?: number;
   readonly withTotal?: boolean;
   /** The properties to return. `id` is always returned. */
   readonly select?: readonly string[];
@@ -169,13 +173,17 @@ function valueOf(field: Known, mode: 'ci' | 'ci_ai' | undefined, value: unknown)
             `Use ${COMPARED_OPERATORS.join(', ')}.`,
           );
         }
-        out[operator] = Array.isArray(operand)
-          ? operand.map((item) => foldedText(field, item, mode))
-          : foldedText(field, operand, mode);
+        // An empty value has no folded text: `null` stays `null`, so a filter can ask for the rows that have none.
+        out[operator] =
+          operand === null
+            ? null
+            : Array.isArray(operand)
+              ? operand.map((item) => foldedText(field, item, mode))
+              : foldedText(field, operand, mode);
       }
       return out;
     }
-    return foldedText(field, value, mode);
+    return value === null ? null : foldedText(field, value, mode);
   }
   if (isPlain(value)) {
     const out: Row = {};
@@ -274,6 +282,18 @@ export async function listPage(em: EntityManager, schema: OrmSchema, options: Li
   const known = knownFields(schema);
   const meta = em.getMetadata().get(schema);
   const limit = pageSize(options.limit);
+  if (options.offset !== undefined) {
+    if (!Number.isInteger(options.offset) || options.offset < 0 || options.offset > MAX_OFFSET) {
+      throw dataError(
+        'DATA_PAGE_LIMIT',
+        400,
+        `The offset must be a whole number from 0 to ${MAX_OFFSET}.`,
+        'Use a cursor to go deeper.',
+      );
+    }
+    if (options.cursor !== undefined)
+      return queryInvalid('An offset and a cursor cannot be used together.', 'Use a page number or a cursor.');
+  }
   const where = options.where === undefined ? {} : translateWhere(schema, known, options.where);
   const order = orderOf(known, options.sort);
   const signature = order.map((item) => `${item.field.name}:${item.direction}`).join(',');
@@ -313,6 +333,7 @@ export async function listPage(em: EntityManager, schema: OrmSchema, options: Li
       [item.field.lookup]: item.direction === 'asc' ? QueryOrder.ASC : QueryOrder.DESC,
     })),
     limit: limit + 1,
+    ...(options.offset === undefined || options.offset === 0 ? {} : { offset: options.offset }),
     disableIdentityMap: true,
     connectionType: 'read',
     // One query per relation (DATA-10), whatever the default of the ORM is, so a page never joins a collection into its own rows.

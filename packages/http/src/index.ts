@@ -25,6 +25,8 @@
 /** npm name of this package. */
 export const packageName = '@bieberkit/http';
 
+export { entityRoutes, registerEntityRoutes } from './entity-routes.ts';
+export type { EntityRoutesContext } from './entity-routes.ts';
 export { registerHttp } from './lifecycle.ts';
 export type { RegisterHttpOptions } from './lifecycle.ts';
 export type {

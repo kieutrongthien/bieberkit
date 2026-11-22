@@ -42,8 +42,8 @@ export function staleVersion(cause?: unknown): DataError {
  * Compares the version the client saw (an `If-Match` value such as `3`, `"3"` or `W/"3"`) with the version of the row.
  * A different version is `DATA_VERSION_STALE` (412). A value that is not a version number is `DATA_VERSION_INVALID` (400).
  */
-export function expectVersion(row: { readonly version?: unknown }, expected: number | string): void {
-  if (typeof row.version !== 'number') {
+export function expectVersion(row: object, expected: number | string): void {
+  if (typeof Reflect.get(row, 'version') !== 'number') {
     throw dataError(
       'DATA_ENTITY_INVALID',
       500,
@@ -61,5 +61,5 @@ export function expectVersion(row: { readonly version?: unknown }, expected: num
       'Send the version of the record in If-Match, for example "3".',
     );
   }
-  if (Number(match[1]) !== row.version) throw staleVersion();
+  if (Number(match[1]) !== Reflect.get(row, 'version')) throw staleVersion();
 }

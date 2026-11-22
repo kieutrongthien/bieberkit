@@ -22,11 +22,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { createHash } from 'node:crypto';
 import Fastify, { LogController } from 'fastify';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { createLogger, requestContext } from '@bieberkit/core';
 import type { Logger } from '@bieberkit/core';
 import { createAjv, issuesOf } from '@bieberkit/data/build';
+import { normalizeInput } from '@bieberkit/data/schema';
 import type { AjvError, AjvInstance } from '@bieberkit/data/build';
 import { HttpError, ValidationFailed, describeError } from './problem.ts';
 import type { Authenticator, Authorizer, Principal, RateLimiter, RequestInfo, TenantResolver } from './ports.ts';
@@ -125,9 +127,23 @@ interface RequestState {
   principal: Principal | undefined;
   tenantId: string | undefined;
   status: number | undefined;
+  readonly headers: Record<string, string>;
 }
 
 type Compiled = ((data: unknown) => boolean) & { errors?: AjvError[] | null };
+
+/** A weak ETag made of the body: the same answer has the same tag (API-08). */
+function weakEtag(body: string): string {
+  return `W/"${createHash('sha1').update(body).digest('base64url').slice(0, 16)}"`;
+}
+
+const bareTag = (tag: string): string => tag.trim().replace(/^W\//, '');
+
+/** Whether an `If-None-Match` value names the tag. Weak comparison: `W/"a"` and `"a"` are the same, and `*` is every tag. */
+function matches(header: string | undefined, etag: string): boolean {
+  if (header === undefined) return false;
+  return header.split(',').some((candidate) => candidate.trim() === '*' || bareTag(candidate) === bareTag(etag));
+}
 
 const traceIdNow = (): string => requestContext.get()?.traceId ?? '0'.repeat(32);
 
@@ -216,7 +232,7 @@ function pickInfo(request: FastifyRequest): RequestInfo {
 function stateOf(map: WeakMap<FastifyRequest, RequestState>, request: FastifyRequest): RequestState {
   let state = map.get(request);
   if (state === undefined) {
-    state = { principal: undefined, tenantId: undefined, status: undefined };
+    state = { principal: undefined, tenantId: undefined, status: undefined, headers: {} };
     map.set(request, state);
   }
   return state;
@@ -321,6 +337,8 @@ export function createHttpServer(env: HttpEnv, options: HttpServerOptions = {}):
   app.addHook('preValidation', async (request) => {
     const route = routeStateOf(request);
     if (route === undefined) return;
+    // Text is Unicode NFC before it is measured or compared (SCH-05).
+    if (request.body !== undefined) request.body = normalizeInput(request.body);
     const issues = [];
     const parts = [
       ['params', route.params, request.params],
@@ -371,8 +389,22 @@ export function createHttpServer(env: HttpEnv, options: HttpServerOptions = {}):
 
   // Stage 11 (ETag and cache headers) is slice 2. While the server drains, every answer ends its connection, so a client that keeps
   // connections alive does not hold the shutdown open.
-  app.addHook('onSend', (_request, reply, payload, done) => {
+  app.addHook('onSend', (request, reply, payload, done) => {
     if (draining) void reply.header('connection', 'close');
+    if (
+      request.method === 'GET' &&
+      reply.statusCode === 200 &&
+      typeof payload === 'string' &&
+      routeStateOf(request)?.internal !== true
+    ) {
+      if (reply.getHeader('etag') === undefined) void reply.header('etag', weakEtag(payload));
+      if (reply.getHeader('cache-control') === undefined) void reply.header('cache-control', 'private, no-cache');
+      if (matches(request.headers['if-none-match'], String(reply.getHeader('etag')))) {
+        void reply.code(304).removeHeader('content-type').removeHeader('content-length');
+        done(null, '');
+        return;
+      }
+    }
     done(null, payload);
   });
 
@@ -472,6 +504,7 @@ export function createHttpServer(env: HttpEnv, options: HttpServerOptions = {}):
           params: asRecord(request.params),
           query: asRecord(request.query),
           body: request.body,
+          headers: request.headers,
           principal: current.principal,
           tenantId: current.tenantId,
           requestId: request.id,
@@ -480,9 +513,17 @@ export function createHttpServer(env: HttpEnv, options: HttpServerOptions = {}):
           status: (code) => {
             current.status = code;
           },
+          header: (name, value) => {
+            current.headers[name] = value;
+          },
         };
         const result: unknown = await route.handler(context);
+        for (const [name, value] of Object.entries(current.headers)) void reply.header(name, value);
         if (current.status !== undefined) void reply.code(current.status);
+        if (reply.statusCode === 204) {
+          void reply.send();
+          return reply;
+        }
         return result === undefined ? null : result;
       },
     });

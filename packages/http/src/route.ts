@@ -43,6 +43,8 @@ export interface RouteContext {
   readonly params: Readonly<Record<string, unknown>>;
   readonly query: Readonly<Record<string, unknown>>;
   readonly body: unknown;
+  /** The headers of the request. */
+  readonly headers: Readonly<Record<string, string | string[] | undefined>>;
   readonly principal: Principal | undefined;
   readonly tenantId: string | undefined;
   readonly requestId: string;
@@ -50,6 +52,8 @@ export interface RouteContext {
   readonly log: Logger;
   /** Sets the status of the answer. It must be one that `schema.response` has a schema for. Defaults to 200. */
   status(code: number): void;
+  /** Sets a header of the answer. */
+  header(name: string, value: string): void;
 }
 
 export interface RouteDef {
