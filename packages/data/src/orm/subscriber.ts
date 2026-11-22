@@ -23,10 +23,12 @@
  */
 
 import { ChangeSetType } from '@mikro-orm/core';
-import type { EventSubscriber, FlushEventArgs } from '@mikro-orm/core';
+import type { EventArgs, EventSubscriber, FlushEventArgs } from '@mikro-orm/core';
 import { dataError } from '../errors.ts';
 import { AUDIT_ENTITY } from './framework.ts';
 import { entityMeta, isNewRow } from './internals.ts';
+import { formatSequence, nextSequence } from './sequence.ts';
+import { refuseStateWrite, statesOf, takeStateChange } from './state-guard.ts';
 import { assertReferencesVisible, referencedIds } from './references.ts';
 import type { ReferenceVisibility } from './references.ts';
 import { isSystemScope, requireTenant } from './tenant.ts';
@@ -64,6 +66,27 @@ export class DataSubscriber implements EventSubscriber {
     }
   }
 
+  /** Inside the transaction of the flush, before a row is inserted: gives it the numbers of its sequences (MOD-12). */
+  async beforeCreate({ entity, em, meta }: EventArgs<Row>): Promise<void> {
+    for (const [property, options] of Object.entries(meta.properties)) {
+      const marker: unknown = Reflect.get(options, 'bkSequence');
+      if (typeof marker !== 'object' || marker === null || (entity[property] ?? null) !== null) continue;
+      const pattern = String(Reflect.get(marker, 'pattern'));
+      const resetEvery: unknown = Reflect.get(marker, 'resetEvery');
+      const tenant = entity['tenantId'];
+      const now = new Date();
+      const value = await nextSequence(
+        em,
+        { entity: meta.className, field: property, ...(typeof tenant === 'string' ? { tenantId: tenant } : {}) },
+        {
+          now,
+          ...(resetEvery === 'year' || resetEvery === 'month' || resetEvery === 'never' ? { resetEvery } : {}),
+        },
+      );
+      entity[property] = formatSequence(pattern, value, now);
+    }
+  }
+
   /** After the changes are computed: the tenant of a row never changes, and every reference must be visible. */
   async onFlush({ em, uow }: FlushEventArgs): Promise<void> {
     const entities: { entity: Row; created: boolean; changed: readonly string[] }[] = [];
@@ -78,6 +101,16 @@ export class DataSubscriber implements EventSubscriber {
       }
       const created = change.type === ChangeSetType.CREATE;
       const changed = Object.keys(change.payload);
+      for (const { property, initial } of statesOf(entityMeta(change.entity))) {
+        const value: unknown = change.payload[property];
+        if (
+          created
+            ? value !== undefined && value !== initial
+            : changed.includes(property) && !takeStateChange(change.entity)
+        ) {
+          refuseStateWrite(entityMeta(change.entity).className, property);
+        }
+      }
       if (!created && changed.includes('tenantId')) {
         throw dataError(
           'DATA_TENANT_IMMUTABLE',

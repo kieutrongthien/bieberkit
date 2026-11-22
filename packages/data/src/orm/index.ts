@@ -29,11 +29,16 @@ export {
   DATA_PLUGIN,
   OutboxEntry,
   OutboxProcessed,
+  Sequence,
   dataMigrationSteps,
   frameworkEntities,
   grantAuditLog,
 } from './framework.ts';
-export type { AuditLogRow, OutboxEntryRow, OutboxProcessedRow } from './framework.ts';
+export type { AuditLogRow, OutboxEntryRow, OutboxProcessedRow, SequenceRow } from './framework.ts';
+export { formatSequence, nextSequence, periodOf } from './sequence.ts';
+export type { SequenceKey, SequenceOptions } from './sequence.ts';
+export { availableTransitions, transition, transitionOf } from './state.ts';
+export type { AvailableTransition, TransitionResult } from './state.ts';
 export { createOutboxDispatcher, emitEvent, outboxLag, processOnce, purgeProcessed } from './outbox.ts';
 export type {
   DispatchResult,

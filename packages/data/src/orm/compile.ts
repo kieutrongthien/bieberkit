@@ -177,9 +177,16 @@ function columnsOf(name: string, def: FieldDef): Record<string, Property> {
         },
       };
     case 'sequence':
-      return { [name]: { type: 'string', length: 64, nullable: true } };
+      return {
+        [name]: {
+          type: 'string',
+          length: 64,
+          nullable: true,
+          bkSequence: { pattern: def.pattern, resetEvery: def.resetEvery },
+        },
+      };
     case 'state':
-      return { [name]: { type: 'string', length: 64, default: def.initial } };
+      return { [name]: { type: 'string', length: 64, default: def.initial, bkState: { initial: def.initial } } };
     case 'custom':
       return {
         [name]: {

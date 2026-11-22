@@ -38,6 +38,7 @@ export const DATA_PLUGIN = '@bieberkit/data';
 export const OUTBOX_TABLE = 'bieberkit_outbox';
 export const PROCESSED_TABLE = 'bieberkit_outbox_processed';
 export const AUDIT_TABLE = 'audit_log';
+export const SEQUENCE_TABLE = 'bieberkit_sequences';
 /** The class name of the audit schema. The unit of work refuses to change an entity of this name (DATA-25). */
 export const AUDIT_ENTITY = 'bieberkit.AuditLog';
 
@@ -64,6 +65,13 @@ export interface OutboxProcessedRow {
   subscriber: string;
   eventId: string;
   processedAt: number | string;
+}
+
+export interface SequenceRow {
+  tenant: string;
+  name: string;
+  period: string;
+  value: number | string;
 }
 
 export interface AuditLogRow {
@@ -133,16 +141,32 @@ export const AuditLog: EntitySchema<AuditLogRow> = new EntitySchema<AuditLogRow>
   indexes: [{ name: 'audit_log_tenant_at_index', properties: ['tenant', 'at'] }],
 });
 
+export const Sequence: EntitySchema<SequenceRow> = new EntitySchema<SequenceRow>({
+  name: 'bieberkit.Sequence',
+  tableName: SEQUENCE_TABLE,
+  properties: {
+    tenant: uuid({ primary: true, fieldName: 'tenant_id' }),
+    name: { type: 'string', length: 200, primary: true },
+    period: { type: 'string', length: 16, primary: true },
+    value: { type: 'bigint' },
+  },
+});
+
 /** The schemas that `createDatabase` adds to the entities of the project. */
-export const frameworkEntities: readonly EntitySchema[] = [OutboxEntry, OutboxProcessed, AuditLog];
+export const frameworkEntities: readonly EntitySchema[] = [OutboxEntry, OutboxProcessed, AuditLog, Sequence];
 
 type Trx = Kysely<StepDatabase>;
 
 const instant = (dialect: Dialect): ReturnType<typeof sql.raw> =>
   sql.raw(dialect === 'postgres' ? 'timestamptz(3)' : dialect === 'mysql' ? 'datetime(3)' : 'datetime');
 
-function step(id: string, kind: PluginMigrationStep['kind'], up: PluginMigrationStep['up']): PluginMigrationStep {
-  return { plugin: DATA_PLUGIN, version: '0.1.0', id, kind, up };
+function step(
+  id: string,
+  kind: PluginMigrationStep['kind'],
+  up: PluginMigrationStep['up'],
+  version = '0.1.0',
+): PluginMigrationStep {
+  return { plugin: DATA_PLUGIN, version, id, kind, up };
 }
 
 /**
@@ -226,6 +250,21 @@ export const dataMigrationSteps: readonly PluginMigrationStep[] = [
       trx,
     );
   }),
+  step(
+    'sequences-create',
+    'expand',
+    async (trx: Trx, dialect) => {
+      await trx.schema
+        .createTable(SEQUENCE_TABLE)
+        .addColumn('tenant_id', uuidType(dialect), (c) => c.notNull())
+        .addColumn('name', 'varchar(200)', (c) => c.notNull())
+        .addColumn('period', 'varchar(16)', (c) => c.notNull())
+        .addColumn('value', 'bigint', (c) => c.notNull())
+        .addPrimaryKeyConstraint(`${SEQUENCE_TABLE}_pkey`, ['tenant_id', 'name', 'period'])
+        .execute();
+    },
+    '0.2.0',
+  ),
 ];
 
 const ROLE = /^[A-Za-z_][A-Za-z0-9_]*$/;

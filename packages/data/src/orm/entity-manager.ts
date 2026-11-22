@@ -38,6 +38,7 @@ import type {
 import { SqlEntityManager } from '@mikro-orm/sql';
 import { dataError } from '../errors.ts';
 import { assertShadowsWritten } from './shadow.ts';
+import { assertStateNotWritten } from './state-guard.ts';
 import { isSystemScope } from './tenant.ts';
 import { staleVersion } from './version.ts';
 
@@ -95,6 +96,7 @@ export class BieberEntityManager extends SqlEntityManager {
     options?: UpdateOptions<Entity>,
   ): Promise<number> {
     assertShadowsWritten(this.getMetadata().get(entityName), data);
+    assertStateNotWritten(this.getMetadata().get(entityName), data, false);
     return super.nativeUpdate(entityName, where, data, options);
   }
 
@@ -103,8 +105,10 @@ export class BieberEntityManager extends SqlEntityManager {
     data?: NoInfer<RequiredEntityData<Entity> | Entity>,
     options?: NativeInsertUpdateOptions<Entity>,
   ): Promise<Primary<Entity>> {
-    if (data !== undefined && isEntityName(entityNameOrEntity))
+    if (data !== undefined && isEntityName(entityNameOrEntity)) {
       assertShadowsWritten(this.getMetadata().get(entityNameOrEntity), data);
+      assertStateNotWritten(this.getMetadata().get(entityNameOrEntity), data, true);
+    }
     return super.insert(entityNameOrEntity, data, options);
   }
 
@@ -114,7 +118,10 @@ export class BieberEntityManager extends SqlEntityManager {
     options?: NativeInsertUpdateOptions<Entity>,
   ): Promise<Primary<Entity>[]> {
     if (data !== undefined && !Array.isArray(entityNameOrEntities)) {
-      for (const row of data) assertShadowsWritten(this.getMetadata().get(entityNameOrEntities), row);
+      for (const row of data) {
+        assertShadowsWritten(this.getMetadata().get(entityNameOrEntities), row);
+        assertStateNotWritten(this.getMetadata().get(entityNameOrEntities), row, true);
+      }
     }
     return super.insertMany(entityNameOrEntities, data, options);
   }
