@@ -41,6 +41,8 @@ declare module 'vitest' {
 
 export interface DialectContext {
   readonly dialect: Dialect;
+  /** A new, empty database that is dropped after the suite: its connection URL (a file path on SQLite), and nothing created in it. */
+  readonly emptyDatabase: () => Promise<{ readonly dialect: Dialect; readonly url: string }>;
   /**
    * Opens a database of its own for this suite: a temporary file on SQLite, a new database on the server for PostgreSQL
    * and MySQL. The schema of `entities` is created. Everything is closed and dropped after the suite.
@@ -109,25 +111,27 @@ export function describeDialects(name: string, suite: (context: DialectContext) 
       afterAll(async () => {
         for (const cleanup of cleanups.toReversed()) await cleanup();
       });
-      suite({
+      const context: DialectContext = {
         dialect,
-        open: async (entities, options = {}) => {
-          let url = '';
+        emptyDatabase: async () => {
           if (dialect === 'sqlite') {
             const dir = mkdtempSync(join(tmpdir(), 'bk-dialect-'));
-            url = join(dir, 'test.db');
             cleanups.push(async () => rmSync(dir, { recursive: true, force: true }));
-          } else {
-            const created = await provision(dialect, serverUrl);
-            url = created.url;
-            cleanups.push(created.drop);
+            return { dialect, url: join(dir, 'test.db') };
           }
+          const created = await provision(dialect, serverUrl);
+          cleanups.push(created.drop);
+          return { dialect, url: created.url };
+        },
+        open: async (entities, options = {}) => {
+          const { url } = await context.emptyDatabase();
           const database = await createDatabase(env(url, dialect), { ...options, entities });
           cleanups.push(() => database.close());
           await database.orm.schema.create();
           return database;
         },
-      });
+      };
+      suite(context);
     });
   }
 }
