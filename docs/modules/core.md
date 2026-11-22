@@ -87,8 +87,9 @@ function exitCode(result: StopResult): 0 | 1
 // events
 interface EventRegistry {}     // extended by modules: interface EventRegistry { 'crm.deal.won': { dealId: string } }
 function createEventBus(options?: { logger?: Logger }): EventBus
-interface EventBus { on<N extends EventName>(name: N, handler: Handler<N>): () => void; forModule(module: string): ModuleEmitter }
+interface EventBus { on<N extends EventName>(name: N, handler: EventHandler<N>, options?: { name?: string }): () => void; forModule(module: string): ModuleEmitter }
 interface ModuleEmitter { emit<N extends EventName>(name: N, payload: EventRegistry[N]): Promise<EmitResult> }
+interface EmitResult { delivered: number; failures: readonly { handler: string; error: unknown }[] }
 
 // roles
 const ROLES: readonly ['web', 'worker', 'scheduler', 'migrate']
