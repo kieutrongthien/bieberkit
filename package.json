@@ -20,6 +20,7 @@
     "check:api": "node tools/api-report.ts",
     "api:update": "node tools/api-report.ts --write",
     "check:changeset": "node tools/api-report.ts --changeset-since origin/main",
+    "check:packages": "node tools/check-packages.ts",
     "sync:skills": "node tools/sync-skills.ts",
     "changeset": "changeset"
   },
