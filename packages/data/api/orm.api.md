@@ -118,6 +118,37 @@ interface SequenceRow {
   period: string;
   value: number | string;
 }
+interface FeatureRowBase {
+  id: string;
+  tenant: string;
+  entity: string;
+  recordId: string;
+}
+interface CommentEntryRow extends FeatureRowBase {
+  body: string;
+  createdAt: Date;
+  createdBy?: string | null;
+}
+interface TagEntryRow extends FeatureRowBase {
+  tag: string;
+  tagKey: string;
+  createdAt: Date;
+  createdBy?: string | null;
+}
+interface AttachmentEntryRow extends FeatureRowBase {
+  storageKey: string;
+  name: string;
+  contentType: string;
+  size: number | string;
+  createdAt: Date;
+  createdBy?: string | null;
+}
+interface TimelineEntryRow extends FeatureRowBase {
+  type: string;
+  data?: string | null;
+  at: Date;
+  actorId?: string | null;
+}
 interface AuditLogRow {
   id: string;
   tenant?: string | null;
@@ -134,10 +165,76 @@ export declare const OutboxEntry: EntitySchema<OutboxEntryRow>;
 export declare const OutboxProcessed: EntitySchema<OutboxProcessedRow>;
 export declare const AuditLog: EntitySchema<AuditLogRow>;
 export declare const Sequence: EntitySchema<SequenceRow>;
+export declare const Comment: EntitySchema<CommentEntryRow>;
+export declare const Tag: EntitySchema<TagEntryRow>;
+export declare const Attachment: EntitySchema<AttachmentEntryRow>;
+export declare const TimelineEntry: EntitySchema<TimelineEntryRow>;
 export declare const frameworkEntities: readonly EntitySchema[];
 type Trx = Kysely<StepDatabase>;
 export declare const dataMigrationSteps: readonly PluginMigrationStep[];
 export declare function grantAuditLog(trx: Trx, dialect: Dialect, role: string): Promise<void>;
+type OrmSchema = EntitySchema<Record<string, unknown>>;
+interface CompileOptions {
+  readonly tenancy?: "single" | "shared-schema";
+  readonly raw?: readonly OrmSchema[];
+}
+export declare function compileEntities(defs: readonly EntityDef<string>[], options?: CompileOptions): OrmSchema[];
+interface FeaturePage<T> {
+  readonly rows: T[];
+  readonly limit: number;
+  readonly nextCursor: string | null;
+}
+interface PageRequest {
+  readonly limit?: unknown;
+  readonly cursor?: string;
+}
+interface CommentRow {
+  readonly id: string;
+  readonly body: string;
+  readonly createdAt: Date;
+  readonly createdBy: string | null;
+}
+interface TagRow {
+  readonly id: string;
+  readonly tag: string;
+  readonly createdAt: Date;
+  readonly createdBy: string | null;
+}
+interface AttachmentInput {
+  readonly key: string;
+  readonly name: string;
+  readonly contentType: string;
+  readonly size: number;
+}
+interface AttachmentRow extends AttachmentInput {
+  readonly id: string;
+  readonly createdAt: Date;
+  readonly createdBy: string | null;
+}
+interface TimelineInput {
+  readonly type: string;
+  readonly data?: unknown;
+}
+interface TimelineRow {
+  readonly id: string;
+  readonly type: string;
+  readonly data: unknown;
+  readonly at: Date;
+  readonly actorId: string | null;
+}
+export declare function addComment(em: EntityManager, schema: OrmSchema, recordId: string, input: {
+  readonly body: string;
+}): Promise<CommentRow>;
+export declare function listComments(em: EntityManager, schema: OrmSchema, recordId: string, request?: PageRequest): Promise<FeaturePage<CommentRow>>;
+export declare function deleteComment(em: EntityManager, schema: OrmSchema, recordId: string, commentId: string): Promise<boolean>;
+export declare function addTag(em: EntityManager, schema: OrmSchema, recordId: string, text: string): Promise<TagRow>;
+export declare function listTags(em: EntityManager, schema: OrmSchema, recordId: string, request?: PageRequest): Promise<FeaturePage<TagRow>>;
+export declare function removeTag(em: EntityManager, schema: OrmSchema, recordId: string, text: string): Promise<boolean>;
+export declare function addAttachment(em: EntityManager, schema: OrmSchema, recordId: string, input: AttachmentInput): Promise<AttachmentRow>;
+export declare function listAttachments(em: EntityManager, schema: OrmSchema, recordId: string, request?: PageRequest): Promise<FeaturePage<AttachmentRow>>;
+export declare function removeAttachment(em: EntityManager, schema: OrmSchema, recordId: string, attachmentId: string): Promise<boolean>;
+export declare function addTimeline(em: EntityManager, schema: OrmSchema, recordId: string, input: TimelineInput): Promise<TimelineRow>;
+export declare function listTimeline(em: EntityManager, schema: OrmSchema, recordId: string, request?: PageRequest): Promise<FeaturePage<TimelineRow>>;
 export declare function formatSequence(pattern: string, value: number, now?: Date): string;
 export declare function periodOf(resetEvery: ResetEvery | undefined, now?: Date): string;
 interface SequenceKey {
@@ -150,12 +247,6 @@ interface SequenceOptions {
   readonly now?: Date;
 }
 export declare function nextSequence(em: EntityManager, key: SequenceKey, options?: SequenceOptions): Promise<number>;
-type OrmSchema = EntitySchema<Record<string, unknown>>;
-interface CompileOptions {
-  readonly tenancy?: "single" | "shared-schema";
-  readonly raw?: readonly OrmSchema[];
-}
-export declare function compileEntities(defs: readonly EntityDef<string>[], options?: CompileOptions): OrmSchema[];
 type Row$4 = Record<string, unknown>;
 interface TransitionResult {
   readonly name: string;
@@ -342,5 +433,5 @@ export declare function setTranslation(em: EntityManager, schema: OrmSchema, rec
 type Row = Record<string, unknown>;
 export declare function toApiRow(schema: OrmSchema, row: Row): Row;
 export declare function toOrmData(schema: OrmSchema, input: Row, _mode: "create" | "update"): Row;
-export type { AuditEntry, AuditLogRow, AuditSink, AvailableTransition, CompileOptions, Database, DatabaseEnv, DatabaseOptions, DispatchResult, ListOptions, MadeMigration, MigrationEnv, MigrationStatus, Migrator, MigratorOptions, Orm, OrmSchema, OutboxDispatcher, OutboxDispatcherOptions, OutboxEntryRow, OutboxEvent, OutboxLag, OutboxMessage, OutboxProcessedRow, OutboxPublisher, Page, PluginRefusal, PluginRun, PluginRunOptions, PurgeOptions, ReferenceVisibility, ResolvedConnection, SequenceKey, SequenceOptions, SequenceRow, SortOption, SqliteOptions, SystemScopeEntry, TransitionResult, UpOptions };
+export type { AttachmentInput, AttachmentRow, AuditEntry, AuditLogRow, AuditSink, AvailableTransition, CommentRow, CompileOptions, Database, DatabaseEnv, DatabaseOptions, DispatchResult, FeaturePage, ListOptions, MadeMigration, MigrationEnv, MigrationStatus, Migrator, MigratorOptions, Orm, OrmSchema, OutboxDispatcher, OutboxDispatcherOptions, OutboxEntryRow, OutboxEvent, OutboxLag, OutboxMessage, OutboxProcessedRow, OutboxPublisher, Page, PageRequest, PluginRefusal, PluginRun, PluginRunOptions, PurgeOptions, ReferenceVisibility, ResolvedConnection, SequenceKey, SequenceOptions, SequenceRow, SortOption, SqliteOptions, SystemScopeEntry, TagRow, TimelineInput, TimelineRow, TransitionResult, UpOptions };
 ```
