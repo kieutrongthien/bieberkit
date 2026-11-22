@@ -24,9 +24,10 @@
 
 # 0008. ORM and dialects: MikroORM 7, with rules from the spike
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-11-22
 - Deciders: Bieber Kieu
+- Decision process: the maintainer reviewed the spike results and accepted this ADR on 2026-11-22.
 - Requirements: DATA-03, DATA-14, DATA-16, DATA-18, DATA-20 to DATA-23, MOD-11, MOD-18, PERF-04, API-13, P9, P12, spec sections 3 and 9
 
 ## Context
@@ -95,7 +96,7 @@ Not tested: speed, many processes sharing one SQLite file under ORM load, a null
 
 ## Spec changes
 
-To apply when the maintainer accepts this ADR:
+Made in spec 0.8.2, in the same pull request as this ADR:
 
 - Section 3, ORM row: "MikroORM 7.2, pinned exactly" and a pointer to this ADR.
 - DATA-20: state the `id` primary key plus `UNIQUE (tenant_id, id)` design.

@@ -75,7 +75,7 @@ Done when: `pnpm install && pnpm check` passes on a clean clone.
 
 Each ADR is written as `Proposed` with the spike result attached. The maintainer accepts (§22.3, `docs/adr/README.md`).
 
-- [ ] **[M]** ADR: ORM and dialects. Spike: MikroORM 7 `defineEntity` on PostgreSQL 15, MySQL 8.4 and SQLite with one entity set, UUIDv7 key storage (DATA-14), collation and integer money (MOD-11)
+- [x] **[M]** ADR: ORM and dialects. ADR 0008 accepted. Spike: MikroORM 7 `defineEntity` on PostgreSQL 15, MySQL 8.4 and SQLite with one entity set, UUIDv7 key storage (DATA-14), collation and integer money (MOD-11)
 - [ ] **[M][D]** ADR: plugin manifest, static `package.json` field, resolution, collisions, per-plugin migrations (PLG-07, DATA-24, §11.2)
 - [ ] **[M][D]** ADR: `defineEntity` API and field DSL, compilation to MikroORM metadata, JSON Schema, Zod 4 Mini and CASL, escape hatches to raw MikroORM (§10.6, SCH-01 to SCH-06, P12)
 - [ ] **[M][D]** ADR: authentication. Spike: Better Auth 1.7.16+ through a MikroORM adapter that joins the request transaction, on all three dialects (AUTH-09, AUTH-10)

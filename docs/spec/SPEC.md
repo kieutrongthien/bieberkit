@@ -2,7 +2,7 @@
   BieberKit
 
   @file        docs/spec/SPEC.md
-  @description The BieberKit specification, version 0.8.1: design, requirements and roadmap.
+  @description The BieberKit specification, version 0.8.2: design, requirements and roadmap.
   @author      Bieber Kieu <kieutrongthien@gmail.com>
   @copyright   Copyright (c) 2026 Bieber Kieu
   @license     Apache-2.0
@@ -117,7 +117,7 @@ The baseline below is fixed for version 1. Changing any row requires an ADR (arc
 | Task runner | Turborepo 2 | Cached builds and tests across workspace packages. |
 | HTTP server | Fastify 5 | Plugin encapsulation, JSON schema serialization, throughput close to raw node:http in the fastify/benchmarks suite. |
 | Validation | BieberKit field DSL compiled to JSON Schema and Zod 4 Mini. Zod 4 through Standard Schema for custom routes | Ajv validators and fast-json-stringify serializers are generated from JSON Schema at build as standalone modules (SCH-06). Section 10.6. |
-| ORM | MikroORM 7 with `defineEntity` | One entity definition for PostgreSQL, MySQL and SQLite. No decorators. |
+| ORM | MikroORM 7.2, pinned exactly, with `defineEntity` | One entity definition for PostgreSQL, MySQL and SQLite. No decorators. Rules and spike results in ADR 0008. |
 | Databases | PostgreSQL 15+, MySQL 8.4 LTS+, SQLite 3 | Support tiers in section 9. |
 | Authentication | Better Auth 1.7 (1.7.16 or later) | Sessions, MFA, passkeys, OAuth, organizations. |
 | Authorization | CASL | Action, subject, field and condition rules per request. |
@@ -553,11 +553,11 @@ MariaDB is best effort and not in CI (ADR 0005). The only MySQL-family dialect v
 
 * **DATA-18** Standard columns have fixed names and are added by entity options, never by hand: `id`, `tenant_id`, `version`, `created_at`, `updated_at`, `created_by`, `updated_by`, `deleted_at`, `deleted_token`. Plugins and generic features (audit, timeline, sync) rely on these names.
 * **DATA-19** The current tenant is resolved once per request: from the X-Tenant header (or a /t/:tenant URL segment) checked against the user's memberships for admin and API calls, from the API key for machine clients, and from the domain mapping for public site calls. It never comes from mutable session state, so two tabs open on two tenants can never cross. A request with no resolvable tenant on a tenant-scoped route is rejected with 400.
-* **DATA-20** Every write checks that each referenced id (relations, `owner`, `customerId` and so on) is visible under the current tenant filter and the user's CASL read rules. On PostgreSQL and MySQL, relations between tenant-scoped entities also use composite `(tenant_id, id)` foreign keys, so the database rejects a cross-tenant reference even if application code is wrong. The generated tenant tests cover both the two-tab case and the foreign-id case.
+* **DATA-20** Every write checks that each referenced id (relations, `owner`, `customerId` and so on) is visible under the current tenant filter and the user's CASL read rules. On every dialect, entities keep a single-column `id` primary key and add `UNIQUE (tenant_id, id)`, and relations between tenant-scoped entities use composite `(tenant_id, x_id)` foreign keys onto that pair, so the database rejects a cross-tenant reference even if application code is wrong (ADR 0008). The generated tenant tests cover both the two-tab case and the foreign-id case.
 
-- **DATA-21** Every text field declares its comparison semantics: `exact` (default), `ci` (case-insensitive) or `ci_ai` (case- and accent-insensitive). The compiler emits explicit collations or normalized shadow columns per dialect, so "Lê" and "Le" or "LE01" and "le01" behave the same on PostgreSQL, MySQL and SQLite. Contract tests run Vietnamese fixtures on all three.
-- **DATA-22** Money and decimals are stored as scaled integers (MOD-11), never as floating point. This matters on SQLite, which stores DECIMAL values with fractions as REAL.
-- **DATA-23** SQLite runs in WAL mode with a busy timeout and starts write transactions with `BEGIN IMMEDIATE`, so web, worker and scheduler processes can share one file.
+- **DATA-21** Every text field declares its comparison semantics: `exact` (default), `ci` (case-insensitive) or `ci_ai` (case- and accent-insensitive). `ci` and `ci_ai` use shadow columns that the application folds (Unicode NFC, lowercase, and for `ci_ai` also strip combining marks and map `đ` to `d`), compared with plain equality and a normal index. Native collations are not used, because they disagree across dialects (ADR 0008). So "Lê" and "Le", "đường" and "duong", or "LE01" and "le01" behave the same on every dialect. Contract tests run Vietnamese fixtures on all dialects.
+- **DATA-22** Money and decimals are stored as scaled integers (MOD-11), never as floating point and never as `DECIMAL`. This matters on SQLite, which stores DECIMAL values with fractions as REAL. Validation limits every money value to the safe integer range (±9,007,199,254,740,991) on all dialects, because SQLite returns integers to JavaScript as numbers.
+- **DATA-23** SQLite runs in WAL mode with a busy timeout and starts write transactions with `BEGIN IMMEDIATE`, so web, worker and scheduler processes can share one file. MikroORM issues a plain `begin`, so `@bieberkit/data` provides the `BEGIN IMMEDIATE` through its own Kysely driver override (ADR 0008).
 - **DATA-25** Two database roles: `MIGRATE_DATABASE_URL` owns the schema and runs DDL, `DATABASE_URL` is the application role with no DDL rights. On PostgreSQL and MySQL the application role has only INSERT and SELECT on `audit_log`, which makes the audit log append-only in fact. On SQLite, triggers enforce the same rule.
 
 ## 10. Entities and modules
@@ -671,7 +671,7 @@ export const PurchaseOrder = defineEntity({
 
 ### 10.5 Domain helpers
 
-- **MOD-11** Money uses `f.money({ currency })`: stored as an integer in the currency's minor unit plus a currency code, never as a float. Rounding follows the currency's minor unit (0 decimals for VND, 2 for USD) and is applied once, on save.
+- **MOD-11** Money uses `f.money({ currency })`: stored as an integer in the currency's minor unit plus a currency code, never as a float. Rounding follows the currency's minor unit (0 decimals for VND, 2 for USD) and is applied once, on save. The amount must stay within the safe integer range (DATA-22).
 - **MOD-12** Document numbers (for example `PO-2026-00042`) come from `f.sequence({ pattern, resetEvery })`. Numbers are allocated per tenant inside the saving transaction, so they are unique and gap-free even with many concurrent writers.
 - **MOD-13** Any entity can enable shared record features with `features: ['attachments', 'comments', 'timeline', 'tags']`. They are stored once in generic tables, carry the record's permissions, and appear as tabs in the admin detail screen.
 - **MOD-14** Printable documents (invoices, purchase orders, delivery notes) are React templates rendered to PDF in the worker role (Q-09). Each template declares the entity it prints and the permission needed.
@@ -1561,6 +1561,7 @@ Open questions:
 
 | Version | Date | Changes |
 | --- | --- | --- |
+| 0.8.2 | 2026-11-22 | ADR 0008: MikroORM 7.2 pinned, tenant foreign keys on `UNIQUE (tenant_id, id)`, shadow columns only for `ci` and `ci_ai` (`đ` folds to `d`), safe integer limit for money, `BEGIN IMMEDIATE` through a driver override |
 | 0.8.1 | 2026-11-22 | Phase 0 decisions from ADR 0002 to 0007: Oxfmt kept with a header rule for frontmatter, `@bieberkit/log` package, Tiptap, MariaDB best effort, Starlight on Cloudflare Pages, `--license` flag, three open questions closed |
 | 0.8 | 2026-11-22 | Independent review fixes: private caching for session-rendered pages, versioned plugin migrations, per-request tenant and cross-tenant reference checks, separate cache Valkey, Better Auth integration rules, unordered outbox with versions, honest cache guarantees, static plugin manifests, collation semantics, integer money, Vietnamese search, crypto-shredded audit, supply-chain fixes, P12 narrowed, MySQL 8.4, 15 minor fixes. Scope kept as is |
 | 0.7 | 2026-11-21 | Structure, part 2: write path and outbox flow, durable workflows, metadata contract, site composition, generated files. Fixes: commit before response, synchronous cache purge after commit, extension tables for plugin fields |
