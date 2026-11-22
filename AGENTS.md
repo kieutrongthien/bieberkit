@@ -86,7 +86,8 @@ This repository uses the Superpowers plugin. Start every task with the skill `bi
 5. Keep pull requests small. A change to a public API needs a changeset (`pnpm changeset`).
 6. The maintainer designs these by hand. Use plan mode, propose, never merge: the public API of `defineEntity` and `definePlugin`, authentication, authorization, tenant isolation, the release pipeline.
 7. Agents never merge into `main` and never push to it. When a branch is finished, keep it or open a pull request (`superpowers:finishing-a-development-branch`, those two options only).
-8. If a Superpowers skill conflicts with this file, this file wins.
+8. Do not create git worktrees unless the maintainer asks for one. Work in the current checkout, on a branch if needed. This overrides the worktree step of `bieberkit-implement-task` and `superpowers:using-git-worktrees`.
+9. If a Superpowers skill conflicts with this file, this file wins.
 
 ## Commits
 
