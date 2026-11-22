@@ -30,19 +30,10 @@ Generated from the built declaration files by `pnpm api:update`. Do not edit by 
 ```ts
 import { Dialect, Logger } from "@bieberkit/core";
 import { EntityData, EntityManager, EntityName, EntityProperty, EntitySchema, FilterOptions, FilterQuery, FindOneOptions, FindOptions, IDatabaseDriver, MikroORM, NativeInsertUpdateOptions, Platform, Primary, RequiredEntityData, Type, UpdateOptions } from "@mikro-orm/core";
-import { Kysely, RawBuilder, SqliteDialect } from "kysely";
+import { Kysely, RawBuilder, SqliteDialect, Transaction } from "kysely";
 import { SqlEntityManager } from "@mikro-orm/sql";
 import { a as EntityDef } from "./define-entity-B93nbOOC.js";
 import { n as StepDatabase, t as PluginMigrationStep, u as DestructiveFinding } from "./steps-BowZpLj1.js";
-type OrmSchema = EntitySchema<Record<string, unknown>>;
-interface CompileOptions {
-  readonly tenancy?: "single" | "shared-schema";
-  readonly raw?: readonly OrmSchema[];
-}
-export declare function compileEntities(defs: readonly EntityDef<string>[], options?: CompileOptions): OrmSchema[];
-type Row$3 = Record<string, unknown>;
-export declare function bulkInsert(em: EntityManager, schema: OrmSchema, rows: readonly Row$3[]): Promise<void>;
-export declare function bulkUpdate(em: EntityManager, schema: OrmSchema, where: Row$3, data: Row$3): Promise<number>;
 interface ReferenceVisibility {
   visible(entity: string, ids: readonly string[]): Promise<readonly string[]>;
 }
@@ -66,7 +57,7 @@ interface DatabaseEnv {
 }
 interface DatabaseOptions {
   readonly entities: readonly EntitySchema[];
-  readonly audit?: AuditSink;
+  readonly audit?: AuditSink | "table";
   readonly references?: ReferenceVisibility;
   readonly logger?: Logger;
   readonly queryLog?: (sql: string) => void;
@@ -88,6 +79,129 @@ export declare function resolveConnection(env: DatabaseEnv, variable?: string): 
 export declare function createDatabase(env: DatabaseEnv, options: DatabaseOptions): Promise<Database>;
 export declare function currentEntityManager(): EntityManager | undefined;
 export declare function runInUnitOfWork<T>(db: Database, fn: (em: EntityManager) => Promise<T>): Promise<T>;
+interface AuditEntry {
+  readonly action: string;
+  readonly entity?: string;
+  readonly recordId?: string;
+  readonly reason?: string;
+  readonly data?: unknown;
+  readonly tenantId?: string;
+}
+export declare function recordAudit(em: EntityManager, entry: AuditEntry): void;
+export declare function auditTableSink(orm: Orm): AuditSink;
+export declare const DATA_PLUGIN = "@bieberkit/data";
+interface OutboxEntryRow {
+  id: string;
+  tenant?: string | null;
+  event: string;
+  eventVersion: number;
+  entity?: string | null;
+  recordId?: string | null;
+  recordVersion?: number | null;
+  payload: string;
+  idempotencyKey?: string | null;
+  requestId?: string | null;
+  userId?: string | null;
+  createdAt: number | string;
+  availableAt: number | string;
+  attempts: number;
+  lastError?: string | null;
+}
+interface OutboxProcessedRow {
+  subscriber: string;
+  eventId: string;
+  processedAt: number | string;
+}
+interface AuditLogRow {
+  id: string;
+  tenant?: string | null;
+  at: Date;
+  actorId?: string | null;
+  requestId?: string | null;
+  action: string;
+  entity?: string | null;
+  recordId?: string | null;
+  reason?: string | null;
+  data?: string | null;
+}
+export declare const OutboxEntry: EntitySchema<OutboxEntryRow>;
+export declare const OutboxProcessed: EntitySchema<OutboxProcessedRow>;
+export declare const AuditLog: EntitySchema<AuditLogRow>;
+export declare const frameworkEntities: readonly EntitySchema[];
+type Trx = Kysely<StepDatabase>;
+export declare const dataMigrationSteps: readonly PluginMigrationStep[];
+export declare function grantAuditLog(trx: Trx, dialect: Dialect, role: string): Promise<void>;
+interface OutboxEvent {
+  readonly name: string;
+  readonly version?: number;
+  readonly payload: unknown;
+  readonly record?: {
+    readonly entity: string;
+    readonly id: string;
+    readonly version?: number;
+  };
+  readonly idempotencyKey?: string;
+}
+export declare function emitEvent(em: EntityManager, event: OutboxEvent): void;
+interface OutboxMessage {
+  readonly id: string;
+  readonly jobId: string;
+  readonly name: string;
+  readonly version: number;
+  readonly tenantId?: string;
+  readonly userId?: string;
+  readonly requestId?: string;
+  readonly entity?: string;
+  readonly recordId?: string;
+  readonly recordVersion?: number;
+  readonly payload: unknown;
+  readonly idempotencyKey?: string;
+  readonly createdAt: Date;
+}
+interface OutboxPublisher {
+  publish(message: OutboxMessage, trx: Transaction<StepDatabase>): Promise<void>;
+}
+interface OutboxDispatcherOptions {
+  readonly publisher: OutboxPublisher;
+  readonly batchSize?: number;
+  readonly pollMs?: number;
+  readonly maxBackoffMs?: number;
+  readonly logger?: Logger;
+  readonly now?: () => number;
+}
+interface DispatchResult {
+  readonly claimed: number;
+  readonly delivered: number;
+  readonly failed: number;
+}
+interface OutboxDispatcher {
+  dispatchOnce(): Promise<DispatchResult>;
+  start(): void;
+  wake(): void;
+  stop(): Promise<void>;
+}
+export declare function createOutboxDispatcher(db: Database, options: OutboxDispatcherOptions): OutboxDispatcher;
+interface OutboxLag {
+  readonly pending: number;
+  readonly oldestAgeMs: number | null;
+  readonly failing: number;
+}
+export declare function outboxLag(db: Database, now?: () => number): Promise<OutboxLag>;
+export declare function processOnce(db: Database, subscriber: string, eventId: string, handler: (em: EntityManager) => Promise<void>): Promise<boolean>;
+interface PurgeOptions {
+  readonly olderThanMs?: number;
+  readonly now?: () => number;
+}
+export declare function purgeProcessed(db: Database, options?: PurgeOptions): Promise<number>;
+type OrmSchema = EntitySchema<Record<string, unknown>>;
+interface CompileOptions {
+  readonly tenancy?: "single" | "shared-schema";
+  readonly raw?: readonly OrmSchema[];
+}
+export declare function compileEntities(defs: readonly EntityDef<string>[], options?: CompileOptions): OrmSchema[];
+type Row$3 = Record<string, unknown>;
+export declare function bulkInsert(em: EntityManager, schema: OrmSchema, rows: readonly Row$3[]): Promise<void>;
+export declare function bulkUpdate(em: EntityManager, schema: OrmSchema, where: Row$3, data: Row$3): Promise<number>;
 interface PluginRefusal {
   readonly step: string;
   readonly code: string;
@@ -194,5 +308,5 @@ export declare function setTranslation(em: EntityManager, schema: OrmSchema, rec
 type Row = Record<string, unknown>;
 export declare function toApiRow(schema: OrmSchema, row: Row): Row;
 export declare function toOrmData(schema: OrmSchema, input: Row, _mode: "create" | "update"): Row;
-export type { AuditSink, CompileOptions, Database, DatabaseEnv, DatabaseOptions, ListOptions, MadeMigration, MigrationEnv, MigrationStatus, Migrator, MigratorOptions, Orm, OrmSchema, Page, PluginRefusal, PluginRun, PluginRunOptions, ReferenceVisibility, ResolvedConnection, SortOption, SqliteOptions, SystemScopeEntry, UpOptions };
+export type { AuditEntry, AuditLogRow, AuditSink, CompileOptions, Database, DatabaseEnv, DatabaseOptions, DispatchResult, ListOptions, MadeMigration, MigrationEnv, MigrationStatus, Migrator, MigratorOptions, Orm, OrmSchema, OutboxDispatcher, OutboxDispatcherOptions, OutboxEntryRow, OutboxEvent, OutboxLag, OutboxMessage, OutboxProcessedRow, OutboxPublisher, Page, PluginRefusal, PluginRun, PluginRunOptions, PurgeOptions, ReferenceVisibility, ResolvedConnection, SortOption, SqliteOptions, SystemScopeEntry, UpOptions };
 ```

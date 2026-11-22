@@ -160,9 +160,9 @@ Depends on: M1.1.
 - [x] Migrations: snapshot diff per dialect, `make`, `up`, `down` and `status` of `openMigrator`, destructive statement detection, expand then contract (DATA-08, §9.3). The `migrate:*` commands wait for the CLI of M1.8
 - [x] Plugin migration runner with `bieberkit_plugin_migrations` and portable schema builder (DATA-24): step format, `deploy_id` guard, `uuidType` and `setNotNull` helpers, SQLite rebuilds with foreign keys off (DATA-08, DATA-27, ADR 0011). The `bieberkit check` rules are the functions `findStepRisks` and `detectDestructive`, and wait for the CLI of M1.8
 - [x] `MIGRATE_DATABASE_URL` used only by the migrate role (DATA-25)
-- [ ] Outbox table, same-transaction write, dispatcher with SKIP LOCKED batches of 100, versioned events, per-subscriber processed ids, 7 day cleanup, lag metric (MOD-18, §7.5)
-- [ ] Outbox dispatcher on MySQL and MariaDB deletes rows one at a time by primary key and retries on deadlock. With the `database` queue driver the job insert joins the dispatcher's transaction (MOD-18, ADR 0010)
-- [ ] Audit log table, append-only for the app role, written in the same transaction (OBS-05, AUTHZ-05)
+- [x] Outbox table, same-transaction write, dispatcher with SKIP LOCKED batches of 100, versioned events, per-subscriber processed ids, 7 day cleanup, lag numbers (MOD-18, §7.5). `LISTEN/NOTIFY` and the metric export wait for M1.5 and the observability package
+- [x] Outbox dispatcher on MySQL and MariaDB deletes rows one at a time by primary key and retries on deadlock. The publisher gets the transaction of the claim, which is how the `database` queue driver of M1.5 joins it (MOD-18, ADR 0010)
+- [x] Audit log table, append-only for the app role, written in the same transaction (OBS-05, AUTHZ-05)
 - [ ] Features `attachments`, `comments`, `timeline`, `tags` as generic tables (MOD-13)
 - [ ] State machines: `f.state` transitions validated on the server, never through plain update (MOD-06, MOD-07)
 - [ ] Upgrade MikroORM from 7.2.9 to 7.2.11 after 2026-11-27 (`minimumReleaseAge`) and rerun the dialect suites
@@ -222,7 +222,7 @@ Depends on: M1.2. Can run in parallel with M1.4 (no shared files).
 
 - [ ] **[M]** Queue contract, `defineJob`, `sync`, `database` and `redis` (BullMQ) drivers under `@bieberkit/queue` subpaths (PKG-02, PKG-03, §15.1)
 - [ ] Queues `critical`, `default`, `reports`; dead-letter list; input validated on dispatch and execution; stable `jobId` (Q-01 to Q-04)
-- [ ] After-commit dispatch through the outbox (Q-06); job carries tenant and actor and restores them (Q-10)
+- [ ] After-commit dispatch through the outbox (Q-06): the `OutboxPublisher` of each driver, with the `database` driver inserting its job in the transaction of the claim, and a `LISTEN/NOTIFY` wake on PostgreSQL (needs `pg` as a dependency and its ADR line, P9); job carries tenant and actor and restores them (Q-10)
 - [ ] Scheduler under a distributed lock per tick (Q-07)
 - [ ] `worker_threads` pool for CPU-heavy work (Q-09)
 - [ ] Cache contract on BentoCache: `get`, `set`, `remember`, `forget`, `tags`, `lock`; prefix and tenant namespacing; stampede lock (C-01 to C-03)
