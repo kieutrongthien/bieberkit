@@ -30,7 +30,7 @@ Generated from the built declaration files by `pnpm api:update`. Do not edit by 
 ```ts
 import { BkError, Lifecycle, Logger } from "@bieberkit/core";
 import { Database, OrmSchema } from "@bieberkit/data/orm";
-import { JsonSchema } from "@bieberkit/data/schema";
+import { EntityDef, JsonSchema } from "@bieberkit/data/schema";
 import { ValidationIssue } from "@bieberkit/data/build";
 interface Principal {
   readonly id: string;
@@ -86,6 +86,7 @@ interface RouteDef {
   readonly permission?: string;
   readonly public?: true;
   readonly schema: RouteSchema;
+  readonly requiresIfMatch?: true;
   readonly idempotent?: true;
   readonly deprecated?: {
     readonly since?: string;
@@ -124,6 +125,7 @@ interface HttpEnv {
   readonly APP_ENV: "development" | "test" | "production";
   readonly APP_PORT: number;
   readonly TRUST_PROXY: boolean | number;
+  readonly API_DOCS_PUBLIC: boolean;
 }
 interface ErrorContext {
   readonly method: string;
@@ -190,6 +192,8 @@ interface HttpServer {
     requestTimeoutMs: number;
     keepAliveTimeoutMs: number;
   }>;
+  routes(): readonly RouteDef[];
+  readonly docsPublic: boolean;
 }
 export declare function createHttpServer(env: HttpEnv, options?: HttpServerOptions): HttpServer;
 interface EntityRoutesContext {
@@ -200,6 +204,15 @@ export declare function entityRoutes(schema: OrmSchema, context: EntityRoutesCon
 export declare function registerEntityRoutes(server: HttpServer, schemas: readonly OrmSchema[], options: {
   db: Database;
 }): void;
+export declare const META_SCHEMA: JsonSchema;
+export declare function registerMeta(server: HttpServer, entities: readonly EntityDef<string>[]): void;
+interface OpenApiInfo {
+  readonly title: string;
+  readonly version: string;
+}
+type OpenApiDocument = Record<string, unknown>;
+export declare function openApiDocument(routes: readonly RouteDef[], info: OpenApiInfo): OpenApiDocument;
+export declare function registerOpenApi(server: HttpServer, info: OpenApiInfo): void;
 interface RegisterHttpOptions {
   readonly host?: string;
   readonly port?: number;
@@ -237,5 +250,5 @@ interface Problem {
   readonly [extension: string]: unknown;
 }
 export declare const packageName = "@bieberkit/http";
-export type { Authenticator, Authorizer, EntityRoutesContext, ErrorContext, HttpEnv, HttpServer, HttpServerOptions, InjectOptions, InjectResponse, Method, Principal, Problem, RateLimitResult, RateLimiter, RegisterHttpOptions, RequestInfo, RouteContext, RouteDef, RouteSchema, StageContext, StageHook, StageName, TenantResolver };
+export type { Authenticator, Authorizer, EntityRoutesContext, ErrorContext, HttpEnv, HttpServer, HttpServerOptions, InjectOptions, InjectResponse, Method, OpenApiDocument, OpenApiInfo, Principal, Problem, RateLimitResult, RateLimiter, RegisterHttpOptions, RequestInfo, RouteContext, RouteDef, RouteSchema, StageContext, StageHook, StageName, TenantResolver };
 ```

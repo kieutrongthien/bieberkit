@@ -187,9 +187,9 @@ Depends on: M1.2.
 - [ ] Aggregate endpoint for `aggregatable()` fields (API-15)
 - [x] Idempotency-Key for `idempotent: true` routes (§13.1). The store is in memory, for one process, until the cache of M1.5
 - [x] Deprecation and Sunset headers (API-16). The list in OpenAPI comes with slice 4
-- [ ] OpenAPI 3.1 generation, served in development and gated in production (API-06)
+- [x] OpenAPI 3.1 generation, served in development and gated in production (API-06). The client generator (API-07) is the build of M1.8
 - [ ] Security headers, CORS allowlist, CSRF with Fetch Metadata plus signed token, `http.fetch` with SSRF guard, timeouts and circuit breaker (SEC-01 to SEC-04, SEC-06, WH-04)
-- [ ] `/api/v1/_meta` with `schemaVersion`, per tenant and role, ETag (UI-02, META-01 to META-05)
+- [x] `/api/v1/_meta` with `schemaVersion`, per tenant and role, ETag (UI-02, META-01 to META-05). Menus and dashboards are empty until the plugin system fills them, and a cache by role set belongs to `@bieberkit/auth`
 - [x] Health endpoints `/health/live`, `/ready`, `/startup` and graceful shutdown sequence (§19.3, §19.4)
 - [x] Test: a generated list endpoint that issues one query per row fails (PERF-04)
 
