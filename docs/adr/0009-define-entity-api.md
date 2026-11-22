@@ -24,9 +24,10 @@
 
 # 0009. defineEntity and the field DSL
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-11-22
 - Deciders: Bieber Kieu
+- Decision process: the maintainer reviewed the spike results, accepted `ajv-formats` and then accepted this ADR on 2026-11-22.
 - Requirements: SCH-01 to SCH-06, DATA-15, DATA-16, DATA-18, DATA-20 to DATA-22, MOD-11, PKG-02, PKG-03, P9, P12, spec sections 10.1, 10.2 and 10.6
 
 ## Context
@@ -138,7 +139,7 @@ The serializer result matters for wording: its value is the field whitelist (API
 
 ## Spec changes
 
-To apply when the maintainer accepts this ADR:
+Made in spec 0.8.3, in the same pull request as this ADR:
 
 - Section 10.1: the example uses `export const Customer: EntityDef<'crm.Customer'> = defineEntity({...})`.
 - Section 10.2 and 10.6: point at this ADR. Mention the subpath split in 10.6.

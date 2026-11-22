@@ -2,7 +2,7 @@
   BieberKit
 
   @file        docs/spec/SPEC.md
-  @description The BieberKit specification, version 0.8.2: design, requirements and roadmap.
+  @description The BieberKit specification, version 0.8.3: design, requirements and roadmap.
   @author      Bieber Kieu <kieutrongthien@gmail.com>
   @copyright   Copyright (c) 2026 Bieber Kieu
   @license     Apache-2.0
@@ -115,8 +115,8 @@ The baseline below is fixed for version 1. Changing any row requires an ADR (arc
 | Compiler options | `strict`, `erasableSyntaxOnly`, `verbatimModuleSyntax`, `module: nodenext`, `target: esnext` | Lets Node.js run sources directly through type stripping in development. Relative imports keep their .ts extension, and published packages ship compiled JavaScript because Node.js does not strip types inside node\_modules. |
 | Package manager | pnpm 12 with workspaces | Only pnpm is supported, for both the framework and generated projects. |
 | Task runner | Turborepo 2 | Cached builds and tests across workspace packages. |
-| HTTP server | Fastify 5 | Plugin encapsulation, JSON schema serialization, throughput close to raw node:http in the fastify/benchmarks suite. |
-| Validation | BieberKit field DSL compiled to JSON Schema and Zod 4 Mini. Zod 4 through Standard Schema for custom routes | Ajv validators and fast-json-stringify serializers are generated from JSON Schema at build as standalone modules (SCH-06). Section 10.6. |
+| HTTP server | Fastify 5 | Plugin encapsulation, response schemas that whitelist fields (API-01), throughput close to raw node:http in the fastify/benchmarks suite. |
+| Validation | BieberKit field DSL compiled to JSON Schema and Zod 4 Mini. Zod 4 through Standard Schema for custom routes | Ajv validators and fast-json-stringify serializers are generated from JSON Schema at build as standalone modules (SCH-06). Formats come from ajv-formats. Design in ADR 0009, section 10.6. |
 | ORM | MikroORM 7.2, pinned exactly, with `defineEntity` | One entity definition for PostgreSQL, MySQL and SQLite. No decorators. Rules and spike results in ADR 0008. |
 | Databases | PostgreSQL 15+, MySQL 8.4 LTS+, SQLite 3 | Support tiers in section 9. |
 | Authentication | Better Auth 1.7 (1.7.16 or later) | Sessions, MFA, passkeys, OAuth, organizations. |
@@ -555,10 +555,11 @@ MariaDB is best effort and not in CI (ADR 0005). The only MySQL-family dialect v
 * **DATA-19** The current tenant is resolved once per request: from the X-Tenant header (or a /t/:tenant URL segment) checked against the user's memberships for admin and API calls, from the API key for machine clients, and from the domain mapping for public site calls. It never comes from mutable session state, so two tabs open on two tenants can never cross. A request with no resolvable tenant on a tenant-scoped route is rejected with 400.
 * **DATA-20** Every write checks that each referenced id (relations, `owner`, `customerId` and so on) is visible under the current tenant filter and the user's CASL read rules. On every dialect, entities keep a single-column `id` primary key and add `UNIQUE (tenant_id, id)`, and relations between tenant-scoped entities use composite `(tenant_id, x_id)` foreign keys onto that pair, so the database rejects a cross-tenant reference even if application code is wrong (ADR 0008). The generated tenant tests cover both the two-tab case and the foreign-id case.
 
-- **DATA-21** Every text field declares its comparison semantics: `exact` (default), `ci` (case-insensitive) or `ci_ai` (case- and accent-insensitive). `ci` and `ci_ai` use shadow columns that the application folds (Unicode NFC, lowercase, and for `ci_ai` also strip combining marks and map `đ` to `d`), compared with plain equality and a normal index. Native collations are not used, because they disagree across dialects (ADR 0008). So "Lê" and "Le", "đường" and "duong", or "LE01" and "le01" behave the same on every dialect. Contract tests run Vietnamese fixtures on all dialects.
+- **DATA-21** Every text field declares its comparison semantics: `exact` (default), `ci` (case-insensitive) or `ci_ai` (case- and accent-insensitive). `ci` and `ci_ai` use shadow columns that the application folds (Unicode NFC, lowercase, and for `ci_ai` also strip combining marks and map `đ` to `d`), compared with plain equality and a normal index. Native collations are not used, because they disagree across dialects (ADR 0008). So "Lê" and "Le", "đường" and "duong", or "LE01" and "le01" behave the same on every dialect. Contract tests run Vietnamese fixtures on all dialects. Bulk writes (`nativeUpdate`, `insert`) skip entity hooks, so they go through data-layer helpers that add the shadow values, and `bieberkit check` flags direct calls on entities that have compared fields (ADR 0009).
 - **DATA-22** Money and decimals are stored as scaled integers (MOD-11), never as floating point and never as `DECIMAL`. This matters on SQLite, which stores DECIMAL values with fractions as REAL. Validation limits every money value to the safe integer range (±9,007,199,254,740,991) on all dialects, because SQLite returns integers to JavaScript as numbers.
 - **DATA-23** SQLite runs in WAL mode with a busy timeout and starts write transactions with `BEGIN IMMEDIATE`, so web, worker and scheduler processes can share one file. MikroORM issues a plain `begin`, so `@bieberkit/data` provides the `BEGIN IMMEDIATE` through its own Kysely driver override (ADR 0008).
 - **DATA-25** Two database roles: `MIGRATE_DATABASE_URL` owns the schema and runs DDL, `DATABASE_URL` is the application role with no DDL rights. On PostgreSQL and MySQL the application role has only INSERT and SELECT on `audit_log`, which makes the audit log append-only in fact. On SQLite, triggers enforce the same rule.
+- **DATA-26** Standard options expand into constraints automatically. Every unique constraint on a tenant-scoped entity includes `tenant_id`, on a soft-deleted entity it also includes `deleted_token`, and a tenant-scoped entity gets `UNIQUE (tenant_id, id)` as the target of composite foreign keys (DATA-15, DATA-16, DATA-20, ADR 0009).
 
 ## 10. Entities and modules
 
@@ -567,10 +568,10 @@ An entity is declared once with `defineEntity`, and BieberKit derives everything
 ### 10.1 Defining an entity
 
 ```ts
-import { defineEntity, f } from '@bieberkit/data'
+import { defineEntity, f, type EntityDef } from '@bieberkit/data'
 import { User } from '@bieberkit/plugin-users'
 
-export const Customer = defineEntity({
+export const Customer: EntityDef<'crm.Customer'> = defineEntity({
   name: 'crm.Customer',
   table: 'crm_customers',
   tenant: true,
@@ -598,7 +599,7 @@ export const Customer = defineEntity({
 })
 ```
 
-`f.oneOf` produces a string union type. TypeScript enums are not used anywhere (P3).
+`f.oneOf` produces a string union type. TypeScript enums are not used anywhere (P3). The type annotation on the exported constant is required by `isolatedDeclarations`. Row, create and update types come from the generated registry (SCH-04), not from the annotation.
 
 ### 10.2 What is derived
 
@@ -612,6 +613,8 @@ export const Customer = defineEntity({
 | Admin list, form and detail metadata | `admin`, `fields`, `label` | Admin UI |
 | Test factories | `fields` | `@bieberkit/testing` |
 | Generated permission tests | `permissions`, `api` | CI |
+
+The compilers are pure functions over the entity descriptor. Design and spike results are in ADR 0009.
 
 ### 10.3 Modules
 
@@ -643,7 +646,7 @@ export default defineModule({
 Management apps revolve around records that move through states (draft, submitted, approved) and buttons that do more than save. Both are first-class so they get permissions, audit, API and admin UI for free.
 
 ```ts
-export const PurchaseOrder = defineEntity({
+export const PurchaseOrder: EntityDef<'purchasing.PurchaseOrder'> = defineEntity({
   name: 'purchasing.PurchaseOrder',
   fields: {
     status: f.state({
@@ -678,12 +681,12 @@ export const PurchaseOrder = defineEntity({
 
 ### 10.6 Schema pipeline
 
-The field DSL (`f.*`) is the single source of truth, and it belongs to BieberKit, not to any library. At build and boot it compiles into every format the stack needs, so nothing is written twice and entity definitions never depend on a library's own API (P12).
+The field DSL (`f.*`) is the single source of truth, and it belongs to BieberKit, not to any library. At build and boot it compiles into every format the stack needs, so nothing is written twice and entity definitions never depend on a library's own API (P12). Descriptors are plain immutable data (`FieldDef`), and `defineEntity` returns a nameable `EntityDef<Name>`. `@bieberkit/data/schema` holds the descriptors, JSON Schema and Zod outputs and imports no ORM, so the client and the admin can use it. `@bieberkit/data/orm` is the only module that imports MikroORM, and the CASL compiler lives in `@bieberkit/auth` (ADR 0009).
 
 | Output | Used by | Why this format |
 | --- | --- | --- |
 | MikroORM entity metadata | Data layer, migrations | Portable across the three dialects |
-| JSON Schema 2020-12 | Ajv request validation, fast-json-stringify responses, OpenAPI 3.1 | Fastest validation and serialization path in Fastify, and the native schema language of OpenAPI |
+| JSON Schema 2020-12 | Ajv request validation, fast-json-stringify responses, OpenAPI 3.1 | Validation and serialization schemas for Fastify (serialization drops fields that are not in the schema), standalone modules at build, and the native schema language of OpenAPI |
 | Zod 4 Mini schemas | Admin forms, site forms, generated client | Small, tree-shakable client bundles with the same rules as the server |
 | TypeScript types | Services, client, tests | End-to-end type safety without hand-written interfaces |
 | CASL subjects and field masks | Authorization | Permissions follow the same field names |
@@ -691,11 +694,13 @@ The field DSL (`f.*`) is the single source of truth, and it belongs to BieberKit
 - **SCH-01** Custom routes and jobs MAY use any Standard Schema library, Zod 4 by default. Their schemas are converted to JSON Schema for OpenAPI and serialization. Rules that JSON Schema cannot express (custom refinements) run as a second validation step.
 - **SCH-02** Changing the ORM, the validator or the client generator changes only the compiler targets, never entity definitions.
 
-* **SCH-03** The DSL defines one meaning for every rule, and both validators are generated to match it. String lengths count Unicode code points, so a Vietnamese or emoji-containing value gets the same answer on server and client. Shared fixtures run through Ajv and Zod Mini in the generated contract tests, and any disagreement fails CI.
-* **SCH-04** Entity, client and permission types are generated into `.bieberkit/types/` by `bieberkit dev` and `bieberkit build`, instead of being inferred through deep generic types. This keeps type checking and editor feedback fast as projects grow to hundreds of entities.
+* **SCH-03** The DSL defines one meaning for every rule, and both validators are generated to match it. String lengths count Unicode code points, so a Vietnamese or emoji-containing value gets the same answer on server and client. Shared fixtures run through Ajv and Zod Mini in the generated contract tests, and any disagreement fails CI. Ajv and Zod 4 Mini both count code points by default, so only the NFC step (SCH-05) has to run before either of them (ADR 0009).
+* **SCH-04** Entity, client and permission types are generated into `.bieberkit/types/` by `bieberkit dev` and `bieberkit build`, instead of being inferred through deep generic types. This keeps type checking and editor feedback fast as projects grow to hundreds of entities. Entity files declare `EntityDef<Name>`, a type with no field generics, and `Row<Name>`, `CreateInput<Name>` and `UpdateInput<Name>` resolve through a generated `EntityRegistry` interface, which also keeps entity files valid under `isolatedDeclarations` (ADR 0009).
 
 - **SCH-05** Every string input is normalized to Unicode NFC at the validation boundary, so Vietnamese typed in decomposed form (NFD, common on macOS and some input methods) gets the same length, uniqueness and slug as composed text.
-- **SCH-06** Ajv validators and fast-json-stringify serializers are emitted as standalone modules at build. The web role loads them instead of compiling thousands of schemas at boot, which protects the cold start target.
+- **SCH-06** Ajv validators and fast-json-stringify serializers are emitted as standalone modules at build. The web role loads them instead of compiling thousands of schemas at boot, which protects the cold start target. The generated validators `require` Ajv's runtime helpers and `ajv-formats`, so both ship in the web role.
+- **SCH-07** `f.custom({ column, jsonSchema, zod, tsType, admin })` is the only way to add a field kind in version 1. `zod` is a schema value. An option that receives a library namespace (`(z) => ...`) is not allowed, because it keeps all of the library in the client bundle (28 KB against 426 KB measured, ADR 0009).
+- **SCH-08** Entity files import only `@bieberkit/data`. Hand-written MikroORM entities, the escape hatch, live in separate `*.orm.ts` files and are registered next to generated entities, and `orm: { indexes, properties }` on an entity merges extra metadata into the generated schema. `bieberkit check` reports both uses (ADR 0009).
 
 ### 10.7 Workflows
 
@@ -1561,6 +1566,7 @@ Open questions:
 
 | Version | Date | Changes |
 | --- | --- | --- |
+| 0.8.3 | 2026-11-22 | ADR 0009: `EntityDef<Name>` with a generated `EntityRegistry`, descriptors compiled by pure functions, `f.custom` takes schema values, ORM-free entity files, bulk write helpers for shadow columns, serializer wording, SCH-07, SCH-08, DATA-26 |
 | 0.8.2 | 2026-11-22 | ADR 0008: MikroORM 7.2 pinned, tenant foreign keys on `UNIQUE (tenant_id, id)`, shadow columns only for `ci` and `ci_ai` (`đ` folds to `d`), safe integer limit for money, `BEGIN IMMEDIATE` through a driver override |
 | 0.8.1 | 2026-11-22 | Phase 0 decisions from ADR 0002 to 0007: Oxfmt kept with a header rule for frontmatter, `@bieberkit/log` package, Tiptap, MariaDB best effort, Starlight on Cloudflare Pages, `--license` flag, three open questions closed |
 | 0.8 | 2026-11-22 | Independent review fixes: private caching for session-rendered pages, versioned plugin migrations, per-request tenant and cross-tenant reference checks, separate cache Valkey, Better Auth integration rules, unordered outbox with versions, honest cache guarantees, static plugin manifests, collation semantics, integer money, Vietnamese search, crypto-shredded audit, supply-chain fixes, P12 narrowed, MySQL 8.4, 15 minor fixes. Scope kept as is |

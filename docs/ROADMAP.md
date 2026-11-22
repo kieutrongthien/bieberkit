@@ -77,7 +77,7 @@ Each ADR is written as `Proposed` with the spike result attached. The maintainer
 
 - [x] **[M]** ADR: ORM and dialects. ADR 0008 accepted. Spike: MikroORM 7 `defineEntity` on PostgreSQL 15, MySQL 8.4 and SQLite with one entity set, UUIDv7 key storage (DATA-14), collation and integer money (MOD-11)
 - [ ] **[M][D]** ADR: plugin manifest, static `package.json` field, resolution, collisions, per-plugin migrations (PLG-07, DATA-24, §11.2)
-- [ ] **[M][D]** ADR: `defineEntity` API and field DSL, compilation to MikroORM metadata, JSON Schema, Zod 4 Mini and CASL, escape hatches to raw MikroORM (§10.6, SCH-01 to SCH-06, P12)
+- [x] **[M][D]** ADR: `defineEntity` API and field DSL, compilation to MikroORM metadata, JSON Schema, Zod 4 Mini and CASL, escape hatches to raw MikroORM (§10.6, SCH-01 to SCH-06, P12) ADR 0009 accepted.
 - [ ] **[M][D]** ADR: authentication. Spike: Better Auth 1.7.16+ through a MikroORM adapter that joins the request transaction, on all three dialects (AUTH-09, AUTH-10)
 - [ ] **[M][D]** ADR: authorization. Spike: `@ucast/sql` on MikroORM 7, otherwise an own CASL to ORM translator with a small operator set and generated permission tests (AUTHZ-02, §26)
 - [ ] **[M]** ADR: queue drivers. Spike: BullMQ on Valkey and the `database` driver behind one contract, outbox dispatch with SKIP LOCKED (Q-05, MOD-18)
@@ -141,6 +141,8 @@ Depends on: M1.1.
 - [ ] **[D]** Field DSL `f.*`: id, string, email, oneOf, decimal, money, sequence, createdAt, updatedAt, belongsTo, hasMany, hasOne, state, computed (§10.1, MOD-08, MOD-11, MOD-12)
 - [ ] **[D]** `defineEntity` compiling to MikroORM metadata, JSON Schema 2020-12, Zod 4 Mini and TypeScript types (SCH-01 to SCH-04)
 - [ ] Unicode NFC normalization at the validation boundary; code point length semantics; shared fixtures through Ajv and Zod Mini fail CI on disagreement (SCH-03, SCH-05)
+- [ ] Write helpers that add shadow column values for bulk writes, and a `bieberkit check` rule that flags direct `nativeUpdate` or `insert` on entities with compared fields (DATA-21, ADR 0009)
+- [ ] `f.custom` takes schema values only, with a bundle size test that fails when a whole validator library is pulled into the client (SCH-07, ADR 0009)
 - [ ] Standalone Ajv and fast-json-stringify modules emitted at build (SCH-06, PERF-06)
 - [ ] Standard columns and entity options: `version`, `created_by`, `updated_by`, `deleted_at`, `deleted_token` (DATA-18)
 - [ ] UUIDv7 keys, native storage per dialect (DATA-03, DATA-14)
@@ -248,6 +250,7 @@ Depends on: M1.1 to M1.6 (can start the resolver and flags earlier).
 - [ ] Commands: `dev`, `build`, `start <role>`, `migrate:make`, `migrate`, `db:seed`, `env:check`, `env:example`, `routes`, `openapi`, `client:generate`, `doctor`, `test` (§5.2)
 - [ ] `make:entity`, `make:module`, `make:job` from official recipes (§5.2)
 - [ ] `bieberkit check` rules: boundaries, headers, env access, route permissions, destructive migrations, `http.fetch` or queue calls inside transactions, string-built SQL, stale generated files (WP-01, SEC-05, GEN-01, DATA-07)
+- [ ] `bieberkit check` rule: ORM imports in entity files, and use of `orm` overrides or hand-written ORM entities (SCH-08, ADR 0009)
 - [ ] Deterministic generators writing `.bieberkit/*` and `packages/client` (GEN-01 to GEN-03, API-07, SCH-04)
 - [ ] Oxlint plugin with BieberKit rules used by `check` (§3)
 - [ ] `bieberkit add` and `remove` with data ownership prompt (PLG-03, DATA-02)
