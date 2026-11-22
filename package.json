@@ -17,6 +17,9 @@
     "check:layers": "node tools/check-layers.ts",
     "check:skills": "node tools/sync-skills.ts --check",
     "check:workflows": "node tools/check-workflows.ts",
+    "check:api": "node tools/api-report.ts",
+    "api:update": "node tools/api-report.ts --write",
+    "check:changeset": "node tools/api-report.ts --changeset-since origin/main",
     "sync:skills": "node tools/sync-skills.ts",
     "changeset": "changeset"
   },
