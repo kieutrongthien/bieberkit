@@ -41,6 +41,7 @@ Status values: `Proposed`, `Accepted`, `Rejected`, `Superseded by NNNN`. Only th
 | [0007](0007-generated-project-license.md)     | Default license of generated projects                   | Accepted |
 | [0008](0008-orm-and-dialects.md)              | ORM and dialects: MikroORM 7, with rules from the spike | Accepted |
 | [0009](0009-define-entity-api.md)             | defineEntity and the field DSL                          | Accepted |
+| [0010](0010-queue-drivers.md)                 | Queue drivers: BullMQ on Valkey and a database driver   | Proposed |
 
 ## Needed for the Phase 0 gate
 
