@@ -134,7 +134,7 @@ Depends on: Phase 0 gate. Only Node.js built-ins (PKG-04).
 - [x] Unit coverage at least 90% lines (TST-01): `pnpm test:coverage`, threshold 90% lines for `packages/core/src` in `vitest.config.ts`
 - [ ] **[D]** Run `pnpm test:coverage` in `ci.yml` (proposed: replace `pnpm test` in the `check` job, so the threshold fails the build)
 
-Done when: a test app boots a module and a plugin graph, fails on a missing env key with a stable code, and stops in reverse order.
+Done when: a test app boots a module and a plugin graph, fails on a missing env key with a stable code, and stops in reverse order. Proven by `packages/core/src/kernel.test.ts` (2026-11-22).
 
 ### M1.2 Data: `@bieberkit/data`
 
