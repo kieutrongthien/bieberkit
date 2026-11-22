@@ -29,3 +29,16 @@ export const packageName = '@bieberkit/core';
 
 export { BkError, ConfigError, ContainerError, EnvValidationError, toBkError } from './errors/errors.ts';
 export type { BkErrorOptions, EnvProblem, ErrorBody } from './errors/errors.ts';
+
+export { defineEnv, describeEnv, env, mergeEnv, readEnv, redact } from './config/env.ts';
+export type {
+  EnvDescription,
+  EnvKeyBuilder,
+  EnvKeyDef,
+  EnvKind,
+  EnvOwner,
+  EnvSchema,
+  EnvSource,
+  EnvValues,
+  IntOptions,
+} from './config/env.ts';

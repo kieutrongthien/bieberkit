@@ -47,12 +47,12 @@ class EnvValidationError extends ConfigError { readonly problems: readonly EnvPr
 class ContainerError extends BkError {}         // CORE_SERVICE_*
 
 // environment
-const env: { string(): EnvKeyBuilder<string>; int(): EnvKeyBuilder<number>; boolean(): EnvKeyBuilder<boolean>;
+const env: { string(): EnvKeyBuilder<string>; int(options?: { min?: number; max?: number }): EnvKeyBuilder<number>; boolean(): EnvKeyBuilder<boolean>;
              enum<V extends string>(values: readonly V[]): EnvKeyBuilder<V>; url(): EnvKeyBuilder<string>; base64(): EnvKeyBuilder<string> }
 // EnvKeyBuilder: .default(v) .optional() .secret() .describe(text)   (immutable, each call returns a new builder)
 function defineEnv<T>(keys: { [K in keyof T]: EnvKeyBuilder<T[K]> }): EnvSchema<T>
 function mergeEnv(owners: readonly EnvOwner[]): EnvSchema<Record<string, unknown>>
-function readEnv<T>(schema: EnvSchema<T>, source: EnvSource, options?: { appEnv?: AppEnv }): T   // throws EnvValidationError
+function readEnv<T>(schema: EnvSchema<T>, source: EnvSource): T          // throws EnvValidationError
 function parseEnvFile(text: string): EnvSource
 function withEnvFile(real: EnvSource, file: EnvSource): EnvSource        // real values win (CFG-03)
 function redact<T>(schema: EnvSchema<T>, values: T): Record<string, unknown>
@@ -194,6 +194,7 @@ The keys of section 8.2 are the core schema (`coreEnv`), with its defaults. Rule
 - In development and test, a missing `APP_KEY` or `AUTH_SECRET` gets an ephemeral random value and a warning in the log. In production a missing one is `CFG_ENV_MISSING`.
 - `APP_ENV` decides this and the production checks. It defaults to `development`.
 - `.env` is read from the working directory unless `envFile` says otherwise, with `util.parseEnv`, so the parse changes nothing global.
+- An empty value (`KEY=`) counts as unset, so the default or the missing-key error applies.
 - Booleans accept `true`, `false`, `1` and `0`. Integers must be whole numbers inside the optional range.
 
 ## Tests
