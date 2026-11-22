@@ -41,18 +41,19 @@ interface CompileOptions {
 }
 export declare function entityOfSchema(schema: object): EntityDef<string>;
 export declare function compileEntities(defs: readonly EntityDef<string>[], options?: CompileOptions): OrmSchema[];
-type Row$5 = Record<string, unknown>;
+type Row$6 = Record<string, unknown>;
 interface AggregateOptions {
   readonly groupBy?: readonly string[];
   readonly sum?: readonly string[];
   readonly count?: boolean;
-  readonly where?: Row$5;
+  readonly where?: Row$6;
+  readonly scope?: Row$6;
   readonly maxGroups?: number;
 }
 interface AggregateRow {
-  readonly group: Row$5;
+  readonly group: Row$6;
   readonly count?: number;
-  readonly sum?: Row$5;
+  readonly sum?: Row$6;
 }
 interface AggregateResult {
   readonly rows: AggregateRow[];
@@ -265,7 +266,7 @@ interface SequenceOptions {
   readonly now?: Date;
 }
 export declare function nextSequence(em: EntityManager, key: SequenceKey, options?: SequenceOptions): Promise<number>;
-type Row$4 = Record<string, unknown>;
+type Row$5 = Record<string, unknown>;
 interface TransitionResult {
   readonly name: string;
   readonly from: string;
@@ -278,9 +279,9 @@ interface AvailableTransition {
   readonly permission?: string;
 }
 export declare function transitionOf(schema: OrmSchema, name: string): TransitionDef;
-export declare function availableTransitions(schema: OrmSchema, row: Row$4): readonly AvailableTransition[];
+export declare function availableTransitions(schema: OrmSchema, row: Row$5): readonly AvailableTransition[];
 export declare function entityEventName(entity: string, name: string): string;
-export declare function transition(em: EntityManager, schema: OrmSchema, row: Row$4, name: string, input?: unknown): Promise<TransitionResult>;
+export declare function transition(em: EntityManager, schema: OrmSchema, row: Row$5, name: string, input?: unknown): Promise<TransitionResult>;
 interface OutboxEvent {
   readonly name: string;
   readonly version?: number;
@@ -343,9 +344,9 @@ interface PurgeOptions {
   readonly now?: () => number;
 }
 export declare function purgeProcessed(db: Database, options?: PurgeOptions): Promise<number>;
-type Row$3 = Record<string, unknown>;
-export declare function bulkInsert(em: EntityManager, schema: OrmSchema, rows: readonly Row$3[]): Promise<void>;
-export declare function bulkUpdate(em: EntityManager, schema: OrmSchema, where: Row$3, data: Row$3): Promise<number>;
+type Row$4 = Record<string, unknown>;
+export declare function bulkInsert(em: EntityManager, schema: OrmSchema, rows: readonly Row$4[]): Promise<void>;
+export declare function bulkUpdate(em: EntityManager, schema: OrmSchema, where: Row$4, data: Row$4): Promise<number>;
 interface PluginRefusal {
   readonly step: string;
   readonly code: string;
@@ -362,6 +363,7 @@ interface PluginRunOptions {
   readonly deployId?: string;
 }
 export declare function runPluginMigrations(db: Kysely<StepDatabase>, dialect: Dialect, steps: readonly PluginMigrationStep[], options: PluginRunOptions): Promise<PluginRun>;
+export declare function applyPluginMigrations(db: Database, steps: readonly PluginMigrationStep[], options: PluginRunOptions): Promise<PluginRun>;
 interface MigrationEnv {
   readonly DB_CONNECTION: Dialect | undefined;
   readonly MIGRATE_DATABASE_URL: string | undefined;
@@ -421,13 +423,13 @@ export declare class BieberEntityManager extends SqlEntityManager {
 export declare function softDelete(em: EntityManager, row: Record<string, unknown>): void;
 export declare function restore(em: EntityManager, row: Record<string, unknown>): void;
 export declare function expectVersion(row: object, expected: number | string): void;
-type Row$2 = Record<string, unknown>;
+type Row$3 = Record<string, unknown>;
 interface SortOption {
   readonly field: string;
   readonly direction?: "asc" | "desc";
 }
 interface ListOptions {
-  readonly where?: Row$2;
+  readonly where?: Row$3;
   readonly sort?: readonly SortOption[];
   readonly limit?: unknown;
   readonly cursor?: string;
@@ -436,15 +438,19 @@ interface ListOptions {
   readonly select?: readonly string[];
   readonly populate?: readonly string[];
   readonly locale?: string;
+  readonly scope?: Row$3;
 }
 interface Page {
-  readonly rows: Row$2[];
+  readonly rows: Row$3[];
   readonly limit: number;
   readonly nextCursor: string | null;
   readonly total?: number;
 }
 export declare function queryableFields(schema: OrmSchema): readonly string[];
 export declare function listPage(em: EntityManager, schema: OrmSchema, options?: ListOptions): Promise<Page>;
+type Row$2 = Record<string, unknown>;
+export declare function findScoped(em: EntityManager, schema: OrmSchema, id: string, scope: Row$2 | undefined): Promise<Row$2 | null>;
+export declare function findAllScoped(em: EntityManager, schema: OrmSchema, ids: readonly string[], scope: Row$2 | undefined): Promise<Row$2[]>;
 type Row$1 = Record<string, unknown>;
 export declare function translationName(entityName: string): string;
 export declare function setTranslation(em: EntityManager, schema: OrmSchema, recordId: string, locale: string, values: Row$1): Promise<void>;

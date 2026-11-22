@@ -524,3 +524,20 @@ An outbound `fetch` that webhooks and integrations use.
 ## The aggregate route (API-15)
 
 `GET /<resource>/aggregate?groupBy=tier&sum=visits,credit&count=true&filter[...]` answers `{ data: [{ group, count?, sum? }], meta: { groupBy, sum, count } }`. It exists for an entity that has `api.list` and at least one field declared `.aggregatable()`, and it needs the `read` permission. It uses the keys of the API (`ownerId` for a relation) and the filters of a list, and the data layer applies the tenant filter and the soft delete. A field that has a read mask (`permissions.fields.<name>.read`) can be grouped or summed only by a caller who may read it, as in a list, and the answer is 403 otherwise. `_meta` marks such a field with `aggregatable: true`. Conditions of the ability on rows (CASL) arrive with M1.4, and apply to this route as they do to a list. See the section "API-15" of `docs/modules/data.md` for the rules of the aggregation.
+
+## The access port (AUTHZ-02 to AUTHZ-05, M1.4)
+
+The route permission says whether a caller may call a route. The access port says which rows and which fields. It is additive: a server without it behaves as before.
+
+- `Authorizer.access?(principal, entity, action, request)` answers `{ allowed, reason?, scope?, readable?, writable? }`, and `ctx.access(entity, action)` calls it. `scope` is a condition in the small language of ADR 0013, in the properties of the entity. `readable` and `writable` are field names, and `undefined` is every field. Without an authorizer, or with one that has no `access`, `ctx.access` is `{ allowed: true }`. With an authorizer and no principal it is a denial.
+- `Authorizer.allows?(principal, entity, action, row, request)` and `ctx.allows(entity, action, row)` judge a row that is not stored yet: the data of a create and the new state of an update. They are true when nothing limits them.
+- The entity routes use them. A list, a get and an aggregate add `scope` to the query. A get, an update, a delete, a transition and a bulk item of a row outside the scope are 404 (`not_found` in a bulk call), and a stale version of such a row is 404 too, so the row is not revealed. A create, and an update that would move a row out of the scope, are 403 `AUTHZ_DENIED` (`invalid` for one bulk item). A condition that the language does not have is 403 `AUTHZ_UNSUPPORTED_CONDITION`, before any row is read.
+- A masked field is left out of a list, a get and the answer of a write when the caller may not read it, and asking for it in `fields`, a filter or a sort is 403 `AUTHZ_FIELD_FORBIDDEN`. A body with a field that the caller may not write is 403 `AUTHZ_FIELD_FORBIDDEN`, in a bulk call for the whole call. The answer of a write has `id` and `version` for a caller who may not read.
+- The action of a transition is `transition:<name>` when the transition has a permission of its own, and `update` when it has not.
+- The `StageContext` of the hooks gains `status`, `code` and `details` at `onResponse`: the status of the answer, the code of the problem and its extra members (`HttpError.extensions`). A hook that audits a denial reads them. A problem of `AUTHZ_*` carries `entity`, `action` and, for a field, `fields`, never a value.
+
+| Code                          | Status | Fix                                                                    |
+| ----------------------------- | ------ | ---------------------------------------------------------------------- |
+| `AUTHZ_DENIED`                | 403    | The caller has no permission for this data                             |
+| `AUTHZ_FIELD_FORBIDDEN`       | 403    | Remove the fields that the caller has no permission for                |
+| `AUTHZ_UNSUPPORTED_CONDITION` | 403    | A condition of a role uses an operator that the language does not have |

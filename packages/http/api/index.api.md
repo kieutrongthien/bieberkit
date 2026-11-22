@@ -75,8 +75,17 @@ interface Authenticator {
 interface TenantResolver {
   resolve(request: RequestInfo, principal: Principal | undefined): Promise<string | undefined>;
 }
+interface AccessAnswer {
+  readonly allowed: boolean;
+  readonly reason?: "no-permission" | "unsupported-condition";
+  readonly scope?: Readonly<Record<string, unknown>>;
+  readonly readable?: ReadonlySet<string>;
+  readonly writable?: ReadonlySet<string>;
+}
 interface Authorizer {
   can(principal: Principal, permission: string, request: RequestInfo): Promise<boolean>;
+  access?(principal: Principal, entity: string, action: string, request: RequestInfo): Promise<AccessAnswer>;
+  allows?(principal: Principal, entity: string, action: string, row: Readonly<Record<string, unknown>>, request: RequestInfo): Promise<boolean>;
 }
 interface RateLimitResult {
   readonly allowed: boolean;
@@ -106,6 +115,8 @@ interface RouteContext {
   status(code: number): void;
   header(name: string, value: string): void;
   can(permission: string): Promise<boolean>;
+  access(entity: string, action: string): Promise<AccessAnswer>;
+  allows(entity: string, action: string, row: Readonly<Record<string, unknown>>): Promise<boolean>;
 }
 interface RouteDef {
   readonly method: Method;
@@ -150,6 +161,9 @@ interface StageContext {
   readonly requestId: string;
   readonly traceId: string;
   readonly result?: unknown;
+  readonly status?: number;
+  readonly code?: string;
+  readonly details?: Readonly<Record<string, unknown>>;
 }
 type StageHook = (context: StageContext) => void | Promise<void>;
 interface HttpServerOptions {
@@ -296,5 +310,5 @@ interface Problem {
   readonly [extension: string]: unknown;
 }
 export declare const packageName = "@bieberkit/http";
-export type { Authenticator, Authorizer, CorsOptions, CsrfProtection, EntityRoutesContext, ErrorContext, HttpEnv, HttpFetch, HttpFetchInit, HttpFetchOptions, HttpServer, HttpServerOptions, InjectOptions, InjectResponse, Method, OpenApiDocument, OpenApiInfo, Principal, Problem, RateLimitResult, RateLimiter, RegisterHttpOptions, RequestInfo, ResolvedAddress, RouteContext, RouteDef, RouteSchema, StageContext, StageHook, StageName, TenantResolver };
+export type { AccessAnswer, Authenticator, Authorizer, CorsOptions, CsrfProtection, EntityRoutesContext, ErrorContext, HttpEnv, HttpFetch, HttpFetchInit, HttpFetchOptions, HttpServer, HttpServerOptions, InjectOptions, InjectResponse, Method, OpenApiDocument, OpenApiInfo, Principal, Problem, RateLimitResult, RateLimiter, RegisterHttpOptions, RequestInfo, ResolvedAddress, RouteContext, RouteDef, RouteSchema, StageContext, StageHook, StageName, TenantResolver };
 ```

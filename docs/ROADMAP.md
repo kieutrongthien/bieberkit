@@ -207,11 +207,11 @@ Depends on: M1.3.
 - [ ] Email and password with ASVS rules (AUTH-04); magic link, TOTP and passkeys (AUTH-03)
 - [ ] MFA required for roles flagged `requireMfa` (AUTH-05)
 - [ ] Per-IP and per-account limits on login, OTP, magic link and reset (AUTH-06, SEC-10)
-- [ ] **[D]** CASL ability per request from role data; permissions in code, roles in database (AUTHZ-01, §14.2)
-- [ ] **[D]** CASL to ORM condition translator; lists return only permitted rows (AUTHZ-02): own translator with a small operator set that fails closed with `AUTHZ_UNSUPPORTED_CONDITION` (ADR 0013)
+- [x] **[D]** CASL ability per request from role data; permissions in code, roles in database (AUTHZ-01, §14.2). Roles are per tenant, a condition is code attached to a permission string (`scopedPermissions`), and the ability lives for one request
+- [x] **[D]** CASL to ORM condition translator; lists return only permitted rows (AUTHZ-02): own translator with a small operator set that fails closed with `AUTHZ_UNSUPPORTED_CONDITION` (ADR 0013)
 - [ ] `bieberkit check` rule: condition operators outside the supported set, dotted paths and unknown fields (AUTHZ-06, ADR 0013)
-- [ ] **[D]** Field masks on read and write, default deny (AUTHZ-03, AUTHZ-04)
-- [ ] Audit of role changes, `asSystem()`, impersonation, failed authorization (AUTHZ-05)
+- [x] **[D]** Field masks on read and write, default deny (AUTHZ-03, AUTHZ-04)
+- [ ] Audit of role changes, `asSystem()`, impersonation, failed authorization (AUTHZ-05). `asSystem()` and failed authorization (a denial, an unsupported condition, a write of a masked field) are done. Role changes wait for the service that edits roles, and impersonation for its design
 - [ ] API keys primitive: shown once, hashed, scoped, expiring (AUTH-07)
 - [ ] `encrypted: true` fields with key rotation through `APP_KEY_PREVIOUS`; `pii: true` log redaction (SEC-08, SEC-09)
 
@@ -246,7 +246,7 @@ Depends on: M1.3, M1.4, M1.5.
 - [ ] OpenTelemetry traces over HTTP, database, cache, queue, jobs with context carried into jobs (OBS-02)
 - [ ] Prometheus metrics on `METRICS_PORT`, not routed publicly (OBS-03, OBS-04)
 - [ ] `@bieberkit/testing`: `createTestApp`, entity factories, `actingAs`, `withTenant` (TST-02)
-- [ ] Generated contract tests per entity: permissions, field masks, tenant isolation, validation, pagination limits (§21). Generated from the `permissions` block, with a mutation job that proves they catch six known faults (ADR 0013)
+- [ ] Generated contract tests per entity: permissions, field masks, tenant isolation, validation, pagination limits (§21). Generated from the `permissions` block, with a mutation job that proves they catch six known faults (ADR 0013). The permission part is done in `@bieberkit/auth/testing` (M1.4); validation and pagination limits are left
 - [ ] Testcontainers setup for PostgreSQL, MySQL and Valkey; network calls outside containers fail tests (TST-03)
 - [ ] Coverage gates: 90% core, data, http, auth; 80% elsewhere (TST-01)
 

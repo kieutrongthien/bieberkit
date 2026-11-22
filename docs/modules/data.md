@@ -757,3 +757,12 @@ aggregate(em, schema, { groupBy?: string[]; sum?: string[]; count?: boolean; whe
 | ------------------------- | ------ | ----------------------------------------------------------------- |
 | `DATA_AGGREGATE_INVALID`  | 400    | Declare the field with `.aggregatable()` and use a kind that fits |
 | `DATA_AGGREGATE_TOO_MANY` | 400    | Group by something coarser, or filter first                       |
+
+## Scoped reads (AUTHZ-02, ADR 0013)
+
+`listPage` and `aggregate` take `scope`, and `findScoped(em, schema, id, scope)` and `findAllScoped(em, schema, ids, scope)` find tracked rows. A scope is the set of rows that code allows a caller to see, translated by `@bieberkit/auth` from the conditions of his roles. It is not a filter of the client:
+
+- It is applied next to `where` and next to the filters of the entity manager, so the tenant filter and the soft delete stay, and no scope can take them away. The total, the cursor and the offset of a list count only the rows of the scope.
+- A field of a scope needs no index, because code chooses it and a client does not. The language is the one of ADR 0013: properties of the entity (no path), the operators `$eq`, `$ne`, `$in`, `$nin`, `$gt`, `$gte`, `$lt`, `$lte`, a plain value or `null` for equality, and `$or` of scopes at the top. A property that the entity does not have, a path, any other operator and a nested `$or` are `DATA_QUERY_INVALID` (400) before a query runs.
+- `findScoped` gives `null` for a row outside the scope, a row of another tenant, a deleted row and an id that is not a UUID, so a caller cannot tell them apart. A scope that is not in the language is refused first.
+- `applyPluginMigrations(db, steps, options)` is `runPluginMigrations` for a `Database`, so a package that ships steps (the roles tables of `@bieberkit/auth`) does not reach for the Kysely of the data layer.
