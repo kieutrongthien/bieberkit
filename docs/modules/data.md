@@ -663,3 +663,69 @@ All of it about the databases.
 - **Events for comments and tags** (for notifications) come with the notifications plugin of M1.8. The route can call `emitEvent`.
 - **Editing a comment.** A comment is added or deleted. An edit with history is a product decision for the admin.
 - **Deleting the rows of a deleted record.** A soft deleted record keeps its features. A hard delete is a job of the retention work (PDP).
+
+## Slice 9: standalone validators and serializers
+
+Designed on 2026-11-23. None of it is maintainer-designed (SCH-06, PERF-06 and ADR 0009 decide the model). Slices 7 and 8 were merged into `main` before it started.
+
+### What is built
+
+At build, `emitStandalone(defs)` writes two CommonJS modules and a manifest. The web role loads them instead of compiling the schemas at boot (ADR 0009 measured 654 to 668 ms to compile 600 validators, and 69 ms to load the standalone module).
+
+- `validators.cjs`: one Ajv validator for each entity and each of `create` and `update`, keyed `<entity>:<mode>`. The `read` schema is not a validator, because the server writes what it reads.
+- `serializers.cjs`: one `fast-json-stringify` function for each entity, `<entity>:read`, and one for a list of rows, `<entity>:list`. Its value is the whitelist of fields (API-01): a field that the read schema does not name never leaves the server. ADR 0009 found that it is not faster than `JSON.stringify`, and the wording of the spec follows that.
+- `standalone.json`: the format version, the SHA-256 of all schemas, and the entity names.
+
+### Public API (`@bieberkit/data/build`)
+
+A new subpath, for build tools and the web role. It imports Ajv and `fast-json-stringify`, so the client never does, and `./schema` stays free of them (SCH-07).
+
+```ts
+emitStandalone(defs, options?: { runtime?: string }): StandaloneFiles          // pure: returns the text of the three files
+writeStandalone(defs, directory, options?): Promise<StandaloneFiles>
+loadStandalone(directory): Promise<StandaloneRuntime>
+createStandaloneRuntime(parts: { validators; serializers; manifest }): StandaloneRuntime
+createAjv(options?): Ajv                                                         // the options of SCH-06, also used by the contract tests
+
+interface StandaloneRuntime {
+  validate(entity: string, mode: 'create' | 'update', input: unknown): ValidationResult
+  serialize(entity: string, row: unknown): string
+  serializeMany(entity: string, rows: readonly unknown[]): string
+  assertCurrent(defs): void
+}
+type ValidationResult = { ok: true; value: unknown } | { ok: false; issues: ValidationIssue[] }
+interface ValidationIssue { path: string; keyword: string; message: string }   // path is dotted: 'balance.amount', or '' for the body
+```
+
+`@bieberkit/data/runtime` (a second new subpath) re-exports the few helpers that the generated code needs: `ucs2length` and `equal` of Ajv, the formats of `ajv-formats`, and the serializer helpers of `fast-json-stringify`.
+
+### Rules
+
+- **The generated code `require`s only `@bieberkit/data/runtime`.** Ajv and `fast-json-stringify` write `require("ajv/dist/runtime/ucs2length")` and similar. A project that depends on `@bieberkit/data` cannot resolve them under pnpm, because they are dependencies of ours. The emitter rewrites each known `require` to `require("@bieberkit/data/runtime").<name>`, and an unknown one stops the build with `DATA_STANDALONE_UNSUPPORTED`, so a new Ajv helper is noticed at build and not at the first request. `options.runtime` replaces the specifier, for tests that run from the sources.
+- **The output is reproducible.** The same entities give the same bytes and the same hash. Entities are sorted by name, and nothing in the text depends on the time or the machine.
+- **`validate` normalizes first.** It runs `normalizeInput` (NFC, SCH-05) and then the validator, and returns the normalized value, so a handler never sees decomposed text. The verdict of the standalone validator is the verdict of an Ajv that compiled the same schema, and a test compares them on the shared fixtures.
+- **A stale build is refused.** `assertCurrent(defs)` compares the hash of the schemas of the entities that are loaded with the manifest, and a difference is `DATA_STANDALONE_STALE`. The web role calls it at boot, so old validators never run on new entities.
+- **An unknown entity or mode is `DATA_STANDALONE_UNKNOWN`** (500: the route that asked is wrong).
+- **Dependency (P9).** `fast-json-stringify` 7.3.6 (MIT, exact). ADR 0009 named 7.3.9, which was a day old and refused by `minimumReleaseAge`, so the newest version that is old enough is used. The upgrade is a roadmap item with the others.
+
+### Errors of slice 9
+
+| Code                          | Status | Fix                                                                                                     |
+| ----------------------------- | ------ | ------------------------------------------------------------------------------------------------------- |
+| `DATA_STANDALONE_STALE`       | 500    | Run the build again: the entities changed since the modules were made                                   |
+| `DATA_STANDALONE_UNKNOWN`     | 500    | The entity is not in the build, or the mode is not `create` or `update`                                 |
+| `DATA_STANDALONE_UNSUPPORTED` | 500    | The generated code needs a helper that the runtime does not export. Add it to `@bieberkit/data/runtime` |
+
+### Found while implementing slice 9
+
+- **The output was not the same twice.** `fast-json-stringify` names what it merges and checks with a counter that lives as long as the process (`__fjs_merged_0`, `__fjs_root_2`), so a second emit in the same process gave other names. The emitter renumbers each name by its first place in the unit.
+- **A row with an unexpected key inside a money value is refused.** The read schema of a nullable money is `anyOf` an object with `additionalProperties: false` and `null`, and the serializer throws `does not match schema definition` for such a row. A field at the top that the schema does not name is dropped, as API-01 wants. The rows come from `toApiRow`, so the throw is a bug of the caller and is fail closed.
+- **The `require` of an ESM package works.** The generated `.cjs` files require `@bieberkit/data/runtime`, which is ESM, and Node 24.12 loads it with `require()`. A check with the built package (subpath exports, the generated file in a folder of the same package) printed a valid and an invalid verdict, and the file asks for nothing else.
+- **A test cannot use the built package.** Tests run from the sources, so they name `src/runtime.ts` as the runtime. The check of the real specifier was made by hand after `pnpm build`.
+- **The tests write under `packages/data/.tmp`**, like the migration tests: a file under `node_modules` would not be loaded as TypeScript.
+
+### Left out
+
+- **The command** `bieberkit build` that calls `writeStandalone` is the CLI of M1.8. This slice is the library.
+- **Validators of custom route schemas.** They come from Zod through JSON Schema (SCH-01) and are the route layer's, in M1.3.
+- **A benchmark** of the boot time. The k6 and boot measurements are M1.9.
