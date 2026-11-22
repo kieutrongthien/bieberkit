@@ -1,0 +1,132 @@
+<!--
+  BieberKit
+
+  @file        docs/modules/auth.md
+  @description Module spec of @bieberkit/auth: slice A, authorization with roles as data, CASL abilities, the condition translator, row scope and field masks (M1.4).
+  @author      Bieber Kieu <kieutrongthien@gmail.com>
+  @copyright   Copyright (c) 2026 Bieber Kieu
+  @license     Apache-2.0
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+
+  SPDX-License-Identifier: Apache-2.0
+-->
+
+# @bieberkit/auth
+
+- Package: `@bieberkit/auth`
+- Layer: contracts (it may import `@bieberkit/core`, `@bieberkit/data` and `@bieberkit/http`)
+- Spec sections: 14 (authentication and authorization), 7.5, 21, ADR 0012, ADR 0013
+- Status: **Slice A (authorization) is implemented on 2026-11-23**, on the branch `feat/auth-design`, after the maintainer delegated the open decisions to the engineer (all six points under "Found while writing the tests" were accepted). Slices B and C are not started.
+
+## Purpose
+
+Decides what a signed-in caller may do: which routes, which rows, which fields. Better Auth (who the caller is) is slice B of M1.4 and plugs in through the ports of `@bieberkit/http`. Slice A works with any `Authenticator`.
+
+## Slicing of M1.4
+
+| Slice                   | Content                                                                                              |
+| ----------------------- | ---------------------------------------------------------------------------------------------------- |
+| **A. Authorization**    | This document                                                                                        |
+| B. Authentication       | Better Auth over the Kysely of the request, auth tables, cookie, client IP, rate limits, drift check |
+| C. Strong auth and keys | TOTP, passkeys, magic link, `requireMfa`, API keys, `encrypted: true` fields, `pii` log redaction    |
+
+## Public API (slice A)
+
+```ts
+// the permissions that the entities declare
+buildPermissionRegistry(entities: readonly EntityDef<string>[]): PermissionRegistry
+type Action = 'read' | 'create' | 'update' | 'delete' | `transition:${string}`
+interface PermissionEntry { permission: string; subject: string; action: Action; field?: string; fieldAccess?: 'read' | 'update' }
+interface PermissionRegistry { entries: readonly PermissionEntry[]; entriesOf(permission: string): readonly PermissionEntry[] }
+
+// a permission that carries a condition (code, section 14.2)
+interface ScopedPermission { subject: string; action: Action; when(user: AbilityUser): Condition }
+type Condition = Record<string, unknown>         // CASL conditions of ADR 0013: eq, ne, in, nin, gt, gte, lt, lte
+interface AbilityUser { id: string; tenantId?: string }
+
+// the ability of one request
+buildAbility(input: { registry; granted: ReadonlySet<string>; scoped?: Readonly<Record<string, ScopedPermission>>; user: AbilityUser }): Ability
+interface Ability {
+  has(permission: string): boolean                                  // the caller was granted this permission string
+  access(entity: EntityShape, action: Action): AccessAnswer          // for a list, a get, an update: which rows and which fields
+  allows(entity: EntityShape, action: Action, row: Row): boolean     // for a row in memory, for a create and for the new state of an update
+}
+interface EntityShape { name: string; properties: ReadonlySet<string>; fields: readonly string[] }
+interface AccessAnswer { allowed: boolean; reason?: 'no-permission' | 'unsupported-condition'; scope?: Row; readable?: ReadonlySet<string>; writable?: ReadonlySet<string> }
+
+// roles are data
+AUTH_PLUGIN = '@bieberkit/auth'; NIL_TENANT                          // the roles of a request with no tenant belong to the nil UUID
+authMigrationSteps: readonly PluginMigrationStep[]               // plugin '@bieberkit/auth': auth_roles, auth_role_permissions, auth_user_roles
+authEntities: readonly EntitySchema[]                              // the same tables for the ORM
+AuthRole { id, tenant, name, system, requireMfa }; AuthRolePermission { roleId, permission }; AuthUserRole { tenant, userId, roleId }
+loadGrants(db, tenantId: string | undefined, userId: string): Promise<{ permissions: Set<string>; roles: string[]; requireMfa: boolean }>
+
+// the authorizer of the HTTP server
+createAuthorizer(options: AuthorizerOptions): AccessAuthorizer
+interface AuthorizerOptions { db: Database; entities: readonly EntityDef<string>[]; schemas: readonly OrmSchema[]; scoped?: Readonly<Record<string, ScopedPermission>>; grants?: GrantLoader }
+interface AccessAuthorizer extends Authorizer { install(server: HttpServer): void }      // adds the hook that drops the ability of a request
+
+// @bieberkit/auth/testing
+permissionMatrix(entity: EntityDef<string>, options?: { scoped?; conditions?: { permission; inside(userId); outside(userId) }[] }): MatrixCase[]
+interface MatrixCase { id: string; title: string; run(harness: MatrixHarness): Promise<void> }     // throws when the authorizer is wrong
+interface MatrixHarness { entity; path; tenants: readonly [string, string]; sample(extra?): Row; valueOf(field): unknown;
+  caller(permissions, options?: { tenant?; userId? }): Promise<MatrixCaller>; seed(tenant, rows): Promise<string[]>; stored(id, field): Promise<unknown> }
+MUTANTS: readonly Mutant[]                                         // six faults: ignore-conditions, no-read-mask, no-write-mask, write-checks-read, unsupported-allows-all, tenant-blind-grants
+interface Mutant { id; description; build(options: AuthorizerOptions, tenants: readonly [string, string]): AccessAuthorizer }
+```
+
+`@bieberkit/http` gains `Authorizer.access?(principal, entity, action, request): Promise<AccessAnswer>`, the type `AccessAnswer` (the one above, without the dependency on this package), and `ctx.access(entity, action)`. Without `access` a route answers as before (the route permission decides), and `ctx.access` is allowed with no scope and all fields. With an authorizer and no principal it is `{ allowed: false, reason: 'no-permission' }`. The `StageContext` of the hooks gains `status` (set at `onResponse`) and `code` (the code of the problem, when the answer is one), so the hook that audits a denial knows that the request failed and why. `@bieberkit/data/orm` gains `scope` on `listPage` and `aggregate`, `findScoped(em, schema, id, scope)` and `applyPluginMigrations(db, steps, options)` (the `runPluginMigrations` of a `Database`, so a package that has steps does not need the Kysely of the data layer). The generated tests and the mutants are the subpath `@bieberkit/auth/testing`, which has no dependency on a test runner. The helpers that the tests of this package use (the app, the dialects) stay in `src/testing` and are not published, until `@bieberkit/testing` (TST-02) exists.
+
+## Rules
+
+1. **Permission strings are opaque.** An entity may name its permissions anything (`sales.view`). The registry lists each entity's `read`, `create`, `update`, `delete` (default `<module>.<entity>.<action>` like `@bieberkit/http`), each transition (`transition:<name>`, the permission of the transition or `update`) and each masked field (`permissions.fields.<field>.read|update`). A permission that no entity declares is a plain capability such as `system.api-docs`, and `has` answers it by name.
+2. **Roles are data and per tenant.** `auth_roles (id, tenant_id, name, system, require_mfa)` with the name unique in its tenant, `auth_role_permissions (role_id, permission)` and `auth_user_roles (tenant_id, user_id, role_id)`, whose key `(tenant_id, role_id)` points at `auth_roles` so that a role cannot be given in another tenant. Deleting a role deletes its permissions and its assignments. A request with no tenant uses the roles of the nil tenant. The caller's grants are the union of the permissions of the roles that he has in the tenant of the request. Roles of another tenant grant nothing. A role only grants.
+3. **A condition is attached to a permission string in code, in `scoped`.** (This refines the plan, which keyed a function by a permission of the entity. A permission such as `crm.deal.read-own` is not one that the entity declares, so the subject and the action have to be given, and a role that has only this permission must still reach the route that asks for `crm.deal.read`: **a route permission passes when the caller has any granted permission with the same subject and action**, and the scope of the answer is what limits the rows.) `{ 'crm.deal.read-own': { subject: 'crm.Deal', action: 'read', when: (user) => ({ assignee: user.id }) } }`. The entity's own `read` has no condition, so a role that grants `crm.deal.read` sees every row and a role that grants `crm.deal.read-own` sees its own, and a caller with both sees every row (CASL combines them). A scoped permission whose subject and action disagree with the entity that declares the same string is refused when the ability is built. `defineEntity` is not changed. A module contributes `scoped` through the key `scopedPermissions` that this package adds to `ModuleContributions` (`permissions` is taken: a plugin lists its permission strings there).
+4. **The condition language is small and fails closed (ADR 0013).** One operator per field from `eq` (also `null`), `ne`, `in`, `nin`, `gt`, `gte`, `lt`, `lte`, on properties of the entity. `$or`, `$and` and `$not` do not appear in a condition, and a dotted path, an unknown field or any other operator makes the answer `{ allowed: false, reason: 'unsupported-condition' }` before a query runs. The tenant filter is added outside by the data layer and no scope can remove it. A condition names fields of the entity (`owner`), and a relation takes the id of the row.
+5. **Default deny.** A subject and action that no granted permission covers is `{ allowed: false, reason: 'no-permission' }`. A masked field is readable only with its `read` permission and writable only with its `update` permission. A field without a mask follows the entity.
+6. **One ability for one request (AUTHZ-01).** It is built from the grants of (user, tenant) the first time a request asks, kept under the request id, and dropped by a hook of the stage `onResponse`. Nothing is shared between requests, so a change of roles shows in the next request.
+7. **The routes use the answer.** The list, the aggregate and the bulk route add `scope` to the query. A get, an update, a delete or a transition of a row outside the scope is 404, as if the row did not exist. A create, and the new state of an update, must pass `allows` for the data that is written, otherwise 403 `AUTHZ_DENIED`. A response has only the `readable` fields and the standard keys (`id`, `version`, dates), also the response of a write, so a caller who may update and not read gets `id` and `version`. A body with a field that is not `writable` is 403 `AUTHZ_FIELD_FORBIDDEN`, in a bulk call too (for the whole call, since the data is one for every item), and asking for a masked field that the caller may not read in `fields` is 403 `AUTHZ_FIELD_FORBIDDEN` (a masked field that was not asked for is just left out). A bulk item outside the scope is `not_found`, and one that the write would move out of the scope is `invalid`. A stale version of a row outside the scope is 404, not 412, so the row is not revealed. A transition is scoped like any other action: a scoped permission with `action: 'transition:close'`. `_meta` takes its visibility from the same answer.
+8. **Audit (AUTHZ-05).** A denial (`authz.denied`), an unsupported condition (`authz.unsupported-condition`) and a write of a masked field (`authz.field-forbidden`) each write an `audit_log` entry in a transaction of their own, because the request is failing. The entry is written by the `onResponse` hook, from what the request recorded (`status`, `code`, and the entity, action and permission that the authorizer saw), so a failing audit write never changes the answer. The data holds the permission, the entity, the action and the names of fields, never the values. A request with no principal (401) and a row outside the scope (404) write nothing: the first has no actor, the second is not a denial.
+9. **Generated tests (section 21).** `permissionMatrix(entity)` returns the cases of ADR 0013 for the `permissions` block of an entity, and `MUTANTS` are six faults of the authorizer: conditions ignored, no read mask, no write mask, no action check on update, an unsupported condition that allows everything, and the tenant filter off. The cases are generated from the `permissions` block of the entity (default deny, read allowed, read does not give write, other permissions do not give read, mask hidden and shown, mask write rejected and accepted, tenant isolation of a list, of the roles and of an update, an update with an empty payload), plus the conditions and the scoped permissions that are given. A case judges the rows that it made, so the cases can share one database. The suite of the package runs the matrix on the three dialects against the real authorizer and against each mutant, and every mutant must fail at least one case. The `asSystem` audit case of ADR 0013 is covered by the tests of `@bieberkit/data` and is not repeated.
+
+## Errors
+
+| Code                          | Status | Fix                                                                      |
+| ----------------------------- | ------ | ------------------------------------------------------------------------ |
+| `AUTHZ_DENIED`                | 403    | The caller has no permission for this, or for this data                  |
+| `AUTHZ_FIELD_FORBIDDEN`       | 403    | Remove the fields that the caller may not write                          |
+| `AUTHZ_UNSUPPORTED_CONDITION` | 403    | A condition uses an operator that the language does not have (ADR 0013)  |
+| `AUTHZ_PERMISSION_CONFLICT`   | 500    | A scoped permission names another subject or action than the entity does |
+
+## Tests (red until the maintainer approves)
+
+In `packages/auth/src`: `registry.test.ts`, `ability.test.ts` (with the language), `roles.dialects.test.ts`, `authorizer.dialects.test.ts` (can, access, the ability of a request, the audit of a denial), `entity-access.dialects.test.ts` (the routes with a real authorizer: scope, conditions of writes, masks, aggregate and bulk, fail closed), `matrix.dialects.test.ts` (the generated matrix and the six mutants). In `@bieberkit/data`: `scope.dialects.test.ts`. In `@bieberkit/http`: `access.test.ts`. The tests need the package to compile, so they are red until the code exists.
+
+## Left out of slice A
+
+- **Conditions through relations** (a dotted path). They need their own design (a join or a subquery) before they are allowed.
+- **Deny rules and role inheritance.** A role grants. If a need appears it is an ADR.
+- **The seeder of the administrator role** is M1.8, and `requireMfa` is enforced in slice C.
+- **The `bieberkit check` rule** for conditions (AUTHZ-06) waits for the CLI of M1.8. The runtime refusal is the second line of ADR 0013.
+
+## Found while writing and implementing slice A
+
+- **`allows` is a port method too.** The routes need to judge a row that is not stored (a create, the new state of an update), and `@bieberkit/http` must not depend on CASL, so `Authorizer.allows?` and `ctx.allows` carry the question to `Ability.allows`. One matcher gives one answer for a list and for a write.
+- **A route permission passes with `covers`.** `Ability.covers(permission)` is true when the permission was granted, or when another granted permission (a scoped one) has the same subject and action. The permission of a masked field must be granted itself.
+- **The key is `scopedPermissions`.** `permissions` of `ModuleContributions` is the list of strings of a plugin, so the contribution of conditions has its own key.
+- **A scope is written from the tree of CASL.** `rulesToAST` gives an `or` of conditions, or one condition, or an empty `and` (every row, no scope), or `null` (no rule). The translator merges the operators of one field into one object, writes equality as the plain value, and refuses a node that it does not know. An empty condition is refused too, because a function that returns `{}` by mistake must not open every row.
+- **The roles tables need two flushes.** The tables point at each other by key and not by relation, so the ORM does not order the inserts. A service writes the role first. The migration steps make the keys: `(tenant_id, role_id)` of `auth_user_roles` points at `auth_roles`, so a role cannot be given in another tenant.
+- **`@mikro-orm/core` is a dependency of this package.** The three tables are ORM schemas, like the framework tables of `@bieberkit/data`. It is the same version as `@bieberkit/data` (7.2.9), and no new third party library comes with it. `@casl/ability` 7.1.3 is the one that ADR 0013 and the P9 line name.
+- **The matrix found a weak spot of the first design of the mutants.** The tenant fault cannot be a wrapper over the authorizer, because the tenant filter of the rows lives in the data layer. The sixth mutant is `tenant-blind-grants`: the roles of every tenant grant. The tenant filter of the rows has its own tests in `@bieberkit/data`. Each mutant is caught by the cases that are meant to catch it: `conditions:*`, `mask-hidden`, `mask-write-rejected`, `read-does-not-grant-write`, `unsupported-denies:*` and `tenant-isolation-roles`.
+- **An empty update is a validation error for everyone.** The schema refuses `{}` before the permission is asked, so the case `update-empty-payload` of ADR 0013 is an update that names no masked field, by a caller who may only read.
