@@ -175,12 +175,12 @@ Done when: one sample entity round-trips on all three dialects, generates a migr
 
 Depends on: M1.2.
 
-- [ ] Fastify 5 server and the 12-stage request pipeline with named plugin hook stages only (§13.4, REQ-01, REQ-02)
-- [ ] RFC 9457 errors with `code` and `traceId`, validation `errors[]` (MOD-17, SEC-07)
+- [x] Fastify 5 server and the 12-stage request pipeline with named plugin hook stages only (§13.4, REQ-01, REQ-02). Authentication, tenants and authorization are ports until M1.4; CSRF (stage 6) and ETag (stage 11) are named places that slices 2 and 5 fill
+- [x] RFC 9457 errors with `code` and `traceId`, validation `errors[]` (MOD-17, SEC-07)
 - [ ] Generated entity routes from `api` settings: list, get, create, update, delete (§10.2, §13.1)
 - [ ] Filtering, sorting, `include`, `fields`, only on declared fields (§13.1)
-- [ ] Every route declares schemas and a permission or `public: true`; response serialized through schema (API-01, API-02)
-- [ ] Body limit, timeouts, `x-request-id`, trace headers (API-03 to API-05)
+- [x] Every route declares schemas and a permission or `public: true`; response serialized through schema (API-01, API-02). The `bieberkit check` rule on the source waits for the CLI of M1.8
+- [x] Body limit, timeouts, `x-request-id`, trace headers (API-03 to API-05)
 - [ ] ETag and conditional GET; cache headers for public cacheable routes (API-08, API-09)
 - [ ] Action and transition routes `POST .../actions/<name>` with audit and event (MOD-06)
 - [ ] Bulk endpoints up to 500 ids with per-row results and version conflicts (API-14, API-17)
@@ -190,7 +190,7 @@ Depends on: M1.2.
 - [ ] OpenAPI 3.1 generation, served in development and gated in production (API-06)
 - [ ] Security headers, CORS allowlist, CSRF with Fetch Metadata plus signed token, `http.fetch` with SSRF guard, timeouts and circuit breaker (SEC-01 to SEC-04, SEC-06, WH-04)
 - [ ] `/api/v1/_meta` with `schemaVersion`, per tenant and role, ETag (UI-02, META-01 to META-05)
-- [ ] Health endpoints `/health/live`, `/ready`, `/startup` and graceful shutdown sequence (§19.3, §19.4)
+- [x] Health endpoints `/health/live`, `/ready`, `/startup` and graceful shutdown sequence (§19.3, §19.4)
 - [ ] Test: a generated list endpoint that issues one query per row fails (PERF-04)
 
 Done when: entity routes, OpenAPI and `_meta` are generated for a sample entity and a request passes every pipeline stage in order.

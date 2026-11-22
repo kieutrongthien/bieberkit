@@ -28,5 +28,168 @@
 Generated from the built declaration files by `pnpm api:update`. Do not edit by hand. A change here is a change to the public API and needs a changeset (spec section 22.3).
 
 ```ts
+import { BkError, Lifecycle, Logger } from "@bieberkit/core";
+import { JsonSchema } from "@bieberkit/data/schema";
+import { ValidationIssue } from "@bieberkit/data/build";
+interface Principal {
+  readonly id: string;
+  readonly kind: "user" | "apiKey" | "service";
+}
+interface RequestInfo {
+  readonly method: string;
+  readonly path: string;
+  readonly headers: Readonly<Record<string, string | string[] | undefined>>;
+  readonly ip: string;
+}
+interface Authenticator {
+  authenticate(request: RequestInfo): Promise<Principal | undefined>;
+}
+interface TenantResolver {
+  resolve(request: RequestInfo, principal: Principal | undefined): Promise<string | undefined>;
+}
+interface Authorizer {
+  can(principal: Principal, permission: string, request: RequestInfo): Promise<boolean>;
+}
+interface RateLimitResult {
+  readonly allowed: boolean;
+  readonly retryAfterSeconds?: number;
+}
+interface RateLimiter {
+  hit(key: string): Promise<RateLimitResult>;
+}
+type Method = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+export declare const METHODS: readonly Method[];
+interface RouteSchema {
+  readonly params?: JsonSchema;
+  readonly query?: JsonSchema;
+  readonly body?: JsonSchema;
+  readonly response: Readonly<Record<number, JsonSchema>>;
+}
+interface RouteContext {
+  readonly params: Readonly<Record<string, unknown>>;
+  readonly query: Readonly<Record<string, unknown>>;
+  readonly body: unknown;
+  readonly principal: Principal | undefined;
+  readonly tenantId: string | undefined;
+  readonly requestId: string;
+  readonly traceId: string;
+  readonly log: Logger;
+  status(code: number): void;
+}
+interface RouteDef {
+  readonly method: Method;
+  readonly url: string;
+  readonly permission?: string;
+  readonly public?: true;
+  readonly schema: RouteSchema;
+  handler(ctx: RouteContext): unknown;
+}
+export declare function defineRoute(route: RouteDef): RouteDef;
+interface HttpEnv {
+  readonly APP_ENV: "development" | "test" | "production";
+  readonly APP_PORT: number;
+  readonly TRUST_PROXY: boolean | number;
+}
+interface ErrorContext {
+  readonly method: string;
+  readonly path: string;
+  readonly requestId: string;
+  readonly traceId: string;
+}
+export declare const STAGE_NAMES: readonly ["afterAuth", "beforeHandler", "afterHandler", "onResponse"];
+type StageName = (typeof STAGE_NAMES)[number];
+interface StageContext {
+  readonly method: string;
+  readonly path: string;
+  readonly principal: Principal | undefined;
+  readonly tenantId: string | undefined;
+  readonly requestId: string;
+  readonly traceId: string;
+  readonly result?: unknown;
+}
+type StageHook = (context: StageContext) => void | Promise<void>;
+interface HttpServerOptions {
+  readonly logger?: Logger;
+  readonly authenticator?: Authenticator;
+  readonly tenantResolver?: TenantResolver;
+  readonly authorizer?: Authorizer;
+  readonly ipLimiter?: RateLimiter;
+  readonly userLimiter?: RateLimiter;
+  readonly bodyLimit?: number;
+  readonly requestTimeoutMs?: number;
+  readonly keepAliveTimeoutMs?: number;
+  readonly onError?: (error: unknown, context: ErrorContext) => void;
+}
+interface InjectOptions {
+  readonly method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "HEAD" | "OPTIONS";
+  readonly url: string;
+  readonly headers?: Record<string, string>;
+  readonly payload?: string | object;
+}
+interface InjectResponse {
+  readonly statusCode: number;
+  readonly headers: Record<string, string | string[] | number | undefined>;
+  readonly body: string;
+}
+interface HttpServer {
+  route(route: RouteDef): void;
+  stage(name: StageName, hook: StageHook): void;
+  inject(request: InjectOptions): Promise<InjectResponse>;
+  listen(options?: {
+    port?: number;
+    host?: string;
+  }): Promise<{
+    address: string;
+    port: number;
+  }>;
+  markReady(): void;
+  stop(options?: {
+    drainMs?: number;
+    timeoutMs?: number;
+  }): Promise<{
+    timedOut: boolean;
+  }>;
+  readonly settings: Readonly<{
+    bodyLimit: number;
+    requestTimeoutMs: number;
+    keepAliveTimeoutMs: number;
+  }>;
+}
+export declare function createHttpServer(env: HttpEnv, options?: HttpServerOptions): HttpServer;
+interface RegisterHttpOptions {
+  readonly host?: string;
+  readonly port?: number;
+  readonly drainMs?: number;
+  readonly timeoutMs?: number;
+}
+export declare function registerHttp(lifecycle: Lifecycle, server: HttpServer, options?: RegisterHttpOptions): void;
+export declare class HttpError extends BkError {
+  readonly headers: Readonly<Record<string, string>>;
+  constructor(code: string, status: number, message: string, fix: string, headers?: Readonly<Record<string, string>>, cause?: unknown);
+}
+export declare class ValidationFailed extends HttpError {
+  readonly errors: readonly {
+    readonly path: string;
+    readonly code: string;
+    readonly message: string;
+  }[];
+  constructor(issues: readonly ValidationIssue[]);
+}
+interface Problem {
+  readonly type: string;
+  readonly title: string;
+  readonly status: number;
+  readonly detail: string;
+  readonly code: string;
+  readonly traceId: string;
+  readonly instance: string;
+  readonly fix?: string;
+  readonly errors?: readonly {
+    readonly path: string;
+    readonly code: string;
+    readonly message: string;
+  }[];
+}
 export declare const packageName = "@bieberkit/http";
+export type { Authenticator, Authorizer, ErrorContext, HttpEnv, HttpServer, HttpServerOptions, InjectOptions, InjectResponse, Method, Principal, Problem, RateLimitResult, RateLimiter, RegisterHttpOptions, RequestInfo, RouteContext, RouteDef, RouteSchema, StageContext, StageHook, StageName, TenantResolver };
 ```
