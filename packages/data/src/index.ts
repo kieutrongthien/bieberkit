@@ -32,3 +32,4 @@ export { createUuid7, isUuid, uuid7, uuid7FromBytes, uuid7ToBytes } from './keys
 export type { Uuid7Options } from './keys/uuid7.ts';
 export { codePointLength, fold, nfc } from './text/fold.ts';
 export type { Compare } from './text/fold.ts';
+export { assertSafeScaled, fromMinor, fromScaled, minorUnitOf, SAFE_MAX, toMinor, toScaled } from './numbers/scaled.ts';
