@@ -31,7 +31,7 @@ import { DIALECTS } from '@bieberkit/core';
 import type { Dialect } from '@bieberkit/core';
 import { afterAll, describe, inject, it } from 'vitest';
 import { createDatabase } from '../orm/connect.ts';
-import type { Database } from '../orm/connect.ts';
+import type { Database, DatabaseOptions } from '../orm/connect.ts';
 
 declare module 'vitest' {
   export interface ProvidedContext {
@@ -45,7 +45,7 @@ export interface DialectContext {
    * Opens a database of its own for this suite: a temporary file on SQLite, a new database on the server for PostgreSQL
    * and MySQL. The schema of `entities` is created. Everything is closed and dropped after the suite.
    */
-  readonly open: (entities: readonly EntitySchema[]) => Promise<Database>;
+  readonly open: (entities: readonly EntitySchema[], options?: Omit<DatabaseOptions, 'entities'>) => Promise<Database>;
 }
 
 const ENV_NAME: Readonly<Record<Exclude<Dialect, 'sqlite'>, string>> = {
@@ -111,7 +111,7 @@ export function describeDialects(name: string, suite: (context: DialectContext) 
       });
       suite({
         dialect,
-        open: async (entities) => {
+        open: async (entities, options = {}) => {
           let url = '';
           if (dialect === 'sqlite') {
             const dir = mkdtempSync(join(tmpdir(), 'bk-dialect-'));
@@ -122,7 +122,7 @@ export function describeDialects(name: string, suite: (context: DialectContext) 
             url = created.url;
             cleanups.push(created.drop);
           }
-          const database = await createDatabase(env(url, dialect), { entities });
+          const database = await createDatabase(env(url, dialect), { ...options, entities });
           cleanups.push(() => database.close());
           await database.orm.schema.create();
           return database;

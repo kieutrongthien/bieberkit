@@ -290,7 +290,7 @@ Unique constraints and indexes come from `tableConstraints(def)`, translated fro
 
 ### Other rules
 
-- **Version (API-13).** A stale flush is `DATA_VERSION_STALE` (412). `expectVersion` compares an `If-Match` value before the write. A write bumps `version` by one.
+- **Version (API-13).** A stale flush is `DATA_VERSION_STALE` (412). `expectVersion` compares an `If-Match` value (a number, or text such as `3`, `"3"` and `W/"3"`) before the write, and a value that is not a version is `DATA_VERSION_INVALID` (400). A write bumps `version` by one.
 - **Soft delete (DATA-16).** `softDelete` sets `deletedAt` and `deletedToken = id`. The filter `softDelete` hides deleted rows, and `filters: { softDelete: false }` stays allowed for trash views because it is not a security boundary.
 - **Shadow columns (DATA-21).** `bulkInsert` and `bulkUpdate` add the folded values. A direct `nativeUpdate` or `insert` that sets a compared field without its shadow value is `DATA_SHADOW_STALE`.
 - **Standard values.** `createdBy` and `updatedBy` come from `requestContext().userId`.

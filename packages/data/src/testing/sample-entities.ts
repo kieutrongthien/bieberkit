@@ -91,3 +91,15 @@ export const Asset: EntityDef<'inventory.Asset'> = defineEntity({
     label: f.string({ max: 50 }).optional(),
   },
 });
+
+/** A tenant entity that points at another one, so the composite foreign key `(tenant_id, customer_id)` is exercised (DATA-20). */
+export const Contact: EntityDef<'crm.Contact'> = defineEntity({
+  name: 'crm.Contact',
+  table: 'crm_contacts',
+  tenant: true,
+  fields: {
+    id: f.id(),
+    fullName: f.string({ min: 1, max: 100, compare: 'ci_ai' }).index(),
+    customer: f.belongsTo(() => Customer),
+  },
+});
