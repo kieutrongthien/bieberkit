@@ -28,11 +28,11 @@
 Generated from the built declaration files by `pnpm api:update`. Do not edit by hand. A change here is a change to the public API and needs a changeset (spec section 22.3).
 
 ```ts
+import { C as ResetEvery, E as TransitionDef, a as EntityDef } from "./define-entity-B93nbOOC.js";
 import { Dialect, Logger } from "@bieberkit/core";
 import { EntityData, EntityManager, EntityName, EntityProperty, EntitySchema, FilterOptions, FilterQuery, FindOneOptions, FindOptions, IDatabaseDriver, MikroORM, NativeInsertUpdateOptions, Platform, Primary, RequiredEntityData, Type, UpdateOptions } from "@mikro-orm/core";
 import { Kysely, RawBuilder, SqliteDialect, Transaction } from "kysely";
 import { SqlEntityManager } from "@mikro-orm/sql";
-import { a as EntityDef } from "./define-entity-B93nbOOC.js";
 import { n as StepDatabase, t as PluginMigrationStep, u as DestructiveFinding } from "./steps-BowZpLj1.js";
 interface ReferenceVisibility {
   visible(entity: string, ids: readonly string[]): Promise<readonly string[]>;
@@ -112,6 +112,12 @@ interface OutboxProcessedRow {
   eventId: string;
   processedAt: number | string;
 }
+interface SequenceRow {
+  tenant: string;
+  name: string;
+  period: string;
+  value: number | string;
+}
 interface AuditLogRow {
   id: string;
   tenant?: string | null;
@@ -127,10 +133,44 @@ interface AuditLogRow {
 export declare const OutboxEntry: EntitySchema<OutboxEntryRow>;
 export declare const OutboxProcessed: EntitySchema<OutboxProcessedRow>;
 export declare const AuditLog: EntitySchema<AuditLogRow>;
+export declare const Sequence: EntitySchema<SequenceRow>;
 export declare const frameworkEntities: readonly EntitySchema[];
 type Trx = Kysely<StepDatabase>;
 export declare const dataMigrationSteps: readonly PluginMigrationStep[];
 export declare function grantAuditLog(trx: Trx, dialect: Dialect, role: string): Promise<void>;
+export declare function formatSequence(pattern: string, value: number, now?: Date): string;
+export declare function periodOf(resetEvery: ResetEvery | undefined, now?: Date): string;
+interface SequenceKey {
+  readonly entity: string;
+  readonly field: string;
+  readonly tenantId?: string;
+}
+interface SequenceOptions {
+  readonly resetEvery?: ResetEvery;
+  readonly now?: Date;
+}
+export declare function nextSequence(em: EntityManager, key: SequenceKey, options?: SequenceOptions): Promise<number>;
+type OrmSchema = EntitySchema<Record<string, unknown>>;
+interface CompileOptions {
+  readonly tenancy?: "single" | "shared-schema";
+  readonly raw?: readonly OrmSchema[];
+}
+export declare function compileEntities(defs: readonly EntityDef<string>[], options?: CompileOptions): OrmSchema[];
+type Row$4 = Record<string, unknown>;
+interface TransitionResult {
+  readonly name: string;
+  readonly from: string;
+  readonly to: string;
+  readonly event: string;
+}
+interface AvailableTransition {
+  readonly name: string;
+  readonly to: string;
+  readonly permission?: string;
+}
+export declare function transitionOf(schema: OrmSchema, name: string): TransitionDef;
+export declare function availableTransitions(schema: OrmSchema, row: Row$4): readonly AvailableTransition[];
+export declare function transition(em: EntityManager, schema: OrmSchema, row: Row$4, name: string, input?: unknown): Promise<TransitionResult>;
 interface OutboxEvent {
   readonly name: string;
   readonly version?: number;
@@ -193,12 +233,6 @@ interface PurgeOptions {
   readonly now?: () => number;
 }
 export declare function purgeProcessed(db: Database, options?: PurgeOptions): Promise<number>;
-type OrmSchema = EntitySchema<Record<string, unknown>>;
-interface CompileOptions {
-  readonly tenancy?: "single" | "shared-schema";
-  readonly raw?: readonly OrmSchema[];
-}
-export declare function compileEntities(defs: readonly EntityDef<string>[], options?: CompileOptions): OrmSchema[];
 type Row$3 = Record<string, unknown>;
 export declare function bulkInsert(em: EntityManager, schema: OrmSchema, rows: readonly Row$3[]): Promise<void>;
 export declare function bulkUpdate(em: EntityManager, schema: OrmSchema, where: Row$3, data: Row$3): Promise<number>;
@@ -308,5 +342,5 @@ export declare function setTranslation(em: EntityManager, schema: OrmSchema, rec
 type Row = Record<string, unknown>;
 export declare function toApiRow(schema: OrmSchema, row: Row): Row;
 export declare function toOrmData(schema: OrmSchema, input: Row, _mode: "create" | "update"): Row;
-export type { AuditEntry, AuditLogRow, AuditSink, CompileOptions, Database, DatabaseEnv, DatabaseOptions, DispatchResult, ListOptions, MadeMigration, MigrationEnv, MigrationStatus, Migrator, MigratorOptions, Orm, OrmSchema, OutboxDispatcher, OutboxDispatcherOptions, OutboxEntryRow, OutboxEvent, OutboxLag, OutboxMessage, OutboxProcessedRow, OutboxPublisher, Page, PluginRefusal, PluginRun, PluginRunOptions, PurgeOptions, ReferenceVisibility, ResolvedConnection, SortOption, SqliteOptions, SystemScopeEntry, UpOptions };
+export type { AuditEntry, AuditLogRow, AuditSink, AvailableTransition, CompileOptions, Database, DatabaseEnv, DatabaseOptions, DispatchResult, ListOptions, MadeMigration, MigrationEnv, MigrationStatus, Migrator, MigratorOptions, Orm, OrmSchema, OutboxDispatcher, OutboxDispatcherOptions, OutboxEntryRow, OutboxEvent, OutboxLag, OutboxMessage, OutboxProcessedRow, OutboxPublisher, Page, PluginRefusal, PluginRun, PluginRunOptions, PurgeOptions, ReferenceVisibility, ResolvedConnection, SequenceKey, SequenceOptions, SequenceRow, SortOption, SqliteOptions, SystemScopeEntry, TransitionResult, UpOptions };
 ```

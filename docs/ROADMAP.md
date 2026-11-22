@@ -164,7 +164,8 @@ Depends on: M1.1.
 - [x] Outbox dispatcher on MySQL and MariaDB deletes rows one at a time by primary key and retries on deadlock. The publisher gets the transaction of the claim, which is how the `database` queue driver of M1.5 joins it (MOD-18, ADR 0010)
 - [x] Audit log table, append-only for the app role, written in the same transaction (OBS-05, AUTHZ-05)
 - [ ] Features `attachments`, `comments`, `timeline`, `tags` as generic tables (MOD-13)
-- [ ] State machines: `f.state` transitions validated on the server, never through plain update (MOD-06, MOD-07)
+- [x] State machines: `f.state` transitions validated on the server, never through plain update (MOD-06, MOD-07). The routes `POST .../actions/<name>` wait for M1.3
+- [x] Document numbers: `f.sequence` numbered by the server in the saving transaction, gap free per tenant (MOD-12)
 - [ ] Upgrade MikroORM from 7.2.9 to 7.2.11 after 2026-11-27 (`minimumReleaseAge`) and rerun the dialect suites
 - [ ] Integration tests green on PostgreSQL, MySQL and SQLite (§9.1)
 
