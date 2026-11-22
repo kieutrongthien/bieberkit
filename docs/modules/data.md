@@ -85,7 +85,7 @@ interface Database { readonly dialect: Dialect; readonly orm: MikroORM; fork(): 
 function runInUnitOfWork<T>(db: Database, fn: (em: EntityManager) => Promise<T>): Promise<T>     // fork per request or job, tied to requestContext
 function applySqlitePragmas(connection: SqliteConnectionLike): void                              // WAL, synchronous NORMAL, busy_timeout
 
-// @bieberkit/data/testing  (test helpers, not part of the runtime API)
+// packages/data/src/testing  (test support of this package, not exported and not built)
 function describeDialects(name: string, suite: (db: TestDatabase) => void): void                 // runs on SQLite, PostgreSQL, MySQL
 ```
 
