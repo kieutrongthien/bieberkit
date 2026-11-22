@@ -51,3 +51,6 @@ test-results/
 .DS_Store
 Thumbs.db
 *.log
+
+# Scratch folders of tests (the bundle size test builds here and removes it)
+.tmp/
