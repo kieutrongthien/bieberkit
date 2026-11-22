@@ -56,8 +56,9 @@ It does not hold HTTP routes, authorization rules or the admin UI. It reads conf
 
 ```ts
 // @bieberkit/data  (no ORM import)
-function uuid7(options?: { now?: () => number; random?: (bytes: Uint8Array) => void }): string   // lower case, 36 characters
-function uuid7ToBytes(id: string): Uint8Array                                                    // 16 bytes
+function uuid7(): string                                                                         // lower case, 36 characters, strictly increasing in the process
+function createUuid7(options?: { now?: () => number; random?: (bytes: Uint8Array) => void }): () => string   // a generator with its own state, for tests
+function uuid7ToBytes(id: string): Uint8Array                                                    // 16 bytes, any UUID version
 function uuid7FromBytes(bytes: Uint8Array): string
 function isUuid(value: unknown): value is string                                                 // any version, case-insensitive
 
