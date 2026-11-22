@@ -32,7 +32,7 @@ import { registerEntityRoutes } from './entity-routes.ts';
 import type { HttpServerOptions } from './server.ts';
 import { testServer, TENANT } from './testing.ts';
 import type { MemoryLogger } from './testing.ts';
-import type { HttpServer } from './server.ts';
+import type { HttpEnv, HttpServer } from './server.ts';
 import type { Principal } from './ports.ts';
 
 export const Person: EntityDef<'crm.Person'> = defineEntity({
@@ -78,6 +78,7 @@ export const Account: EntityDef<'crm.Account'> = defineEntity({
     create: 'crm.account.create',
     update: 'crm.account.update',
     delete: 'crm.account.delete',
+    fields: { note: { read: 'crm.account.read-note', update: 'crm.account.edit-note' } },
   },
   api: { list: true, get: true, create: true, update: true, delete: true },
 });
@@ -110,7 +111,7 @@ export interface EntityApp {
 }
 
 /** A server whose user may do everything, over a fresh in-memory SQLite database that holds the sample entities. */
-export async function entityApp(options: HttpServerOptions = {}): Promise<EntityApp> {
+export async function entityApp(options: HttpServerOptions = {}, env?: HttpEnv): Promise<EntityApp> {
   const schemas = compileEntities([Person, Account, Note, Hidden]);
   const queries: string[] = [];
   const db = await createDatabase(
@@ -119,12 +120,15 @@ export async function entityApp(options: HttpServerOptions = {}): Promise<Entity
   );
   await db.orm.schema.create();
   const asked: string[] = [];
-  const { server, logger } = testServer({
-    authenticator: { authenticate: async () => USER },
-    tenantResolver: { resolve: async () => TENANT },
-    authorizer: { can: async (_principal, permission) => (asked.push(permission), true) },
-    ...options,
-  });
+  const { server, logger } = testServer(
+    {
+      authenticator: { authenticate: async () => USER },
+      tenantResolver: { resolve: async () => TENANT },
+      authorizer: { can: async (_principal, permission) => (asked.push(permission), true) },
+      ...options,
+    },
+    env,
+  );
   registerEntityRoutes(server, schemas, { db });
   return {
     server,

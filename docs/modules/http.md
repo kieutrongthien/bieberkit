@@ -338,3 +338,98 @@ createMemoryIdempotencyStore(options?: { ttlMs?: number; now?: () => number }): 
 | `HTTP_IDEMPOTENCY_KEY_INVALID` | 400    | Use 1 to 255 visible characters                                  |
 | `HTTP_IDEMPOTENCY_KEY_REUSED`  | 422    | The key was used for another request. Use a new key              |
 | `HTTP_IDEMPOTENCY_IN_PROGRESS` | 409    | The first request with this key is still running. Wait and retry |
+
+## Slice 4: OpenAPI and `_meta`
+
+Designed on 2026-11-23. None of it is maintainer-designed (API-06, API-07, META-01 to META-05 and UI-02 decide it). Slice 3 was merged into `main` before it started.
+
+### Public API
+
+```ts
+openApiDocument(routes: readonly RouteDef[], info: { title: string; version: string }): OpenApiDocument       // pure
+registerOpenApi(server: HttpServer, info): void                // GET /api/v1/openapi.json
+registerMeta(server: HttpServer, entities: readonly EntityDef<string>[], options?: { locales?: readonly string[] }): void   // GET /api/v1/_meta
+META_SCHEMA: JsonSchema                                        // the JSON Schema of the _meta answer (META-05)
+// HttpServer gains routes(): readonly RouteDef[]               // the routes that were added, not the probes of the server
+// HttpEnv gains API_DOCS_PUBLIC: boolean
+```
+
+### OpenAPI 3.1 (API-06)
+
+- **The document is made from the routes.** Every route that was added to the server is an operation. Its `schema.params` and `schema.query` become parameters, its `schema.body` the request body, and each `schema.response` a response. JSON Schema 2020-12 is the dialect of OpenAPI 3.1, so the schemas go in as they are, without `$schema` and `$id`.
+- **Paths use `{id}`**, and an operation has an `operationId` made of the method and the path (`getCrmAccountsById`), which is unique. Paths and methods are sorted, so the same routes give the same bytes.
+- **Errors.** Every operation has a `default` response of `application/problem+json` that refers to `#/components/schemas/Problem`, which is the problem of RFC 9457 with `code`, `traceId` and `errors`.
+- **Security.** A route with a `permission` has `security` of the session cookie or a bearer API key, and `x-permission`. A public route has `security: []`.
+- **Filters.** `filter[field][op]` is one `deepObject` parameter named `filter`, because OpenAPI cannot list a pattern of names.
+- **Deprecation (API-16).** A deprecated route has `deprecated: true` and `x-sunset` with the date.
+- **Who may read it.** In development and test it is public. In production it is public only when `API_DOCS_PUBLIC` is true, and otherwise the route needs the permission `system.api-docs` (401 or 403). The route is registered one way or the other when the server starts, so the rule is the same declared rule as for any route (API-02).
+- **The client (API-07)** is generated from this document by the build of M1.8. This slice makes the document.
+
+### `_meta` (META-01 to META-05, UI-02)
+
+`GET /api/v1/_meta` answers what the admin shell needs, for the caller and the tenant of the request. It is public in the sense of API-02, and the handler answers 401 when nobody is signed in.
+
+```jsonc
+{
+  "schemaVersion": 1,
+  "entities": [
+    {
+      "name": "crm.Account",
+      "path": "/api/v1/crm/accounts",
+      "label": { "en": "Account" },
+      "operations": { "list": true, "get": true, "create": true, "update": true, "delete": true },
+      "can": { "read": true, "create": true, "update": true, "delete": false },
+      "features": ["comments"],
+      "softDelete": true,
+      "tenant": true,
+      "title": "name",
+      "list": ["code", "name"],
+      "icon": "users",
+      "fields": [
+        {
+          "key": "tier",
+          "kind": "oneOf",
+          "widget": "select",
+          "required": false,
+          "readOnly": false,
+          "default": "basic",
+          "values": ["basic", "gold"],
+          "filterable": true,
+          "sortable": true,
+          "validation": { "type": "string", "enum": ["basic", "gold"] },
+        },
+      ],
+      "form": ["code", "name", "tier"],
+      "transitions": [
+        {
+          "name": "open",
+          "from": ["new"],
+          "to": "open",
+          "permission": "crm.account.update",
+          "allowed": true,
+          "path": "/api/v1/crm/accounts/{id}/actions/open",
+        },
+      ],
+    },
+  ],
+  "menu": [],
+  "dashboards": [],
+  "permissions": ["crm.account.read"],
+  "locales": [],
+}
+```
+
+- **Only what the caller may see (META-04).** An entity is in the answer when the caller has its `read` permission. A field whose `permissions.fields.<name>.read` the caller lacks is left out, and one whose `update` is lacking is `readOnly`. There are no rows, secrets or tenant ids in it. `permissions` lists the permissions of the entities and transitions that the caller has.
+- **Types and hints (META-02).** `kind` is the kind of the field, `widget` is a hint from it (`text`, `textarea`, `email`, `select`, `switch`, `number`, `decimal`, `money`, `date`, `datetime`, `relation`, `readonly`), and `validation` is the JSON Schema of the field in the create shape, or the read shape for a field that the server fills. `filterable` and `sortable` follow the index rule (DATA-07). A relation names its target (`{ entity, path }`).
+- **Layouts.** `list` and `title` come from `admin`, and `form` is the writable fields in the order of the entity.
+- **Menus and dashboards** belong to plugins and come with the plugin system. They are empty lists now, so the shape does not change later.
+- **Caching (META-03).** The body is the same for the same entities, permissions and tenant, and it has an ETag, so the shell sends `If-None-Match` and gets 304. The static part of each entity is built once, when `registerMeta` is called, and each request only filters it. A cache of the answer by role set belongs to `@bieberkit/auth`, which knows the role set.
+- **The shape is published (META-05).** `META_SCHEMA` is exported, the route answers through it, and a test validates a real answer against it with Ajv.
+
+### Found while implementing slice 4
+
+- **fast-json-stringify drops what a schema does not name**, also for a document. The route of `openapi.json` answers through `{ type: 'object', additionalProperties: true }`, so the document is written as it is. The route of `_meta` answers through `META_SCHEMA`, which names every field, so a field that is not in the published schema never leaves the server.
+- **The key of a relation in the API is `ownerId`.** The fields of `_meta` use the keys of the API, so an adapter reads and writes the same names that the routes use.
+- **Whether `openapi.json` is public is decided when the server starts.** The route is registered with `public: true` or with `permission: 'system.api-docs'`, so `bieberkit check` sees the same rule as for any other route.
+- **`If-Match` and `Idempotency-Key` are documented from the route.** A route that needs the header says so with `requiresIfMatch`, and an idempotent one lists the optional header, so a generated client sends them (API-07).
+- **`_meta` for a caller with no permission is an empty list**, not an error: the shell can still draw its frame and show that there is nothing.

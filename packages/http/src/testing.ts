@@ -57,7 +57,7 @@ export function memoryLogger(bindings: LogFields = {}, lines: LoggedLine[] = [])
   };
 }
 
-export const TEST_ENV: HttpEnv = { APP_ENV: 'test', APP_PORT: 0, TRUST_PROXY: false };
+export const TEST_ENV: HttpEnv = { APP_ENV: 'test', APP_PORT: 0, TRUST_PROXY: false, API_DOCS_PUBLIC: false };
 
 export function testServer(
   options: HttpServerOptions = {},

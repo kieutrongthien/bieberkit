@@ -25,7 +25,7 @@
 import { BkError, requestContext } from '@bieberkit/core';
 import { describe, expect, it } from 'vitest';
 import type { HttpServerOptions } from './server.ts';
-import { okRoute, testServer } from './testing.ts';
+import { okRoute, testServer, TEST_ENV } from './testing.ts';
 import type { RouteDef } from './route.ts';
 
 const USER = { id: 'u-1', kind: 'user' } as const;
@@ -231,7 +231,7 @@ describe('API-05 rate limits', () => {
     const direct = testServer({ ipLimiter: limiter });
     direct.server.route(okRoute('/api/v1/t/ip'));
     await direct.server.inject({ method: 'GET', url: '/api/v1/t/ip', headers: { 'x-forwarded-for': '203.0.113.9' } });
-    const proxied = testServer({ ipLimiter: limiter }, { APP_ENV: 'test', APP_PORT: 0, TRUST_PROXY: true });
+    const proxied = testServer({ ipLimiter: limiter }, { ...TEST_ENV, TRUST_PROXY: true });
     proxied.server.route(okRoute('/api/v1/t/ip'));
     await proxied.server.inject({ method: 'GET', url: '/api/v1/t/ip', headers: { 'x-forwarded-for': '203.0.113.9' } });
     expect(keys).toEqual(['127.0.0.1', '203.0.113.9']);
