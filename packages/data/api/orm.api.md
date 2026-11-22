@@ -178,6 +178,7 @@ interface CompileOptions {
   readonly tenancy?: "single" | "shared-schema";
   readonly raw?: readonly OrmSchema[];
 }
+export declare function entityOfSchema(schema: object): EntityDef<string>;
 export declare function compileEntities(defs: readonly EntityDef<string>[], options?: CompileOptions): OrmSchema[];
 interface FeaturePage<T> {
   readonly rows: T[];
@@ -261,6 +262,7 @@ interface AvailableTransition {
 }
 export declare function transitionOf(schema: OrmSchema, name: string): TransitionDef;
 export declare function availableTransitions(schema: OrmSchema, row: Row$4): readonly AvailableTransition[];
+export declare function entityEventName(entity: string, name: string): string;
 export declare function transition(em: EntityManager, schema: OrmSchema, row: Row$4, name: string, input?: unknown): Promise<TransitionResult>;
 interface OutboxEvent {
   readonly name: string;
@@ -401,9 +403,7 @@ export declare class BieberEntityManager extends SqlEntityManager {
 }
 export declare function softDelete(em: EntityManager, row: Record<string, unknown>): void;
 export declare function restore(em: EntityManager, row: Record<string, unknown>): void;
-export declare function expectVersion(row: {
-  readonly version?: unknown;
-}, expected: number | string): void;
+export declare function expectVersion(row: object, expected: number | string): void;
 type Row$2 = Record<string, unknown>;
 interface SortOption {
   readonly field: string;
@@ -414,6 +414,7 @@ interface ListOptions {
   readonly sort?: readonly SortOption[];
   readonly limit?: unknown;
   readonly cursor?: string;
+  readonly offset?: number;
   readonly withTotal?: boolean;
   readonly select?: readonly string[];
   readonly populate?: readonly string[];

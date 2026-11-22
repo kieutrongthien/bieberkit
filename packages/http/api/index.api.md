@@ -29,6 +29,7 @@ Generated from the built declaration files by `pnpm api:update`. Do not edit by 
 
 ```ts
 import { BkError, Lifecycle, Logger } from "@bieberkit/core";
+import { Database, OrmSchema } from "@bieberkit/data/orm";
 import { JsonSchema } from "@bieberkit/data/schema";
 import { ValidationIssue } from "@bieberkit/data/build";
 interface Principal {
@@ -69,12 +70,14 @@ interface RouteContext {
   readonly params: Readonly<Record<string, unknown>>;
   readonly query: Readonly<Record<string, unknown>>;
   readonly body: unknown;
+  readonly headers: Readonly<Record<string, string | string[] | undefined>>;
   readonly principal: Principal | undefined;
   readonly tenantId: string | undefined;
   readonly requestId: string;
   readonly traceId: string;
   readonly log: Logger;
   status(code: number): void;
+  header(name: string, value: string): void;
 }
 interface RouteDef {
   readonly method: Method;
@@ -156,6 +159,14 @@ interface HttpServer {
   }>;
 }
 export declare function createHttpServer(env: HttpEnv, options?: HttpServerOptions): HttpServer;
+interface EntityRoutesContext {
+  readonly db: Database;
+  readonly schemas: readonly OrmSchema[];
+}
+export declare function entityRoutes(schema: OrmSchema, context: EntityRoutesContext): RouteDef[];
+export declare function registerEntityRoutes(server: HttpServer, schemas: readonly OrmSchema[], options: {
+  db: Database;
+}): void;
 interface RegisterHttpOptions {
   readonly host?: string;
   readonly port?: number;
@@ -165,7 +176,8 @@ interface RegisterHttpOptions {
 export declare function registerHttp(lifecycle: Lifecycle, server: HttpServer, options?: RegisterHttpOptions): void;
 export declare class HttpError extends BkError {
   readonly headers: Readonly<Record<string, string>>;
-  constructor(code: string, status: number, message: string, fix: string, headers?: Readonly<Record<string, string>>, cause?: unknown);
+  readonly extensions: Readonly<Record<string, unknown>>;
+  constructor(code: string, status: number, message: string, fix: string, headers?: Readonly<Record<string, string>>, cause?: unknown, extensions?: Readonly<Record<string, unknown>>);
 }
 export declare class ValidationFailed extends HttpError {
   readonly errors: readonly {
@@ -189,7 +201,8 @@ interface Problem {
     readonly code: string;
     readonly message: string;
   }[];
+  readonly [extension: string]: unknown;
 }
 export declare const packageName = "@bieberkit/http";
-export type { Authenticator, Authorizer, ErrorContext, HttpEnv, HttpServer, HttpServerOptions, InjectOptions, InjectResponse, Method, Principal, Problem, RateLimitResult, RateLimiter, RegisterHttpOptions, RequestInfo, RouteContext, RouteDef, RouteSchema, StageContext, StageHook, StageName, TenantResolver };
+export type { Authenticator, Authorizer, EntityRoutesContext, ErrorContext, HttpEnv, HttpServer, HttpServerOptions, InjectOptions, InjectResponse, Method, Principal, Problem, RateLimitResult, RateLimiter, RegisterHttpOptions, RequestInfo, RouteContext, RouteDef, RouteSchema, StageContext, StageHook, StageName, TenantResolver };
 ```
