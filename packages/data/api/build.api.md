@@ -83,7 +83,8 @@ interface StandaloneRuntime {
   serializeMany(entity: string, rows: readonly unknown[]): string;
   assertCurrent(defs: readonly EntityDef<string>[]): void;
 }
+export declare function issuesOf(errors: readonly AjvError[] | null | undefined): ValidationIssue[];
 export declare function createStandaloneRuntime(parts: StandaloneParts): StandaloneRuntime;
 export declare function loadStandalone(directory: string): Promise<StandaloneRuntime>;
-export type { AjvInstance, StandaloneFiles, StandaloneManifest, StandaloneOptions, StandaloneParts, StandaloneRuntime, ValidationIssue, ValidationResult };
+export type { AjvError, AjvInstance, StandaloneFiles, StandaloneManifest, StandaloneOptions, StandaloneParts, StandaloneRuntime, ValidationIssue, ValidationResult };
 ```

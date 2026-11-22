@@ -43,7 +43,7 @@ export type ValidationResult =
   | { readonly ok: true; readonly value: unknown }
   | { readonly ok: false; readonly issues: ValidationIssue[] };
 
-interface AjvError {
+export interface AjvError {
   readonly instancePath: string;
   readonly keyword: string;
   readonly message?: string;
@@ -87,6 +87,15 @@ function pathOf(error: AjvError): string {
   return parts.join('.');
 }
 
+/** The issues of a failed Ajv validator, with the path of each as `balance.amount`. */
+export function issuesOf(errors: readonly AjvError[] | null | undefined): ValidationIssue[] {
+  return (errors ?? []).map((error) => ({
+    path: pathOf(error),
+    keyword: error.keyword,
+    message: error.message ?? error.keyword,
+  }));
+}
+
 function unknownBuild(what: string): never {
   throw dataError(
     'DATA_STANDALONE_UNKNOWN',
@@ -110,12 +119,7 @@ export function createStandaloneRuntime(parts: StandaloneParts): StandaloneRunti
       const validator = pick(validators, entity, mode);
       const value = normalizeInput(input);
       if (validator(value)) return { ok: true, value };
-      const issues = (validator.errors ?? []).map((error) => ({
-        path: pathOf(error),
-        keyword: error.keyword,
-        message: error.message ?? error.keyword,
-      }));
-      return { ok: false, issues };
+      return { ok: false, issues: issuesOf(validator.errors) };
     },
     serialize: (entity, row) => pick(serializers, entity, 'read')(row),
     serializeMany: (entity, rows) => pick(serializers, entity, 'list')(rows),

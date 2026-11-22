@@ -2,7 +2,7 @@
  * BieberKit
  *
  * @file        packages/http/src/index.ts
- * @description Public entry point of @bieberkit/http.
+ * @description Public API of @bieberkit/http: the server, the routes and the ports of the pipeline (spec 13).
  * @author      Bieber Kieu <kieutrongthien@gmail.com>
  * @copyright   Copyright (c) 2026 Bieber Kieu
  * @license     Apache-2.0
@@ -22,7 +22,33 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-// Public API of @bieberkit/http. Implementation starts after the Phase 0 ADRs (docs/adr/README.md).
-
 /** npm name of this package. */
 export const packageName = '@bieberkit/http';
+
+export { registerHttp } from './lifecycle.ts';
+export type { RegisterHttpOptions } from './lifecycle.ts';
+export type {
+  Authenticator,
+  Authorizer,
+  Principal,
+  RateLimiter,
+  RateLimitResult,
+  RequestInfo,
+  TenantResolver,
+} from './ports.ts';
+export { HttpError, ValidationFailed } from './problem.ts';
+export type { Problem } from './problem.ts';
+export { defineRoute, METHODS } from './route.ts';
+export type { Method, RouteContext, RouteDef, RouteSchema } from './route.ts';
+export { createHttpServer, STAGE_NAMES } from './server.ts';
+export type {
+  ErrorContext,
+  HttpEnv,
+  HttpServer,
+  HttpServerOptions,
+  InjectOptions,
+  InjectResponse,
+  StageContext,
+  StageHook,
+  StageName,
+} from './server.ts';

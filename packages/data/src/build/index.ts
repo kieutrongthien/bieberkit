@@ -26,5 +26,5 @@ export { createAjv } from './ajv.ts';
 export type { AjvInstance } from './ajv.ts';
 export { emitStandalone, writeStandalone } from './emit.ts';
 export type { StandaloneFiles, StandaloneManifest, StandaloneOptions } from './emit.ts';
-export { createStandaloneRuntime, loadStandalone } from './standalone.ts';
-export type { StandaloneParts, StandaloneRuntime, ValidationIssue, ValidationResult } from './standalone.ts';
+export { createStandaloneRuntime, issuesOf, loadStandalone } from './standalone.ts';
+export type { AjvError, StandaloneParts, StandaloneRuntime, ValidationIssue, ValidationResult } from './standalone.ts';

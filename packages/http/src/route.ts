@@ -1,0 +1,69 @@
+/**
+ * BieberKit
+ *
+ * @file        packages/http/src/route.ts
+ * @description Route definitions and the rules that a route must meet before the server accepts it (API-01, API-02).
+ * @author      Bieber Kieu <kieutrongthien@gmail.com>
+ * @copyright   Copyright (c) 2026 Bieber Kieu
+ * @license     Apache-2.0
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import type { Logger } from '@bieberkit/core';
+import type { JsonSchema } from '@bieberkit/data/schema';
+import type { Principal } from './ports.ts';
+
+export type Method = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+
+export const METHODS: readonly Method[] = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
+
+export interface RouteSchema {
+  readonly params?: JsonSchema;
+  readonly query?: JsonSchema;
+  readonly body?: JsonSchema;
+  /** One schema for each status that the handler may answer with. At least one must be 2xx (API-01). */
+  readonly response: Readonly<Record<number, JsonSchema>>;
+}
+
+/** What a handler receives. */
+export interface RouteContext {
+  readonly params: Readonly<Record<string, unknown>>;
+  readonly query: Readonly<Record<string, unknown>>;
+  readonly body: unknown;
+  readonly principal: Principal | undefined;
+  readonly tenantId: string | undefined;
+  readonly requestId: string;
+  readonly traceId: string;
+  readonly log: Logger;
+  /** Sets the status of the answer. It must be one that `schema.response` has a schema for. Defaults to 200. */
+  status(code: number): void;
+}
+
+export interface RouteDef {
+  readonly method: Method;
+  readonly url: string;
+  /** The permission that a caller needs (API-02). Exactly one of `permission` and `public`. */
+  readonly permission?: string;
+  readonly public?: true;
+  readonly schema: RouteSchema;
+  /** Returns the body of the answer, or a promise of it. */
+  handler(ctx: RouteContext): unknown;
+}
+
+/** Declares a route. It returns the route unchanged, so the compiler checks its shape where it is written. */
+export function defineRoute(route: RouteDef): RouteDef {
+  return route;
+}
