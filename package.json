@@ -12,10 +12,11 @@
     "format": "oxfmt",
     "format:check": "oxfmt --check",
     "test": "vitest run",
-    "check": "pnpm check:headers && pnpm check:layers && pnpm check:skills",
+    "check": "pnpm check:headers && pnpm check:layers && pnpm check:skills && pnpm check:workflows",
     "check:headers": "node tools/check-headers.ts",
     "check:layers": "node tools/check-layers.ts",
     "check:skills": "node tools/sync-skills.ts --check",
+    "check:workflows": "node tools/check-workflows.ts",
     "sync:skills": "node tools/sync-skills.ts",
     "changeset": "changeset"
   },
@@ -30,7 +31,8 @@
     "tsdown": "0.23.7",
     "turbo": "^2.11.11",
     "typescript": "^7.0.2",
-    "vitest": "^4.1.12"
+    "vitest": "^4.1.12",
+    "yaml": "2.9.1"
   },
   "engines": {
     "node": ">=24.12",
