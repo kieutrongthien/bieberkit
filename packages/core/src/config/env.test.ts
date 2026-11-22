@@ -128,6 +128,39 @@ describe('CFG-01 defineEnv and readEnv', () => {
   });
 });
 
+describe('CFG-01 env.custom', () => {
+  const list = env.custom<readonly string[]>('a comma-separated list', (raw) => ({
+    value: raw.split(',').map((item) => item.trim()),
+  }));
+  const trust = env.custom<boolean | number>('true, false or a hop count', (raw) => {
+    if (raw === 'true') return { value: true };
+    if (raw === 'false') return { value: false };
+    return /^\d+$/.test(raw) ? { value: Number(raw) } : undefined;
+  });
+  const custom = defineEnv({ HOSTS: list.default([]), TRUST: trust.default(false) });
+
+  it('CFG-01 parses with the given function and applies the default', () => {
+    expect(readEnv(custom, {}).HOSTS).toEqual([]);
+    expect(readEnv(custom, { HOSTS: 'a, b' }).HOSTS).toEqual(['a', 'b']);
+    expect(readEnv(custom, { TRUST: '2' }).TRUST).toBe(2);
+    expect(readEnv(custom, { TRUST: 'true' }).TRUST).toBe(true);
+  });
+
+  it('CFG-01 a value the function refuses is CFG_ENV_INVALID and names what was expected', () => {
+    const error = failureOf(() => readEnv(custom, { TRUST: 'many' }));
+    expect(error.code).toBe('CFG_ENV_INVALID');
+    expect(error.problems[0]?.message).toContain('true, false or a hop count');
+  });
+
+  it('CFG-06 describeEnv shows the expected text of a custom key', () => {
+    expect(describeEnv(custom)[1]).toMatchObject({
+      key: 'TRUST',
+      type: 'custom',
+      expected: 'true, false or a hop count',
+    });
+  });
+});
+
 describe('CFG-05 redaction', () => {
   it('CFG-05 redact hides secret values only', () => {
     const values = readEnv(schema, valid);

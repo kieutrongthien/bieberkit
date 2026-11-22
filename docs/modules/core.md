@@ -48,7 +48,8 @@ class ContainerError extends BkError {}         // CORE_SERVICE_*
 
 // environment
 const env: { string(): EnvKeyBuilder<string>; int(options?: { min?: number; max?: number }): EnvKeyBuilder<number>; boolean(): EnvKeyBuilder<boolean>;
-             enum<V extends string>(values: readonly V[]): EnvKeyBuilder<V>; url(): EnvKeyBuilder<string>; base64(): EnvKeyBuilder<string> }
+             enum<V extends string>(values: readonly V[]): EnvKeyBuilder<V>; url(): EnvKeyBuilder<string>; base64(): EnvKeyBuilder<string>;
+             custom<T>(expected: string, parse: (raw: string) => { value: T } | undefined): EnvKeyBuilder<T> }   // the one escape hatch
 // EnvKeyBuilder: .default(v) .optional() .secret() .describe(text)   (immutable, each call returns a new builder)
 function defineEnv<T>(keys: { [K in keyof T]: EnvKeyBuilder<T[K]> }): EnvSchema<T>
 function mergeEnv(owners: readonly EnvOwner[]): EnvSchema<Record<string, unknown>>
@@ -56,10 +57,11 @@ function readEnv<T>(schema: EnvSchema<T>, source: EnvSource): T          // thro
 function parseEnvFile(text: string): EnvSource
 function readEnvFile(path: string): EnvSource                            // a missing file gives {}
 function withEnvFile(real: EnvSource, file: EnvSource): EnvSource        // real values win (CFG-03)
-function redact<T>(schema: EnvSchema<T>, values: T): Record<string, unknown>
+function redact(schema: EnvSchema<unknown>, values: object): Record<string, unknown>
+function readCoreEnv(source: EnvSource, options?: { extra?: readonly EnvOwner[] }): { env: CoreEnv; extra: Record<string, unknown>; warnings: string[] }
 function assertProductionSafe(values: CoreEnv): void                     // CFG-07, throws ConfigError
 const coreEnv: EnvSchema<CoreEnv>                                        // the keys of section 8.2
-function loadEnv(options?: { envFile?: string | false; schemas?: readonly EnvOwner[] }): MergedEnvValues   // the only reader of process.env
+function loadEnv(options?: { source?: EnvSource; envFile?: string | false; extra?: readonly EnvOwner[] }): CoreEnvResult   // the only reader of process.env
 
 // logging
 interface Logger { level: LogLevel; fatal/error/warn/info/debug/trace(msg: string, fields?: LogFields): void; child(bindings: LogFields): Logger }
@@ -192,7 +194,9 @@ Each line is testable, and each test is named after its ID.
 
 The keys of section 8.2 are the core schema (`coreEnv`), with its defaults. Rules not in the spec, proposed here:
 
-- In development and test, a missing `APP_KEY` or `AUTH_SECRET` gets an ephemeral random value and a warning in the log. In production a missing one is `CFG_ENV_MISSING`.
+- In development and test, a missing `APP_KEY` or `AUTH_SECRET` gets an ephemeral random value and a warning in the log. In production a missing one is `CFG_ENV_MISSING`. `SITE_SERVICE_TOKEN` and `SITE_REVALIDATE_SECRET` are generated in development and test without a warning, and in production they are required only when `SITE_URL` is set.
+- `CACHE_PREFIX` defaults to `APP_NAME`. `CACHE_REDIS_URL` and `MIGRATE_DATABASE_URL` fall back to `REDIS_URL` and `DATABASE_URL` in development and test only.
+- `AUTH_SECRET` under 32 bytes is also refused in production, next to the four checks of CFG-07.
 - `APP_ENV` decides this and the production checks. It defaults to `development`.
 - `.env` is read from the working directory unless `envFile` says otherwise, with `util.parseEnv`, so the parse changes nothing global.
 - An empty value (`KEY=`) counts as unset, so the default or the missing-key error applies.

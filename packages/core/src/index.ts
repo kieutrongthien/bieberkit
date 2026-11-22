@@ -32,6 +32,7 @@ export type { BkErrorOptions, EnvProblem, ErrorBody } from './errors/errors.ts';
 
 export { defineEnv, describeEnv, env, mergeEnv, readEnv, redact } from './config/env.ts';
 export type {
+  EnvCustomParse,
   EnvDescription,
   EnvKeyBuilder,
   EnvKeyDef,
@@ -43,3 +44,9 @@ export type {
   IntOptions,
 } from './config/env.ts';
 export { parseEnvFile, readEnvFile, withEnvFile } from './config/env-file.ts';
+export { assertProductionSafe, coreEnv, readCoreEnv } from './config/core-env.ts';
+export type { AppEnv, CoreEnv, CoreEnvResult, CoreEnvValues, ReadCoreEnvOptions } from './config/core-env.ts';
+export { loadEnv } from './config/load-env.ts';
+export type { LoadEnvOptions } from './config/load-env.ts';
+export { LOG_LEVELS } from './logging/levels.ts';
+export type { LogLevel } from './logging/levels.ts';

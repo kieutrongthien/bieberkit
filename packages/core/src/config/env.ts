@@ -25,7 +25,10 @@
 import { ConfigError, EnvValidationError } from '../errors/errors.ts';
 import type { EnvProblem } from '../errors/errors.ts';
 
-export type EnvKind = 'string' | 'int' | 'boolean' | 'enum' | 'url' | 'base64';
+export type EnvKind = 'string' | 'int' | 'boolean' | 'enum' | 'url' | 'base64' | 'custom';
+
+/** Parser of a custom key. It returns `undefined` for a value it refuses. */
+export type EnvCustomParse<T> = (raw: string) => { readonly value: T } | undefined;
 
 /** Where values come from. A real environment is `process.env`, which only `loadEnv` touches (P8). */
 export type EnvSource = Readonly<Record<string, string | undefined>>;
@@ -34,6 +37,8 @@ export type EnvSource = Readonly<Record<string, string | undefined>>;
 export interface EnvKeyDef {
   readonly kind: EnvKind;
   readonly values?: readonly string[];
+  readonly expected?: string;
+  readonly parse?: EnvCustomParse<unknown>;
   readonly min?: number;
   readonly max?: number;
   readonly hasDefault: boolean;
@@ -73,6 +78,7 @@ export interface EnvDescription {
   readonly secret: boolean;
   readonly description: string;
   readonly values?: readonly string[];
+  readonly expected?: string;
 }
 
 export interface IntOptions {
@@ -107,6 +113,8 @@ export const env: {
   enum<V extends string>(values: readonly V[]): EnvKeyBuilder<V>;
   url(): EnvKeyBuilder<string>;
   base64(): EnvKeyBuilder<string>;
+  /** The one escape hatch for a value that is none of the other types. `expected` completes "must be ...". */
+  custom<T>(expected: string, parse: EnvCustomParse<T>): EnvKeyBuilder<T>;
 } = {
   string: () => builder<string>(base('string')),
   int: (options = {}) => {
@@ -120,6 +128,7 @@ export const env: {
   enum: <V extends string>(values: readonly V[]) => builder<V>(base('enum', { values })),
   url: () => builder<string>(base('url')),
   base64: () => builder<string>(base('base64')),
+  custom: <T>(expected: string, parse: EnvCustomParse<T>) => builder<T>(base('custom', { expected, parse })),
 };
 
 export type EnvValues<K extends Record<string, EnvKeyBuilder<unknown>>> = {
@@ -208,6 +217,12 @@ function parseValue(name: string, def: EnvKeyDef, raw: string): Parsed {
       return URL.canParse(raw)
         ? { ok: true, value: raw }
         : bad('an absolute URL', `Set ${name} to a full URL such as https://example.com.`);
+    case 'custom': {
+      const result = def.parse?.(raw);
+      return result === undefined
+        ? bad(def.expected ?? 'a valid value', `Set ${name} to ${def.expected ?? 'a valid value'}.`)
+        : { ok: true, value: result.value };
+    }
     default:
       return BASE64.test(raw)
         ? { ok: true, value: raw }
@@ -264,5 +279,6 @@ export function describeEnv<T>(schema: EnvSchema<T>): readonly EnvDescription[] 
     secret: def.secret,
     description: def.description,
     ...(def.values === undefined ? {} : { values: def.values }),
+    ...(def.expected === undefined ? {} : { expected: def.expected }),
   }));
 }
