@@ -318,3 +318,54 @@ Unique constraints and indexes come from `tableConstraints(def)`, translated fro
 4. **No `rls` filter option.** MikroORM 7.2 can also write PostgreSQL row level security policies from a filter. The spec calls RLS an optional second layer (section 9.4), and it needs the application role and `FORCE ROW LEVEL SECURITY` work of the migration slice. It is left for then.
 5. **API mappers wait for slice 4.** Turning `{ amount, currency }`, decimal text and `ownerId` into ORM properties is needed when HTTP arrives. Slice 3 round trips through the ORM properties.
 6. **The roadmap item about a `bieberkit check` rule stays open.** The runtime guard `DATA_SHADOW_STALE` is stronger, but the CLI rule is still needed for code that never runs in tests.
+
+## Slice 4: queries, translations and mappers
+
+Designed on 2026-11-22. None of it is maintainer-designed, so the tests and the code follow the design directly.
+
+### Public API (`@bieberkit/data/orm`)
+
+```ts
+listPage(em, schema, options?: ListOptions): Promise<Page>
+interface ListOptions {
+  where?: Record<string, unknown>                // ORM property names; compared fields are folded for you
+  sort?: readonly { field: string; direction?: 'asc' | 'desc' }[]   // default: id ascending
+  limit?: unknown                                 // pageSize(): 1 to 100, default 25
+  cursor?: string
+  withTotal?: boolean
+  select?: readonly string[]                      // properties to return, `id` is always there
+  populate?: readonly string[]                    // relations, one batched query each
+  locale?: string                                 // the translation to prefer, with fallback to the default value
+}
+interface Page { rows: Record<string, unknown>[]; limit: number; nextCursor: string | null; total?: number }
+
+queryableFields(schema): readonly string[]        // what a client may filter or sort by (DATA-07)
+
+setTranslation(em, schema, recordId, locale, values): Promise<void>   // upsert one row of the translation table
+translationName(entityName): string               // 'crm.Page' gives 'crm.PageTranslation'
+
+toApiRow(schema, row): Record<string, unknown>    // an ORM row to the read shape of the API
+toOrmData(schema, input, mode: 'create' | 'update'): Record<string, unknown>   // a validated body to ORM properties
+
+DatabaseOptions.queryLog?: (sql: string) => void  // for tests that count queries (PERF-04)
+```
+
+### Rules
+
+- **Pages (DATA-06, DATA-11).** `listPage` always orders by the sort fields and then by `id`, so the order is total. The cursor holds the values of the last row, and the next page is the rows after it (`(a, b, id) > (x, y, z)`, written for mixed directions). It also holds the sort, so a cursor of another sort is `DATA_CURSOR_INVALID`. One more row than the limit is read to know whether there is a next page. `total` is counted only when `withTotal` is true, over the same filter without the cursor.
+- **Index rule (DATA-07).** A client may filter or sort only by `id`, `createdAt`, `updatedAt` and fields declared `.index()` or `.unique()`. Another field is `DATA_FIELD_NOT_INDEXED` (400) and an unknown one `DATA_QUERY_INVALID`. A sort field must not be optional (`DATA_SORT_INVALID`), because a keyset over nulls is not total.
+- **Compared fields (DATA-21).** `where: { name: 'DUONG' }` on a `ci_ai` field looks in the shadow column with the folded value. Allowed: equality, `$eq`, `$ne`, `$in`, `$nin` and `$like` (the pattern is folded). Sorting by a compared field sorts by the shadow column.
+- **Read only (DATA-10, PERF-04).** Rows are read with `disableIdentityMap`, returned as plain objects, and relations are loaded with one query each (`select-in`). Hidden columns do not come back. The read goes to a replica when there is one (`connectionType: 'read'`).
+- **Translations (DATA-17).** A localized field keeps its value for the default locale in the table of the entity. Each other locale is a row of `<table>_i18n` with `record`, `locale` and the localized fields, unique on `(record, locale)` and with the same tenant foreign key as any relation. The compiler adds the schema `<name>Translation` after the entities. A read with `locale` takes every translated, non-null field from that row and the default value for the rest. It costs one query for the whole page.
+- **Mappers.** `toApiRow` turns money into `{ amount, currency }`, decimals into text, a relation into `<name>Id`, instants into ISO text and stored or non-stored computed fields into values (a non-stored one is calculated here, MOD-08). `toOrmData` does the reverse for a body that was validated with the schemas of slice 2.
+- **`orm.uniques`** joins `orm.indexes` in the override of an entity: composite unique constraints by property names.
+
+### Errors of slice 4
+
+| Code                     | Status | Fix                                                                             |
+| ------------------------ | ------ | ------------------------------------------------------------------------------- |
+| `DATA_QUERY_INVALID`     | 400    | The query names a field or an operator that does not exist. Check the name      |
+| `DATA_FIELD_NOT_INDEXED` | 400    | Filter and sort only by an indexed field. Add `.index()` to the field (DATA-07) |
+| `DATA_SORT_INVALID`      | 400    | Sort by a field that is always set, such as a required field or `createdAt`     |
+| `DATA_LOCALE_INVALID`    | 400    | Use a language tag such as `vi` or `pt-BR`                                      |
+| `DATA_FIELD_INVALID`     | 500    | Only localized fields have translations (also raised by builders)               |

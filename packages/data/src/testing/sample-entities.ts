@@ -59,7 +59,7 @@ export const Customer: EntityDef<'crm.Customer'> = defineEntity({
       initial: 'new',
       transitions: { qualify: { from: ['new'], to: 'qualified', permission: 'crm.customer.qualify' } },
     }),
-    score: f.int().computed(() => 0),
+    score: f.int().computed((row) => Number(row['visits'] ?? 0) * 2),
     owner: f.belongsTo(() => User),
     createdAt: f.createdAt(),
     updatedAt: f.updatedAt(),
@@ -101,5 +101,18 @@ export const Contact: EntityDef<'crm.Contact'> = defineEntity({
     id: f.id(),
     fullName: f.string({ min: 1, max: 100, compare: 'ci_ai' }).index(),
     customer: f.belongsTo(() => Customer),
+  },
+});
+
+/** An entity with localized fields, so the translation table is exercised (DATA-17). */
+export const Page: EntityDef<'cms.Page'> = defineEntity({
+  name: 'cms.Page',
+  table: 'cms_pages',
+  tenant: true,
+  fields: {
+    id: f.id(),
+    slug: f.string({ max: 100 }).unique(),
+    title: f.string({ max: 200 }).localized(),
+    body: f.text({ max: 5000 }).optional().localized(),
   },
 });

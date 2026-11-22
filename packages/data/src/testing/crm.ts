@@ -28,7 +28,7 @@ import { compileEntities } from '../orm/compile.ts';
 import { runInUnitOfWork } from '../orm/connect.ts';
 import type { Database } from '../orm/connect.ts';
 import { runAsTenant } from '../orm/tenant.ts';
-import { Contact, Customer, User } from './sample-entities.ts';
+import { Contact, Customer, Page, User } from './sample-entities.ts';
 
 /** The ORM schemas of a row, whose properties the tests read by name. */
 export type Schema = EntitySchema<Record<string, unknown>>;
@@ -85,4 +85,19 @@ export async function seedCustomer(
     await em.flush();
     return String(customer['id']);
   });
+}
+
+export interface CmsSchemas {
+  readonly Page: Schema;
+  readonly Translation: Schema;
+  readonly all: readonly Schema[];
+}
+
+/** Compiles the page entity, which comes with its translation schema after it. */
+export function cmsSchemas(tenancy: 'single' | 'shared-schema' = 'shared-schema'): CmsSchemas {
+  const all = compileEntities([Page], { tenancy });
+  const [page, translation] = all;
+  if (page === undefined || translation === undefined)
+    throw new Error('A localized entity must compile to two schemas.');
+  return { Page: page, Translation: translation, all };
 }
