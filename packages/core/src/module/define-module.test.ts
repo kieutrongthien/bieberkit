@@ -115,6 +115,6 @@ describe('MOD-02 registerModule', () => {
   it('MOD-02 a module without services registers nothing', async () => {
     const container = createContainer();
     registerModule(container, defineModule({ name: 'empty' }));
-    await container.boot();
+    await expect(container.boot()).resolves.toBeUndefined();
   });
 });

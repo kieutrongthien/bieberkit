@@ -61,6 +61,16 @@ export declare class EnvValidationError extends ConfigError {
   readonly problems: readonly EnvProblem[];
   constructor(problems: readonly EnvProblem[]);
 }
+interface ConfigProblem {
+  readonly key: string;
+  readonly code: "CFG_CONFIG_INVALID" | "CFG_CONFIG_UNKNOWN" | "CFG_CONFIG_SECRET";
+  readonly message: string;
+  readonly fix: string;
+}
+export declare class ConfigValidationError extends ConfigError {
+  readonly problems: readonly ConfigProblem[];
+  constructor(problems: readonly ConfigProblem[]);
+}
 export declare function toBkError(value: unknown): BkError;
 type EnvKind = "string" | "int" | "boolean" | "enum" | "url" | "base64" | "custom";
 type EnvCustomParse<T> = (raw: string) => {
@@ -132,6 +142,8 @@ export declare function withEnvFile(real: EnvSource, file: EnvSource): EnvSource
 export declare function readEnvFile(path: string): EnvSource;
 export declare const LOG_LEVELS: readonly ["fatal", "error", "warn", "info", "debug", "trace"];
 type LogLevel = (typeof LOG_LEVELS)[number];
+export declare const DIALECTS: readonly ["postgres", "mysql", "sqlite"];
+type Dialect = (typeof DIALECTS)[number];
 type AppEnv = "development" | "test" | "production";
 interface CoreEnvValues {
   APP_NAME: string;
@@ -144,7 +156,7 @@ interface CoreEnvValues {
   AUTH_SECRET: string | undefined;
   LOG_LEVEL: LogLevel;
   TRUST_PROXY: boolean | number;
-  DB_CONNECTION: "postgres" | "mysql" | "sqlite" | undefined;
+  DB_CONNECTION: Dialect | undefined;
   DATABASE_URL: string | undefined;
   DATABASE_READ_URLS: readonly string[];
   MIGRATE_DATABASE_URL: string | undefined;
@@ -301,6 +313,137 @@ export declare function createEventBus(options?: EventBusOptions): EventBus;
 export declare const ROLES: readonly ["web", "worker", "scheduler", "migrate"];
 type Role = (typeof ROLES)[number];
 export declare function parseRole(argv: readonly string[]): Role;
+interface Parser<T> {
+  parse(input: unknown): T;
+}
+export declare function runParser<T>(parser: Parser<T>, input: unknown, path: string): T;
+interface ModuleContributions {}
+type ServiceDefs = { readonly [N in ServiceName]?: Registration<N>; };
+interface ModuleInput extends ModuleContributions {
+  readonly name: string;
+  readonly services?: ServiceDefs;
+}
+interface ModuleDef {
+  readonly kind: "module";
+  readonly name: string;
+  readonly services: ServiceDefs;
+  readonly contributions: Readonly<Record<string, unknown>>;
+}
+export declare function defineModule(input: ModuleInput): ModuleDef;
+export declare function registerModule(container: Container, def: ModuleDef): void;
+interface PluginProblem {
+  readonly code: string;
+  readonly message: string;
+  readonly fix: string;
+}
+export declare class PluginError extends BkError {
+  readonly problems: readonly PluginProblem[];
+  constructor(problems: readonly PluginProblem[]);
+}
+export declare function satisfies(version: string, range: string): boolean;
+type SeedFn = (services: ServiceRegistry) => void | Promise<void>;
+interface PluginInput<O = undefined> extends ModuleContributions {
+  readonly name: string;
+  readonly version: string;
+  readonly core: string;
+  readonly dialects: readonly Dialect[];
+  readonly requires?: Readonly<Record<string, string>>;
+  readonly conflicts?: readonly string[];
+  readonly env?: Readonly<Record<string, EnvKeyBuilder<unknown>>>;
+  readonly permissions?: readonly string[];
+  readonly options?: Parser<O>;
+  readonly services?: ServiceDefs;
+  readonly seed?: SeedFn;
+}
+interface PluginDef<O = undefined> {
+  readonly kind: "plugin";
+  readonly name: string;
+  readonly shortName: string;
+  readonly version: string;
+  readonly core: string;
+  readonly dialects: readonly Dialect[];
+  readonly requires: Readonly<Record<string, string>>;
+  readonly conflicts: readonly string[];
+  readonly permissions: readonly string[];
+  readonly options: Parser<O>;
+  readonly seed?: SeedFn;
+  readonly module: ModuleDef;
+  readonly envSchema: EnvSchema<Record<string, unknown>>;
+}
+export declare function definePlugin(input: PluginInput): PluginDef;
+export declare function definePlugin<O>(input: PluginInput<O> & {
+  readonly options: Parser<O>;
+}): PluginDef<O>;
+export declare function parsePluginOptions<O>(def: PluginDef<O>, options: unknown, path?: string): O;
+interface Manifest {
+  core: string;
+  dialects: Dialect[];
+  requires: Record<string, string>;
+  conflicts: string[];
+  env: string[];
+  tables: string[];
+  routes: string[];
+  permissions: string[];
+  admin: string[];
+}
+interface KeyCollector {
+  readonly field: "tables" | "routes" | "admin";
+  collect(contributions: Readonly<Record<string, unknown>>): readonly string[];
+}
+type ManifestCheck = {
+  readonly ok: true;
+} | {
+  readonly ok: false;
+  readonly code: "PLG_MANIFEST_NAME" | "PLG_MANIFEST_VERSION" | "PLG_MANIFEST_MISSING" | "PLG_MANIFEST_STALE";
+  readonly message: string;
+};
+export declare function toManifest(def: PluginDef<unknown>, collectors?: readonly KeyCollector[]): Manifest;
+export declare function checkManifest(pkg: {
+  readonly name: string;
+  readonly version: string;
+  readonly bieberkit?: unknown;
+}, def: PluginDef<unknown>, collectors?: readonly KeyCollector[]): ManifestCheck;
+interface Installed {
+  readonly name: string;
+  readonly version: string;
+  readonly manifest: Manifest;
+}
+interface ResolveContext {
+  readonly core: string;
+  readonly dialect: Dialect;
+}
+interface Resolution {
+  readonly order: readonly string[];
+}
+export declare function resolvePlugins(installed: readonly Installed[], context: ResolveContext): Resolution;
+interface ConfigSections {}
+type PluginEntry = string | readonly [name: string, options: Readonly<Record<string, unknown>>];
+interface ProjectConfigInput extends ConfigSections {
+  name: string;
+  author: string;
+  license: string;
+  database: {
+    dialect: Dialect;
+  };
+  tenancy: {
+    mode: "single" | "shared-schema";
+  };
+  locales: {
+    default: string;
+    supported: readonly string[];
+  };
+  plugins: readonly PluginEntry[];
+}
+interface ConfigSection<K extends keyof ConfigSections> {
+  readonly key: K;
+  readonly parser: Parser<ConfigSections[K]>;
+}
+interface ValidateConfigOptions {
+  readonly sections?: readonly ConfigSection<keyof ConfigSections>[];
+}
+export declare function defineConfig(input: ProjectConfigInput): ProjectConfigInput;
+export declare function defineConfigSection<K extends keyof ConfigSections>(key: K, parser: Parser<ConfigSections[K]>): ConfigSection<K>;
+export declare function validateConfig(input: unknown, options?: ValidateConfigOptions): ProjectConfigInput;
 export declare const packageName = "@bieberkit/core";
-export type { AppEnv, BkErrorOptions, Container, CoreEnv, CoreEnvResult, CoreEnvValues, EmitResult, EnvCustomParse, EnvDescription, EnvKeyBuilder, EnvKeyDef, EnvKind, EnvOwner, EnvProblem, EnvSchema, EnvSource, EnvValues, ErrorBody, EventBus, EventBusOptions, EventHandler, EventName, EventRegistry, HandlerFailure, Hook, HookFailure, IntOptions, Lifecycle, LifecycleOptions, LoadEnvOptions, LogFields, LogLevel, Logger, LoggerOptions, ModuleEmitter, OnOptions, Phase, ReadCoreEnvOptions, Registration, RequestContext, RequestScope, Role, ServiceName, ServiceRegistry, ServiceScope, StopResult };
+export type { AppEnv, BkErrorOptions, ConfigProblem, ConfigSection, ConfigSections, Container, CoreEnv, CoreEnvResult, CoreEnvValues, Dialect, EmitResult, EnvCustomParse, EnvDescription, EnvKeyBuilder, EnvKeyDef, EnvKind, EnvOwner, EnvProblem, EnvSchema, EnvSource, EnvValues, ErrorBody, EventBus, EventBusOptions, EventHandler, EventName, EventRegistry, HandlerFailure, Hook, HookFailure, Installed, IntOptions, KeyCollector, Lifecycle, LifecycleOptions, LoadEnvOptions, LogFields, LogLevel, Logger, LoggerOptions, Manifest, ManifestCheck, ModuleContributions, ModuleDef, ModuleEmitter, ModuleInput, OnOptions, Parser, Phase, PluginDef, PluginEntry, PluginInput, PluginProblem, ProjectConfigInput, ReadCoreEnvOptions, Registration, RequestContext, RequestScope, Resolution, ResolveContext, Role, SeedFn, ServiceDefs, ServiceName, ServiceRegistry, ServiceScope, StopResult, ValidateConfigOptions };
 ```

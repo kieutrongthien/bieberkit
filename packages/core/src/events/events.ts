@@ -24,6 +24,7 @@
 
 import { BkError } from '../errors/errors.ts';
 import type { Logger } from '../logging/logger.ts';
+import { MODULE_NAME } from '../module/define-module.ts';
 
 /**
  * Names and payloads of the events. A module adds its events by declaration merging, through the package entry:
@@ -72,8 +73,6 @@ interface Subscription {
   readonly run: (payload: unknown) => void | Promise<void>;
   readonly name: string;
 }
-
-const MODULE_NAME = /^[a-z][a-z0-9-]*$/;
 
 export function createEventBus(options: EventBusOptions = {}): EventBus {
   const subscriptions = new Map<string, Subscription[]>();

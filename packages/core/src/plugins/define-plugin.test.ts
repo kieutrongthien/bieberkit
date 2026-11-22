@@ -62,7 +62,7 @@ describe('MOD-01 definePlugin', () => {
     const def = definePlugin({ ...base, services: {} });
     const container = createContainer();
     registerModule(container, def.module);
-    await container.boot();
+    await expect(container.boot()).resolves.toBeUndefined();
   });
 
   it('CFG-01 builds an env schema from the keys of the plugin', () => {

@@ -27,6 +27,8 @@ import { ConfigError, EnvValidationError } from '../errors/errors.ts';
 import type { EnvProblem } from '../errors/errors.ts';
 import type { LogLevel } from '../logging/levels.ts';
 import { LOG_LEVELS } from '../logging/levels.ts';
+import { DIALECTS } from './dialects.ts';
+import type { Dialect } from './dialects.ts';
 import { defineEnv, env, mergeEnv, readEnv } from './env.ts';
 import type { EnvOwner, EnvSchema, EnvSource } from './env.ts';
 
@@ -44,7 +46,7 @@ export interface CoreEnvValues {
   AUTH_SECRET: string | undefined;
   LOG_LEVEL: LogLevel;
   TRUST_PROXY: boolean | number;
-  DB_CONNECTION: 'postgres' | 'mysql' | 'sqlite' | undefined;
+  DB_CONNECTION: Dialect | undefined;
   DATABASE_URL: string | undefined;
   DATABASE_READ_URLS: readonly string[];
   MIGRATE_DATABASE_URL: string | undefined;
@@ -116,7 +118,7 @@ export const coreEnv: EnvSchema<CoreEnvValues> = defineEnv({
   TRUST_PROXY: trustProxy
     .default(false)
     .describe('Trust the proxy headers: true, false or the number of hops. Required behind a load balancer'),
-  DB_CONNECTION: env.enum(['postgres', 'mysql', 'sqlite']).optional().describe('Database dialect'),
+  DB_CONNECTION: env.enum(DIALECTS).optional().describe('Database dialect'),
   DATABASE_URL: env.string().secret().optional().describe('Database connection URL'),
   DATABASE_READ_URLS: list.default([]).describe('Read replicas, comma separated'),
   MIGRATE_DATABASE_URL: env

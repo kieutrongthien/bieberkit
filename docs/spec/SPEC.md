@@ -2,7 +2,7 @@
   BieberKit
 
   @file        docs/spec/SPEC.md
-  @description The BieberKit specification, version 0.8.5: design, requirements and roadmap.
+  @description The BieberKit specification, version 0.8.6: design, requirements and roadmap.
   @author      Bieber Kieu <kieutrongthien@gmail.com>
   @copyright   Copyright (c) 2026 Bieber Kieu
   @license     Apache-2.0
@@ -767,7 +767,7 @@ In `package.json` the `bieberkit` field holds `core`, `dialects`, `requires`, `c
 
 The same resolver runs in the scaffolder, in `bieberkit add`, and at kernel boot, so a project that boots is a project that resolves.
 
-The resolver is one pure function that reports every problem together, each with a stable code: `PLG_CORE_RANGE`, `PLG_DIALECT`, `PLG_MISSING_REQUIRE`, `PLG_REQUIRE_RANGE`, `PLG_CONFLICT`, `PLG_CYCLE`, `PLG_COLLISION_TABLE`, `PLG_COLLISION_ROUTE`, `PLG_COLLISION_PERMISSION`, `PLG_COLLISION_ENV`, `PLG_COLLISION_ADMIN`, `PLG_PREFIX_ENV` and `PLG_PREFIX_PERMISSION`. Env keys start with the plugin's short name in upper case (`SEO_`) and permissions with the short name and a dot (`seo.`), so env and permission collisions can only come from two plugins with the same short name in different scopes. The boot order is topological with ties broken by name, so it does not depend on input order (ADR 0011).
+The resolver is one pure function that reports every problem together, each with a stable code: `PLG_CORE_RANGE`, `PLG_DIALECT`, `PLG_MISSING_REQUIRE`, `PLG_REQUIRE_RANGE`, `PLG_CONFLICT`, `PLG_CYCLE`, `PLG_COLLISION_TABLE`, `PLG_COLLISION_ROUTE`, `PLG_COLLISION_PERMISSION`, `PLG_COLLISION_ENV`, `PLG_COLLISION_ADMIN`, `PLG_PREFIX_ENV` and `PLG_PREFIX_PERMISSION`. Env keys start with the plugin's short name in upper case (`SEO_`) and permissions with the short name and a dot (`seo.`), so env and permission collisions can only come from two plugins with the same short name in different scopes. The boot order is topological with ties broken by name, so it does not depend on input order (ADR 0011). `definePlugin` raises the name, version, range, dialect and prefix codes (`PLG_NAME`, `PLG_BAD_VERSION`, `PLG_BAD_RANGE`, `PLG_DIALECT`, `PLG_PREFIX_ENV`, `PLG_PREFIX_PERMISSION`) when the plugin is built. The manifest check reports `PLG_MANIFEST_NAME`, `PLG_MANIFEST_VERSION`, `PLG_MANIFEST_MISSING` or `PLG_MANIFEST_STALE`. The short name of a plugin drops the scope and a leading `bieberkit-plugin-` or `plugin-`.
 
 ### 11.3 Extension points
 
@@ -1583,6 +1583,7 @@ Open questions:
 
 | Version | Date | Changes |
 | --- | --- | --- |
+| 0.8.6 | 2026-11-22 | Section 11.2: the codes raised by `definePlugin` and by the manifest check (`PLG_NAME`, `PLG_MANIFEST_NAME`, and the existing ones), and how the short name of a plugin is derived. Found while implementing M1.1 |
 | 0.8.5 | 2026-11-22 | Section 23.5: changeset files are exempt from the header, because their text becomes the changelog. Found while adding the first changeset of M1.1 |
 | 0.8.4 | 2026-11-22 | ADRs 0010 to 0014: queue drivers and outbox rules (Q-01, Q-05, Q-07, Q-11, MOD-18), plugin manifest, resolver and migration steps (PLG-07, PLG-08, DATA-08, DATA-24, DATA-27), Better Auth on MikroORM's Kysely (AUTH-01, AUTH-09 to AUTH-11), own authorization translator (AUTHZ-02, AUTHZ-05, AUTHZ-06), release pipeline (SEC-13, SEC-15, SEC-16, SEC-21, section 24.2) |
 | 0.8.3 | 2026-11-22 | ADR 0009: `EntityDef<Name>` with a generated `EntityRegistry`, descriptors compiled by pure functions, `f.custom` takes schema values, ORM-free entity files, bulk write helpers for shadow columns, serializer wording, SCH-07, SCH-08, DATA-26 |

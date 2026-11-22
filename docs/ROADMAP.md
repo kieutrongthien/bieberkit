@@ -120,7 +120,7 @@ Goal: a `blank` project that a real pilot can run in production with web, worker
 
 Depends on: Phase 0 gate. Only Node.js built-ins (PKG-04).
 
-- [ ] **[D]** `defineModule`, `definePlugin`, `defineConfig` with the manifest fields of §11.1 (MOD-01, MOD-02, CFG-08, CFG-09)
+- [x] **[D]** `defineModule`, `definePlugin`, `defineConfig` with the manifest fields of §11.1 (MOD-01, MOD-02, CFG-08, CFG-09)
 - [x] `defineEnv` and merged env schema with secret redaction, native `.env` loading, precedence of real env (CFG-01 to CFG-06)
 - [x] `Logger` port, dependency-free default JSON logger and request context on `AsyncLocalStorage` in core (OBS-01, PKG-04, ADR 0003)
 - [x] Core env keys of §8.2 with defaults and the production safety checks (CFG-07, APP_SINGLE_NODE)
@@ -129,7 +129,7 @@ Depends on: Phase 0 gate. Only Node.js built-ins (PKG-04).
 - [x] Container: singleton, request and transient scopes, name resolution with inferred types, cycle and missing service fail at boot (§7.3)
 - [x] Lifecycle: boot, ready, stop, reverse shutdown order, `onShutdown` hooks (§7.2, §19.4 steps 6 and 7)
 - [x] Event bus with typed payloads (MOD-03, MOD-05)
-- [ ] **[D]** Plugin resolver: `core` range, `requires`, `conflicts`, `dialects`, topological sort, collision detection, shared with scaffolder and CLI (§11.2, PLG-07), with stable error codes and a dependency-free range matcher that is tested against `semver` (PLG-08, ADR 0011)
+- [x] **[D]** Plugin resolver: `core` range, `requires`, `conflicts`, `dialects`, topological sort, collision detection, shared with scaffolder and CLI (§11.2, PLG-07), with stable error codes and a dependency-free range matcher that is tested against `semver` (PLG-08, ADR 0011)
 - [x] Process role selection from argv for `web`, `worker`, `scheduler`, `migrate` (§7.1)
 - [x] Unit coverage at least 90% lines (TST-01): `pnpm test:coverage`, threshold 90% lines for `packages/core/src` in `vitest.config.ts`
 - [ ] **[D]** Run `pnpm test:coverage` in `ci.yml` (proposed: replace `pnpm test` in the `check` job, so the threshold fails the build)

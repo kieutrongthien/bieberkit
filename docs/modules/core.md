@@ -27,7 +27,7 @@
 - Package: `@bieberkit/core`
 - Layer: foundation (Node.js built-ins only, PKG-04)
 - Spec sections: 7 (runtime), 8 (configuration), 11 (plugins), 19.4 (shutdown), 20 (observability), ADR 0003, ADR 0011
-- Status: Draft. Sections marked **[D]** are proposals for the maintainer to design (AGENTS.md, Workflow 6). They get no code until you approve them.
+- Status: Implemented. The maintainer-designed parts (**[D]**) were approved on 2026-11-22 and are implemented.
 
 ## Purpose
 

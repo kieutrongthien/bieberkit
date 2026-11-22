@@ -93,6 +93,28 @@ export class EnvValidationError extends ConfigError {
   }
 }
 
+/** One problem in the project configuration. `key` is the dotted path, for example `locales.default` or `plugins[2][1]`. */
+export interface ConfigProblem {
+  readonly key: string;
+  readonly code: 'CFG_CONFIG_INVALID' | 'CFG_CONFIG_UNKNOWN' | 'CFG_CONFIG_SECRET';
+  readonly message: string;
+  readonly fix: string;
+}
+
+/** Every problem found in `bieberkit.config.ts`, reported together, in the same shape as `EnvValidationError` (CFG-09). */
+export class ConfigValidationError extends ConfigError {
+  readonly problems: readonly ConfigProblem[];
+
+  constructor(problems: readonly ConfigProblem[]) {
+    super(problems.map((problem) => `${problem.key}: ${problem.message}`).join('\n'), {
+      code: problems[0]?.code ?? 'CFG_CONFIG_INVALID',
+      safeMessage: 'The project configuration is not valid.',
+      fix: problems.map((problem) => problem.fix).join('\n'),
+    });
+    this.problems = problems;
+  }
+}
+
 /** Returns a BkError unchanged and wraps anything else as `BK_UNKNOWN` (status 500). */
 export function toBkError(value: unknown): BkError {
   if (value instanceof BkError) return value;

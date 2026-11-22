@@ -79,3 +79,28 @@ export type {
 } from './events/events.ts';
 export { parseRole, ROLES } from './roles/roles.ts';
 export type { Role } from './roles/roles.ts';
+export { DIALECTS } from './config/dialects.ts';
+export type { Dialect } from './config/dialects.ts';
+export { runParser } from './config/parser.ts';
+export type { Parser } from './config/parser.ts';
+export { ConfigValidationError } from './errors/errors.ts';
+export type { ConfigProblem } from './errors/errors.ts';
+export { defineModule, registerModule } from './module/define-module.ts';
+export type { ModuleContributions, ModuleDef, ModuleInput, ServiceDefs } from './module/define-module.ts';
+export { PluginError } from './plugins/errors.ts';
+export type { PluginProblem } from './plugins/errors.ts';
+export { satisfies } from './plugins/range.ts';
+export { definePlugin, parsePluginOptions } from './plugins/define-plugin.ts';
+export type { PluginDef, PluginInput, SeedFn } from './plugins/define-plugin.ts';
+export { checkManifest, toManifest } from './plugins/manifest.ts';
+export type { KeyCollector, Manifest, ManifestCheck } from './plugins/manifest.ts';
+export { resolvePlugins } from './plugins/resolver.ts';
+export type { Installed, ResolveContext, Resolution } from './plugins/resolver.ts';
+export { defineConfig, defineConfigSection, validateConfig } from './config/define-config.ts';
+export type {
+  ConfigSection,
+  ConfigSections,
+  PluginEntry,
+  ProjectConfigInput,
+  ValidateConfigOptions,
+} from './config/define-config.ts';
