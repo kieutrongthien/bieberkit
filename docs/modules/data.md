@@ -201,11 +201,7 @@ generateRegistrySource(defs, options): string                          // the En
 
 ### Tenant model (slice 3)
 
-- `tenant: true` adds `tenant_id`, `UNIQUE (tenant_id, id)`, and a MikroORM global filter that is on by default (DATA-09).
-- The tenant comes from core's `requestContext().tenantId`, which the HTTP layer sets once per request (DATA-19). Data never reads headers or sessions.
-- No tenant on a query of a tenant entity is `DATA_TENANT_REQUIRED` (400), never an unfiltered read.
-- `asSystem(reason, fn)` disables the filter inside `fn`, writes an audit entry with the reason, and is the only way to do it. A blank reason is `DATA_SYSTEM_SCOPE_REASON`.
-- Every write checks that each referenced id is visible under the filter (DATA-20). The CASL read rule joins that check when `@bieberkit/auth` provides it, through a small `ReferenceVisibility` port that data defines and auth implements.
+See "Slice 3: ORM compiler and tenant model" below.
 
 ## Decisions
 
@@ -235,3 +231,88 @@ Other calls made while writing the slice 2 tests, marked for review:
 - **`.unique()` is refused on `f.money`**, because a unique amount has no meaning. `.index()` is allowed.
 - **Inline collections** (`f.hasMany(...).inline()`) and `f.hasOne` do not appear in the schemas of slice 2. They join in the HTTP milestone, which needs the schema of the target entity.
 - **Codes:** `DATA_FIELD_INVALID`, `DATA_FIELD_CUSTOM_CALLBACK`, `DATA_ENTITY_INVALID`, `DATA_INPUT_INVALID`.
+
+## Slice 3: ORM compiler and tenant model **[D]**
+
+Proposed on 2026-11-22 after reading MikroORM 7.2.9 and the spike code of ADR 0009. The tests come first and wait for the maintainer's review, then the code.
+
+### Public API (`@bieberkit/data/orm`)
+
+```ts
+compileEntities(defs: readonly EntityDef<string>[], options?: { tenancy?: 'single' | 'shared-schema'; raw?: readonly EntitySchema[] }): EntitySchema[]
+//   one schema per definition, in the same order, then the raw ones. tenancy defaults to 'shared-schema'.
+
+createDatabase(env, { entities, audit?: AuditSink, references?: ReferenceVisibility }): Promise<Database>
+interface Database { /* slice 1 */ asSystem<T>(reason: string, fn: () => Promise<T>): Promise<T> }
+
+runAsTenant<T>(tenantId: string, fn: () => T): T        // sets requestContext().tenantId for jobs and tests
+currentTenantId(): string | undefined
+
+softDelete(em, row): void       restore(em, row): void       // set or clear deletedAt and deletedToken
+expectVersion(row, expected: number | string): void         // If-Match, throws DATA_VERSION_STALE
+bulkInsert(em, schema, rows): Promise<void>                  // adds id, tenant, timestamps and shadow values
+bulkUpdate(em, schema, where, data): Promise<number>         // adds updatedAt and shadow values
+
+interface AuditSink { record(entry: SystemScopeEntry): void | Promise<void> }
+interface SystemScopeEntry { reason: string; userId?: string; requestId?: string; tenantId?: string; at: Date }
+interface ReferenceVisibility { visible(entity: string, ids: readonly string[]): Promise<readonly string[]> }
+```
+
+### Mapping of an entity
+
+| Field                      | ORM property and column                                                                                                                                         |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`                       | `id`, `Uuid7Type`, `onCreate` gives `uuid7()`                                                                                                                   |
+| standard columns           | `tenantId`, `version` (versioned), `createdAt`, `updatedAt`, `createdBy`, `updatedBy`, `deletedAt`, `deletedToken` (default empty), from `standardColumns(def)` |
+| `string`, `email`, `oneOf` | `varchar(max)`, and `<name>Cmp` (hidden, `varchar(max)`) for `ci` and `ci_ai`, filled by `onCreate` and `onUpdate` with `fold()`                                |
+| `text`                     | `text`                                                                                                                                                          |
+| `int`, `boolean`           | `integer`, `boolean`                                                                                                                                            |
+| `date`, `dateTime`         | `date` as `YYYY-MM-DD` text, `datetime` in UTC                                                                                                                  |
+| `decimal`                  | `<name>Scaled`, bigint                                                                                                                                          |
+| `money`                    | `<name>Minor` bigint and `<name>Currency` `varchar(3)` with the currency as default                                                                             |
+| `belongsTo`                | many to one, column `<name>_id`. A composite `(tenant_id, <name>_id)` foreign key onto `(tenant_id, id)` when both entities are tenant scoped (DATA-20)         |
+| `hasOne`, `hasMany`        | one to one and one to many, `mappedBy` is the only relation of the target that points back, else `DATA_ENTITY_INVALID`                                          |
+| `custom`                   | `column.type` and `column.length`                                                                                                                               |
+| stored computed            | a column filled on create and update by the function. A computed field that is not stored has no column (the API mapper of slice 4 calculates it)               |
+| `state`, `sequence`        | plain `varchar` columns. Their rules come in slice 6                                                                                                            |
+
+Unique constraints and indexes come from `tableConstraints(def)`, translated from column names to property names. The `orm: { indexes, properties }` override is merged last, and `raw` schemas are added unchanged.
+
+### Tenant rules
+
+- **Filter.** Every tenant entity has the filter `tenant` and, with `softDelete`, the filter `softDelete`. The tenant filter reads `requestContext().tenantId` when the query runs. No tenant is `DATA_TENANT_REQUIRED` (400), never an unfiltered read.
+- **No bypass.** `BieberEntityManager` overrides `applyFilters()`. Disabling the tenant filter (`filters: { tenant: false }`, `filters: false`, a list without it) on a read, `nativeUpdate` or `nativeDelete` is `DATA_TENANT_FILTER_DISABLED`, unless the call runs inside `db.asSystem()`.
+- **`asSystem(reason, fn)`.** Switches the tenant filter off for the async call tree of `fn`. A blank reason is `DATA_SYSTEM_SCOPE_REASON`. Every use is recorded through the `AuditSink`. Until the audit table of slice 6 the default sink writes a `warn` log line.
+- **Tenant on write.** `tenantId` is taken from the context on create. A different value is `DATA_TENANT_MISMATCH` (403), and changing it later is `DATA_TENANT_IMMUTABLE` (403).
+- **`tenancy: 'single'`** (CFG-11) compiles tenant entities without `tenant_id`, the unique pair and the filter. A tenant entity then behaves like a global one.
+- **A global entity cannot reference a tenant entity**: `compileEntities` throws `DATA_ENTITY_INVALID`, since no foreign key could keep the row inside one tenant.
+- **References (DATA-20).** A flush check counts the ids of every relation set on a created or updated row under the current filter. Fewer visible ids than given is `DATA_REFERENCE_NOT_VISIBLE` (422). `ReferenceVisibility`, when given, then filters the visible ids by the CASL read rule of `@bieberkit/auth`. The composite foreign key stays as the backstop.
+
+### Other rules
+
+- **Version (API-13).** A stale flush is `DATA_VERSION_STALE` (412). `expectVersion` compares an `If-Match` value before the write. A write bumps `version` by one.
+- **Soft delete (DATA-16).** `softDelete` sets `deletedAt` and `deletedToken = id`. The filter `softDelete` hides deleted rows, and `filters: { softDelete: false }` stays allowed for trash views because it is not a security boundary.
+- **Shadow columns (DATA-21).** `bulkInsert` and `bulkUpdate` add the folded values. A direct `nativeUpdate` or `insert` that sets a compared field without its shadow value is `DATA_SHADOW_STALE`.
+- **Standard values.** `createdBy` and `updatedBy` come from `requestContext().userId`.
+
+### Errors of slice 3
+
+| Code                          | Status | Fix                                                                                    |
+| ----------------------------- | ------ | -------------------------------------------------------------------------------------- |
+| `DATA_TENANT_REQUIRED`        | 400    | The request has no tenant. Send the tenant header, or run the job inside `runAsTenant` |
+| `DATA_TENANT_FILTER_DISABLED` | 500    | The tenant filter cannot be switched off here. Use `db.asSystem(reason, fn)`           |
+| `DATA_SYSTEM_SCOPE_REASON`    | 500    | Give `asSystem` a reason that says why, for the audit log                              |
+| `DATA_TENANT_MISMATCH`        | 403    | The row belongs to another tenant than the request                                     |
+| `DATA_TENANT_IMMUTABLE`       | 403    | The tenant of a row never changes                                                      |
+| `DATA_REFERENCE_NOT_VISIBLE`  | 422    | A referenced id does not exist for this tenant, or the user may not read it            |
+| `DATA_VERSION_STALE`          | 412    | The record changed since it was read. Reload it and try again                          |
+| `DATA_SHADOW_STALE`           | 500    | Use `bulkInsert` and `bulkUpdate`, which keep the shadow columns right                 |
+
+### Decisions of slice 3
+
+1. **A subclass of `EntityManager`, not only filters.** A plain filter can be switched off by any caller with one option. The subclass is installed through `Configuration.entityManager` and checks the options, so the only way to read across tenants is the audited `asSystem`.
+2. **The tenant is read when the query runs.** Not copied onto each fork, so a fork reused in another tenant context cannot keep the old one, and two tabs on two tenants cannot cross (DATA-19).
+3. **`asSystem` is a method of `Database`.** It needs the audit sink, so one way to do it (P1).
+4. **No `rls` filter option.** MikroORM 7.2 can also write PostgreSQL row level security policies from a filter. The spec calls RLS an optional second layer (section 9.4), and it needs the application role and `FORCE ROW LEVEL SECURITY` work of the migration slice. It is left for then.
+5. **API mappers wait for slice 4.** Turning `{ amount, currency }`, decimal text and `ownerId` into ORM properties is needed when HTTP arrives. Slice 3 round trips through the ORM properties.
+6. **The roadmap item about a `bieberkit check` rule stays open.** The runtime guard `DATA_SHADOW_STALE` is stronger, but the CLI rule is still needed for code that never runs in tests.
