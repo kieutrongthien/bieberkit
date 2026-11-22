@@ -28,7 +28,7 @@ import type { HttpServerOptions } from './server.ts';
 import { okRoute, testServer, TEST_ENV } from './testing.ts';
 import type { RouteDef } from './route.ts';
 
-const USER = { id: 'u-1', kind: 'user' } as const;
+const USER = { id: 'u-1', kind: 'user', via: 'token' } as const;
 
 function problemOf(body: string): Record<string, unknown> {
   const parsed: unknown = JSON.parse(body);

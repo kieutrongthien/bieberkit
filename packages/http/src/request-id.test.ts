@@ -33,7 +33,9 @@ const SPAN = 'b7ad6b7169203331';
 function seen() {
   const contexts: Partial<RequestContext>[] = [];
   const { server, logger } = testServer({
-    authenticator: { authenticate: async () => ({ id: '0190f6b2-7c4e-7000-8000-0123456789ab', kind: 'user' }) },
+    authenticator: {
+      authenticate: async () => ({ id: '0190f6b2-7c4e-7000-8000-0123456789ab', kind: 'user', via: 'token' }),
+    },
     tenantResolver: { resolve: async () => '0190f6b2-7c4e-7000-8000-0123456789cd' },
   });
   server.route(

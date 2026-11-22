@@ -165,7 +165,7 @@ describe('API-14 the permission check of a handler', () => {
   it('API-14 can() asks the authorizer for the principal of the request', async () => {
     const asked: string[] = [];
     const { server } = testServer({
-      authenticator: { authenticate: async () => ({ id: 'u-1', kind: 'user' }) },
+      authenticator: { authenticate: async () => ({ id: 'u-1', kind: 'user', via: 'token' }) },
       authorizer: { can: async (_principal, permission) => (asked.push(permission), permission === 'a.yes') },
     });
     server.route(
@@ -181,7 +181,9 @@ describe('API-14 the permission check of a handler', () => {
     const { server } = testServer();
     server.route(okRoute('/api/v1/t/can', { handler: async (ctx) => ({ ok: await ctx.can('a.yes') }) }));
     expect(JSON.parse((await server.inject({ method: 'GET', url: '/api/v1/t/can' })).body)).toEqual({ ok: false });
-    const signed = testServer({ authenticator: { authenticate: async () => ({ id: 'u-1', kind: 'user' }) } });
+    const signed = testServer({
+      authenticator: { authenticate: async () => ({ id: 'u-1', kind: 'user', via: 'token' }) },
+    });
     signed.server.route(okRoute('/api/v1/t/can', { handler: async (ctx) => ({ ok: await ctx.can('a.yes') }) }));
     expect(JSON.parse((await signed.server.inject({ method: 'GET', url: '/api/v1/t/can' })).body)).toEqual({
       ok: false,

@@ -98,7 +98,7 @@ export const Hidden: EntityDef<'crm.Hidden'> = defineEntity({
   fields: { id: f.id(), text: f.string({ max: 10 }) },
 });
 
-export const USER: Principal = { id: '0190f6b2-7c4e-7000-8000-0000000000b1', kind: 'user' };
+export const USER: Principal = { id: '0190f6b2-7c4e-7000-8000-0000000000b1', kind: 'user', via: 'token' };
 
 export interface EntityApp {
   readonly server: HttpServer;

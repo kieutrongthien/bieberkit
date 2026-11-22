@@ -193,7 +193,7 @@ describe('API-06 who may read it', () => {
 
     const denied = testServer(
       {
-        authenticator: { authenticate: async () => ({ id: 'u', kind: 'user' }) },
+        authenticator: { authenticate: async () => ({ id: 'u', kind: 'user', via: 'token' }) },
         authorizer: { can: async () => false },
       },
       env,
@@ -204,7 +204,7 @@ describe('API-06 who may read it', () => {
     const asked: string[] = [];
     const allowed = testServer(
       {
-        authenticator: { authenticate: async () => ({ id: 'u', kind: 'user' }) },
+        authenticator: { authenticate: async () => ({ id: 'u', kind: 'user', via: 'token' }) },
         authorizer: { can: async (_p, permission) => (asked.push(permission), true) },
       },
       env,

@@ -31,7 +31,7 @@ const wait = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(
 function counting(extra: Record<string, unknown> = {}) {
   const calls = { n: 0 };
   const { server } = testServer({
-    authenticator: { authenticate: async () => ({ id: 'u-1', kind: 'user' }) },
+    authenticator: { authenticate: async () => ({ id: 'u-1', kind: 'user', via: 'token' }) },
     ...extra,
   });
   server.route({
@@ -103,7 +103,9 @@ describe('13.1 Idempotency-Key', () => {
 
   it('13.1 a key belongs to one caller: another principal with the same key runs its own request', async () => {
     let who = 'u-1';
-    const { server, calls } = counting({ authenticator: { authenticate: async () => ({ id: who, kind: 'user' }) } });
+    const { server, calls } = counting({
+      authenticator: { authenticate: async () => ({ id: who, kind: 'user', via: 'token' }) },
+    });
     await post(server, 'key-4');
     who = 'u-2';
     await post(server, 'key-4');

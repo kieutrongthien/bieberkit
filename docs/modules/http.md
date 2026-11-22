@@ -433,3 +433,90 @@ META_SCHEMA: JsonSchema                                        // the JSON Schem
 - **Whether `openapi.json` is public is decided when the server starts.** The route is registered with `public: true` or with `permission: 'system.api-docs'`, so `bieberkit check` sees the same rule as for any other route.
 - **`If-Match` and `Idempotency-Key` are documented from the route.** A route that needs the header says so with `requiresIfMatch`, and an idempotent one lists the optional header, so a generated client sends them (API-07).
 - **`_meta` for a caller with no permission is an empty list**, not an error: the shell can still draw its frame and show that there is nothing.
+
+## Slice 5: security headers, CORS, CSRF and `http.fetch`
+
+Designed on 2026-11-23. None of it is maintainer-designed (SEC-01 to SEC-04, SEC-06, WH-04 and API-12 decide it). Slice 4 was merged into `main` before it started. The session itself (the cookie, its id, the signing) is `@bieberkit/auth`, so CSRF here only asks the principal for what it needs.
+
+### Public API
+
+```ts
+// HttpServerOptions gains
+headers?: Readonly<Record<string, string | false>>         // overrides of the security headers. false removes one
+cors?: { origins: readonly string[]; credentials?: boolean; maxAgeSeconds?: number }
+csrf?: CsrfProtection
+
+createCsrf(secret: string): CsrfProtection
+interface CsrfProtection { issue(sessionId: string): string; verify(token: string, sessionId: string): boolean }
+registerCsrfToken(server: HttpServer): void                 // GET /api/v1/csrf gives the token of the session of the caller
+// Principal gains: via?: 'cookie' | 'token', sessionId?: string
+
+createHttpFetch(options?: HttpFetchOptions): HttpFetch      // the SSRF guarded fetch (SEC-06, WH-04)
+interface HttpFetchOptions { allow?: readonly string[]; connectTimeoutMs?: number; timeoutMs?: number; retries?: number; backoffMs?: number;
+                             maxRedirects?: number; maxResponseBytes?: number; failureThreshold?: number; openMs?: number }
+isBlockedAddress(address: string): boolean
+```
+
+### Security headers (SEC-01)
+
+Every answer, also an error and a 304, carries:
+
+| Header                      | Value                                                                                            |
+| --------------------------- | ------------------------------------------------------------------------------------------------ |
+| `Content-Security-Policy`   | `default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'`                |
+| `X-Content-Type-Options`    | `nosniff`                                                                                        |
+| `Referrer-Policy`           | `strict-origin-when-cross-origin`                                                                |
+| `Permissions-Policy`        | `camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()`               |
+| `Strict-Transport-Security` | `max-age=31536000; includeSubDomains`, in production, and on any request that arrived over https |
+
+The policy is that of a JSON API, which renders nothing. The admin and the site have their own policies (hashes and nonces, SEC-01), and they set them where they serve their pages. `headers` replaces the value of one header, or removes it with `false`, for a server that also serves pages.
+
+### CORS (SEC-02)
+
+- **An explicit list of origins.** `cors.origins` takes origins only (`https://admin.example.com`, with scheme, host and optional port, and no path). `*`, `null` and anything else are refused when the server is made (`HTTP_CONFIG_INVALID`). With no `cors`, no origin is allowed, and a browser may call the API only from its own origin.
+- **An allowed origin** gets `Access-Control-Allow-Origin` with that origin, `Vary: Origin`, `Access-Control-Allow-Credentials: true` (unless `credentials: false`) and `Access-Control-Expose-Headers` for the headers that clients read (`x-request-id`, `etag`, `location`, `retry-after`, `idempotency-replayed`). An origin that is not allowed gets none of them, so the browser blocks the answer. The answer still carries `Vary: Origin`, so a cache cannot give one origin the answer of another.
+- **A preflight** (an `OPTIONS` with `Origin` and `Access-Control-Request-Method`) is answered before authentication and rate limiting, because a browser sends it with no credentials. From an allowed origin it is 204 with the methods, the headers that the API reads and `Access-Control-Max-Age` (600 s). From another origin it is 403 `HTTP_CORS_DENIED`.
+
+### CSRF (SEC-03, stage 6)
+
+For a request that changes state (`POST`, `PUT`, `PATCH`, `DELETE`) from a principal that signed in with a cookie:
+
+1. A principal that came with a token (`via: 'token'`) or a service (`kind: 'service'`, API-12) is not checked: nothing in a browser attaches those by itself.
+2. `Sec-Fetch-Site: same-origin` passes. It is the primary check, and a browser sends it and a page cannot change it.
+3. Anything else (the header missing, `same-site`, `cross-site`, `none`) needs a valid `X-CSRF-Token`, which is signed with HMAC-SHA256 and bound to the session id, and an `Origin` header, when there is one, that is the origin of the server or in `cors.origins`.
+4. No token, an invalid token or a token of another session is 403 `HTTP_CSRF_FAILED`. With no `csrf` option no token is valid, so only same-origin requests pass: the server fails closed.
+
+The token comes from `GET /api/v1/csrf`, which answers 401 for a caller with no session id. A GET is never checked, and nothing here changes state on a GET: a route that does is a bug, and `bieberkit check` reports it.
+
+### `http.fetch` (SEC-06, WH-04)
+
+An outbound `fetch` that webhooks and integrations use.
+
+- **Addresses that are blocked.** The host is resolved, and every address must be public. Blocked are loopback, private (`10/8`, `172.16/12`, `192.168/16`), link-local and the cloud metadata address (`169.254/16`), shared address space (`100.64/10`), unspecified, multicast, reserved and benchmarking ranges, and for IPv6 `::1`, `::`, unique local (`fc00::/7`), link-local (`fe80::/10`), multicast and documentation ranges. An IPv4 address inside an IPv6 one (`::ffff:10.0.0.1`) is read as the IPv4 address. A host with one blocked address among several is blocked.
+- **No DNS rebinding.** The connection goes to the address that was checked, not to a second lookup: the check is in the `lookup` of the socket.
+- **The allowlist.** `allow` takes host names and addresses or ranges (`internal.example.com`, `10.1.2.3`, `10.0.0.0/8`). A host name in it may resolve to a blocked range. An address or range in it is allowed even when it is blocked.
+- **Redirects.** At most 3, each checked as a new request. A redirect to another scheme than http and https is refused.
+- **Timeouts and size.** 5 s to connect and 30 s in all (WH-04), and a response of more than 10 MiB is cut off.
+- **Retries.** Only a request that is idempotent: GET, HEAD, PUT, DELETE and OPTIONS, and a POST that sends `Idempotency-Key`. Two retries after a network error or a 502, 503 or 504, with a wait that doubles from 200 ms.
+- **A circuit breaker for each host.** After 5 failures in a row (a network error, a timeout or a 5xx) the host is open for 30 s, and calls fail at once with `HTTP_FETCH_CIRCUIT_OPEN`. After that one trial goes through: a success closes the circuit, and a failure opens it again.
+
+### Errors of slice 5
+
+| Code                      | Status | Fix                                                                       |
+| ------------------------- | ------ | ------------------------------------------------------------------------- |
+| `HTTP_CORS_DENIED`        | 403    | The origin is not in the list that the server allows                      |
+| `HTTP_CSRF_FAILED`        | 403    | Send `X-CSRF-Token` from `GET /api/v1/csrf`, or call from the same origin |
+| `HTTP_FETCH_BLOCKED`      | 400    | The address is private or reserved. Add it to `allow` if it is meant      |
+| `HTTP_FETCH_TIMEOUT`      | 504    | The host did not answer in time                                           |
+| `HTTP_FETCH_FAILED`       | 502    | The call failed. The cause has the detail                                 |
+| `HTTP_FETCH_TOO_LARGE`    | 502    | The response is larger than `maxResponseBytes`                            |
+| `HTTP_FETCH_CIRCUIT_OPEN` | 503    | The host failed too often. Try again after `openMs`                       |
+
+### Found while implementing slice 5
+
+- **Every API client of the earlier tests became a browser.** A principal that does not say how it came counts as a cookie caller, so the POSTs of the old tests failed the CSRF check at once. They now say `via: 'token'`, which is also what a real API client is. The default is the safe one: a new kind of principal is checked until its authenticator says that it is not a browser.
+- **The check of a redirect is the check of a request.** Each hop goes through `resolve`, so a redirect to `169.254.169.254` or to `ftp:` is refused like a first call, and `Authorization` is dropped when the host changes.
+- **A refusal of ours is not retried.** A call that passed 3 redirects failed 3 times, because a retry looked like a network failure. Only a timeout and a failure that has a cause (a reset, a refused connection) are tried again.
+- **`BlockList` does the ranges.** `node:net` has subnets for IPv4 and IPv6 and no dependency is needed. An IPv4 address inside an IPv6 one is turned into IPv4 first, because `BlockList` does not look inside it.
+- **A literal address is checked before the socket exists.** Node does not call `lookup` for `127.0.0.1` or `[::1]`, so the guard checks a literal itself. The numbers `2130706433` and `0x7f.1` are made `127.0.0.1` by the URL parser, and are refused as that.
+- **The check of CORS and the check of CSRF share the list of origins.** An origin that may call the API may also carry a token, and nothing else may.
