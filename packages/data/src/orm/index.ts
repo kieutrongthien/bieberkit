@@ -25,16 +25,43 @@
 export { auditTableSink, recordAudit } from './audit.ts';
 export type { AuditEntry } from './audit.ts';
 export {
+  Attachment,
   AuditLog,
+  Comment,
   DATA_PLUGIN,
   OutboxEntry,
   OutboxProcessed,
   Sequence,
+  Tag,
+  TimelineEntry,
   dataMigrationSteps,
   frameworkEntities,
   grantAuditLog,
 } from './framework.ts';
 export type { AuditLogRow, OutboxEntryRow, OutboxProcessedRow, SequenceRow } from './framework.ts';
+export {
+  addAttachment,
+  addComment,
+  addTag,
+  addTimeline,
+  deleteComment,
+  listAttachments,
+  listComments,
+  listTags,
+  listTimeline,
+  removeAttachment,
+  removeTag,
+} from './features.ts';
+export type {
+  AttachmentInput,
+  AttachmentRow,
+  CommentRow,
+  FeaturePage,
+  PageRequest,
+  TagRow,
+  TimelineInput,
+  TimelineRow,
+} from './features.ts';
 export { formatSequence, nextSequence, periodOf } from './sequence.ts';
 export type { SequenceKey, SequenceOptions } from './sequence.ts';
 export { availableTransitions, transition, transitionOf } from './state.ts';

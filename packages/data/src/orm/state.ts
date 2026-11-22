@@ -27,6 +27,7 @@ import { dataError } from '../errors.ts';
 import type { TransitionDef } from '../schema/fields.ts';
 import { recordAudit } from './audit.ts';
 import { entityOfSchema } from './compile.ts';
+import { addTimelineFor } from './features.ts';
 import type { OrmSchema } from './compile.ts';
 import { emitEvent } from './outbox.ts';
 import { allowStateChange } from './state-guard.ts';
@@ -172,5 +173,6 @@ export async function transition(
     record: { entity: machine.entity, id, version: (typeof row['version'] === 'number' ? row['version'] : 0) + 1 },
   });
   recordAudit(em, { action: label, entity: machine.entity, recordId: id, data: detail });
+  addTimelineFor(em, schema, row, { type: 'transition', data: { name, from, to: declared.to } });
   return { name, from, to: declared.to, event };
 }

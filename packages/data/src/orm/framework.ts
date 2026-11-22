@@ -39,6 +39,10 @@ export const OUTBOX_TABLE = 'bieberkit_outbox';
 export const PROCESSED_TABLE = 'bieberkit_outbox_processed';
 export const AUDIT_TABLE = 'audit_log';
 export const SEQUENCE_TABLE = 'bieberkit_sequences';
+export const COMMENT_TABLE = 'bieberkit_comments';
+export const TAG_TABLE = 'bieberkit_tags';
+export const ATTACHMENT_TABLE = 'bieberkit_attachments';
+export const TIMELINE_TABLE = 'bieberkit_timeline';
 /** The class name of the audit schema. The unit of work refuses to change an entity of this name (DATA-25). */
 export const AUDIT_ENTITY = 'bieberkit.AuditLog';
 
@@ -72,6 +76,42 @@ export interface SequenceRow {
   name: string;
   period: string;
   value: number | string;
+}
+
+interface FeatureRowBase {
+  id: string;
+  tenant: string;
+  entity: string;
+  recordId: string;
+}
+
+export interface CommentEntryRow extends FeatureRowBase {
+  body: string;
+  createdAt: Date;
+  createdBy?: string | null;
+}
+
+export interface TagEntryRow extends FeatureRowBase {
+  tag: string;
+  tagKey: string;
+  createdAt: Date;
+  createdBy?: string | null;
+}
+
+export interface AttachmentEntryRow extends FeatureRowBase {
+  storageKey: string;
+  name: string;
+  contentType: string;
+  size: number | string;
+  createdAt: Date;
+  createdBy?: string | null;
+}
+
+export interface TimelineEntryRow extends FeatureRowBase {
+  type: string;
+  data?: string | null;
+  at: Date;
+  actorId?: string | null;
 }
 
 export interface AuditLogRow {
@@ -152,8 +192,83 @@ export const Sequence: EntitySchema<SequenceRow> = new EntitySchema<SequenceRow>
   },
 });
 
+export const Comment: EntitySchema<CommentEntryRow> = new EntitySchema<CommentEntryRow>({
+  name: 'bieberkit.Comment',
+  tableName: COMMENT_TABLE,
+  properties: {
+    id: uuid({ primary: true, onCreate: () => uuid7() }),
+    tenant: uuid({ fieldName: 'tenant_id' }),
+    entity: { type: 'string', length: 200 },
+    recordId: uuid({}),
+    body: { type: 'text' },
+    createdAt: { type: DateTimeType, length: 3, onCreate: () => new Date() },
+    createdBy: uuid({ nullable: true }),
+  },
+  indexes: [{ name: 'bieberkit_comments_record_index', properties: ['tenant', 'entity', 'recordId'] }],
+});
+
+export const Tag: EntitySchema<TagEntryRow> = new EntitySchema<TagEntryRow>({
+  name: 'bieberkit.Tag',
+  tableName: TAG_TABLE,
+  properties: {
+    id: uuid({ primary: true, onCreate: () => uuid7() }),
+    tenant: uuid({ fieldName: 'tenant_id' }),
+    entity: { type: 'string', length: 200 },
+    recordId: uuid({}),
+    tag: { type: 'string', length: 64 },
+    tagKey: { type: 'string', length: 64, fieldName: 'tag_key' },
+    createdAt: { type: DateTimeType, length: 3, onCreate: () => new Date() },
+    createdBy: uuid({ nullable: true }),
+  },
+  indexes: [{ name: 'bieberkit_tags_record_index', properties: ['tenant', 'entity', 'recordId'] }],
+  uniques: [{ name: 'bieberkit_tags_unique', properties: ['tenant', 'entity', 'recordId', 'tagKey'] }],
+});
+
+export const Attachment: EntitySchema<AttachmentEntryRow> = new EntitySchema<AttachmentEntryRow>({
+  name: 'bieberkit.Attachment',
+  tableName: ATTACHMENT_TABLE,
+  properties: {
+    id: uuid({ primary: true, onCreate: () => uuid7() }),
+    tenant: uuid({ fieldName: 'tenant_id' }),
+    entity: { type: 'string', length: 200 },
+    recordId: uuid({}),
+    storageKey: { type: 'string', length: 512 },
+    name: { type: 'string', length: 255 },
+    contentType: { type: 'string', length: 255 },
+    size: { type: 'bigint' },
+    createdAt: { type: DateTimeType, length: 3, onCreate: () => new Date() },
+    createdBy: uuid({ nullable: true }),
+  },
+  indexes: [{ name: 'bieberkit_attachments_record_index', properties: ['tenant', 'entity', 'recordId'] }],
+});
+
+export const TimelineEntry: EntitySchema<TimelineEntryRow> = new EntitySchema<TimelineEntryRow>({
+  name: 'bieberkit.TimelineEntry',
+  tableName: TIMELINE_TABLE,
+  properties: {
+    id: uuid({ primary: true, onCreate: () => uuid7() }),
+    tenant: uuid({ fieldName: 'tenant_id' }),
+    entity: { type: 'string', length: 200 },
+    recordId: uuid({}),
+    type: { type: 'string', length: 100 },
+    data: { type: 'text', nullable: true },
+    at: { type: DateTimeType, length: 3, onCreate: () => new Date() },
+    actorId: uuid({ nullable: true }),
+  },
+  indexes: [{ name: 'bieberkit_timeline_record_index', properties: ['tenant', 'entity', 'recordId'] }],
+});
+
 /** The schemas that `createDatabase` adds to the entities of the project. */
-export const frameworkEntities: readonly EntitySchema[] = [OutboxEntry, OutboxProcessed, AuditLog, Sequence];
+export const frameworkEntities: readonly EntitySchema[] = [
+  OutboxEntry,
+  OutboxProcessed,
+  AuditLog,
+  Sequence,
+  Comment,
+  Tag,
+  Attachment,
+  TimelineEntry,
+];
 
 type Trx = Kysely<StepDatabase>;
 
@@ -167,6 +282,109 @@ function step(
   version = '0.1.0',
 ): PluginMigrationStep {
   return { plugin: DATA_PLUGIN, version, id, kind, up };
+}
+
+const FEATURE_VERSION = '0.3.0';
+const KEY = ['tenant_id', 'entity', 'record_id'];
+
+function indexStep(name: string, table: string, columns: string[], unique = false): PluginMigrationStep {
+  return step(
+    name,
+    'expand',
+    async (trx: Trx) => {
+      const builder = trx.schema.createIndex(name).on(table);
+      await (unique ? builder.unique() : builder).columns(columns).execute();
+    },
+    FEATURE_VERSION,
+  );
+}
+
+/** The four tables of the record features, one step for each table and each index (version 0.3.0). */
+function featureSteps(): PluginMigrationStep[] {
+  return [
+    step(
+      'comments-create',
+      'expand',
+      async (trx: Trx, dialect) => {
+        await trx.schema
+          .createTable(COMMENT_TABLE)
+          .addColumn('id', uuidType(dialect), (c) => c.notNull())
+          .addColumn('tenant_id', uuidType(dialect), (c) => c.notNull())
+          .addColumn('entity', 'varchar(200)', (c) => c.notNull())
+          .addColumn('record_id', uuidType(dialect), (c) => c.notNull())
+          .addColumn('body', 'text', (c) => c.notNull())
+          .addColumn('created_at', instant(dialect), (c) => c.notNull())
+          .addColumn('created_by', uuidType(dialect))
+          .addPrimaryKeyConstraint(`${COMMENT_TABLE}_pkey`, ['id'])
+          .execute();
+      },
+      FEATURE_VERSION,
+    ),
+    indexStep('bieberkit_comments_record_index', COMMENT_TABLE, KEY),
+    step(
+      'tags-create',
+      'expand',
+      async (trx: Trx, dialect) => {
+        await trx.schema
+          .createTable(TAG_TABLE)
+          .addColumn('id', uuidType(dialect), (c) => c.notNull())
+          .addColumn('tenant_id', uuidType(dialect), (c) => c.notNull())
+          .addColumn('entity', 'varchar(200)', (c) => c.notNull())
+          .addColumn('record_id', uuidType(dialect), (c) => c.notNull())
+          .addColumn('tag', 'varchar(64)', (c) => c.notNull())
+          .addColumn('tag_key', 'varchar(64)', (c) => c.notNull())
+          .addColumn('created_at', instant(dialect), (c) => c.notNull())
+          .addColumn('created_by', uuidType(dialect))
+          .addPrimaryKeyConstraint(`${TAG_TABLE}_pkey`, ['id'])
+          .execute();
+      },
+      FEATURE_VERSION,
+    ),
+    indexStep('bieberkit_tags_record_index', TAG_TABLE, KEY),
+    indexStep('bieberkit_tags_unique', TAG_TABLE, [...KEY, 'tag_key'], true),
+    step(
+      'attachments-create',
+      'expand',
+      async (trx: Trx, dialect) => {
+        await trx.schema
+          .createTable(ATTACHMENT_TABLE)
+          .addColumn('id', uuidType(dialect), (c) => c.notNull())
+          .addColumn('tenant_id', uuidType(dialect), (c) => c.notNull())
+          .addColumn('entity', 'varchar(200)', (c) => c.notNull())
+          .addColumn('record_id', uuidType(dialect), (c) => c.notNull())
+          .addColumn('storage_key', 'varchar(512)', (c) => c.notNull())
+          .addColumn('name', 'varchar(255)', (c) => c.notNull())
+          .addColumn('content_type', 'varchar(255)', (c) => c.notNull())
+          .addColumn('size', 'bigint', (c) => c.notNull())
+          .addColumn('created_at', instant(dialect), (c) => c.notNull())
+          .addColumn('created_by', uuidType(dialect))
+          .addPrimaryKeyConstraint(`${ATTACHMENT_TABLE}_pkey`, ['id'])
+          .execute();
+      },
+      FEATURE_VERSION,
+    ),
+    indexStep('bieberkit_attachments_record_index', ATTACHMENT_TABLE, KEY),
+    step(
+      'timeline-create',
+      'expand',
+      async (trx: Trx, dialect) => {
+        await trx.schema
+          .createTable(TIMELINE_TABLE)
+          .addColumn('id', uuidType(dialect), (c) => c.notNull())
+          .addColumn('tenant_id', uuidType(dialect), (c) => c.notNull())
+          .addColumn('entity', 'varchar(200)', (c) => c.notNull())
+          .addColumn('record_id', uuidType(dialect), (c) => c.notNull())
+          .addColumn('type', 'varchar(100)', (c) => c.notNull())
+          .addColumn('data', 'text')
+          .addColumn('at', instant(dialect), (c) => c.notNull())
+          .addColumn('actor_id', uuidType(dialect))
+          .addPrimaryKeyConstraint(`${TIMELINE_TABLE}_pkey`, ['id'])
+          .execute();
+      },
+      FEATURE_VERSION,
+    ),
+    indexStep('bieberkit_timeline_record_index', TIMELINE_TABLE, KEY),
+  ];
 }
 
 /**
@@ -265,6 +483,7 @@ export const dataMigrationSteps: readonly PluginMigrationStep[] = [
     },
     '0.2.0',
   ),
+  ...featureSteps(),
 ];
 
 const ROLE = /^[A-Za-z_][A-Za-z0-9_]*$/;

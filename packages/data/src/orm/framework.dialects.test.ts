@@ -79,9 +79,7 @@ describeDialects('MOD-18 framework tables', ({ dialect, openFramework, emptyData
   it('DATA-24 the steps and the schemas of the ORM describe the same tables', async () => {
     const db = await openFramework();
     const statements = await db.orm.schema.getUpdateSchemaSQL({ safe: true });
-    const touching = statements
-      .split(';')
-      .filter((text) => /bieberkit_outbox|audit_log|bieberkit_sequences/.test(text) && text.trim() !== '');
+    const touching = statements.split(';').filter((text) => /bieberkit_|audit_log/.test(text) && text.trim() !== '');
     expect(touching).toEqual([]);
   });
 
