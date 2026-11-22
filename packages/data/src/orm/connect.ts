@@ -27,7 +27,9 @@ import type { EntityManager, EntitySchema, IDatabaseDriver, MikroORM } from '@mi
 import { createLogger } from '@bieberkit/core';
 import type { Dialect, Logger } from '@bieberkit/core';
 import { dataError } from '../errors.ts';
+import { auditTableSink } from './audit.ts';
 import { BieberEntityManager } from './entity-manager.ts';
+import { frameworkEntities } from './framework.ts';
 import type { ReferenceVisibility } from './references.ts';
 import { createSqliteDialect } from './sqlite.ts';
 import { DataSubscriber } from './subscriber.ts';
@@ -44,8 +46,11 @@ export interface DatabaseEnv {
 
 export interface DatabaseOptions {
   readonly entities: readonly EntitySchema[];
-  /** Where `asSystem` records its use. Defaults to a `warn` line through `logger`, until the audit log of slice 6. */
-  readonly audit?: AuditSink;
+  /**
+   * Where `asSystem` records its use (AUTHZ-05). `'table'` writes the audit log, which needs the framework tables (`dataMigrationSteps`).
+   * Defaults to a `warn` line through `logger`, for a project that has not made them yet.
+   */
+  readonly audit?: AuditSink | 'table';
   /** The CASL read rule that decides which referenced ids a user may see (DATA-20). */
   readonly references?: ReferenceVisibility;
   readonly logger?: Logger;
@@ -201,7 +206,7 @@ export async function initOrm(resolved: ResolvedConnection, common: CommonOrmSet
 export async function createDatabase(env: DatabaseEnv, options: DatabaseOptions): Promise<Database> {
   const resolved = resolveConnection(env);
   const common = {
-    entities: [...options.entities],
+    entities: [...options.entities, ...frameworkEntities],
     forceUtcTimezone: true,
     allowGlobalContext: false,
     ensureDatabase: false,
@@ -216,9 +221,12 @@ export async function createDatabase(env: DatabaseEnv, options: DatabaseOptions)
   } as const;
   const orm = await initOrm(resolved, common, env.DB_POOL_MAX);
   const logger = options.logger ?? createLogger({ level: 'info', role: 'data' });
-  const sink: AuditSink = options.audit ?? {
-    record: (entry: SystemScopeEntry) => logger.warn('tenant filter switched off', { ...entry }),
-  };
+  const sink: AuditSink =
+    options.audit === 'table'
+      ? auditTableSink(orm)
+      : (options.audit ?? {
+          record: (entry: SystemScopeEntry) => logger.warn('tenant filter switched off', { ...entry }),
+        });
   return {
     dialect: resolved.dialect,
     orm,

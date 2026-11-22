@@ -22,6 +22,29 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+export { auditTableSink, recordAudit } from './audit.ts';
+export type { AuditEntry } from './audit.ts';
+export {
+  AuditLog,
+  DATA_PLUGIN,
+  OutboxEntry,
+  OutboxProcessed,
+  dataMigrationSteps,
+  frameworkEntities,
+  grantAuditLog,
+} from './framework.ts';
+export type { AuditLogRow, OutboxEntryRow, OutboxProcessedRow } from './framework.ts';
+export { createOutboxDispatcher, emitEvent, outboxLag, processOnce, purgeProcessed } from './outbox.ts';
+export type {
+  DispatchResult,
+  OutboxDispatcher,
+  OutboxDispatcherOptions,
+  OutboxEvent,
+  OutboxLag,
+  OutboxMessage,
+  OutboxPublisher,
+  PurgeOptions,
+} from './outbox.ts';
 export { bulkInsert, bulkUpdate } from './bulk.ts';
 export { compileEntities } from './compile.ts';
 export type { CompileOptions, OrmSchema } from './compile.ts';

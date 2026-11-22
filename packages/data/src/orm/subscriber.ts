@@ -25,6 +25,7 @@
 import { ChangeSetType } from '@mikro-orm/core';
 import type { EventSubscriber, FlushEventArgs } from '@mikro-orm/core';
 import { dataError } from '../errors.ts';
+import { AUDIT_ENTITY } from './framework.ts';
 import { entityMeta, isNewRow } from './internals.ts';
 import { assertReferencesVisible, referencedIds } from './references.ts';
 import type { ReferenceVisibility } from './references.ts';
@@ -67,6 +68,14 @@ export class DataSubscriber implements EventSubscriber {
   async onFlush({ em, uow }: FlushEventArgs): Promise<void> {
     const entities: { entity: Row; created: boolean; changed: readonly string[] }[] = [];
     for (const change of uow.getChangeSets()) {
+      if (change.type !== ChangeSetType.CREATE && entityMeta(change.entity).className === AUDIT_ENTITY) {
+        throw dataError(
+          'DATA_AUDIT_APPEND_ONLY',
+          500,
+          'An audit entry is never changed or deleted.',
+          'Write a new entry that corrects the old one.',
+        );
+      }
       const created = change.type === ChangeSetType.CREATE;
       const changed = Object.keys(change.payload);
       if (!created && changed.includes('tenantId')) {
