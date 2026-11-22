@@ -234,7 +234,9 @@ Other calls made while writing the slice 2 tests, marked for review:
 
 ## Slice 3: ORM compiler and tenant model **[D]**
 
-Proposed on 2026-11-22 after reading MikroORM 7.2.9 and the spike code of ADR 0009. The tests come first and wait for the maintainer's review, then the code.
+Designed on 2026-11-22 after reading MikroORM 7.2.9 and the spike code of ADR 0009, approved by the maintainer and implemented with the tests written first.
+
+Two things found while implementing, both about MikroORM 7.2.9. `Uuid7Type` needs `compareValues`, because a row read as bytes and the same id converted again were compared as objects, so every update rewrote the key columns and the version moved on a flush that changed nothing. And on SQLite the plain `datetime` type had the same problem for every date, so datetimes use MikroORM's `DateTimeType`, which stores the same integer and compares correctly.
 
 ### Public API (`@bieberkit/data/orm`)
 

@@ -29,7 +29,8 @@ Generated from the built declaration files by `pnpm api:update`. Do not edit by 
 
 ```ts
 import * as z from "zod/mini";
-import { A as SchemaValue, C as ColumnDef, D as FieldDef, E as FieldBuilders, M as TransitionDef, N as f, O as FieldKind, S as tableConstraints, T as Field, _ as StandardColumn, a as UpdateInput, b as snake, c as AdminOptions, d as EntityDef, f as EntityOptions, g as Permissions, h as OrmOverride, i as Row, j as StateOptions, k as ResetEvery, l as ApiOptions, m as FieldLike, n as EntityRegistry, o as generateRegistrySource, p as Feature, r as RegistryOptions, s as ActionDef, t as CreateInput, u as ConstraintDef, v as TableConstraints, w as ComputedFn, x as standardColumns, y as defineEntity } from "./registry-ByPyP6V3.js";
+import { C as ResetEvery, D as f, E as TransitionDef, S as FieldKind, T as StateOptions, _ as ColumnDef, a as EntityDef, b as FieldBuilders, c as FieldLike, d as StandardColumn, f as TableConstraints, g as tableConstraints, h as standardColumns, i as ConstraintDef, l as OrmOverride, m as snake, n as AdminOptions, o as EntityOptions, p as defineEntity, r as ApiOptions, s as Feature, t as ActionDef, u as Permissions, v as ComputedFn, w as SchemaValue, x as FieldDef, y as Field } from "./define-entity-fSi6hSbi.js";
+import { a as UpdateInput, i as Row, n as EntityRegistry, o as generateRegistrySource, r as RegistryOptions, t as CreateInput } from "./registry-CGVHQuS7.js";
 type SchemaMode = "create" | "update" | "read";
 interface ApiField {
   readonly key: string;

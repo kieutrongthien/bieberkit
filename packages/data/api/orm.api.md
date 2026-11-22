@@ -28,9 +28,36 @@
 Generated from the built declaration files by `pnpm api:update`. Do not edit by hand. A change here is a change to the public API and needs a changeset (spec section 22.3).
 
 ```ts
-import { Dialect } from "@bieberkit/core";
-import { EntityManager, EntityProperty, EntitySchema, IDatabaseDriver, MikroORM, Platform, Type } from "@mikro-orm/core";
+import "./errors-Bn-3jo6Z.js";
+import { Dialect, Logger } from "@bieberkit/core";
+import { EntityData, EntityManager, EntityName, EntityProperty, EntitySchema, FilterOptions, FilterQuery, FindOneOptions, FindOptions, IDatabaseDriver, MikroORM, NativeInsertUpdateOptions, Platform, Primary, RequiredEntityData, Type, UpdateOptions } from "@mikro-orm/core";
+import { SqlEntityManager } from "@mikro-orm/sql";
 import { SqliteDialect } from "kysely";
+import { a as EntityDef } from "./define-entity-fSi6hSbi.js";
+type OrmSchema = EntitySchema<Record<string, unknown>>;
+interface CompileOptions {
+  readonly tenancy?: "single" | "shared-schema";
+  readonly raw?: readonly OrmSchema[];
+}
+export declare function compileEntities(defs: readonly EntityDef<string>[], options?: CompileOptions): OrmSchema[];
+type Row = Record<string, unknown>;
+export declare function bulkInsert(em: EntityManager, schema: OrmSchema, rows: readonly Row[]): Promise<void>;
+export declare function bulkUpdate(em: EntityManager, schema: OrmSchema, where: Row, data: Row): Promise<number>;
+interface ReferenceVisibility {
+  visible(entity: string, ids: readonly string[]): Promise<readonly string[]>;
+}
+interface SystemScopeEntry {
+  readonly reason: string;
+  readonly userId?: string;
+  readonly requestId?: string;
+  readonly tenantId?: string;
+  readonly at: Date;
+}
+interface AuditSink {
+  record(entry: SystemScopeEntry): void | Promise<void>;
+}
+export declare function currentTenantId(): string | undefined;
+export declare function runAsTenant<T>(tenantId: string, fn: () => T): T;
 interface DatabaseEnv {
   readonly DB_CONNECTION: Dialect | undefined;
   readonly DATABASE_URL: string | undefined;
@@ -39,12 +66,16 @@ interface DatabaseEnv {
 }
 interface DatabaseOptions {
   readonly entities: readonly EntitySchema[];
+  readonly audit?: AuditSink;
+  readonly references?: ReferenceVisibility;
+  readonly logger?: Logger;
 }
 type Orm = MikroORM<IDatabaseDriver, EntityManager, readonly EntitySchema[]>;
 interface Database {
   readonly dialect: Dialect;
   readonly orm: Orm;
   fork(): EntityManager;
+  asSystem<T>(reason: string, fn: () => Promise<T>): Promise<T>;
   close(): Promise<void>;
 }
 interface ResolvedConnection {
@@ -64,8 +95,22 @@ export declare class Uuid7Type extends Type<string | null, string | Uint8Array |
   override getColumnType(_prop: EntityProperty, platform: Platform): string;
   override convertToDatabaseValue(value: string | Uint8Array | null | undefined, platform: Platform): string | Uint8Array | null;
   override convertToJSValue(value: string | Uint8Array | null | undefined, _platform?: Platform): string | null;
+  override compareValues(a: string | Uint8Array | null, b: string | Uint8Array | null): boolean;
   override compareAsType(): string;
   override ensureComparable(): boolean;
 }
-export type { Database, DatabaseEnv, DatabaseOptions, Orm, ResolvedConnection, SqliteOptions };
+type FilterType = "read" | "update" | "delete";
+export declare class BieberEntityManager extends SqlEntityManager {
+  override applyFilters<Entity extends object>(entityName: EntityName<Entity>, where: FilterQuery<Entity> | undefined, options: FilterOptions | undefined, type: FilterType, findOptions?: FindOptions<Entity> | FindOneOptions<Entity>): Promise<FilterQuery<Entity> | undefined>;
+  override flush(): Promise<void>;
+  override nativeUpdate<Entity extends object>(entityName: EntityName<Entity>, where: FilterQuery<NoInfer<Entity>>, data: EntityData<Entity>, options?: UpdateOptions<Entity>): Promise<number>;
+  override insert<Entity extends object>(entityNameOrEntity: EntityName<Entity> | Entity, data?: NoInfer<RequiredEntityData<Entity> | Entity>, options?: NativeInsertUpdateOptions<Entity>): Promise<Primary<Entity>>;
+  override insertMany<Entity extends object>(entityNameOrEntities: EntityName<Entity> | Entity[], data?: NoInfer<RequiredEntityData<Entity>[] | Entity[]>, options?: NativeInsertUpdateOptions<Entity>): Promise<Primary<Entity>[]>;
+}
+export declare function softDelete(em: EntityManager, row: Record<string, unknown>): void;
+export declare function restore(em: EntityManager, row: Record<string, unknown>): void;
+export declare function expectVersion(row: {
+  readonly version?: unknown;
+}, expected: number | string): void;
+export type { AuditSink, CompileOptions, Database, DatabaseEnv, DatabaseOptions, Orm, OrmSchema, ReferenceVisibility, ResolvedConnection, SqliteOptions, SystemScopeEntry };
 ```

@@ -28,10 +28,9 @@
 Generated from the built declaration files by `pnpm api:update`. Do not edit by hand. A change here is a change to the public API and needs a changeset (spec section 22.3).
 
 ```ts
-import { A as SchemaValue, C as ColumnDef, D as FieldDef, E as FieldBuilders, F as codePointLength, I as fold, L as nfc, M as TransitionDef, N as f, O as FieldKind, P as Compare, S as tableConstraints, T as Field, _ as StandardColumn, a as UpdateInput, b as snake, c as AdminOptions, d as EntityDef, f as EntityOptions, g as Permissions, h as OrmOverride, i as Row, j as StateOptions, k as ResetEvery, l as ApiOptions, m as FieldLike, n as EntityRegistry, p as Feature, s as ActionDef, t as CreateInput, u as ConstraintDef, v as TableConstraints, w as ComputedFn, x as standardColumns, y as defineEntity } from "./registry-ByPyP6V3.js";
-import { BkError } from "@bieberkit/core";
-export declare class DataError extends BkError {}
-export declare function dataError(code: string, status: number, message: string, fix: string, cause?: unknown): DataError;
+import { A as fold, C as ResetEvery, D as f, E as TransitionDef, O as Compare, S as FieldKind, T as StateOptions, _ as ColumnDef, a as EntityDef, b as FieldBuilders, c as FieldLike, d as StandardColumn, f as TableConstraints, g as tableConstraints, h as standardColumns, i as ConstraintDef, j as nfc, k as codePointLength, l as OrmOverride, m as snake, n as AdminOptions, o as EntityOptions, p as defineEntity, r as ApiOptions, s as Feature, t as ActionDef, u as Permissions, v as ComputedFn, w as SchemaValue, x as FieldDef, y as Field } from "./define-entity-fSi6hSbi.js";
+import { a as UpdateInput, i as Row, n as EntityRegistry, t as CreateInput } from "./registry-CGVHQuS7.js";
+import { n as dataError, t as DataError } from "./errors-Bn-3jo6Z.js";
 interface Uuid7Options {
   readonly now?: () => number;
   readonly random?: (bytes: Uint8Array) => void;
@@ -55,5 +54,5 @@ export declare function pageSize(requested: unknown, fallback?: number): number;
 export declare function encodeCursor(position: readonly CursorValue[]): string;
 export declare function decodeCursor(cursor: string): readonly CursorValue[];
 export declare const packageName = "@bieberkit/data";
-export { type ActionDef, type AdminOptions, type ApiOptions, type ColumnDef, type Compare, type ComputedFn, type ConstraintDef, type CreateInput, type CursorValue, type EntityDef, type EntityOptions, type EntityRegistry, type Feature, Field, type FieldBuilders, type FieldDef, type FieldKind, type FieldLike, type OrmOverride, type Permissions, type ResetEvery, type Row, type SchemaValue, type StandardColumn, type StateOptions, type TableConstraints, type TransitionDef, type UpdateInput, type Uuid7Options, codePointLength, defineEntity, f, fold, nfc, snake, standardColumns, tableConstraints };
+export { type ActionDef, type AdminOptions, type ApiOptions, type ColumnDef, type Compare, type ComputedFn, type ConstraintDef, type CreateInput, type CursorValue, DataError, type EntityDef, type EntityOptions, type EntityRegistry, type Feature, Field, type FieldBuilders, type FieldDef, type FieldKind, type FieldLike, type OrmOverride, type Permissions, type ResetEvery, type Row, type SchemaValue, type StandardColumn, type StateOptions, type TableConstraints, type TransitionDef, type UpdateInput, type Uuid7Options, codePointLength, dataError, defineEntity, f, fold, nfc, snake, standardColumns, tableConstraints };
 ```
