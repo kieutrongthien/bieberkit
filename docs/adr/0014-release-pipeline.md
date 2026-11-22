@@ -24,9 +24,10 @@
 
 # 0014. Release pipeline: trusted publishing from tarballs
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-11-22
 - Deciders: Bieber Kieu
+- Decision process: the maintainer reviewed the spike results and accepted this ADR on 2026-11-22.
 - Requirements: SEC-11 to SEC-17, SEC-21, GOV-03, spec sections 17.3 and 24.2, roadmap M0.3
 
 ## Context
@@ -96,7 +97,7 @@ zizmor has no rule for SEC-21 (no install or build in the job that holds `id-tok
 
 ## Spec changes
 
-To apply when the maintainer accepts this ADR:
+Made in spec 0.8.4, in the same pull request as these ADRs:
 
 - SEC-13: say that Renovate also keeps the SHAs current and that the tag is kept in a comment.
 - SEC-15 and SEC-16: the three job structure, the tag pattern, the ruleset and the environment.

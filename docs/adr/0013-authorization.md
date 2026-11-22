@@ -24,9 +24,10 @@
 
 # 0013. Authorization: an own CASL to MikroORM translator
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-11-22
 - Deciders: Bieber Kieu
+- Decision process: the maintainer reviewed the spike results and accepted this ADR on 2026-11-22.
 - Requirements: AUTHZ-01 to AUTHZ-05, DATA-15, DATA-19, PERF-04, SEC-07, P9, P12, spec sections 14.2, 21 and 26
 
 ## Context
@@ -91,7 +92,7 @@ Neither path returned a row that CASL would refuse. What differed:
 
 ## Spec changes
 
-To apply when the maintainer accepts this ADR:
+Made in spec 0.8.4, in the same pull request as these ADRs:
 
 - AUTHZ-02: BieberKit's translator, the operator set, fail closed with `AUTHZ_UNSUPPORTED_CONDITION`.
 - New AUTHZ-06: the condition language (decision 5) and the build-time check.

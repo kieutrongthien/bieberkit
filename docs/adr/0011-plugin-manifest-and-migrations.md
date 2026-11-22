@@ -24,9 +24,10 @@
 
 # 0011. Plugin manifest, resolver and per-plugin migrations
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-11-22
 - Deciders: Bieber Kieu
+- Decision process: the maintainer reviewed the spike results and accepted this ADR on 2026-11-22.
 - Requirements: PLG-01 to PLG-07, DATA-08, DATA-24, PKG-04, MOD-01, spec sections 11.1 and 11.2
 
 ## Context
@@ -91,7 +92,7 @@ Spike on 2026-11-22, Node.js 26.13.1, Kysely 0.29.9, PostgreSQL 15.20, MySQL 8.4
 
 ## Spec changes
 
-To apply when the maintainer accepts this ADR:
+Made in spec 0.8.4, in the same pull request as these ADRs:
 
 - Section 11.1: list the manifest fields as stored in `package.json` (adding `tables`, `routes`, `permissions`, `admin` and `env` as key lists), and say the file is generated.
 - Section 11.2: add the error codes, the prefix rule, the range syntax subset, and the deterministic order.

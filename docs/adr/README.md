@@ -41,11 +41,11 @@ Status values: `Proposed`, `Accepted`, `Rejected`, `Superseded by NNNN`. Only th
 | [0007](0007-generated-project-license.md)      | Default license of generated projects                   | Accepted |
 | [0008](0008-orm-and-dialects.md)               | ORM and dialects: MikroORM 7, with rules from the spike | Accepted |
 | [0009](0009-define-entity-api.md)              | defineEntity and the field DSL                          | Accepted |
-| [0010](0010-queue-drivers.md)                  | Queue drivers: BullMQ on Valkey and a database driver   | Proposed |
-| [0011](0011-plugin-manifest-and-migrations.md) | Plugin manifest, resolver and per-plugin migrations     | Proposed |
-| [0012](0012-authentication.md)                 | Authentication: Better Auth on MikroORM's Kysely        | Proposed |
-| [0013](0013-authorization.md)                  | Authorization: an own CASL to MikroORM translator       | Proposed |
-| [0014](0014-release-pipeline.md)               | Release pipeline: trusted publishing from tarballs      | Proposed |
+| [0010](0010-queue-drivers.md)                  | Queue drivers: BullMQ on Valkey and a database driver   | Accepted |
+| [0011](0011-plugin-manifest-and-migrations.md) | Plugin manifest, resolver and per-plugin migrations     | Accepted |
+| [0012](0012-authentication.md)                 | Authentication: Better Auth on MikroORM's Kysely        | Accepted |
+| [0013](0013-authorization.md)                  | Authorization: an own CASL to MikroORM translator       | Accepted |
+| [0014](0014-release-pipeline.md)               | Release pipeline: trusted publishing from tarballs      | Accepted |
 
 ## Needed for the Phase 0 gate
 

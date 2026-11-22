@@ -2,7 +2,7 @@
   BieberKit
 
   @file        docs/spec/SPEC.md
-  @description The BieberKit specification, version 0.8.3: design, requirements and roadmap.
+  @description The BieberKit specification, version 0.8.4: design, requirements and roadmap.
   @author      Bieber Kieu <kieutrongthien@gmail.com>
   @copyright   Copyright (c) 2026 Bieber Kieu
   @license     Apache-2.0
@@ -119,9 +119,9 @@ The baseline below is fixed for version 1. Changing any row requires an ADR (arc
 | Validation | BieberKit field DSL compiled to JSON Schema and Zod 4 Mini. Zod 4 through Standard Schema for custom routes | Ajv validators and fast-json-stringify serializers are generated from JSON Schema at build as standalone modules (SCH-06). Formats come from ajv-formats. Design in ADR 0009, section 10.6. |
 | ORM | MikroORM 7.2, pinned exactly, with `defineEntity` | One entity definition for PostgreSQL, MySQL and SQLite. No decorators. Rules and spike results in ADR 0008. |
 | Databases | PostgreSQL 15+, MySQL 8.4 LTS+, SQLite 3 | Support tiers in section 9. |
-| Authentication | Better Auth 1.7 (1.7.16 or later) | Sessions, MFA, passkeys, OAuth, organizations. |
-| Authorization | CASL | Action, subject, field and condition rules per request. |
-| Queue | BullMQ on Valkey or Redis, plus a built-in database driver | Section 15. |
+| Authentication | Better Auth 1.7 (1.7.16 or later), pinned exactly | Sessions, MFA, passkeys, OAuth, organizations. Runs on MikroORM's Kysely (ADR 0012). |
+| Authorization | CASL | Action, subject, field and condition rules per request. Own condition translator (ADR 0013). |
+| Queue | BullMQ 6 on Valkey or Redis, pinned exactly, plus a built-in database driver | Section 15 and ADR 0010. BullMQ's PostgreSQL backend is not used. |
 | Cache | BentoCache: memory first level, Valkey second level, tags, stampede protection, grace periods | Section 15. |
 | File storage | FlyDrive | Local disk, S3, R2, GCS and S3-compatible stores. |
 | Logging and telemetry | pino, OpenTelemetry | Section 20. |
@@ -135,7 +135,8 @@ The baseline below is fixed for version 1. Changing any row requires an ADR (arc
 | Lint and type check | Oxlint with type-aware rules (tsgolint on TypeScript 7) | One pass runs lint rules and TypeScript diagnostics on the same program. BieberKit rules ship as an Oxlint plugin used by bieberkit check. |
 | Formatting | Oxfmt | Same Oxc toolchain as Oxlint, Rolldown and Vite. Pinned to an exact version. The Biome formatter is the fallback (ADR 0002). |
 | Docs site | Starlight (Astro) on Cloudflare Pages | ADR 0006. Static output, so the host can change. Built from `docs/`, with `llms.txt` and per-version docs. Section 22.1. |
-| Package build | tsdown, pinned (pre-1.0) | ESM-only packages with exports maps. isolatedDeclarations for fast .d.ts output. publint and attw check every package in CI. |
+| Package build | tsdown, pinned (pre-1.0) | ESM-only packages with exports maps. isolatedDeclarations for fast .d.ts output. publint and attw check every package in CI, with `attw --profile esm-only`. |
+| Workflow checks | actionlint, zizmor and `tools/check-workflows.ts` | Run in `pnpm check` for SEC-13, SEC-15, SEC-16 and SEC-21 (ADR 0014). |
 
 Dependency policy:
 
@@ -520,8 +521,8 @@ MariaDB is best effort and not in CI (ADR 0005). The only MySQL-family dialect v
 ### 9.3 Migrations
 
 - Project modules: `bieberkit migrate:make` diffs project entities against a committed schema snapshot (`migrations/.snapshot-<dialect>.json`), never against a live database, so the output is the same on every machine.
-- **DATA-24** Plugins own their migrations: ordered, versioned steps written with a portable schema builder plus data steps, keyed by plugin version and recorded in a `bieberkit_plugin_migrations` table. `bieberkit add` and `bieberkit upgrade` run each plugin's pending steps in version order, so a rename or a split moves data before anything is dropped.
-- **DATA-08** Schema changes follow expand, migrate, contract. Old and new versions run side by side during a rolling deploy, so a column is added first, filled, and only removed or constrained in a later release. A plugin MUST NOT ship an expand and its contract in the same minor release, and the migrate role refuses a contract step whose expand step was applied in the same deploy, so skipping several versions can never merge them. `bieberkit check` flags destructive statements (drop, rename, type narrowing, new non-null column without default).
+- **DATA-24** Plugins own their migrations: ordered, versioned steps written with a portable schema builder plus data steps, keyed by plugin version and recorded in a `bieberkit_plugin_migrations` table. `bieberkit add` and `bieberkit upgrade` run each plugin's pending steps in version order, so a rename or a split moves data before anything is dropped. A step is `{ plugin, version, id, kind: 'expand' | 'migrate' | 'contract', after?, up(trx, dialect) }` and runs in its own transaction. The ledger row holds the plugin, step id, version, kind, time and the `deploy_id` of the `bieberkit migrate` run, with `(plugin, step_id)` as primary key. The portable builder is Kysely's schema builder with helpers for UUID columns and `setNotNull` (ADR 0011).
+- **DATA-08** Schema changes follow expand, migrate, contract. Old and new versions run side by side during a rolling deploy, so a column is added first, filled, and only removed or constrained in a later release. A plugin MUST NOT ship an expand and its contract in the same minor release, and the migrate role refuses a contract step whose expand step was applied in the same deploy, so skipping several versions can never merge them. `bieberkit check` flags destructive statements (drop, rename, type narrowing, new non-null column without default). The refusal is `PLG_CONTRACT_SAME_DEPLOY`, and later steps of that plugin wait. A contract step starts with an idempotent backfill, because rows written by the old version between the two deploys can still be incomplete (ADR 0011).
 - Migrations run only in the `migrate` role, once per deploy, never at web start, using `MIGRATE_DATABASE_URL` (DATA-25).
 
 ### 9.4 Multi-tenancy
@@ -560,6 +561,8 @@ MariaDB is best effort and not in CI (ADR 0005). The only MySQL-family dialect v
 - **DATA-23** SQLite runs in WAL mode with a busy timeout and starts write transactions with `BEGIN IMMEDIATE`, so web, worker and scheduler processes can share one file. MikroORM issues a plain `begin`, so `@bieberkit/data` provides the `BEGIN IMMEDIATE` through its own Kysely driver override (ADR 0008).
 - **DATA-25** Two database roles: `MIGRATE_DATABASE_URL` owns the schema and runs DDL, `DATABASE_URL` is the application role with no DDL rights. On PostgreSQL and MySQL the application role has only INSERT and SELECT on `audit_log`, which makes the audit log append-only in fact. On SQLite, triggers enforce the same rule.
 - **DATA-26** Standard options expand into constraints automatically. Every unique constraint on a tenant-scoped entity includes `tenant_id`, on a soft-deleted entity it also includes `deleted_token`, and a tenant-scoped entity gets `UNIQUE (tenant_id, id)` as the target of composite foreign keys (DATA-15, DATA-16, DATA-20, ADR 0009).
+
+- **DATA-27** A SQLite table rebuild in a plugin step runs with foreign keys switched off (the runner sets the pragma, because it cannot change inside a transaction), since dropping the old table with foreign keys on silently cascades deletes into dependent tables. On MySQL and MariaDB DDL is not transactional, so a step has one DDL statement or guards every statement with `if not exists` or `if exists`, and `bieberkit check` flags steps that do not (ADR 0011).
 
 ## 10. Entities and modules
 
@@ -639,7 +642,7 @@ export default defineModule({
 - **MOD-04** Multi-step operations that touch several modules or external systems are workflows. Each step declares a compensation that runs when a later step fails.
 - **MOD-05** Lifecycle hooks (`beforeCreate`, `afterUpdate` and so on) are limited to the entity's own module. Other modules subscribe to events instead.
 
-* **MOD-18** Outbox delivery is at least once with no ordering guarantee, because open-source BullMQ has no per-group ordering. Every event carries the record version, and subscribers ignore an event older than what they already applied. Processed event ids are recorded per subscriber so a redelivered event is skipped. The dispatcher claims rows with SKIP LOCKED in batches of 100 (one dispatcher on SQLite), wakes on LISTEN/NOTIFY on PostgreSQL and polls every second otherwise, deletes delivered rows and processed ids after 7 days, and exports dispatch lag as a metric.
+* **MOD-18** Outbox delivery is at least once with no ordering guarantee, because open-source BullMQ has no per-group ordering. Every event carries the record version, and subscribers ignore an event older than what they already applied. Processed event ids are recorded per subscriber so a redelivered event is skipped. The dispatcher claims rows with SKIP LOCKED in batches of 100 (one dispatcher on SQLite), wakes on LISTEN/NOTIFY on PostgreSQL and polls every second otherwise, deletes delivered rows and processed ids after 7 days, and exports dispatch lag as a metric. On MySQL and MariaDB the dispatcher deletes delivered rows one at a time by primary key and retries on a deadlock error, because range deletes deadlock between dispatchers. With the `database` queue driver the job insert joins the dispatcher's own transaction, so moving a row from the outbox to the queue is atomic, which SQLite requires. With BullMQ the stable `jobId` (`ob-<outbox id>`) absorbs a repeated dispatch (ADR 0010).
 
 ### 10.4 Actions and state machines
 
@@ -752,6 +755,8 @@ export default definePlugin({
 | `admin` | no | Menu items, pages, field panels, dashboard widgets |
 | `seed` | no | Idempotent seed function |
 
+In `package.json` the `bieberkit` field holds `core`, `dialects`, `requires`, `conflicts` and the key lists `env`, `tables`, `routes`, `permissions` and `admin`. `name` and `version` come from `package.json`, and `bieberkit build` writes the field from `definePlugin` (ADR 0011).
+
 ### 11.2 Resolution
 
 1. Collect manifests of all plugins listed in `bieberkit.config.ts`.
@@ -761,6 +766,8 @@ export default definePlugin({
 5. Boot plugins in dependency order. Shut them down in reverse order.
 
 The same resolver runs in the scaffolder, in `bieberkit add`, and at kernel boot, so a project that boots is a project that resolves.
+
+The resolver is one pure function that reports every problem together, each with a stable code: `PLG_CORE_RANGE`, `PLG_DIALECT`, `PLG_MISSING_REQUIRE`, `PLG_REQUIRE_RANGE`, `PLG_CONFLICT`, `PLG_CYCLE`, `PLG_COLLISION_TABLE`, `PLG_COLLISION_ROUTE`, `PLG_COLLISION_PERMISSION`, `PLG_COLLISION_ENV`, `PLG_COLLISION_ADMIN`, `PLG_PREFIX_ENV` and `PLG_PREFIX_PERMISSION`. Env keys start with the plugin's short name in upper case (`SEO_`) and permissions with the short name and a dot (`seo.`), so env and permission collisions can only come from two plugins with the same short name in different scopes. The boot order is topological with ties broken by name, so it does not depend on input order (ADR 0011).
 
 ### 11.3 Extension points
 
@@ -781,9 +788,11 @@ The same resolver runs in the scaffolder, in `bieberkit add`, and at kernel boot
 - **PLG-04** Plugins run in-process with full trust. There is no sandbox, so projects SHOULD install only first-party or reviewed plugins. This is documented on the plugin page.
 - **PLG-05** First-party plugins are named `@bieberkit/plugin-<name>`. Community plugins SHOULD be named `bieberkit-plugin-<name>`.
 
-* **PLG-07** Each plugin publishes a static manifest in the `bieberkit` field of its `package.json`: core range, requires, conflicts, dialects, env keys, tables, route prefixes and permissions. It is generated from `definePlugin` at plugin build and checked against it in CI. The scaffolder reads first-party manifests bundled in `create-bieberkit`, so it can resolve the graph before anything is installed. Route collisions are checked again at kernel boot.
+* **PLG-07** Each plugin publishes a static manifest in the `bieberkit` field of its `package.json`: `core`, `dialects`, `requires`, `conflicts` and the key lists `env`, `tables`, `routes`, `permissions` and `admin`. The CI check compares canonical text (keys sorted), so only a real difference fails it. It is generated from `definePlugin` at plugin build and checked against it in CI. The scaffolder reads first-party manifests bundled in `create-bieberkit`, so it can resolve the graph before anything is installed. Route collisions are checked again at kernel boot.
 
 - **PLG-06** Fields a plugin adds to another plugin's entity live in the extending plugin's own 1:1 extension table, never as columns in the target table. Ownership stays clear (MOD-01), the target plugin can upgrade its schema freely, and removing the extending plugin drops only its own table.
+
+- **PLG-08** The resolver accepts exact versions, `^`, `~`, `>=` and `*`, and rejects pre-release tags, `||`, partial versions and `x` ranges with `PLG_BAD_RANGE`, so it needs no dependency (PKG-04). Plugin authors see the error when they build (ADR 0011).
 
 ## 12. Starter templates
 
@@ -881,7 +890,7 @@ Better Auth handles identity and sessions. CASL evaluates permissions per reques
 
 ### 14.1 Authentication
 
-- **AUTH-01** Browser sessions are server-side, referenced by a `__Host-` cookie that is `HttpOnly`, `Secure` and `SameSite=Lax`. Tokens are never stored in `localStorage`.
+- **AUTH-01** Browser sessions are server-side, referenced by a `__Host-` cookie that is `HttpOnly`, `Secure` and `SameSite=Lax`. Tokens are never stored in `localStorage`. The cookie is named `__Host-bk_session`, with `Path=/` and no `Domain`, set through `advanced.cookies.session_token`. `useSecureCookies` stays off, because it prefixes `__Secure-` and breaks the `__Host-` name (ADR 0012).
 - **AUTH-02** Session storage uses the database by default and Valkey when `REDIS_URL` is set, so every web replica sees every session.
 - **AUTH-03** Supported methods: email and password, magic link, OAuth and OIDC providers, TOTP, passkeys. Organizations and teams through the Better Auth organization plugin in the `saas` template.
 - **AUTH-04** Passwords: minimum 8 characters, 15 or more recommended in the UI, no composition rules, optional breached-password check. This follows OWASP ASVS 5.0.
@@ -890,9 +899,11 @@ Better Auth handles identity and sessions. CASL evaluates permissions per reques
 - **AUTH-07** Machine clients use API keys from the `api-keys` plugin. Keys are shown once, stored hashed, scoped to permissions, and expire.
 - **AUTH-08** Better Auth is pinned to 1.7.16 or later, and its security advisories are watched by a dedicated Renovate rule that skips the release-age delay.
 
-* **AUTH-09** Better Auth connects through a BieberKit adapter on top of MikroORM that joins the request's transaction, so signup writes its user, audit and outbox rows atomically (section 7.5). Its tables are part of the BieberKit schema and migrated as versioned steps of `@bieberkit/auth` (DATA-24), so auth and application data share one migration history. The Phase 0 spike confirms this works on all three dialects.
+* **AUTH-09** Better Auth connects through a BieberKit adapter on top of MikroORM that joins the request's transaction, so signup writes its user, audit and outbox rows atomically (section 7.5). Its tables are part of the BieberKit schema and migrated as versioned steps of `@bieberkit/auth` (DATA-24), so auth and application data share one migration history. The mechanism is Better Auth's own Kysely adapter over `em.getKysely()` of the current request, reached through a request-scoped proxy (`AsyncLocalStorage`) where a nested `db.transaction()` joins the outer transaction. The Phase 0 spike confirmed it on PostgreSQL, MySQL and SQLite (ADR 0012).
 
-- **AUTH-10** Better Auth is configured to fit the pipeline: client IP comes from the `TRUST_PROXY` resolution (never a raw `X-Forwarded-For`), rate-limit counters live in Valkey or the database (never per-process memory), tables and columns map to snake\_case, and user and organization ids use the DSL's UUID type so foreign keys from `created_by` match. A CI job compares Better Auth's expected schema with the BieberKit entities on every Better Auth upgrade and fails on drift. Better Auth's active organization is set per request from the resolved tenant (DATA-19) and never persisted in the session.
+- **AUTH-10** Better Auth is configured to fit the pipeline: client IP comes from the `TRUST_PROXY` resolution (never a raw `X-Forwarded-For`), rate-limit counters live in Valkey or the database (never per-process memory), tables and columns map to snake\_case, and user and organization ids use the DSL's UUID type so foreign keys from `created_by` match. A CI job compares Better Auth's expected schema with the BieberKit entities on every Better Auth upgrade and fails on drift. Better Auth's active organization is set per request from the resolved tenant (DATA-19) and never persisted in the session. The pipeline sets the trusted header `x-bk-client-ip` after removing any incoming one, and Better Auth reads only that header. No column is named `<entity>_id` on the table of that entity, because MikroORM reads it as the primary key (Better Auth's `account.accountId` is stored as `external_account_ref`). The id generator stays set, and the UUID type throws on a string that is not a UUID. The drift job compares property presence, nullability and uniqueness (ADR 0012).
+
+- **AUTH-11** Better Auth is pinned to an exact version (1.7.27 was tested, the minimum is 1.7.16), and its telemetry stays off (ADR 0012).
 
 ### 14.2 Authorization model
 
@@ -905,10 +916,12 @@ Better Auth handles identity and sessions. CASL evaluates permissions per reques
 | Tenant scope | Global data filter | Rows of the current tenant only |
 
 - **AUTHZ-01** A CASL ability is built per request from the user's roles and cached for the request only.
-- **AUTHZ-02** CASL conditions are translated into MikroORM query conditions, so list endpoints return only permitted rows instead of filtering after loading. BieberKit owns this translator.
+- **AUTHZ-02** CASL conditions are translated into MikroORM query conditions, so list endpoints return only permitted rows instead of filtering after loading. BieberKit owns this translator. It reads CASL's condition tree (`rulesToAST`) and supports the operators `eq` (also `null`), `ne`, `in`, `nin`, `gt`, `gte`, `lt` and `lte` on entity properties, with the `and`, `or` and `not` nodes that CASL builds from several rules. Anything else throws `AUTHZ_UNSUPPORTED_CONDITION` before a query runs, so a list answers 403 and never widens. The tenant filter is AND-ed outside the translated condition (ADR 0013).
 - **AUTHZ-03** Field masks apply to both reads (fields removed from responses) and writes (fields rejected in input).
 - **AUTHZ-04** Default deny: a route without a matching permission returns 403.
-- **AUTHZ-05** Role and permission changes, impersonation, `asSystem()` calls and failed authorization attempts are written to the audit log.
+- **AUTHZ-05** Role and permission changes, impersonation, `asSystem()` calls and failed authorization attempts are written to the audit log. Unsupported conditions are written too.
+
+- **AUTHZ-06** A condition uses one operator per field from the AUTHZ-02 set and no `$or`, `$and` or `$not` inside it: "or" is several rules and "not" is an inverted rule. `bieberkit check` rejects other operators, dotted paths and unknown fields in declared conditions at build time (ADR 0013).
 
 ## 15. Queue, cache and storage services
 
@@ -937,16 +950,18 @@ export const sendInvoice = defineJob({
 await queue.dispatch(sendInvoice, { invoiceId })
 ```
 
-- **Q-01** Delivery is at least once. Handlers MUST be idempotent, and the framework passes a stable `jobId` to help.
+- **Q-01** Delivery is at least once. Handlers MUST be idempotent, and the framework passes a stable `jobId` to help. BullMQ keeps completed jobs for at least 1 hour and never uses `removeOnComplete: true`, so a redelivered outbox row cannot run twice. The attempt number is informational and is not a delivery count (ADR 0010).
 - **Q-02** Job input is validated on dispatch and again on execution.
 - **Q-03** Named queues `critical`, `default` and `reports` exist by default, so long jobs never block urgent ones. Workers choose queues with `--queues`.
 - **Q-04** Failed jobs land in a dead-letter list visible in the admin UI, with retry and discard actions.
-- **Q-05** The `database` driver claims jobs with `SELECT ... FOR UPDATE SKIP LOCKED` on PostgreSQL and MySQL 8.4. On SQLite it uses a plain transaction, which is safe because SQLite has a single writer.
+- **Q-05** The `database` driver claims jobs with `SELECT ... FOR UPDATE SKIP LOCKED` on PostgreSQL, MySQL 8.4 and MariaDB. On SQLite it claims inside a `BEGIN IMMEDIATE` transaction, provided by the driver override of ADR 0008, which is safe because SQLite has a single writer.
 - **Q-06** Jobs dispatched inside a database transaction are enqueued only after commit (outbox), so a rollback never leaves an orphan job.
-- **Q-07** Schedules run only in the `scheduler` role and take a distributed lock per tick, so a second scheduler cannot run the same tick twice.
+- **Q-07** Schedules run only in the `scheduler` role and take a distributed lock per tick, so a second scheduler cannot run the same tick twice. On Valkey the lock is `SET key owner NX PX ttl` per tick. With the `database` driver it is a row in `bk_locks`, taken by an `UPDATE ... WHERE until < now` followed by a read of the owner (ADR 0010).
 - **Q-08** Valkey or Redis used for queues MUST run with `maxmemory-policy noeviction`. `bieberkit doctor` checks it. Cache data lives on a separate instance (CACHE\_REDIS\_URL) with an eviction policy and a TTL on every key, because Valkey applies one memory policy per instance and a full cache must never block jobs, sessions or rate limits.
 
 * **Q-10** Every job carries the `tenantId` and the acting user or system actor of the code that dispatched it. Workers restore that context before running, so tenant filters, permission checks and audit entries behave exactly as in the original request.
+
+- **Q-11** Every queue driver passes the shared contract suite of nine tests: context restored (Q-10), `jobId` deduplication, retries with backoff, dead letters, delay, queue isolation, redelivery after a crash, exactly one run per job with two workers, and throughput (ADR 0010).
 
 ### 15.2 Cache
 
@@ -1154,16 +1169,16 @@ BieberKit targets OWASP ASVS 5.0 Level 2 for generated projects and covers the O
 
 - **SEC-11** pnpm settings in the framework and in generated projects: dependency build scripts blocked unless allowlisted, exotic sub-dependencies blocked, `minimumReleaseAge` of 10080 minutes (7 days) with no blanket exclusion, not even for `@bieberkit/*`. A security fast path (AUTH-08, SITE-06) adds a temporary exclusion for the exact fixed version and removes it after 7 days, and `trustPolicy: no-downgrade`.
 - **SEC-12** CI installs with `--frozen-lockfile` and never runs lifecycle scripts of unreviewed packages.
-- **SEC-13** Third-party GitHub Actions are pinned by commit SHA.
+- **SEC-13** Third-party GitHub Actions are pinned by commit SHA, with the tag in a comment. Renovate keeps the SHAs current and respects `minimumReleaseAge`.
 - **SEC-14** Agent configuration (`AGENTS.md`, `CLAUDE.md`, `.claude/`, `.agents/`, skill folders) is treated as code: changes need maintainer review and are listed in CODEOWNERS.
 
 ### 17.3 Releases
 
-- **SEC-15** Packages are published only by npm trusted publishing (OIDC) from a dedicated release workflow, which adds provenance automatically. No long-lived npm token exists.
-- **SEC-16** The release workflow runs only on protected tags, never on `pull_request_target`, shares no cache with pull request workflows, grants `id-token: write` to the publish job only, and waits for manual approval in a protected environment.
+- **SEC-15** Packages are published only by npm trusted publishing (OIDC) from a dedicated release workflow, which adds provenance automatically. No long-lived npm token exists. The release workflow has three jobs, `verify`, `build` and `publish`. It starts only from a tag `v<major>.<minor>.<patch>`, and a repository ruleset on `refs/tags/v*` limits creation to the maintainer and blocks updates and deletion (ADR 0014).
+- **SEC-16** The release workflow runs only on protected tags, never on `pull_request_target`, shares no cache with pull request workflows, grants `id-token: write` to the publish job only, and waits for manual approval in a protected environment. The publish job runs in the environment `release`, whose required reviewer is the maintainer and which accepts only `v*` tags, and its `setup-node` step has no `registry-url` (that would set `NODE_AUTH_TOKEN` and override the OIDC exchange).
 - **SEC-17** These rules come from the May 2026 TanStack incident, where a poisoned Actions cache let an attacker publish through a legitimate trusted publisher without stealing a long-lived token: attacker code ran in the release workflow through a poisoned Actions cache and extracted the short-lived OIDC token from runner memory.
 
-- **SEC-21** No job that holds `id-token: write` runs dependency installs, builds or tests. The publish job only downloads artifacts that earlier jobs built and attested.
+- **SEC-21** No job that holds `id-token: write` runs dependency installs, builds or tests. The publish job only downloads artifacts that earlier jobs built and checksummed (npm adds provenance when it publishes), and the only actions it may use are `actions/download-artifact` and `actions/setup-node`. `actionlint`, `zizmor` and `tools/check-workflows.ts` run in `pnpm check` and enforce SEC-13, SEC-15, SEC-16 and SEC-21 (ADR 0014).
 
 ### 17.4 Containers
 
@@ -1340,7 +1355,7 @@ Tests run against real databases in containers, and a large share of tests is ge
 | --- | --- | --- | --- |
 | Unit | Vitest 4 | Pure functions, services with fakes | Every push |
 | Module integration | Vitest 4, Testcontainers | One module booted alone against PostgreSQL, MySQL and SQLite | Every push |
-| Generated contract | `@bieberkit/testing` | Each entity: permissions, field masks, tenant isolation, validation, pagination limits | Every push |
+| Generated contract | `@bieberkit/testing` | Each entity: permissions, field masks, tenant isolation, validation, pagination limits, generated from the `permissions` block. The generator is mutation-tested against six known faults (ADR 0013) | Every push |
 | End to end | Playwright | Login, CRUD in the admin UI, uploads, one flow per template | Pull requests to main |
 | Upgrade | `examples/` apps | `bieberkit upgrade` and codemods on sample apps from the previous minor and major | Release candidates |
 | Load | k6 | Reference endpoints in section 18 | Release candidates |
@@ -1495,6 +1510,7 @@ BieberKit has one maintainer, Bieber Kieu, who makes final decisions. Process ex
 ### 24.2 Versioning and releases
 
 - All `@bieberkit/*` packages share one version and are released together (release train), so `bieberkit upgrade` moves one number.
+- Tarballs are packed once in the build job, checked by checksum in the publish job and published in layer order. A rerun skips versions that already exist, so a partly published release is finished by running the job again (ADR 0014).
 - Semantic Versioning. Changes are recorded with changesets, and changelogs are generated from them.
 - A public API is deprecated in a minor release before it is removed in the next major. Deprecations log a warning with the replacement.
 - Every breaking change ships a codemod run by `bieberkit upgrade`, tested against `examples/`.
@@ -1541,7 +1557,7 @@ The largest risk is scope: a framework with many plugins and three dialects can 
 | --- | --- | --- |
 | Scope grows faster than one maintainer can review | Stalled releases, burnout | Small core (P4), issue-first policy, plugins outside core, release train |
 | Three dialects triple test and bug surface | Slower releases | Tier 2 for SQLite, dialect-free core (DATA-01), CI matrix from day one |
-| CASL to MikroORM condition translator: @ucast/sql has a MikroORM module but may not support version 7 | Wrong rows returned if buggy | Evaluate @ucast/sql in Phase 0, otherwise an own translator limited to a small operator set, with generated permission tests for every entity |
+| CASL to MikroORM condition translator: @ucast/sql has a MikroORM module but may not support version 7 | Wrong rows returned if buggy | Decided in ADR 0013: an own translator limited to a small operator set that fails closed, with generated permission tests for every entity, which are mutation-tested |
 | Better Auth ships many security advisories | Auth vulnerabilities in projects | Pinned minimum version, Renovate fast path, advisory watch |
 | npm supply-chain attacks | Compromised builds or releases | SEC-11 to SEC-17 |
 | Over-abstraction in `defineEntity` | Hard to express unusual cases | Escape hatches to raw MikroORM entities and custom routes, tested in examples |
@@ -1566,6 +1582,7 @@ Open questions:
 
 | Version | Date | Changes |
 | --- | --- | --- |
+| 0.8.4 | 2026-11-22 | ADRs 0010 to 0014: queue drivers and outbox rules (Q-01, Q-05, Q-07, Q-11, MOD-18), plugin manifest, resolver and migration steps (PLG-07, PLG-08, DATA-08, DATA-24, DATA-27), Better Auth on MikroORM's Kysely (AUTH-01, AUTH-09 to AUTH-11), own authorization translator (AUTHZ-02, AUTHZ-05, AUTHZ-06), release pipeline (SEC-13, SEC-15, SEC-16, SEC-21, section 24.2) |
 | 0.8.3 | 2026-11-22 | ADR 0009: `EntityDef<Name>` with a generated `EntityRegistry`, descriptors compiled by pure functions, `f.custom` takes schema values, ORM-free entity files, bulk write helpers for shadow columns, serializer wording, SCH-07, SCH-08, DATA-26 |
 | 0.8.2 | 2026-11-22 | ADR 0008: MikroORM 7.2 pinned, tenant foreign keys on `UNIQUE (tenant_id, id)`, shadow columns only for `ci` and `ci_ai` (`đ` folds to `d`), safe integer limit for money, `BEGIN IMMEDIATE` through a driver override |
 | 0.8.1 | 2026-11-22 | Phase 0 decisions from ADR 0002 to 0007: Oxfmt kept with a header rule for frontmatter, `@bieberkit/log` package, Tiptap, MariaDB best effort, Starlight on Cloudflare Pages, `--license` flag, three open questions closed |

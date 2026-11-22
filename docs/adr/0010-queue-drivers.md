@@ -24,9 +24,10 @@
 
 # 0010. Queue drivers: BullMQ on Valkey and a database driver
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-11-22
 - Deciders: Bieber Kieu
+- Decision process: the maintainer reviewed the spike results and accepted this ADR on 2026-11-22.
 - Requirements: Q-01 to Q-08, Q-10, MOD-18, WP-01, PKG-02, PKG-03, SEC-11, P9, P12, spec sections 7.5 and 15.1
 
 ## Context
@@ -109,7 +110,7 @@ BullMQ on PostgreSQL matched our driver on PostgreSQL, so it brings no gain ther
 
 ## Spec changes
 
-To apply when the maintainer accepts this ADR:
+Made in spec 0.8.4, in the same pull request as these ADRs:
 
 - Section 3, Queue row: BullMQ 6, pinned exactly.
 - Q-05: add MariaDB, and say that SQLite uses `BEGIN IMMEDIATE` through the driver override of ADR 0008.

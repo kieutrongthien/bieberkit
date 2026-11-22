@@ -76,28 +76,29 @@ Done when: `pnpm install && pnpm check` passes on a clean clone.
 Each ADR is written as `Proposed` with the spike result attached. The maintainer accepts (§22.3, `docs/adr/README.md`).
 
 - [x] **[M]** ADR: ORM and dialects. ADR 0008 accepted. Spike: MikroORM 7 `defineEntity` on PostgreSQL 15, MySQL 8.4 and SQLite with one entity set, UUIDv7 key storage (DATA-14), collation and integer money (MOD-11)
-- [ ] **[M][D]** ADR: plugin manifest, static `package.json` field, resolution, collisions, per-plugin migrations (PLG-07, DATA-24, §11.2)
+- [x] **[M][D]** ADR: plugin manifest, static `package.json` field, resolution, collisions, per-plugin migrations (PLG-07, DATA-24, §11.2) ADR 0011 accepted.
 - [x] **[M][D]** ADR: `defineEntity` API and field DSL, compilation to MikroORM metadata, JSON Schema, Zod 4 Mini and CASL, escape hatches to raw MikroORM (§10.6, SCH-01 to SCH-06, P12) ADR 0009 accepted.
-- [ ] **[M][D]** ADR: authentication. Spike: Better Auth 1.7.16+ through a MikroORM adapter that joins the request transaction, on all three dialects (AUTH-09, AUTH-10)
-- [ ] **[M][D]** ADR: authorization. Spike: `@ucast/sql` on MikroORM 7, otherwise an own CASL to ORM translator with a small operator set and generated permission tests (AUTHZ-02, §26)
-- [ ] **[M]** ADR: queue drivers. Spike: BullMQ on Valkey and the `database` driver behind one contract, outbox dispatch with SKIP LOCKED (Q-05, MOD-18)
-- [ ] **[M][D]** ADR: release pipeline, npm trusted publishing, protected tags, no shared cache, `id-token: write` on the publish job only (SEC-15, SEC-16, SEC-21)
+- [x] **[M][D]** ADR: authentication. Spike: Better Auth 1.7.16+ through a MikroORM adapter that joins the request transaction, on all three dialects (AUTH-09, AUTH-10) ADR 0012 accepted.
+- [x] **[M][D]** ADR: authorization. Spike: `@ucast/sql` on MikroORM 7, otherwise an own CASL to ORM translator with a small operator set and generated permission tests (AUTHZ-02, §26) ADR 0013 accepted.
+- [x] **[M]** ADR: queue drivers. Spike: BullMQ on Valkey and the `database` driver behind one contract, outbox dispatch with SKIP LOCKED (Q-05, MOD-18) ADR 0010 accepted.
+- [x] **[M][D]** ADR: release pipeline, npm trusted publishing, protected tags, no shared cache, `id-token: write` on the publish job only (SEC-15, SEC-16, SEC-21) ADR 0014 accepted.
 - [x] **[M]** ADR: content editor, Lexical or Tiptap, judged on block support, Vietnamese input, bundle size (CNT-04). ADR 0004 picks Tiptap 3. The Vietnamese input test is a gate before M2.3
 - [x] **[M]** ADR: formatter, Oxfmt or Biome fallback (§3). ADR 0002 keeps Oxfmt
 - [x] **[M]** ADR: where pino binds given `@bieberkit/core` has no runtime dependency (PKG-04, OBS-01). ADR 0003: `Logger` port in core, pino in `@bieberkit/log/pino`
 - [x] **[M]** Decide the open questions in spec §26: MariaDB support level, docs site generator and hosting, default license of generated projects, Ant Design 6 `vi_VN` locale check. ADR 0005, 0006, 0007, and the locale check in spec §26
 - [ ] **[M]** Reserve the `@bieberkit` npm scope, the `bieberkit` and `create-bieberkit` names and the GitHub organization; confirm the employer question (§26)
-- [ ] Update `docs/adr/README.md` index for every ADR added
+- [x] Update `docs/adr/README.md` index for every ADR added. ADRs 0001 to 0014 are listed
 
 Done when: every ADR above has status `Accepted` and the spec §3 table matches them.
 
 ### M0.3 CI and release pipeline
 
 - [ ] **[D]** `.github/workflows/ci.yml` runs `pnpm install --frozen-lockfile`, `check`, `typecheck`, `lint`, `format:check`, `test`, `build` on Node.js 26 and 24 (SEC-12, §3)
-- [ ] Third-party Actions pinned by commit SHA (SEC-13)
-- [ ] `publint` and `attw` run per package in CI (§3)
+- [ ] Third-party Actions pinned by commit SHA (SEC-13), and Renovate keeps the SHAs current (ADR 0014)
+- [ ] `publint` and `attw` run per package in CI (§3). `attw` runs with `--profile esm-only` (ADR 0014)
+- [ ] `actionlint`, `zizmor` and `tools/check-workflows.ts` run in `pnpm check` (SEC-13, SEC-15, SEC-16, SEC-21, ADR 0014)
 - [ ] API report per package committed, diff shows in pull requests, changeset required on change (§22.3 step 4)
-- [ ] **[D]** Release workflow: protected tags, manual approval environment, trusted publishing with provenance, no PR cache sharing, no install or build in the job holding `id-token: write` (SEC-15, SEC-16, SEC-21)
+- [ ] **[D]** Release workflow: protected tags, manual approval environment, trusted publishing with provenance, no PR cache sharing, no install or build in the job holding `id-token: write` (SEC-15, SEC-16, SEC-21). Three jobs (`verify`, `build`, `publish`), tarballs packed once and checked by checksum, layer order, a rerun skips existing versions (ADR 0014)
 - [ ] **[D]** Dry-run release publishes a throwaway package end to end
 - [ ] Renovate rules: 7 day release age, fast path for Better Auth and TanStack Start advisories (AUTH-08, SITE-06)
 - [ ] Database service containers (PostgreSQL, MySQL, Valkey) available to CI for later phases (TST, §9.1)
@@ -128,7 +129,7 @@ Depends on: Phase 0 gate. Only Node.js built-ins (PKG-04).
 - [ ] Container: singleton, request and transient scopes, name resolution with inferred types, cycle and missing service fail at boot (§7.3)
 - [ ] Lifecycle: boot, ready, stop, reverse shutdown order, `onShutdown` hooks (§7.2, §19.4 steps 6 and 7)
 - [ ] Event bus with typed payloads (MOD-03, MOD-05)
-- [ ] **[D]** Plugin resolver: `core` range, `requires`, `conflicts`, `dialects`, topological sort, collision detection, shared with scaffolder and CLI (§11.2, PLG-07)
+- [ ] **[D]** Plugin resolver: `core` range, `requires`, `conflicts`, `dialects`, topological sort, collision detection, shared with scaffolder and CLI (§11.2, PLG-07), with stable error codes and a dependency-free range matcher that is tested against `semver` (PLG-08, ADR 0011)
 - [ ] Process role selection from argv for `web`, `worker`, `scheduler`, `migrate` (§7.1)
 - [ ] Unit coverage at least 90% lines (TST-01)
 
@@ -155,9 +156,10 @@ Depends on: M1.1.
 - [ ] **[D]** Cross-tenant reference checks on writes (spec 0.8 review fix)
 - [ ] Optimistic concurrency by `version` and `If-Match` (API-13)
 - [ ] Migrations: snapshot diff per dialect, `migrate:make`, `migrate`, status and rollback, destructive statement detection, expand then contract (DATA-08, §9.3)
-- [ ] Plugin migration runner with `bieberkit_plugin_migrations` and portable schema builder (DATA-24)
+- [ ] Plugin migration runner with `bieberkit_plugin_migrations` and portable schema builder (DATA-24): step format, `deploy_id` guard, `uuidType` and `setNotNull` helpers, SQLite rebuilds with foreign keys off, and a `bieberkit check` rule for MySQL steps (DATA-08, DATA-27, ADR 0011)
 - [ ] `MIGRATE_DATABASE_URL` used only by the migrate role (DATA-25)
 - [ ] Outbox table, same-transaction write, dispatcher with SKIP LOCKED batches of 100, versioned events, per-subscriber processed ids, 7 day cleanup, lag metric (MOD-18, §7.5)
+- [ ] Outbox dispatcher on MySQL and MariaDB deletes rows one at a time by primary key and retries on deadlock. With the `database` queue driver the job insert joins the dispatcher's transaction (MOD-18, ADR 0010)
 - [ ] Audit log table, append-only for the app role, written in the same transaction (OBS-05, AUTHZ-05)
 - [ ] Features `attachments`, `comments`, `timeline`, `tags` as generic tables (MOD-13)
 - [ ] State machines: `f.state` transitions validated on the server, never through plain update (MOD-06, MOD-07)
@@ -193,15 +195,17 @@ Done when: entity routes, OpenAPI and `_meta` are generated for a sample entity 
 
 Depends on: M1.3.
 
-- [ ] **[D]** Better Auth adapter on MikroORM sharing the request transaction; auth tables as versioned migration steps (AUTH-09)
+- [ ] **[D]** Better Auth adapter on MikroORM sharing the request transaction; auth tables as versioned migration steps (AUTH-09): Kysely adapter over `em.getKysely()` through a request-scoped proxy, nested transactions join, with the flow tests of ADR 0012
 - [ ] **[D]** Better Auth configuration: client IP from `TRUST_PROXY`, rate-limit counters in shared store, snake_case, UUID ids, organization set per request from the tenant (AUTH-10)
 - [ ] CI job compares Better Auth's expected schema with BieberKit entities and fails on drift (AUTH-10)
+- [ ] **[D]** Session cookie `__Host-bk_session` without `useSecureCookies`, trusted `x-bk-client-ip` header, UUID type that rejects invalid strings, Better Auth pinned exactly with telemetry off (AUTH-01, AUTH-10, AUTH-11, ADR 0012)
 - [ ] Server-side sessions, `__Host-` cookie, database or Valkey storage (AUTH-01, AUTH-02)
 - [ ] Email and password with ASVS rules (AUTH-04); magic link, TOTP and passkeys (AUTH-03)
 - [ ] MFA required for roles flagged `requireMfa` (AUTH-05)
 - [ ] Per-IP and per-account limits on login, OTP, magic link and reset (AUTH-06, SEC-10)
 - [ ] **[D]** CASL ability per request from role data; permissions in code, roles in database (AUTHZ-01, §14.2)
-- [ ] **[D]** CASL to ORM condition translator; lists return only permitted rows (AUTHZ-02)
+- [ ] **[D]** CASL to ORM condition translator; lists return only permitted rows (AUTHZ-02): own translator with a small operator set that fails closed with `AUTHZ_UNSUPPORTED_CONDITION` (ADR 0013)
+- [ ] `bieberkit check` rule: condition operators outside the supported set, dotted paths and unknown fields (AUTHZ-06, ADR 0013)
 - [ ] **[D]** Field masks on read and write, default deny (AUTHZ-03, AUTHZ-04)
 - [ ] Audit of role changes, `asSystem()`, impersonation, failed authorization (AUTHZ-05)
 - [ ] API keys primitive: shown once, hashed, scoped, expiring (AUTH-07)
@@ -224,7 +228,7 @@ Depends on: M1.2. Can run in parallel with M1.4 (no shared files).
 - [ ] Storage contract on FlyDrive: local and S3-compatible, signed upload URLs, private by default, content sniffing (S-01 to S-04)
 - [ ] Mail contract with `log` and `smtp`, sent through the queue (M-01)
 - [ ] Error-reporter contract with an optional Sentry-compatible driver (OBS-06)
-- [ ] Contract test suite run against every driver; each driver imported only in `src/adapters/<driver>/` (PKG-03, `check:layers`)
+- [ ] Contract test suite run against every driver; each driver imported only in `src/adapters/<driver>/` (PKG-03, `check:layers`). Includes the nine queue contract tests of ADR 0010 (Q-11)
 
 Done when: each contract passes its shared driver tests, and switching `QUEUE_DRIVER` or `CACHE_DRIVER` changes no application code.
 
@@ -236,7 +240,7 @@ Depends on: M1.3, M1.4, M1.5.
 - [ ] OpenTelemetry traces over HTTP, database, cache, queue, jobs with context carried into jobs (OBS-02)
 - [ ] Prometheus metrics on `METRICS_PORT`, not routed publicly (OBS-03, OBS-04)
 - [ ] `@bieberkit/testing`: `createTestApp`, entity factories, `actingAs`, `withTenant` (TST-02)
-- [ ] Generated contract tests per entity: permissions, field masks, tenant isolation, validation, pagination limits (§21)
+- [ ] Generated contract tests per entity: permissions, field masks, tenant isolation, validation, pagination limits (§21). Generated from the `permissions` block, with a mutation job that proves they catch six known faults (ADR 0013)
 - [ ] Testcontainers setup for PostgreSQL, MySQL and Valkey; network calls outside containers fail tests (TST-03)
 - [ ] Coverage gates: 90% core, data, http, auth; 80% elsewhere (TST-01)
 

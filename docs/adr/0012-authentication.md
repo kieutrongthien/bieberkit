@@ -24,9 +24,10 @@
 
 # 0012. Authentication: Better Auth on MikroORM's Kysely
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-11-22
 - Deciders: Bieber Kieu
+- Decision process: the maintainer reviewed the spike results and accepted this ADR on 2026-11-22.
 - Requirements: AUTH-01, AUTH-02, AUTH-06, AUTH-08, AUTH-09, AUTH-10, DATA-18, DATA-24, SEC-11, P9, P12, spec sections 7.5 and 14.1
 
 ## Context
@@ -105,7 +106,7 @@ Spike on 2026-11-22, Node.js 26.13.1, Better Auth 1.7.27, MikroORM 7.2.11, Postg
 
 ## Spec changes
 
-To apply when the maintainer accepts this ADR:
+Made in spec 0.8.4, in the same pull request as these ADRs:
 
 - AUTH-09: name the mechanism (Kysely adapter over `em.getKysely()` with a request-scoped proxy, nested transactions join) and say the spike passed on three dialects.
 - AUTH-10: the `x-bk-client-ip` header, the column-name rule, the `generateId` and UUID type rule, and the drift check's exact comparison (property, nullability, unique).
