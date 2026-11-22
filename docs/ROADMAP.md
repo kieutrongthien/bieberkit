@@ -124,7 +124,7 @@ Depends on: Phase 0 gate. Only Node.js built-ins (PKG-04).
 - [ ] `defineEnv` and merged env schema with secret redaction, native `.env` loading, precedence of real env (CFG-01 to CFG-06)
 - [ ] `Logger` port, dependency-free default JSON logger and request context on `AsyncLocalStorage` in core (OBS-01, PKG-04, ADR 0003)
 - [ ] Core env keys of §8.2 with defaults and the production safety checks (CFG-07, APP_SINGLE_NODE)
-- [ ] `process.env` read only in `packages/core/src/config/` (P8, `check` rule)
+- [x] `process.env` read only in `packages/core/src/config/` (P8, `check` rule: `tools/check-env-access.ts`)
 - [ ] `BkError` base and subclasses with stable code, HTTP status, safe message (MOD-17)
 - [ ] Container: singleton, request and transient scopes, name resolution with inferred types, cycle and missing service fail at boot (§7.3)
 - [ ] Lifecycle: boot, ready, stop, reverse shutdown order, `onShutdown` hooks (§7.2, §19.4 steps 6 and 7)
