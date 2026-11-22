@@ -164,7 +164,10 @@ export function splitPreamble(text: string, style: CommentStyle, relPath: string
   if (style === 'html' && text.startsWith('---\n')) {
     const close = text.indexOf('\n---\n', 3);
     if (close !== -1) {
-      return { preamble: text.slice(0, close + 5), body: text.slice(close + 5) };
+      // Formatters put a blank line after the frontmatter, and HDR-01 allows blank lines there.
+      const blanks = /^\n*/.exec(text.slice(close + 5))?.[0].length ?? 0;
+      const end = close + 5 + blanks;
+      return { preamble: text.slice(0, end), body: text.slice(end) };
     }
   }
   return { preamble: '', body: text };

@@ -52,6 +52,19 @@ describe('file headers (spec section 23)', () => {
     expect(split.preamble).toBe('---\nname: x\n---\n');
   });
 
+  it('HDR-01 allows blank lines between Markdown frontmatter and the header', () => {
+    const text = `---\nname: x\n---\n\n\n${renderHeader('html', fields)}\n\ncontent\n`;
+    const split = splitPreamble(text, 'html', '.agents/skills/x/SKILL.md');
+    expect(split.preamble).toBe('---\nname: x\n---\n\n\n');
+    expect(parseHeader(split.body, 'html')).not.toBeNull();
+  });
+
+  it('HDR-01 still finds no header when frontmatter is followed by other content', () => {
+    const text = '---\nname: x\n---\n\n# Title\n';
+    const split = splitPreamble(text, 'html', '.agents/skills/x/SKILL.md');
+    expect(parseHeader(split.body, 'html')).toBeNull();
+  });
+
   it('classifies exempt and unknown files', () => {
     expect(kindOf('package.json')).toBe('exempt');
     expect(kindOf('LICENSE')).toBe('exempt');
