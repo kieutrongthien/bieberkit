@@ -28,12 +28,36 @@
 Generated from the built declaration files by `pnpm api:update`. Do not edit by hand. A change here is a change to the public API and needs a changeset (spec section 22.3).
 
 ```ts
-import { C as ResetEvery, E as TransitionDef, a as EntityDef } from "./define-entity-B93nbOOC.js";
+import { C as ResetEvery, E as TransitionDef, a as EntityDef } from "./define-entity-BWQ7TmhE.js";
 import { Dialect, Logger } from "@bieberkit/core";
 import { EntityData, EntityManager, EntityName, EntityProperty, EntitySchema, FilterOptions, FilterQuery, FindOneOptions, FindOptions, IDatabaseDriver, MikroORM, NativeInsertUpdateOptions, Platform, Primary, RequiredEntityData, Type, UpdateOptions } from "@mikro-orm/core";
 import { Kysely, RawBuilder, SqliteDialect, Transaction } from "kysely";
 import { SqlEntityManager } from "@mikro-orm/sql";
 import { n as StepDatabase, t as PluginMigrationStep, u as DestructiveFinding } from "./steps-BowZpLj1.js";
+type OrmSchema = EntitySchema<Record<string, unknown>>;
+interface CompileOptions {
+  readonly tenancy?: "single" | "shared-schema";
+  readonly raw?: readonly OrmSchema[];
+}
+export declare function entityOfSchema(schema: object): EntityDef<string>;
+export declare function compileEntities(defs: readonly EntityDef<string>[], options?: CompileOptions): OrmSchema[];
+type Row$5 = Record<string, unknown>;
+interface AggregateOptions {
+  readonly groupBy?: readonly string[];
+  readonly sum?: readonly string[];
+  readonly count?: boolean;
+  readonly where?: Row$5;
+  readonly maxGroups?: number;
+}
+interface AggregateRow {
+  readonly group: Row$5;
+  readonly count?: number;
+  readonly sum?: Row$5;
+}
+interface AggregateResult {
+  readonly rows: AggregateRow[];
+}
+export declare function aggregate(em: EntityManager, schema: OrmSchema, options?: AggregateOptions): Promise<AggregateResult>;
 interface ReferenceVisibility {
   visible(entity: string, ids: readonly string[]): Promise<readonly string[]>;
 }
@@ -173,13 +197,6 @@ export declare const frameworkEntities: readonly EntitySchema[];
 type Trx = Kysely<StepDatabase>;
 export declare const dataMigrationSteps: readonly PluginMigrationStep[];
 export declare function grantAuditLog(trx: Trx, dialect: Dialect, role: string): Promise<void>;
-type OrmSchema = EntitySchema<Record<string, unknown>>;
-interface CompileOptions {
-  readonly tenancy?: "single" | "shared-schema";
-  readonly raw?: readonly OrmSchema[];
-}
-export declare function entityOfSchema(schema: object): EntityDef<string>;
-export declare function compileEntities(defs: readonly EntityDef<string>[], options?: CompileOptions): OrmSchema[];
 interface FeaturePage<T> {
   readonly rows: T[];
   readonly limit: number;
@@ -434,5 +451,5 @@ export declare function setTranslation(em: EntityManager, schema: OrmSchema, rec
 type Row = Record<string, unknown>;
 export declare function toApiRow(schema: OrmSchema, row: Row): Row;
 export declare function toOrmData(schema: OrmSchema, input: Row, _mode: "create" | "update"): Row;
-export type { AttachmentInput, AttachmentRow, AuditEntry, AuditLogRow, AuditSink, AvailableTransition, CommentRow, CompileOptions, Database, DatabaseEnv, DatabaseOptions, DispatchResult, FeaturePage, ListOptions, MadeMigration, MigrationEnv, MigrationStatus, Migrator, MigratorOptions, Orm, OrmSchema, OutboxDispatcher, OutboxDispatcherOptions, OutboxEntryRow, OutboxEvent, OutboxLag, OutboxMessage, OutboxProcessedRow, OutboxPublisher, Page, PageRequest, PluginRefusal, PluginRun, PluginRunOptions, PurgeOptions, ReferenceVisibility, ResolvedConnection, SequenceKey, SequenceOptions, SequenceRow, SortOption, SqliteOptions, SystemScopeEntry, TagRow, TimelineInput, TimelineRow, TransitionResult, UpOptions };
+export type { AggregateOptions, AggregateResult, AggregateRow, AttachmentInput, AttachmentRow, AuditEntry, AuditLogRow, AuditSink, AvailableTransition, CommentRow, CompileOptions, Database, DatabaseEnv, DatabaseOptions, DispatchResult, FeaturePage, ListOptions, MadeMigration, MigrationEnv, MigrationStatus, Migrator, MigratorOptions, Orm, OrmSchema, OutboxDispatcher, OutboxDispatcherOptions, OutboxEntryRow, OutboxEvent, OutboxLag, OutboxMessage, OutboxProcessedRow, OutboxPublisher, Page, PageRequest, PluginRefusal, PluginRun, PluginRunOptions, PurgeOptions, ReferenceVisibility, ResolvedConnection, SequenceKey, SequenceOptions, SequenceRow, SortOption, SqliteOptions, SystemScopeEntry, TagRow, TimelineInput, TimelineRow, TransitionResult, UpOptions };
 ```

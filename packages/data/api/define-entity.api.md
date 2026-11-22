@@ -54,6 +54,7 @@ interface FieldDef {
   readonly unique?: true;
   readonly index?: true;
   readonly searchable?: true;
+  readonly aggregatable?: true;
   readonly localized?: true;
   readonly inline?: true;
   readonly default?: unknown;
@@ -86,6 +87,7 @@ interface Chain<Self> {
   unique(): Self;
   index(): Self;
   searchable(): Self;
+  aggregatable(): Self;
   localized(): Self;
 }
 type ComputedField = Chain<ComputedField>;
@@ -146,6 +148,7 @@ declare class Field {
   unique(): Field;
   index(): Field;
   searchable(): Field;
+  aggregatable(): Field;
   localized(): Field;
   default(value: unknown): Field;
   computed(fn: ComputedFn, options?: {

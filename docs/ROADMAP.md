@@ -184,7 +184,7 @@ Depends on: M1.2.
 - [x] ETag and conditional GET; cache headers for public cacheable routes (API-08, API-09)
 - [x] Action and transition routes `POST .../actions/<name>` with audit and event (MOD-06). Transitions are done. A custom `actions` handler needs a declared result schema in `ActionDef`, which is a change of the DSL
 - [x] Bulk endpoints with per-row results and version conflicts (API-14, API-17). Up to 100 rows run in one request, and 101 to 500 wait for the queue (M1.5)
-- [ ] Aggregate endpoint for `aggregatable()` fields (API-15)
+- [x] Aggregate endpoint for `aggregatable()` fields (API-15). Money sums (one for each currency) and groups by an instant (a bucket) are later work
 - [x] Idempotency-Key for `idempotent: true` routes (§13.1). The store is in memory, for one process, until the cache of M1.5
 - [x] Deprecation and Sunset headers (API-16). The list in OpenAPI comes with slice 4
 - [x] OpenAPI 3.1 generation, served in development and gated in production (API-06). The client generator (API-07) is the build of M1.8
