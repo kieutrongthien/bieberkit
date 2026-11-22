@@ -86,7 +86,7 @@ export { createDatabase, currentEntityManager, resolveConnection, runInUnitOfWor
 export type { Database, DatabaseEnv, DatabaseOptions, Orm, ResolvedConnection } from './connect.ts';
 export { openMigrator } from './migrate.ts';
 export type { MadeMigration, MigrationEnv, MigrationStatus, Migrator, MigratorOptions, UpOptions } from './migrate.ts';
-export { runPluginMigrations } from './plugin-migrate.ts';
+export { applyPluginMigrations, runPluginMigrations } from './plugin-migrate.ts';
 export type { PluginRefusal, PluginRun, PluginRunOptions } from './plugin-migrate.ts';
 export { setNotNull, uuidType } from './portable.ts';
 export { createSqliteDialect } from './sqlite.ts';
@@ -99,6 +99,7 @@ export { currentTenantId, runAsTenant } from './tenant.ts';
 export type { AuditSink, SystemScopeEntry } from './tenant.ts';
 export { expectVersion } from './version.ts';
 export { listPage, queryableFields } from './query.ts';
+export { findAllScoped, findScoped } from './scoped.ts';
 export type { ListOptions, Page, SortOption } from './query.ts';
 export { setTranslation, translationName } from './localize.ts';
 export { toApiRow, toOrmData } from './mapper.ts';

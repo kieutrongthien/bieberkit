@@ -19,6 +19,11 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
+    "./testing": {
+      "@bieberkit/source": "./src/testing/index.ts",
+      "types": "./dist/testing.d.ts",
+      "default": "./dist/testing.js"
+    },
     "./package.json": "./package.json"
   },
   "publishConfig": {
@@ -26,6 +31,10 @@
       ".": {
         "types": "./dist/index.d.ts",
         "default": "./dist/index.js"
+      },
+      "./testing": {
+        "types": "./dist/testing.d.ts",
+        "default": "./dist/testing.js"
       },
       "./package.json": "./package.json"
     },
@@ -37,7 +46,10 @@
   },
   "dependencies": {
     "@bieberkit/core": "workspace:*",
-    "@bieberkit/data": "workspace:*"
+    "@bieberkit/data": "workspace:*",
+    "@bieberkit/http": "workspace:*",
+    "@casl/ability": "7.1.3",
+    "@mikro-orm/core": "7.2.9"
   },
   "engines": {
     "node": ">=24.12"

@@ -69,6 +69,12 @@ export interface StageContext {
   readonly requestId: string;
   readonly traceId: string;
   readonly result?: unknown;
+  /** The status of the answer, at `onResponse` only. */
+  readonly status?: number;
+  /** The code of the problem when the answer is one, at `onResponse` only. */
+  readonly code?: string;
+  /** The members that the problem has besides the standard ones (`HttpError.extensions`), at `onResponse` only. */
+  readonly details?: Readonly<Record<string, unknown>>;
 }
 
 export type StageHook = (context: StageContext) => void | Promise<void>;
@@ -151,6 +157,9 @@ interface RequestState {
   /** The key of an idempotent request that is running, so that its answer is kept. */
   idempotencyKey: string | undefined;
   replayed: boolean;
+  /** The code of the problem that answered the request, and its extra members. */
+  problemCode: string | undefined;
+  problemDetails: Readonly<Record<string, unknown>> | undefined;
 }
 
 type Compiled = ((data: unknown) => boolean) & { errors?: AjvError[] | null };
@@ -316,6 +325,8 @@ function stateOf(map: WeakMap<FastifyRequest, RequestState>, request: FastifyReq
       headers: {},
       idempotencyKey: undefined,
       replayed: false,
+      problemCode: undefined,
+      problemDetails: undefined,
     };
     map.set(request, state);
   }
@@ -422,7 +433,7 @@ export function createHttpServer(env: HttpEnv, options: HttpServerOptions = {}):
     checkCsrf(request, state.principal);
   });
 
-  const stageContext = (request: FastifyRequest, result?: unknown): StageContext => {
+  const stageContext = (request: FastifyRequest, result?: unknown, answered?: { status: number }): StageContext => {
     const state = stateOf(requests, request);
     return {
       method: request.method,
@@ -432,6 +443,13 @@ export function createHttpServer(env: HttpEnv, options: HttpServerOptions = {}):
       requestId: request.id,
       traceId: traceIdNow(),
       ...(result === undefined ? {} : { result }),
+      ...(answered === undefined
+        ? {}
+        : {
+            status: answered.status,
+            ...(state.problemCode === undefined ? {} : { code: state.problemCode }),
+            ...(state.problemDetails === undefined ? {} : { details: state.problemDetails }),
+          }),
     };
   };
   const run = async (name: StageName, context: StageContext): Promise<void> => {
@@ -632,6 +650,9 @@ export function createHttpServer(env: HttpEnv, options: HttpServerOptions = {}):
   }
 
   // Stage 12: one log line, then the plugin hooks of `onResponse`. Nothing here can change an answer that was sent.
+  // The hooks run after the answer was sent, so `inject` and `stop` wait for the ones that are still running: a test sees what a hook
+  // wrote (the audit of a denial), and a shutdown does not lose it.
+  const finishing = new Set<Promise<void>>();
   app.addHook('onResponse', async (request, reply) => {
     const level = reply.statusCode >= 500 ? 'error' : 'info';
     logger[level]('request completed', {
@@ -641,15 +662,27 @@ export function createHttpServer(env: HttpEnv, options: HttpServerOptions = {}):
       durationMs: Math.round(reply.elapsedTime * 100) / 100,
       requestId: request.id,
     });
+    const work = (async (): Promise<void> => {
+      try {
+        await run('onResponse', stageContext(request, undefined, { status: reply.statusCode }));
+      } catch (error) {
+        logger.error('onResponse hook failed', { reason: error instanceof Error ? error.message : String(error) });
+      }
+    })();
+    finishing.add(work);
     try {
-      await run('onResponse', stageContext(request));
-    } catch (error) {
-      logger.error('onResponse hook failed', { reason: error instanceof Error ? error.message : String(error) });
+      await work;
+    } finally {
+      finishing.delete(work);
     }
   });
 
   const answer = (error: unknown, request: FastifyRequest, reply: FastifyReply): FastifyReply => {
     const described = describeError(error, { traceId: traceIdNow(), instance: pickInfo(request).path, showFix });
+    const problemState = stateOf(requests, request);
+    problemState.problemCode = described.problem.code;
+    if (error instanceof HttpError && Object.keys(error.extensions).length > 0)
+      problemState.problemDetails = error.extensions;
     if (described.bug) {
       logger.error('request failed', {
         requestId: request.id,
@@ -745,6 +778,22 @@ export function createHttpServer(env: HttpEnv, options: HttpServerOptions = {}):
           can: async (permission) =>
             current.principal !== undefined &&
             (await options.authorizer?.can(current.principal, permission, pickInfo(request))) === true,
+          allows: async (entity, action, row) => {
+            if (options.authorizer === undefined) return true;
+            if (current.principal === undefined) return false;
+            return (
+              (await options.authorizer.allows?.(current.principal, entity, action, row, pickInfo(request))) ?? true
+            );
+          },
+          access: async (entity, action) => {
+            if (options.authorizer === undefined) return { allowed: true };
+            if (current.principal === undefined) return { allowed: false, reason: 'no-permission' };
+            return (
+              (await options.authorizer.access?.(current.principal, entity, action, pickInfo(request))) ?? {
+                allowed: true,
+              }
+            );
+          },
         };
         const result: unknown = await route.handler(context);
         for (const [name, value] of Object.entries(current.headers)) void reply.header(name, value);
@@ -792,6 +841,9 @@ export function createHttpServer(env: HttpEnv, options: HttpServerOptions = {}):
         ...(request.headers === undefined ? {} : { headers: request.headers }),
         ...(request.payload === undefined ? {} : { payload: request.payload }),
       });
+      // The `onResponse` hooks start when the answer ends. Let them start, then wait for them.
+      await new Promise<void>((resolve) => void setImmediate(resolve));
+      await Promise.allSettled(finishing);
       return { statusCode: response.statusCode, headers: response.headers, body: response.body };
     },
     async listen(listenOptions = {}) {
@@ -823,6 +875,7 @@ export function createHttpServer(env: HttpEnv, options: HttpServerOptions = {}):
         await closing.catch(() => undefined);
       }
       clearInterval(sweep);
+      await Promise.allSettled(finishing);
       return { timedOut: outcome === 'timeout' };
     },
     settings: { bodyLimit, requestTimeoutMs, keepAliveTimeoutMs },

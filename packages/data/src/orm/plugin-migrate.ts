@@ -29,6 +29,8 @@ import type { Dialect } from '@bieberkit/core';
 import { dataError } from '../errors.ts';
 import { orderSteps, stepName, validateSteps } from '../migrations/steps.ts';
 import type { PluginMigrationStep, StepDatabase } from '../migrations/steps.ts';
+import type { Database } from './connect.ts';
+import { kyselyOf } from './internals.ts';
 
 const LEDGER = 'bieberkit_plugin_migrations';
 
@@ -175,4 +177,13 @@ export async function runPluginMigrations(
     run.applied.push(name);
   }
   return run;
+}
+
+/** `runPluginMigrations` on a database that was opened with `createDatabase`, for a package that ships steps and has no Kysely of its own. */
+export async function applyPluginMigrations(
+  db: Database,
+  steps: readonly PluginMigrationStep[],
+  options: PluginRunOptions,
+): Promise<PluginRun> {
+  return runPluginMigrations(await kyselyOf(db.orm.em), db.dialect, steps, options);
 }

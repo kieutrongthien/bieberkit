@@ -52,6 +52,7 @@ export default defineConfig({
       thresholds: {
         'packages/core/src/**': { lines: 90 },
         'packages/data/src/**': { lines: 90 },
+        'packages/auth/src/**': { lines: 90 },
       },
     },
   },

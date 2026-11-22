@@ -52,9 +52,38 @@ export interface TenantResolver {
   resolve(request: RequestInfo, principal: Principal | undefined): Promise<string | undefined>;
 }
 
-/** Stage 8. Whether the principal has the permission that the route names. Conditions on the record come later, in the service. */
+/**
+ * What a caller may do with an entity (AUTHZ-02, AUTHZ-03): whether it may at all, which rows (`scope`, in the properties of the
+ * entity, in the small condition language of ADR 0013) and which fields. `readable` and `writable` are field names, and
+ * `undefined` means every field. `reason` says why `allowed` is false.
+ */
+export interface AccessAnswer {
+  readonly allowed: boolean;
+  readonly reason?: 'no-permission' | 'unsupported-condition';
+  readonly scope?: Readonly<Record<string, unknown>>;
+  readonly readable?: ReadonlySet<string>;
+  readonly writable?: ReadonlySet<string>;
+}
+
+/** Stage 8. Whether the principal has the permission that the route names. */
 export interface Authorizer {
   can(principal: Principal, permission: string, request: RequestInfo): Promise<boolean>;
+  /**
+   * The rows and the fields that the principal may use for `action` (`read`, `create`, `update`, `delete`, `transition:<name>`)
+   * on the entity that is named `entity`. Without it a route is decided by its permission alone.
+   */
+  access?(principal: Principal, entity: string, action: string, request: RequestInfo): Promise<AccessAnswer>;
+  /**
+   * Whether the principal may use `action` on a row that is not stored yet: the data of a create, or the new state of an update. The
+   * row is in the properties of the entity. Without it, only `access` limits what a caller writes.
+   */
+  allows?(
+    principal: Principal,
+    entity: string,
+    action: string,
+    row: Readonly<Record<string, unknown>>,
+    request: RequestInfo,
+  ): Promise<boolean>;
 }
 
 export interface RateLimitResult {

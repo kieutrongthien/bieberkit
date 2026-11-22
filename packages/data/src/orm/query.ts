@@ -57,6 +57,8 @@ export interface ListOptions {
   readonly populate?: readonly string[];
   /** The translation to prefer. A field without one keeps its default value. */
   readonly locale?: string;
+  /** The rows that the caller may see, chosen by code and not by the client (AUTHZ-02). It is applied next to the tenant filter and `where`. */
+  readonly scope?: Row;
 }
 
 export interface Page {
@@ -72,6 +74,8 @@ interface Known {
   /** The property that the query uses: the shadow column for a compared field. */
   readonly lookup: string;
   readonly indexed: boolean;
+  /** Whether a filter or a scope may name it at all, with or without an index. */
+  readonly filterable: boolean;
   readonly sortable: boolean;
   readonly compared: boolean;
   readonly text: boolean;
@@ -106,7 +110,16 @@ export function knownFields(schema: OrmSchema): Map<string, Known> {
   const def = entityOfSchema(schema);
   const known = new Map<string, Known>();
   const standard = (name: string, instant: boolean): void =>
-    void known.set(name, { name, lookup: name, indexed: true, sortable: true, compared: false, text: false, instant });
+    void known.set(name, {
+      name,
+      lookup: name,
+      indexed: true,
+      filterable: true,
+      sortable: true,
+      compared: false,
+      text: false,
+      instant,
+    });
   standard('id', false);
   standard('createdAt', true);
   standard('updatedAt', true);
@@ -119,6 +132,7 @@ export function knownFields(schema: OrmSchema): Map<string, Known> {
       name,
       lookup: compared ? `${name}Cmp` : name,
       indexed: filterable && (field.index === true || field.unique === true),
+      filterable,
       sortable: field.optional !== true,
       compared,
       text: field.kind === 'string' || field.kind === 'email',
@@ -221,6 +235,48 @@ export function translateWhere(schema: OrmSchema, known: ReadonlyMap<string, Kno
   return out;
 }
 
+const SCOPE_OPERATORS: readonly string[] = ['$eq', '$ne', '$in', '$nin', '$gt', '$gte', '$lt', '$lte'];
+
+/**
+ * Turns the scope that code gives a read (the conditions of a role, translated by `@bieberkit/auth`) into a `where`. The code
+ * chooses a scope, a client does not, so a field needs no index. The language stays small and fails closed: the operators of
+ * `SCOPE_OPERATORS`, `null`, and an `$or` of scopes at the top, on properties of the entity (ADR 0013).
+ */
+export function translateScope(
+  schema: OrmSchema,
+  known: ReadonlyMap<string, Known>,
+  scope: unknown,
+  nested = false,
+): Row {
+  if (!isPlain(scope)) return queryInvalid('A scope must be an object.', 'Write the scope as { field: value }.');
+  const def = entityOfSchema(schema);
+  const out: Row = {};
+  for (const [key, value] of Object.entries(scope)) {
+    if (key === '$or') {
+      if (nested || !Array.isArray(value) || value.length === 0) {
+        return queryInvalid('$or needs a list of scopes, and only at the top.', 'Write { $or: [{ ... }, { ... }] }.');
+      }
+      out[key] = value.map((item) => translateScope(schema, known, item, true));
+      continue;
+    }
+    const field = key.startsWith('$') ? undefined : known.get(key);
+    if (field === undefined || !field.filterable)
+      return queryInvalid(
+        `${key} cannot be used in a scope.`,
+        'Name a field of the entity, with no path and no operator.',
+      );
+    if (isPlain(value)) {
+      for (const operator of Object.keys(value)) {
+        if (!SCOPE_OPERATORS.includes(operator))
+          return queryInvalid(`${operator} is not an operator of a scope.`, `Use ${SCOPE_OPERATORS.join(', ')}.`);
+      }
+    }
+    const mode = def.fields[key]?.compare ?? 'exact';
+    out[field.lookup] = valueOf(field, mode === 'exact' ? undefined : mode, value);
+  }
+  return out;
+}
+
 interface Ordered {
   readonly field: Known;
   readonly direction: 'asc' | 'desc';
@@ -295,10 +351,12 @@ export async function listPage(em: EntityManager, schema: OrmSchema, options: Li
       return queryInvalid('An offset and a cursor cannot be used together.', 'Use a page number or a cursor.');
   }
   const where = options.where === undefined ? {} : translateWhere(schema, known, options.where);
+  const scope = options.scope === undefined ? {} : translateScope(schema, known, options.scope);
+  const base: Row = Object.keys(scope).length === 0 ? where : { $and: [where, scope] };
   const order = orderOf(known, options.sort);
   const signature = order.map((item) => `${item.field.name}:${item.direction}`).join(',');
 
-  const conditions: Row[] = Object.keys(where).length > 0 ? [where] : [];
+  const conditions: Row[] = Object.keys(base).length > 0 ? [base] : [];
   if (options.cursor !== undefined) {
     const [seen, ...values] = decodeCursor(options.cursor);
     if (seen !== signature || values.length !== order.length) {
@@ -358,6 +416,6 @@ export async function listPage(em: EntityManager, schema: OrmSchema, options: Li
   });
   if (options.locale !== undefined) await applyTranslations(em, schema, rows, options.locale);
 
-  const total = options.withTotal === true ? await em.count(schema, where, { connectionType: 'read' }) : undefined;
+  const total = options.withTotal === true ? await em.count(schema, base, { connectionType: 'read' }) : undefined;
   return { rows, limit, nextCursor, ...(total === undefined ? {} : { total }) };
 }

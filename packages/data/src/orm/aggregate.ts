@@ -30,7 +30,7 @@ import { fromScaled } from '../numbers/scaled.ts';
 import { entityOfSchema } from './compile.ts';
 import type { OrmSchema } from './compile.ts';
 import { BieberEntityManager } from './entity-manager.ts';
-import { knownFields, translateWhere } from './query.ts';
+import { knownFields, translateScope, translateWhere } from './query.ts';
 
 type Row = Record<string, unknown>;
 
@@ -49,6 +49,8 @@ export interface AggregateOptions {
   readonly count?: boolean;
   /** The same filter as a list: indexed fields only. */
   readonly where?: Row;
+  /** The rows that the caller may see, chosen by code (AUTHZ-02). It is applied next to the tenant filter and `where`. */
+  readonly scope?: Row;
   /** More groups than this is an error, so a dashboard never pulls a whole table. Defaults to 1000. */
   readonly maxGroups?: number;
 }
@@ -149,7 +151,9 @@ export async function aggregate(
     return platform.quoteIdentifier(name);
   };
   const known = knownFields(schema);
-  const where = options.where === undefined ? {} : translateWhere(schema, known, options.where);
+  const filter = options.where === undefined ? {} : translateWhere(schema, known, options.where);
+  const scope = options.scope === undefined ? {} : translateScope(schema, known, options.scope);
+  const where = Object.keys(scope).length === 0 ? filter : { $and: [filter, scope] };
   // The filters of the entity (tenant, soft delete) are added the way a find adds them, and the guard against switching them off applies.
   const filtered = await em.applyFilters(schema, where, undefined, 'read');
 

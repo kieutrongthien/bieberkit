@@ -38,6 +38,7 @@ export type { OpenApiDocument, OpenApiInfo } from './openapi.ts';
 export { registerHttp } from './lifecycle.ts';
 export type { RegisterHttpOptions } from './lifecycle.ts';
 export type {
+  AccessAnswer,
   Authenticator,
   Authorizer,
   Principal,

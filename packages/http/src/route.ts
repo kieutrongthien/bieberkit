@@ -24,7 +24,7 @@
 
 import type { Logger } from '@bieberkit/core';
 import type { JsonSchema } from '@bieberkit/data/schema';
-import type { Principal } from './ports.ts';
+import type { AccessAnswer, Principal } from './ports.ts';
 
 export type Method = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
@@ -56,6 +56,13 @@ export interface RouteContext {
   header(name: string, value: string): void;
   /** Whether the caller has `permission`, for a check that depends on the request, such as the operation of a bulk call. */
   can(permission: string): Promise<boolean>;
+  /**
+   * The rows and the fields that the caller may use for `action` on `entity` (AUTHZ-02). Without an authorizer, or with one that
+   * has no `access`, it is allowed with no scope and every field. A caller with no principal is denied when there is an authorizer.
+   */
+  access(entity: string, action: string): Promise<AccessAnswer>;
+  /** Whether the caller may use `action` on this row in memory: for a create, and for the new state of an update (AUTHZ-02). Allowed when nothing limits it. */
+  allows(entity: string, action: string, row: Readonly<Record<string, unknown>>): Promise<boolean>;
 }
 
 export interface RouteDef {

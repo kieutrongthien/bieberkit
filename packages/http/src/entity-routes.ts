@@ -29,6 +29,8 @@ import {
   entityEventName,
   entityOfSchema,
   expectVersion,
+  findAllScoped,
+  findScoped,
   listPage,
   recordAudit,
   runInUnitOfWork,
@@ -38,6 +40,7 @@ import {
   toOrmData,
 } from '@bieberkit/data/orm';
 import type { Database, OrmSchema } from '@bieberkit/data/orm';
+import type { AccessAnswer } from './ports.ts';
 import { apiFields, toJsonSchema } from '@bieberkit/data/schema';
 import type { ApiField, EntityDef, JsonSchema } from '@bieberkit/data/schema';
 import { HttpError, ValidationFailed } from './problem.ts';
@@ -99,6 +102,58 @@ function recordNotFound(): DataError {
     'The record does not exist.',
     'Check the id, and that the record belongs to this tenant.',
   );
+}
+
+/** 403 for a caller who may not do this. The entity and the action travel with the problem, so the audit knows what was refused. */
+function authzDenied(
+  entity: string,
+  action: string,
+  reason: 'no-permission' | 'unsupported-condition' | undefined,
+): HttpError {
+  const unsupported = reason === 'unsupported-condition';
+  return new HttpError(
+    unsupported ? 'AUTHZ_UNSUPPORTED_CONDITION' : 'AUTHZ_DENIED',
+    403,
+    'You may not do this.',
+    unsupported
+      ? 'A condition of the role uses an operator that the language does not have. Ask an administrator.'
+      : 'Ask an administrator for the permission, or for the rows that this needs.',
+    {},
+    undefined,
+    { entity, action },
+  );
+}
+
+function fieldForbidden(entity: string, action: string, fields: readonly string[]): HttpError {
+  return new HttpError(
+    'AUTHZ_FIELD_FORBIDDEN',
+    403,
+    'You may not use these fields.',
+    'Remove the fields that the caller has no permission for.',
+    {},
+    undefined,
+    { entity, action, fields },
+  );
+}
+
+const refOrValue = (value: unknown): unknown =>
+  typeof value === 'object' && value !== null && !(value instanceof Date) && 'id' in value ? value.id : value;
+
+/** The values of a row that a condition may look at, in the properties of the entity. A relation is its id. */
+function snapshotOf(def: EntityDef<string>, entity: Row): Row {
+  const out: Row = { id: entity['id'] };
+  for (const name of Object.keys(def.fields)) out[name] = refOrValue(entity[name]);
+  return out;
+}
+
+/** What a new row has before it is stored: the defaults of the fields. */
+function defaultsOf(def: EntityDef<string>): Row {
+  const out: Row = {};
+  for (const [name, field] of Object.entries(def.fields)) {
+    if (field.kind === 'state' && field.initial !== undefined) out[name] = field.initial;
+    else if (field.default !== undefined) out[name] = field.default;
+  }
+  return out;
 }
 
 /** The ORM properties behind a key of the API, for `select`. */
@@ -336,6 +391,37 @@ export function entityRoutes(schema: OrmSchema, context: EntityRoutesContext): R
   };
   const event = (verb: string): string => entityEventName(def.name, verb);
 
+  const masked = Object.keys(def.permissions.fields ?? {});
+  const keyOfName = new Map([...reader.byKey.values()].map((field) => [field.name, field.key]));
+  const keyOf = (name: string): string => keyOfName.get(name) ?? name;
+  const nameOfKey = (key: string): string => reader.byKey.get(key)?.name ?? key;
+  /** The access of the caller, or the refusal. A route that is reached has passed its permission, so this decides the rows and the fields. */
+  const need = async (ctx: RouteContext, action: string): Promise<AccessAnswer> => {
+    const answer = await ctx.access(def.name, action);
+    if (!answer.allowed) throw authzDenied(def.name, action, answer.reason);
+    return answer;
+  };
+  /** The masked fields (by name) that the set does not have. `undefined` means every field. */
+  const closedOf = (open: ReadonlySet<string> | undefined): Set<string> =>
+    new Set(open === undefined ? [] : masked.filter((name) => !open.has(name)));
+  const refuseNames = (closed: ReadonlySet<string>, names: readonly string[], action: string): void => {
+    const forbidden = names.filter((name) => closed.has(name));
+    if (forbidden.length > 0) throw fieldForbidden(def.name, action, forbidden.map(keyOf));
+  };
+  const strip = (closed: ReadonlySet<string>, row: Row): Row => {
+    for (const name of closed) delete row[keyOf(name)];
+    return row;
+  };
+  /** The answer of a write: what the caller may read, and nothing but `id` and `version` for a caller who may not read. */
+  const respond = async (ctx: RouteContext, row: Row): Promise<Row> => {
+    const read = await ctx.access(def.name, 'read');
+    if (!read.allowed) return { id: row['id'], version: row['version'] };
+    return strip(closedOf(read.readable), row);
+  };
+  /** The write that the body asks for, checked against the fields that the caller may write. */
+  const checkWritable = (access: AccessAnswer, body: Row, action: string): void =>
+    refuseNames(closedOf(access.writable), Object.keys(body).map(nameOfKey), action);
+
   /** The part of a request that decides which fields and relations come back. */
   const shape = (query: Row): { fields: string[]; include: string[]; select: string[] | undefined } => {
     const fields = namesOf(textOf(query['fields']));
@@ -392,8 +478,17 @@ export function entityRoutes(schema: OrmSchema, context: EntityRoutesContext): R
           }
           const { fields, include, select } = shape(query);
           const sort = sortOf(textOf(query['sort']), reader);
+          const read = await need(ctx, 'read');
+          const closed = closedOf(read.readable);
+          const where = whereOf(query, reader);
+          refuseNames(
+            closed,
+            [...fields.map(nameOfKey), ...Object.keys(where), ...(sort ?? []).map((item) => item.field)],
+            'read',
+          );
           const result = await listPage(em, schema, {
-            where: whereOf(query, reader),
+            where,
+            ...(read.scope === undefined ? {} : { scope: read.scope }),
             limit: size,
             ...(sort === undefined ? {} : { sort }),
             ...(cursor === undefined ? {} : { cursor }),
@@ -404,7 +499,7 @@ export function entityRoutes(schema: OrmSchema, context: EntityRoutesContext): R
             ...(typeof query['locale'] === 'string' ? { locale: query['locale'] } : {}),
           });
           return {
-            data: result.rows.map((item) => shapeRow(schema, reader, item, fields, include)),
+            data: result.rows.map((item) => strip(closed, shapeRow(schema, reader, item, fields, include))),
             meta: {
               pageSize: result.limit,
               ...(page === undefined ? { nextCursor: result.nextCursor } : { page }),
@@ -466,9 +561,8 @@ export function entityRoutes(schema: OrmSchema, context: EntityRoutesContext): R
       handler: async (ctx) => {
         const groupKeys = namesOf(textOf(ctx.query['groupBy']));
         const sumKeys = namesOf(textOf(ctx.query['sum']));
-        const nameOf = (key: string): string => reader.byKey.get(key)?.name ?? key;
         // A field with a mask is read only by a caller who may read it, in a group and in a sum as in a list (AUTHZ-03).
-        for (const name of [...groupKeys, ...sumKeys].map(nameOf)) {
+        for (const name of [...groupKeys, ...sumKeys].map(nameOfKey)) {
           const mask = def.permissions.fields?.[name]?.read;
           if (mask !== undefined && !(await ctx.can(mask))) {
             throw new HttpError(
@@ -480,16 +574,16 @@ export function entityRoutes(schema: OrmSchema, context: EntityRoutesContext): R
           }
         }
         const count = ctx.query['count'] === true ? true : ctx.query['count'] === false ? false : undefined;
+        const read = await need(ctx, 'read');
         const result = await runInUnitOfWork(db, (em) =>
           aggregate(em, schema, {
-            groupBy: groupKeys.map(nameOf),
-            sum: sumKeys.map(nameOf),
+            groupBy: groupKeys.map(nameOfKey),
+            sum: sumKeys.map(nameOfKey),
             where: whereOf(ctx.query, reader),
+            ...(read.scope === undefined ? {} : { scope: read.scope }),
             ...(count === undefined ? {} : { count }),
           }),
         );
-        const keyOf = (name: string): string =>
-          [...reader.byKey.values()].find((field) => field.name === name)?.key ?? name;
         return {
           data: result.rows.map((row) => ({
             group: Object.fromEntries(Object.entries(row.group).map(([name, value]) => [keyOf(name), value])),
@@ -513,12 +607,16 @@ export function entityRoutes(schema: OrmSchema, context: EntityRoutesContext): R
       handler: (ctx) =>
         runInUnitOfWork(db, async (em) => {
           const { fields, include, select } = shape(ctx.query);
+          const read = await need(ctx, 'read');
+          const closed = closedOf(read.readable);
+          refuseNames(closed, fields.map(nameOfKey), 'read');
           const found = await readOne(em, schema, String(ctx.params['id']), {
+            ...(read.scope === undefined ? {} : { scope: read.scope }),
             ...(select === undefined ? {} : { select }),
             ...(include.length === 0 ? {} : { populate: include }),
             ...(typeof ctx.query['locale'] === 'string' ? { locale: ctx.query['locale'] } : {}),
           });
-          const data = shapeRow(schema, reader, found, fields, include);
+          const data = strip(closed, shapeRow(schema, reader, found, fields, include));
           // The version names the record, so it is the tag that a client sends back as If-Match (API-13).
           if (include.length === 0) ctx.header('etag', `W/"${String(data['version'])}"`);
           return { data };
@@ -535,14 +633,20 @@ export function entityRoutes(schema: OrmSchema, context: EntityRoutesContext): R
       schema: { body: toJsonSchema(def, 'create'), response: { 201: single } },
       handler: (ctx) =>
         runInUnitOfWork(db, async (em) => {
-          const created = em.create(schema, toOrmData(schema, asRow(ctx.body), 'create'));
+          const write = await need(ctx, 'create');
+          const body = asRow(ctx.body);
+          checkWritable(write, body, 'create');
+          const data = toOrmData(schema, body, 'create');
+          if (!(await ctx.allows(def.name, 'create', { ...defaultsOf(def), ...data })))
+            throw authzDenied(def.name, 'create', 'no-permission');
+          const created = em.create(schema, data);
           const id = String(created['id']);
           emitEvent(em, { name: event('created'), payload: { id }, record: { entity: def.name, id, version: 1 } });
           recordAudit(em, { action: `${def.name}.create`, entity: def.name, recordId: id });
           await em.flush();
           ctx.status(201);
           ctx.header('location', `${base}/${id}`);
-          return { data: toApiRow(schema, created) };
+          return { data: await respond(ctx, toApiRow(schema, created)) };
         }),
     });
   }
@@ -559,11 +663,17 @@ export function entityRoutes(schema: OrmSchema, context: EntityRoutesContext): R
         const expected = ifMatchOf(ctx);
         return withCurrent(db, schema, id, () =>
           runInUnitOfWork(db, async (em) => {
-            const found = await em.findOne(schema, { id });
+            const write = await need(ctx, 'update');
+            const body = asRow(ctx.body);
+            checkWritable(write, body, 'update');
+            const found = await findScoped(em, schema, id, write.scope);
             if (found === null) throw recordNotFound();
             expectVersion(found, expected);
-            const body = asRow(ctx.body);
-            em.assign(found, toOrmData(schema, body, 'update'));
+            const data = toOrmData(schema, body, 'update');
+            // The new state must be one that the caller may write: a row cannot be moved out of the rows that the caller owns.
+            if (!(await ctx.allows(def.name, 'update', { ...snapshotOf(def, found), ...data })))
+              throw authzDenied(def.name, 'update', 'no-permission');
+            em.assign(found, data);
             const next = (typeof found['version'] === 'number' ? found['version'] : 0) + 1;
             emitEvent(em, {
               name: event('updated'),
@@ -577,7 +687,7 @@ export function entityRoutes(schema: OrmSchema, context: EntityRoutesContext): R
               data: { fields: Object.keys(body) },
             });
             await em.flush();
-            return { data: toApiRow(schema, found) };
+            return { data: await respond(ctx, toApiRow(schema, found)) };
           }),
         );
       },
@@ -596,7 +706,8 @@ export function entityRoutes(schema: OrmSchema, context: EntityRoutesContext): R
         const expected = ifMatchOf(ctx);
         return withCurrent(db, schema, id, () =>
           runInUnitOfWork(db, async (em) => {
-            const found = await em.findOne(schema, { id });
+            const write = await need(ctx, 'delete');
+            const found = await findScoped(em, schema, id, write.scope);
             if (found === null) throw recordNotFound();
             expectVersion(found, expected);
             emitEvent(em, {
@@ -641,12 +752,13 @@ export function entityRoutes(schema: OrmSchema, context: EntityRoutesContext): R
             (typeof ctx.body === 'object' && ctx.body !== null && Object.keys(ctx.body).length === 0);
           return withCurrent(db, schema, id, () =>
             runInUnitOfWork(db, async (em) => {
-              const found = await em.findOne(schema, { id });
+              const write = await need(ctx, declared.permission === undefined ? 'update' : `transition:${name}`);
+              const found = await findScoped(em, schema, id, write.scope);
               if (found === null) throw recordNotFound();
               expectVersion(found, expected);
               await transition(em, schema, found, name, empty ? undefined : ctx.body);
               await em.flush();
-              return { data: toApiRow(schema, found) };
+              return { data: await respond(ctx, toApiRow(schema, found)) };
             }),
           );
         },
@@ -750,6 +862,14 @@ export function entityRoutes(schema: OrmSchema, context: EntityRoutesContext): R
     if (!(await ctx.can(permission))) {
       throw new HttpError('HTTP_FORBIDDEN', 403, 'You may not do this.', `The permission ${permission} is needed.`);
     }
+    const action =
+      operation === 'transition' && declared?.permission !== undefined
+        ? `transition:${String(name)}`
+        : operation === 'delete'
+          ? 'delete'
+          : 'update';
+    const write = await need(ctx, action);
+    if (operation === 'update') checkWritable(write, asRow(body['data']), 'update');
     if (requested.length > MAX_BULK_INLINE) {
       throw new HttpError(
         'HTTP_BULK_TOO_LARGE',
@@ -759,7 +879,7 @@ export function entityRoutes(schema: OrmSchema, context: EntityRoutesContext): R
       );
     }
     return runInUnitOfWork(db, async (em) => {
-      const found = await em.find(schema, { id: { $in: ids } });
+      const found = await findAllScoped(em, schema, ids, write.scope);
       const byId = new Map(found.map((record) => [String(record['id']), record]));
       const outcomes: { id: string; status: string; version?: number; error?: { code: string; message: string } }[] =
         [];
@@ -788,7 +908,19 @@ export function entityRoutes(schema: OrmSchema, context: EntityRoutesContext): R
         try {
           if (operation === 'update') {
             const data = asRow(body['data']);
-            em.assign(row, toOrmData(schema, data, 'update'));
+            const changes = toOrmData(schema, data, 'update');
+            if (!(await ctx.allows(def.name, 'update', { ...snapshotOf(def, row), ...changes }))) {
+              outcomes.push({
+                id,
+                status: 'invalid',
+                error: {
+                  code: 'AUTHZ_DENIED',
+                  message: 'The change moves the record out of the rows that the caller may write.',
+                },
+              });
+              continue;
+            }
+            em.assign(row, changes);
             emitEvent(em, {
               name: event('updated'),
               payload: { id, fields: Object.keys(data) },

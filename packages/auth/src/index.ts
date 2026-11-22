@@ -22,7 +22,41 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-// Public API of @bieberkit/auth. Implementation starts after the Phase 0 ADRs (docs/adr/README.md).
-
 /** npm name of this package. */
 export const packageName = '@bieberkit/auth';
+
+export { buildAbility } from './ability.ts';
+export type {
+  Ability,
+  AbilityInput,
+  AbilityUser,
+  AccessAnswer,
+  Condition,
+  EntityShape,
+  ScopedPermission,
+} from './ability.ts';
+export { createAuthorizer } from './authorizer.ts';
+export type { AccessAuthorizer, AuthorizerOptions } from './authorizer.ts';
+export { AuthzError, authzError } from './errors.ts';
+export { buildPermissionRegistry } from './registry.ts';
+export type { Action, MaskedField, PermissionEntry, PermissionRegistry } from './registry.ts';
+export {
+  AUTH_PLUGIN,
+  AuthRole,
+  AuthRolePermission,
+  AuthUserRole,
+  authEntities,
+  authMigrationSteps,
+  loadGrants,
+  NIL_TENANT,
+} from './roles.ts';
+export type { AuthRolePermissionRow, AuthRoleRow, AuthUserRoleRow, GrantLoader, Grants } from './roles.ts';
+
+import type { ScopedPermission } from './ability.ts';
+
+declare module '@bieberkit/core' {
+  interface ModuleContributions {
+    /** The permissions of the module that carry a condition, by permission string (AUTHZ-02). */
+    scopedPermissions?: Readonly<Record<string, ScopedPermission>>;
+  }
+}
