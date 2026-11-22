@@ -96,51 +96,62 @@ const ROLES: readonly ['web', 'worker', 'scheduler', 'migrate']
 function parseRole(argv: readonly string[]): Role                        // throws ConfigError CFG_ROLE_INVALID
 ```
 
-### Proposed, to design **[D]**
+### The maintainer-designed API **[D]**
+
+Decided on 2026-11-22 (see Decisions). Tests come first and wait for the maintainer's review, then the code.
 
 ```ts
+// One shape for everything core must validate but does not own. A Zod schema fits it, and so does a hand-written object.
+interface Parser<T> { parse(input: unknown): T }        // throws on bad input; an error with `issues: { path, message }[]` is reported per issue
+const DIALECTS: readonly ['postgres', 'mysql', 'sqlite']; type Dialect = (typeof DIALECTS)[number]
+
 // defineModule: the only public entry of a module (MOD-01, MOD-02, section 10.3)
-interface ModuleContributions {} // other packages add: entities, routes, jobs, schedules, workflows, events, admin
-interface ModuleInput extends ModuleContributions {
-  readonly name: string;
-  readonly services?: ServiceDefs;
-}
-function defineModule(input: ModuleInput): ModuleDef;
+interface ModuleContributions {}                         // other packages add: entities, routes, jobs, schedules, workflows, events, admin
+type ServiceDefs = { readonly [N in ServiceName]?: Registration<N> }
+interface ModuleInput extends ModuleContributions { readonly name: string; readonly services?: ServiceDefs }
+interface ModuleDef { readonly kind: 'module'; readonly name: string; readonly services: ServiceDefs; readonly contributions: Readonly<Record<string, unknown>> }
+function defineModule(input: ModuleInput): ModuleDef     // frozen; the name is the event and permission prefix (lower case, digits, dashes)
+function registerModule(container: Container, def: ModuleDef): void   // registers its services
 
 // definePlugin: a module packaged for reuse, with the manifest fields of section 11.1
-interface PluginInput extends ModuleInput {
-  readonly version: string;
-  readonly core: string;
-  readonly dialects: readonly Dialect[];
-  readonly requires?: Readonly<Record<string, string>>;
-  readonly conflicts?: readonly string[];
-  readonly env?: EnvSchema<unknown>;
-  readonly permissions?: readonly string[];
-  readonly seed?: SeedFn;
+interface PluginInput<O = undefined> extends ModuleContributions {
+  readonly name: string                                  // npm name; the module name is its short name (`@bieberkit/plugin-seo` gives `seo`)
+  readonly version: string; readonly core: string; readonly dialects: readonly Dialect[]
+  readonly requires?: Readonly<Record<string, string>>; readonly conflicts?: readonly string[]
+  readonly env?: Readonly<Record<string, EnvKeyBuilder<unknown>>>   // as in the spec example; keys start with SEO_
+  readonly permissions?: readonly string[]               // start with `seo.`
+  readonly options?: Parser<O>                           // validates the options given in bieberkit.config.ts
+  readonly services?: ServiceDefs; readonly seed?: SeedFn
 }
-function definePlugin(input: PluginInput): PluginDef; // PluginDef carries its ModuleDef
-function toManifest(def: PluginDef): Manifest; // ADR 0011, for the package.json field
-function checkManifest(pkg: PackageJsonLike, def: PluginDef): ManifestCheck;
+interface PluginDef<O = undefined> { readonly kind: 'plugin'; readonly name: string; readonly shortName: string; readonly version: string; /* ...input fields... */ readonly module: ModuleDef; readonly envSchema: EnvSchema<Record<string, unknown>> }
+function definePlugin<O = undefined>(input: PluginInput<O>): PluginDef<O>   // throws PluginError for a bad range, version, prefix or dialect, so authors see it at build
+function parsePluginOptions<O>(def: PluginDef<O>, options: unknown, path?: string): O
 
-// defineConfig: bieberkit.config.ts (CFG-08, CFG-09, section 8.3)
-interface ConfigSections {} // other packages add: admin, site, theme
-interface ProjectConfigInput extends ConfigSections {
-  name: string;
-  author: string;
-  license: string;
-  database: { dialect: Dialect };
-  tenancy: { mode: 'single' | 'shared-schema' };
-  locales: { default: string; supported: readonly string[] };
-  plugins: readonly (string | readonly [string, Record<string, unknown>])[];
-}
-function defineConfig(input: ProjectConfigInput): ProjectConfig;
-function validateConfig(input: unknown): ProjectConfig; // same error format as env validation
+// manifest: the static `bieberkit` field of package.json (ADR 0011, PLG-07)
+interface Manifest { core: string; dialects: Dialect[]; requires: Record<string, string>; conflicts: string[]; env: string[]; tables: string[]; routes: string[]; permissions: string[]; admin: string[] }
+interface KeyCollector { readonly field: 'tables' | 'routes' | 'admin'; collect(contributions: Readonly<Record<string, unknown>>): readonly string[] }   // each package that adds contributions supplies one
+function toManifest(def: PluginDef, collectors?: readonly KeyCollector[]): Manifest         // sorted lists, so output is canonical
+function checkManifest(pkg: { name: string; version: string; bieberkit?: unknown }, def: PluginDef, collectors?: readonly KeyCollector[]): { ok: true } | { ok: false; code: 'PLG_MANIFEST_NAME' | 'PLG_MANIFEST_VERSION' | 'PLG_MANIFEST_MISSING' | 'PLG_MANIFEST_STALE'; message: string }
 
 // resolver: one pure function for the scaffolder, `bieberkit add` and the kernel (section 11.2, ADR 0011)
-function resolvePlugins(
-  installed: readonly Installed[],
-  ctx: { core: string; dialect: Dialect },
-): { order: readonly string[] };
+interface Installed { readonly name: string; readonly version: string; readonly manifest: Manifest }
+function resolvePlugins(installed: readonly Installed[], context: { core: string; dialect: Dialect }): { readonly order: readonly string[] }   // throws PluginError, all problems together
+class PluginError extends BkError { readonly problems: readonly { code: string; message: string }[] }   // code = code of the first problem
+function satisfies(version: string, range: string): boolean      // exact, ^, ~, >=, * (PLG-08); throws PluginError PLG_BAD_RANGE or PLG_BAD_VERSION
+
+// defineConfig: bieberkit.config.ts (CFG-08, CFG-09, section 8.3)
+interface ConfigSections {}                               // other packages add: admin, site, theme
+interface ProjectConfigInput extends ConfigSections {
+  name: string; author: string; license: string
+  database: { dialect: Dialect }; tenancy: { mode: 'single' | 'shared-schema' }
+  locales: { default: string; supported: readonly string[] }
+  plugins: readonly (string | readonly [string, Record<string, unknown>])[]
+}
+interface ConfigSection<K extends keyof ConfigSections> { readonly key: K; readonly parser: Parser<ConfigSections[K]> }
+function defineConfigSection<K extends keyof ConfigSections>(key: K, parser: Parser<ConfigSections[K]>): ConfigSection<K>
+function defineConfig(input: ProjectConfigInput): ProjectConfigInput      // typing helper only, returns its argument
+function validateConfig(input: unknown, options?: { sections?: readonly ConfigSection<keyof ConfigSections>[] }): ProjectConfigInput   // throws ConfigValidationError
+class ConfigValidationError extends ConfigError { readonly problems: readonly ConfigProblem[] }   // same shape as EnvValidationError, with `key` holding the dotted path
 ```
 
 ## Behavior
@@ -213,10 +224,21 @@ All tests sit next to the code as `*.test.ts` and run on Node.js 24.12 and 26. N
 
 The proposed `[D]` parts get their tests written and shown to you first: `defineModule`, `definePlugin`, `toManifest`, `defineConfig`, `validateConfig` and `resolvePlugins` (the 12 error cases and the order of ADR 0011).
 
-## Open questions
+## Decisions
 
-1. **Contributions of a module.** Core cannot know entities, routes or jobs. The proposal is `ModuleContributions`, an interface the upper packages extend by declaration merging, so `defineModule({ entities: [...] })` is typed only when `@bieberkit/data` is installed. The alternative is `contributions: Record<string, unknown[]>`, which is simpler and untyped. Which one?
-2. **Project config sections.** `admin`, `site` and `theme` belong to other packages. Same question: `ConfigSections` by merging, with each package registering its validator, or an opaque record.
-3. **Plugin options.** `['@bieberkit/plugin-seo', { sitemap: true }]` passes options to a plugin. Should a plugin declare an options schema in `definePlugin`, validated by the same code as the env?
-4. **Event delivery.** Handlers run one after another in registration order. Should independent handlers run concurrently? Order is easier to reason about, concurrency is faster.
-5. **Where the request scope lives.** The container creates scopes. The HTTP layer decides when. Should `requestContext` and the container scope be one object?
+Taken on 2026-11-22 on the open questions of the first draft, with reasons.
+
+1. **Contributions of a module: typed, by declaration merging.** `ModuleContributions` is an interface that upper packages extend, the same way as `ServiceRegistry`, `EventRegistry` and `EntityRegistry` (ADR 0009). One mechanism for every extension point (P1). An untyped record would lose the checking that is the point of the framework. Core keeps unknown keys without reading them. The kernel refuses, at boot, a contribution key that no installed package handles (a later slice).
+2. **Config sections: typed by merging, validated by parsers passed in.** `ConfigSections` is extended by `admin`, `site` and `theme` packages. Each supplies a `ConfigSection` (a key and a `Parser`), and the caller of `validateConfig` passes the list. There is no global registry filled by imports, so core stays free of import side effects and tests need no cleanup. An unknown top-level key is an error, which catches a misspelled key or a package that is not installed.
+3. **Plugin options: yes, as a `Parser`.** A plugin declares `options` and `parsePluginOptions` validates the entry from `bieberkit.config.ts`, with the same error format as the env. Core has no validation library (PKG-04), so the contract is the structural `Parser<T>`, which a Zod schema satisfies. A plugin without `options` that is given options is an error, not silently ignored.
+4. **Event delivery: sequential, in registration order.** This is what the code does. It makes ordering and error reports predictable, and handlers that need to be fast or must survive a crash go through the outbox (MOD-03). Concurrency can come later behind an explicit option, with an ADR.
+5. **Request scope and request context stay two objects.** The container scope carries services and the context carries ids. A job or a test can have one without the other, and the container then needs no `AsyncLocalStorage`. `@bieberkit/http` and the worker start both in one place. A helper that does so (`runInRequest`) is added when the first caller needs it, not before.
+
+Other calls made while writing the tests, marked for review:
+
+- **Plugin names.** The short name drops the scope and a leading `bieberkit-plugin-` or `plugin-`, so `@bieberkit/plugin-seo`, `bieberkit-plugin-seo` and `@acme/plugin-seo` all give `seo`. Two of them installed together collide on env keys and permissions (`PLG_COLLISION_*`), as ADR 0011 says.
+- **Plugin `env`** takes a map of key builders, as in the spec example, and the plugin gets its own `EnvSchema` from it.
+- **`tables`, `routes` and `admin` in the manifest** cannot be computed by core, because it does not know entities or routes. Each package that adds those contributions supplies a `KeyCollector`. This keeps one source of truth, so a manifest cannot drift from the code.
+- **`PLG_MANIFEST_NAME`** is added to the three manifest codes of ADR 0011. It was in the spike and needs a line in section 11.2.
+- **`defineConfig` validates nothing.** It is a typing helper, like Vite's. Validation needs the sections, so it happens in `validateConfig` at build and at boot (CFG-09).
+- **New codes:** `MOD_NAME_INVALID`, `CFG_CONFIG_INVALID`, `CFG_CONFIG_UNKNOWN`, `CFG_CONFIG_SECRET`, `PLG_BAD_VERSION`, `PLG_BAD_RANGE`, `PLG_MANIFEST_NAME`.
