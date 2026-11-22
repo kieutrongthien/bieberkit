@@ -78,3 +78,6 @@ export function okRoute(url = '/api/v1/test/ok', extra: Partial<RouteDef> = {}):
     ...extra,
   };
 }
+
+export const TENANT = '0190f6b2-7c4e-7000-8000-0000000000a1';
+export const OTHER_TENANT = '0190f6b2-7c4e-7000-8000-0000000000a2';

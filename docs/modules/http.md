@@ -219,3 +219,69 @@ Reads `APP_ENV`, `APP_PORT` and `TRUST_PROXY` through `CoreEnv`. It reads no env
 ## Open questions
 
 None for slice 1.
+
+## Slice 2: entity routes
+
+Designed on 2026-11-23. None of it is maintainer-designed (§13.1, §10.2, API-08, API-13 and DATA-06 to DATA-11 decide it). Slice 1 was merged into `main` before it started.
+
+### Public API
+
+```ts
+registerEntityRoutes(server: HttpServer, schemas: readonly OrmSchema[], options: { db: Database }): void
+entityRoutes(schema: OrmSchema, context: EntityRoutesContext): RouteDef[]     // the routes of one entity, for tests and for the OpenAPI document
+// RouteContext gains: headers (the request headers), header(name, value) (a header of the answer)
+// RouteSchema gains nothing. A route that answers 204 declares { 204: { type: 'null' } }.
+// @bieberkit/data/orm gains: ListOptions.offset, entityEventName(entity, verb)
+```
+
+`schemas` are the compiled schemas of the project (`compileEntities`). A relation is included only when the schema of its target is in the list.
+
+### The routes
+
+An entity gets the routes that its `api` options turn on. `<module>` is the part of the name before the dot, and `<resource>` is the table without the `<module>_` prefix, with hyphens: `crm.Customer` on `crm_customers` is `/api/v1/crm/customers`.
+
+| Option   | Route                    | Permission | Answer                                      |
+| -------- | ------------------------ | ---------- | ------------------------------------------- |
+| `list`   | `GET /<resource>`        | read       | 200 `{ data: [row], meta }`                 |
+| `get`    | `GET /<resource>/:id`    | read       | 200 `{ data: row }`, `ETag: W/"<version>"`  |
+| `create` | `POST /<resource>`       | create     | 201 `{ data: row }`, `Location`             |
+| `update` | `PATCH /<resource>/:id`  | update     | 200 `{ data: row }`. `If-Match` is required |
+| `delete` | `DELETE /<resource>/:id` | delete     | 204. `If-Match` is required                 |
+
+The permission is `permissions.<action>` of the entity, and when it is missing `<module>.<entity in snake case>.<action>`, such as `crm.customer.read`. List and get share `read`. An `api` without options has no routes.
+
+### Rules
+
+- **Writes use the data layer and write like §7.5.** A create, update or delete runs in `runInUnitOfWork`. The service loads the row, checks `If-Match` with `expectVersion`, changes it with `toOrmData`, adds an outbox event (`crm.customer.created`, `.updated`, `.deleted`) and an audit entry (`crm.Customer.create`, `.update`, `.delete`), and flushes once. So the data, the event and the audit entry are one transaction, and a stale row fails the flush as 412 (API-13).
+- **`If-Match` is required on update and delete.** A request without it is 428 `HTTP_PRECONDITION_REQUIRED`. A value that is not a version is 400. A stale version is 412 `DATA_VERSION_STALE` with the current row in the problem as `current`, so the client can show the conflict (API-13).
+- **A delete is a soft delete when the entity has `softDelete`**, and a removal of the row otherwise.
+- **The body is normalized to NFC before it is validated**, for every route, so lengths and uniqueness count composed text (SCH-05). The create and update schemas of the entity are the body schemas, and an unknown field is refused (SEC-04).
+- **Lists (§13.1).** Query parameters: `pageSize` (25, at most 100), `page` or `cursor`, `sort=-createdAt,name`, `filter[field][op]=value`, `include=owner`, `fields=code,name`, `locale=vi`, `withTotal=true`. Any other parameter is a validation error. `page` is an offset (`page` times `pageSize` is at most 10 000, and a deeper page is 400 `HTTP_PAGE_TOO_DEEP` that says to use a cursor), and `cursor` is the keyset of DATA-06. Both together are refused. The answer is `{ data, meta: { pageSize, page?, nextCursor, total? } }`.
+- **Filters and sorts are only on indexed fields** (DATA-07): the data layer decides and answers `DATA_FIELD_NOT_INDEXED`. Operators are `eq`, `ne`, `in` (comma separated), `lt`, `lte`, `gt`, `gte` and `null` (`true` or `false`). A value is read as the type of the field: a number for `int`, `true` or `false` for `boolean`, and text otherwise. A field of a kind that cannot be filtered (money, decimal) is a validation error. A relation is filtered by `ownerId`.
+- **`fields` and `include`.** `fields` lists the keys of the answer besides `id` and `version`, which are always there. A key that is not in the read shape is 400 `HTTP_FIELDS_INVALID`. `include` names to-one relations. Each is loaded with one extra query for the whole page, and the answer has the related row under the relation name (`owner`), as its own read shape without its relations. The row shape in a response schema has no `required` list, so a row with fewer fields is valid, and the schema still names every field that may leave the server (API-01).
+- **One query per relation, never per row (PERF-04).** The list route reads through `listPage`, which uses `select-in`. A test counts the queries for 5 rows and for 30 and they are equal.
+- **ETag (API-08), stage 11.** A `GET` that answers 200 and has no ETag gets a weak one made from the body, and `If-None-Match` that matches answers 304 with no body. The get route sets `W/"<version>"` itself, which is what a client sends back as `If-Match`. Every GET has `Cache-Control: private, no-cache` unless the route set one (public caching is slice 3).
+- **Tenants, soft delete and field masks are the data layer's and the ability's.** The routes add nothing: a row of another tenant is a 404, and field masks arrive with CASL in M1.4.
+
+### Errors of slice 2
+
+| Code                         | Status | Fix                                                            |
+| ---------------------------- | ------ | -------------------------------------------------------------- |
+| `HTTP_PRECONDITION_REQUIRED` | 428    | Send `If-Match` with the version that you read                 |
+| `HTTP_PAGE_TOO_DEEP`         | 400    | Use `cursor` to go deeper than 10 000 rows                     |
+| `HTTP_FIELDS_INVALID`        | 400    | `fields` and `include` name fields and relations of the entity |
+
+### Found while implementing slice 2
+
+- **`page` needed an offset in the data layer.** The keyset of DATA-06 has no page numbers, so `listPage` has an `offset` (not with a cursor, at most 1 000 000, and the route stops at 10 000 rows). `nextCursor` is left out of a page that was asked for by number.
+- **A filter for `null` failed on a compared field.** `email` is folded, and a `null` has no folded text. The query now keeps `null` as `null`, so `filter[email][null]=true` finds the rows with no e-mail.
+- **A database refusal is a client error.** A second row with a used unique value raised the exception of the driver, which was a 500. The problem mapping reads the name of the exception and answers 409 `HTTP_CONFLICT` for a unique or foreign key violation, without the HTTP package importing the ORM.
+- **The row of a write is built from the entity.** After the flush the entity has its `id`, `version`, sequence number and `createdBy`, so the answer does not read the row again, and it cannot read an old copy from a replica.
+- **A text of `filter[...]` is a key, not a nested object.** Fastify's query parser does not nest, so the list schema has a `patternProperties` for the keys and the handler reads them.
+- **`expectVersion` takes any object.** It read `row.version`, which a loaded entity of a schema does not declare.
+
+### Left out
+
+- **`q=` text search** waits for the search contract (§15.7). The parameter is refused until then.
+- **Field masks and permission conditions** are M1.4. The routes ask for the permission only.
+- **`hasMany` and `hasOne`** are not in the row shape yet, so `include` takes `belongsTo` relations only.

@@ -425,3 +425,36 @@ describe('DATA-07 the same rule without a database', () => {
     ).toEqual(['code', 'name', 'email', 'tier', 'number']);
   });
 });
+
+describeDialects('DATA-06 offset pages', ({ open }) => {
+  it('DATA-06 takes the page that starts after `offset` rows, in the same total order', async () => {
+    const { db, schemas } = await setup(open, 30);
+    const second = await inTenant(db, TENANT_A, (em) =>
+      listPage(em, schemas.Customer, { limit: 10, offset: 10, sort: [{ field: 'code' }] }),
+    );
+    expect(second.rows.map((row) => row['code'])).toEqual(Array.from({ length: 10 }, (_, n) => code(10 + n)));
+    expect(second.nextCursor).toBeTypeOf('string');
+    const last = await inTenant(db, TENANT_A, (em) =>
+      listPage(em, schemas.Customer, { limit: 10, offset: 20, sort: [{ field: 'code' }] }),
+    );
+    expect(last.rows).toHaveLength(10);
+    expect(last.nextCursor).toBeNull();
+    const beyond = await inTenant(db, TENANT_A, (em) => listPage(em, schemas.Customer, { limit: 10, offset: 40 }));
+    expect(beyond.rows).toEqual([]);
+  });
+
+  it('DATA-06 an offset that is not a whole number, or that goes with a cursor, is refused', async () => {
+    const { db, schemas } = await setup(open, 5);
+    for (const offset of [-1, 1.5, Number.NaN, 1_000_001]) {
+      const error = await failureOf(() => inTenant(db, TENANT_A, (em) => listPage(em, schemas.Customer, { offset })));
+      expect(error.code).toBe('DATA_PAGE_LIMIT');
+    }
+    const first = await inTenant(db, TENANT_A, (em) => listPage(em, schemas.Customer, { limit: 2 }));
+    const error = await failureOf(() =>
+      inTenant(db, TENANT_A, (em) =>
+        listPage(em, schemas.Customer, { limit: 2, offset: 2, cursor: first.nextCursor ?? '' }),
+      ),
+    );
+    expect(error.code).toBe('DATA_QUERY_INVALID');
+  });
+});
