@@ -19,6 +19,16 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
+    "./nodemailer": {
+      "@bieberkit/source": "./src/adapters/nodemailer/index.ts",
+      "types": "./dist/nodemailer.d.ts",
+      "default": "./dist/nodemailer.js"
+    },
+    "./testing": {
+      "@bieberkit/source": "./src/testing/index.ts",
+      "types": "./dist/testing.d.ts",
+      "default": "./dist/testing.js"
+    },
     "./package.json": "./package.json"
   },
   "publishConfig": {
@@ -26,6 +36,14 @@
       ".": {
         "types": "./dist/index.d.ts",
         "default": "./dist/index.js"
+      },
+      "./nodemailer": {
+        "types": "./dist/nodemailer.d.ts",
+        "default": "./dist/nodemailer.js"
+      },
+      "./testing": {
+        "types": "./dist/testing.d.ts",
+        "default": "./dist/testing.js"
       },
       "./package.json": "./package.json"
     },
@@ -36,7 +54,13 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
-    "@bieberkit/core": "workspace:*"
+    "@bieberkit/core": "workspace:*",
+    "@bieberkit/queue": "workspace:*",
+    "nodemailer": "10.6.0",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@types/nodemailer": "8.0.2"
   },
   "engines": {
     "node": ">=24.12"

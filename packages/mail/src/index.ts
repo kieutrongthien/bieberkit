@@ -2,7 +2,7 @@
  * BieberKit
  *
  * @file        packages/mail/src/index.ts
- * @description Public entry point of @bieberkit/mail.
+ * @description Public API of @bieberkit/mail: the mailer, the messages, the log and memory transports and the errors.
  * @author      Bieber Kieu <kieutrongthien@gmail.com>
  * @copyright   Copyright (c) 2026 Bieber Kieu
  * @license     Apache-2.0
@@ -22,7 +22,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-// Public API of @bieberkit/mail. Implementation starts after the Phase 0 ADRs (docs/adr/README.md).
-
-/** npm name of this package. */
-export const packageName = '@bieberkit/mail';
+export { MailError, MAX_RECIPIENTS, parseSender, prepareMessage } from './contract.ts';
+export type { Address, Mailbox, MailReceipt, MailTransport, Message, PreparedMessage } from './contract.ts';
+export { createMailer, MAIL_JOB } from './mailer.ts';
+export type { Mail, Mailer, MailerOptions } from './mailer.ts';
+export { createLogTransport, createMemoryTransport } from './transports.ts';
+export type { LogTransportOptions, MemoryTransport } from './transports.ts';
