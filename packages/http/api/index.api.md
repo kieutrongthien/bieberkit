@@ -28,7 +28,7 @@
 Generated from the built declaration files by `pnpm api:update`. Do not edit by hand. A change here is a change to the public API and needs a changeset (spec section 22.3).
 
 ```ts
-import { BkError, Lifecycle, Logger } from "@bieberkit/core";
+import { BkError, ErrorReporter, Lifecycle, Logger } from "@bieberkit/core";
 import { Database, OrmSchema } from "@bieberkit/data/orm";
 import { EntityDef, JsonSchema } from "@bieberkit/data/schema";
 import { ValidationIssue } from "@bieberkit/data/build";
@@ -153,12 +153,6 @@ interface HttpEnv {
   readonly TRUST_PROXY: boolean | number;
   readonly API_DOCS_PUBLIC: boolean;
 }
-interface ErrorContext {
-  readonly method: string;
-  readonly path: string;
-  readonly requestId: string;
-  readonly traceId: string;
-}
 export declare const STAGE_NAMES: readonly ["afterAuth", "beforeHandler", "afterHandler", "onResponse"];
 type StageName = (typeof STAGE_NAMES)[number];
 interface StageContext {
@@ -192,7 +186,7 @@ interface HttpServerOptions {
   readonly cors?: CorsOptions;
   readonly csrf?: CsrfProtection;
   readonly idempotencyStore?: IdempotencyStore;
-  readonly onError?: (error: unknown, context: ErrorContext) => void;
+  readonly errorReporter?: ErrorReporter;
 }
 interface InjectOptions {
   readonly method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "HEAD" | "OPTIONS";
@@ -323,5 +317,5 @@ interface Problem {
   readonly [extension: string]: unknown;
 }
 export declare const packageName = "@bieberkit/http";
-export type { AccessAnswer, Authenticator, Authorizer, CorsOptions, CsrfProtection, EntityRoutesContext, ErrorContext, HttpEnv, HttpFetch, HttpFetchInit, HttpFetchOptions, HttpServer, HttpServerOptions, IdempotencyBegin, IdempotencyStore, InjectOptions, InjectResponse, MemoryIdempotencyOptions, Method, MountDef, OpenApiDocument, OpenApiInfo, Principal, Problem, RateLimitResult, RateLimiter, RegisterHttpOptions, RequestInfo, ResolvedAddress, RouteContext, RouteDef, RouteSchema, StageContext, StageHook, StageName, StoredResponse, TenantResolver };
+export type { AccessAnswer, Authenticator, Authorizer, CorsOptions, CsrfProtection, EntityRoutesContext, HttpEnv, HttpFetch, HttpFetchInit, HttpFetchOptions, HttpServer, HttpServerOptions, IdempotencyBegin, IdempotencyStore, InjectOptions, InjectResponse, MemoryIdempotencyOptions, Method, MountDef, OpenApiDocument, OpenApiInfo, Principal, Problem, RateLimitResult, RateLimiter, RegisterHttpOptions, RequestInfo, ResolvedAddress, RouteContext, RouteDef, RouteSchema, StageContext, StageHook, StageName, StoredResponse, TenantResolver };
 ```

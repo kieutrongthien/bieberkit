@@ -233,7 +233,7 @@ Depends on: M1.2. Can run in parallel with M1.4 (no shared files).
 - [x] Separate cache instance through `CACHE_REDIS_URL` (Q-08). `createCacheFromConfig` reads it, and `checkEvictionPolicy` is what `bieberkit doctor` will call
 - [x] Storage contract on FlyDrive: local and S3-compatible, signed upload URLs, private by default, content sniffing (S-01 to S-04). The `local` disk has no signed URLs: there the API receives the file and calls `put`. Libraries are in ADR 0017 (Proposed)
 - [ ] Mail contract with `log` and `smtp`, sent through the queue (M-01)
-- [ ] Error-reporter contract with an optional Sentry-compatible driver (OBS-06)
+- [x] Error-reporter contract with an optional Sentry-compatible driver (OBS-06). The port is in `@bieberkit/core` with a driver for Sentry, GlitchTip and Bugsink that has no SDK, and it is wired into `@bieberkit/http` (5xx), `@bieberkit/queue` (a job that failed for good) and the process handlers
 - [ ] Contract test suite run against every driver; each driver imported only in `src/adapters/<driver>/` (PKG-03, `check:layers`). Includes the nine queue contract tests of ADR 0010 (Q-11)
 
 Done when: each contract passes its shared driver tests, and switching `QUEUE_DRIVER` or `CACHE_DRIVER` changes no application code.

@@ -451,6 +451,8 @@ All runtime configuration comes from environment variables, validated once at bo
 | `MAIL_DRIVER` | `log`, `smtp` | `log` |  |
 | `SMTP_URL` | URL | empty | Secret |
 | `MAIL_FROM` | address | empty |  |
+| `ERROR_REPORTER_DSN` | URL | empty | Secret. A Sentry, GlitchTip or Bugsink project. Errors are not sent when empty (OBS-06) |
+| `ERROR_REPORTER_SAMPLE_PERCENT` | integer 0 to 100 | `100` | Fatal reports are always sent |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | URL | empty | Tracing is off when empty |
 | `METRICS_PORT` | integer | `9464` | Prometheus endpoint on a separate port |
 | APP\_KEY\_PREVIOUS | base64 | empty | Secret. Previous key, still accepted for decryption during rotation |
@@ -1348,7 +1350,7 @@ Every process writes JSON logs to stdout, exports OpenTelemetry traces when an e
 - **OBS-03** Metrics: HTTP duration histogram by route and status, event loop lag, heap usage, database pool usage, queue depth and job duration by queue, cache hit ratio.
 - **OBS-04** The metrics port is never exposed through the public load balancer.
 - **OBS-05** The audit log is a database table separate from application logs, append-only for the application role, and viewable in the admin UI.
-- **OBS-06** Unhandled errors are reported with the request or job context through an error-reporter contract. A Sentry-compatible driver is optional.
+- **OBS-06** Unhandled errors are reported with the request or job context through an error-reporter contract. A Sentry-compatible driver is optional. The reporter never throws and never waits, reports carry ids and the place of the error and never a body, a header or a query string, and a Sentry-compatible server is reached through `ERROR_REPORTER_DSN` with no SDK.
 
 ## 21. Testing strategy
 

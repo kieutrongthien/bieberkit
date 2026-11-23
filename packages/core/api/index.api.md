@@ -177,6 +177,8 @@ interface CoreEnvValues {
   MAIL_DRIVER: "log" | "smtp";
   SMTP_URL: string | undefined;
   MAIL_FROM: string | undefined;
+  ERROR_REPORTER_DSN: string | undefined;
+  ERROR_REPORTER_SAMPLE_PERCENT: number;
   OTEL_EXPORTER_OTLP_ENDPOINT: string | undefined;
   METRICS_PORT: number;
   API_DOCS_PUBLIC: boolean;
@@ -227,6 +229,93 @@ interface LoggerOptions {
   readonly now?: () => Date;
 }
 export declare function createLogger(options: LoggerOptions): Logger;
+type ReportSource = "http" | "job" | "process" | "client";
+type ReportLevel = "warning" | "error" | "fatal";
+interface ErrorReportContext {
+  readonly source: ReportSource;
+  readonly level?: ReportLevel;
+  readonly requestId?: string;
+  readonly traceId?: string;
+  readonly spanId?: string;
+  readonly tenantId?: string;
+  readonly userId?: string;
+  readonly http?: {
+    readonly method: string;
+    readonly path: string;
+    readonly status?: number;
+  };
+  readonly job?: {
+    readonly name: string;
+    readonly id: string;
+    readonly queue: string;
+    readonly attempt: number;
+  };
+  readonly tags?: Readonly<Record<string, string>>;
+}
+interface ErrorReporter {
+  report(error: unknown, context: ErrorReportContext): void;
+  flush(timeoutMs?: number): Promise<boolean>;
+}
+export declare function createNoopReporter(): ErrorReporter;
+interface MemoryReporter extends ErrorReporter {
+  readonly reports: readonly {
+    readonly error: unknown;
+    readonly context: ErrorReportContext;
+  }[];
+}
+export declare function createMemoryReporter(): MemoryReporter;
+export declare function createCompositeReporter(reporters: readonly ErrorReporter[]): ErrorReporter;
+export declare function reportError(reporter: ErrorReporter, error: unknown, context: ErrorReportContext): void;
+interface ReporterConfig {
+  readonly APP_ENV: string;
+  readonly ERROR_REPORTER_DSN: string | undefined;
+  readonly ERROR_REPORTER_SAMPLE_PERCENT: number;
+}
+interface ReporterFromConfigOptions {
+  readonly logger: Logger;
+  readonly release?: string;
+  readonly secrets?: readonly string[];
+}
+export declare function createErrorReporterFromConfig(config: ReporterConfig, options: ReporterFromConfigOptions): ErrorReporter;
+interface ProcessLike {
+  on(event: "uncaughtException" | "unhandledRejection", listener: (reason: unknown) => void): unknown;
+  off(event: "uncaughtException" | "unhandledRejection", listener: (reason: unknown) => void): unknown;
+  exit(code: number): void;
+}
+interface ProcessHandlerOptions {
+  readonly reporter: ErrorReporter;
+  readonly logger: Logger;
+  readonly flushMs?: number;
+  readonly process?: ProcessLike;
+}
+export declare function installProcessHandlers(options: ProcessHandlerOptions): () => void;
+interface SentryReporterOptions {
+  readonly dsn: string;
+  readonly environment?: string;
+  readonly release?: string;
+  readonly sampleRate?: number;
+  readonly secrets?: readonly string[];
+  readonly maxPerMinute?: number;
+  readonly timeoutMs?: number;
+  readonly logger?: Logger;
+  readonly fetch?: typeof fetch;
+  readonly now?: () => number;
+  readonly random?: () => number;
+}
+interface ParsedDsn {
+  readonly publicKey: string;
+  readonly endpoint: string;
+}
+export declare function parseDsn(dsn: string): ParsedDsn;
+interface Frame {
+  readonly filename: string;
+  readonly function?: string;
+  readonly lineno?: number;
+  readonly colno?: number;
+  readonly in_app: boolean;
+}
+export declare function framesOf(stack: string | undefined): Frame[];
+export declare function createSentryReporter(options: SentryReporterOptions): ErrorReporter;
 interface RequestContext {
   requestId: string;
   traceId?: string;
@@ -446,5 +535,5 @@ export declare function defineConfig(input: ProjectConfigInput): ProjectConfigIn
 export declare function defineConfigSection<K extends keyof ConfigSections>(key: K, parser: Parser<ConfigSections[K]>): ConfigSection<K>;
 export declare function validateConfig(input: unknown, options?: ValidateConfigOptions): ProjectConfigInput;
 export declare const packageName = "@bieberkit/core";
-export type { AppEnv, BkErrorOptions, ConfigProblem, ConfigSection, ConfigSections, Container, CoreEnv, CoreEnvResult, CoreEnvValues, Dialect, EmitResult, EnvCustomParse, EnvDescription, EnvKeyBuilder, EnvKeyDef, EnvKind, EnvOwner, EnvProblem, EnvSchema, EnvSource, EnvValues, ErrorBody, EventBus, EventBusOptions, EventHandler, EventName, EventRegistry, HandlerFailure, Hook, HookFailure, Installed, IntOptions, KeyCollector, Lifecycle, LifecycleOptions, LoadEnvOptions, LogFields, LogLevel, Logger, LoggerOptions, Manifest, ManifestCheck, ModuleContributions, ModuleDef, ModuleEmitter, ModuleInput, OnOptions, Parser, Phase, PluginDef, PluginEntry, PluginInput, PluginProblem, ProjectConfigInput, ReadCoreEnvOptions, Registration, RequestContext, RequestScope, Resolution, ResolveContext, Role, SeedFn, ServiceDefs, ServiceName, ServiceRegistry, ServiceScope, StopResult, ValidateConfigOptions };
+export type { AppEnv, BkErrorOptions, ConfigProblem, ConfigSection, ConfigSections, Container, CoreEnv, CoreEnvResult, CoreEnvValues, Dialect, EmitResult, EnvCustomParse, EnvDescription, EnvKeyBuilder, EnvKeyDef, EnvKind, EnvOwner, EnvProblem, EnvSchema, EnvSource, EnvValues, ErrorBody, ErrorReportContext, ErrorReporter, EventBus, EventBusOptions, EventHandler, EventName, EventRegistry, HandlerFailure, Hook, HookFailure, Installed, IntOptions, KeyCollector, Lifecycle, LifecycleOptions, LoadEnvOptions, LogFields, LogLevel, Logger, LoggerOptions, Manifest, ManifestCheck, MemoryReporter, ModuleContributions, ModuleDef, ModuleEmitter, ModuleInput, OnOptions, ParsedDsn, Parser, Phase, PluginDef, PluginEntry, PluginInput, PluginProblem, ProcessHandlerOptions, ProcessLike, ProjectConfigInput, ReadCoreEnvOptions, Registration, ReportLevel, ReportSource, ReporterConfig, ReporterFromConfigOptions, RequestContext, RequestScope, Resolution, ResolveContext, Role, SeedFn, SentryReporterOptions, ServiceDefs, ServiceName, ServiceRegistry, ServiceScope, StopResult, ValidateConfigOptions };
 ```
