@@ -22,7 +22,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { BkError } from '@bieberkit/core';
+import { BkError, createMemoryReporter } from '@bieberkit/core';
 import { dataError } from '@bieberkit/data';
 import { describe, expect, it } from 'vitest';
 import { okRoute, testServer, TEST_ENV } from './testing.ts';
@@ -74,32 +74,53 @@ describe('MOD-17 errors become problems', () => {
   });
 
   it('MOD-17 any other error is a 500 that says nothing about its cause, and is reported', async () => {
-    const reported: unknown[] = [];
-    const { server, logger } = testServer({ onError: (error) => void reported.push(error) });
+    const reporter = createMemoryReporter();
+    const { server, logger } = testServer({ errorReporter: reporter });
     const failure = new Error(SECRET);
     server.route(throwing('/api/v1/t/c', failure));
     const response = await server.inject({ method: 'GET', url: '/api/v1/t/c' });
     expect(response.statusCode).toBe(500);
     expect(problemOf(response.body)).toMatchObject({ code: 'HTTP_INTERNAL', detail: 'Something went wrong.' });
     expect(response.body).not.toContain('hunter2');
-    expect(reported).toEqual([failure]);
+    expect(reporter.reports).toHaveLength(1);
+    expect(reporter.reports[0]?.error).toBe(failure);
+    expect(reporter.reports[0]?.context).toMatchObject({
+      source: 'http',
+      http: { method: 'GET', path: '/api/v1/t/c', status: 500 },
+    });
+    expect(reporter.reports[0]?.context.requestId).toBeTruthy();
     expect(logger.lines.some((line) => line.level === 'error')).toBe(true);
   });
 
   it('MOD-17 a BkError with status 400 or 404 is not reported as a bug', async () => {
-    const reported: unknown[] = [];
-    const { server } = testServer({ onError: (error) => void reported.push(error) });
+    const reporter = createMemoryReporter();
+    const { server } = testServer({ errorReporter: reporter });
     server.route(throwing('/api/v1/t/d', new BkError('x', { code: 'X_NOT_FOUND', status: 404 })));
     await server.inject({ method: 'GET', url: '/api/v1/t/d' });
-    expect(reported).toEqual([]);
+    expect(reporter.reports).toEqual([]);
   });
 
   it('MOD-17 a BkError with status 500 is reported', async () => {
-    const reported: unknown[] = [];
-    const { server } = testServer({ onError: (error) => void reported.push(error) });
+    const reporter = createMemoryReporter();
+    const { server } = testServer({ errorReporter: reporter });
     server.route(throwing('/api/v1/t/e', new BkError('x', { code: 'X_BUG' })));
     await server.inject({ method: 'GET', url: '/api/v1/t/e' });
-    expect(reported).toHaveLength(1);
+    expect(reporter.reports).toHaveLength(1);
+  });
+
+  it('OBS-06 a reporter that throws does not change the answer of the request', async () => {
+    const { server } = testServer({
+      errorReporter: {
+        report: () => {
+          throw new Error('the reporter is broken');
+        },
+        flush: async () => false,
+      },
+    });
+    server.route(throwing('/api/v1/t/g', new Error('boom')));
+    const response = await server.inject({ method: 'GET', url: '/api/v1/t/g' });
+    expect(response.statusCode).toBe(500);
+    expect(problemOf(response.body)).toMatchObject({ code: 'HTTP_INTERNAL' });
   });
 
   it('MOD-17 the fix of an error is shown outside production only', async () => {

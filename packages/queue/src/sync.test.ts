@@ -24,8 +24,10 @@
 
 // These tests give inputs that the types forbid, on purpose.
 /* oxlint-disable typescript/no-unsafe-type-assertion */
+import { randomUUID } from 'node:crypto';
 import * as z from 'zod/mini';
 import { describe, expect, it } from 'vitest';
+import { createMemoryReporter, requestContext } from '@bieberkit/core';
 import { defineJob, QueueError } from './contract.ts';
 import { createQueue } from './queue.ts';
 import { queueContractSuite } from './testing/index.ts';
@@ -102,5 +104,74 @@ describe('Q-02 the sync driver', () => {
     await expect(createQueue({ driver: 'redis' as never, jobs: [] })).rejects.toMatchObject({
       code: 'QUEUE_DRIVER_UNSUPPORTED',
     });
+  });
+});
+
+describe('OBS-06 the sync driver reports a job that failed for good', () => {
+  const failing = defineJob({
+    name: 'sync.report',
+    queue: 'reports',
+    input: z.object({}),
+    attempts: 3,
+    backoffMs: () => 1,
+    handler: async () => {
+      throw new Error('the report job broke');
+    },
+  });
+
+  it('OBS-06 reports once, after the last delivery, with the job, the queue, the tenant and the user of the dispatcher', async () => {
+    const reporter = createMemoryReporter();
+    const queue = await createQueue({ driver: 'sync', jobs: [failing], errorReporter: reporter });
+    const tenantId = randomUUID();
+    const userId = randomUUID();
+    await requestContext.run({ requestId: 'req-1', tenantId, userId }, () =>
+      queue.dispatch(failing, {}, { jobId: 'report-1' }),
+    );
+    await queue.close();
+    expect(reporter.reports).toHaveLength(1);
+    expect(reporter.reports[0]?.error).toMatchObject({ message: 'the report job broke' });
+    expect(reporter.reports[0]?.context).toMatchObject({
+      source: 'job',
+      requestId: 'req-1',
+      tenantId,
+      userId,
+      job: { name: 'sync.report', id: 'report-1', queue: 'reports', attempt: 3 },
+    });
+  });
+
+  it('OBS-06 does not report a job that fails and then works, or one that works', async () => {
+    const reporter = createMemoryReporter();
+    let runs = 0;
+    const flaky = defineJob({
+      name: 'sync.flaky',
+      input: z.object({}),
+      attempts: 3,
+      backoffMs: () => 1,
+      handler: async () => {
+        runs += 1;
+        if (runs < 3) throw new Error('not yet');
+      },
+    });
+    const queue = await createQueue({ driver: 'sync', jobs: [flaky], errorReporter: reporter });
+    await queue.dispatch(flaky, {});
+    await queue.close();
+    expect(runs).toBe(3);
+    expect(reporter.reports).toEqual([]);
+  });
+
+  it('OBS-06 a reporter that throws does not stop the job from being dead and the queue from working', async () => {
+    const queue = await createQueue({
+      driver: 'sync',
+      jobs: [failing],
+      errorReporter: {
+        report: () => {
+          throw new Error('reporter down');
+        },
+        flush: async () => false,
+      },
+    });
+    await queue.dispatch(failing, {}, { jobId: 'report-2' });
+    expect((await queue.deadLetters()).jobs).toHaveLength(1);
+    await queue.close();
   });
 });

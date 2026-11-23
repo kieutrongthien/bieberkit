@@ -22,8 +22,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { randomUUID } from 'node:crypto';
 import * as z from 'zod/mini';
 import { expect, it } from 'vitest';
+import { createMemoryReporter, requestContext } from '@bieberkit/core';
 import { rawKysely } from '@bieberkit/data/orm';
 import { defineJob } from './contract.ts';
 import { createQueue } from './queue.ts';
@@ -197,5 +199,92 @@ describeDialects('Q-03 the worker', ({ open }) => {
     expect(String(row?.['locked_by'])).toMatch(/^w-/);
     expect(Number(row?.['locked_until'])).toBeGreaterThan(Date.now());
     await worker.stop();
+  });
+});
+
+describeDialects('OBS-06 the worker reports a job that failed for good', ({ open }) => {
+  it('OBS-06 reports a job that used its last attempt, once, with the context that it was dispatched with', async () => {
+    const db = await open([]);
+    const reporter = createMemoryReporter();
+    const job = defineJob({
+      name: 'w.report',
+      queue: 'critical',
+      input: empty,
+      attempts: 2,
+      backoffMs: () => 10,
+      handler: async () => {
+        throw new Error('broken for good');
+      },
+    });
+    const queue = await createQueue({ driver: 'database', jobs: [job], db, errorReporter: reporter });
+    const tenantId = randomUUID();
+    const userId = randomUUID();
+    await requestContext.run({ requestId: 'req-w', tenantId, userId }, () =>
+      queue.dispatch(job, {}, { jobId: 'rep-1' }),
+    );
+    const worker = queue.createWorker({ pollMs: 10 });
+    worker.start();
+    await waitFor(async () => (await queue.deadLetters()).jobs.length === 1);
+    await worker.stop();
+    expect(reporter.reports).toHaveLength(1);
+    expect(reporter.reports[0]?.error).toMatchObject({ message: 'broken for good' });
+    expect(reporter.reports[0]?.context).toMatchObject({
+      source: 'job',
+      requestId: 'req-w',
+      tenantId,
+      userId,
+      job: { name: 'w.report', id: 'rep-1', queue: 'critical', attempt: 2 },
+    });
+  });
+
+  it('OBS-06 does not report a job that works after a retry', async () => {
+    const db = await open([]);
+    const reporter = createMemoryReporter();
+    let runs = 0;
+    const job = defineJob({
+      name: 'w.retry-ok',
+      input: empty,
+      attempts: 3,
+      backoffMs: () => 10,
+      handler: async () => {
+        runs += 1;
+        if (runs === 1) throw new Error('once');
+      },
+    });
+    const queue = await createQueue({ driver: 'database', jobs: [job], db, errorReporter: reporter });
+    await queue.dispatch(job, {});
+    const worker = queue.createWorker({ pollMs: 10 });
+    worker.start();
+    await waitFor(() => runs === 2);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    await worker.stop();
+    expect(reporter.reports).toEqual([]);
+  });
+
+  it('OBS-06 reports a job whose lease ran out on every delivery', async () => {
+    const db = await open([]);
+    const reporter = createMemoryReporter();
+    const job = defineJob({
+      name: 'w.lost-report',
+      input: empty,
+      attempts: 1,
+      handler: async () => new Promise(() => undefined),
+    });
+    const queue = await createQueue({ driver: 'database', jobs: [job], db, errorReporter: reporter });
+    await queue.dispatch(job, {}, { jobId: 'lost-r' });
+    for (let round = 0; round < 2; round += 1) {
+      const worker = queue.createWorker({ pollMs: 15, leaseMs: 200, heartbeatMs: 50 });
+      worker.start();
+      await new Promise((resolve) => setTimeout(resolve, 120));
+      worker.crash();
+      await new Promise((resolve) => setTimeout(resolve, 260));
+    }
+    const closing = queue.createWorker({ pollMs: 15, leaseMs: 200, heartbeatMs: 50 });
+    closing.start();
+    await waitFor(async () => (await queue.deadLetters()).jobs.length === 1);
+    await closing.stop();
+    expect(reporter.reports).toHaveLength(1);
+    expect(reporter.reports[0]?.error).toMatchObject({ message: expect.stringContaining('lease') });
+    expect(reporter.reports[0]?.context.job).toMatchObject({ name: 'w.lost-report', id: 'lost-r' });
   });
 });

@@ -246,3 +246,26 @@ Other calls made while writing the tests, marked for review:
 ## Fields of personal data in log lines (SEC-09)
 
 `createLogger({ redactKeys })` takes the names of fields whose value is never written, at any depth and in any case (`email` also covers `Email` and `EMAIL`), and an empty value stays empty. A key that looks like a secret (`password`, `token`, `cookie`, `api key` and the like) is redacted without being named. A project builds the list from its entities (`piiFields` of `@bieberkit/data/schema`). Without the option, nothing is redacted by name, so the list is the project's to give.
+
+## Error reporting (OBS-06)
+
+Prepared on 2026-11-23. The port, a reporter for Sentry compatible servers and the glue are in core, with no dependency (PKG-04): the transport is the global `fetch` and the event is plain JSON.
+
+```ts
+interface ErrorReporter { report(error, context): void; flush(timeoutMs?): Promise<boolean> }
+reportError(reporter, error, context)              // adds requestId, traceId, tenantId, userId of the request that is running
+createNoopReporter(); createMemoryReporter(); createCompositeReporter([...])
+createSentryReporter({ dsn, environment?, release?, sampleRate?, secrets?, maxPerMinute?, timeoutMs?, logger? })
+createErrorReporterFromConfig(config, { logger, release?, secrets? })   // ERROR_REPORTER_DSN, ERROR_REPORTER_SAMPLE_PERCENT, APP_ENV
+installProcessHandlers({ reporter, logger, flushMs? }): () => void      // uncaughtException and unhandledRejection
+```
+
+1. **`report` never throws and never waits.** It hands the error over and returns, so a reporter that is slow, down or throttled cannot slow or break a request or a job. `reportError` catches what a reporter throws. `flush` waits for what was handed over, for at most `timeoutMs` (2 seconds by default), and says whether it all went out. It is called at shutdown.
+2. **What is reported.** An error that is a bug of ours: a 5xx of `@bieberkit/http` (`errorReporter` option, after the log line), a job that failed for good (`errorReporter` option of `createQueue`: its last attempt failed, its stored input no longer fits, or its lease ran out on every delivery), and an error that nothing caught (`installProcessHandlers`, level `fatal`, then the process ends with 1 as Node does without a listener). A 4xx is the answer to a bad request, and a job that fails and then works are not reports.
+3. **What a report carries.** The source (`http`, `job`, `process`, `client`), the level, the ids of the request, the trace, the tenant and the user, the method and the path without its query string, the name, the queue and the attempt of a job, the code of a `BkError`, and short tags. Never a body, a header, a cookie, a query string or an e-mail (SEC-09). The values of `secrets` are replaced by `[redacted]` in messages, stacks and tags.
+4. **The Sentry compatible reporter** builds an event (the exception with its cause chain, cause first, up to 5, and the frames of the stack with `in_app`), wraps it in an envelope and posts it to `https://<host>/api/<project>/envelope/` with the key of the DSN. Sentry, GlitchTip and Bugsink take it. A DSN that is not valid is `CFG_ERROR_REPORTER_DSN_INVALID` at boot, and the message never shows the key. The call goes straight through `fetch`, and not through the SSRF guard of `http.fetch` (SEC-06), because the address is the operator's own setting and a self-hosted server is often on a private network.
+5. **It protects the server and the process.** `sampleRate` (from `ERROR_REPORTER_SAMPLE_PERCENT`) drops a share of reports, but never a `fatal` one. At most `maxPerMinute` (60) reports go out, and the rest are dropped and counted in one warning. At most 20 sends are in the air. A `429` stops sending for its `Retry-After` (a minute without one). A send is cut after 5 seconds. A server that refuses or does not answer costs one warning a minute, not one for each error.
+6. **Configuration.** `ERROR_REPORTER_DSN` (secret, optional: with none the reporter does nothing) and `ERROR_REPORTER_SAMPLE_PERCENT` (0 to 100, default 100).
+7. **Not done here.** Client errors and web vitals (UI-21) come with the admin. A driver for another vendor is a reporter that implements the port.
+
+Tests: `reporting/reporter.test.ts`, `sentry.test.ts` (the DSN, frames, the envelope, what is left out, sampling, the budget, 429, timeouts, flush), `process-handlers.test.ts`, `from-config.test.ts`; the 5xx cases in `packages/http/src/errors.test.ts`; the dead job cases in `packages/queue/src/sync.test.ts` and `worker.dialects.test.ts`.
