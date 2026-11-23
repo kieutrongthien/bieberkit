@@ -28,7 +28,7 @@
 Generated from the built declaration files by `pnpm api:update`. Do not edit by hand. A change here is a change to the public API and needs a changeset (spec section 22.3).
 
 ```ts
-import { l as Queue, o as JobDef } from "./contract-xjWeN5XP.js";
+import { l as Queue, o as JobDef } from "./contract-5bhgY8ar.js";
 interface ContractSubject {
   readonly queue: Queue;
   readonly close: () => Promise<void>;

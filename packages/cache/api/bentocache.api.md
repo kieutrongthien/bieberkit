@@ -31,6 +31,30 @@ Generated from the built declaration files by `pnpm api:update`. Do not edit by 
 import { Logger } from "@bieberkit/core";
 import { n as Cache } from "./cache-Ck2Ln4Bi.js";
 import { n as CacheEngine } from "./contract--ExGYgOW.js";
+interface InstanceInfo {
+  readonly policy: string;
+  readonly maxmemoryBytes: number;
+}
+interface RedisInstanceConfig {
+  readonly APP_ENV: string;
+  readonly QUEUE_DRIVER: "sync" | "database" | "redis";
+  readonly CACHE_DRIVER: "memory" | "file" | "database" | "redis";
+  readonly REDIS_URL: string | undefined;
+  readonly CACHE_REDIS_URL: string | undefined;
+}
+interface DoctorFinding {
+  readonly id: string;
+  readonly level: "ok" | "warning" | "error";
+  readonly message: string;
+  readonly fix?: string;
+}
+interface RedisInstanceChecks {
+  readonly read?: (url: string) => Promise<InstanceInfo>;
+}
+export declare function describeInstance(url: string): string;
+export declare function sameInstance(a: string, b: string): boolean;
+export declare function readInstance(url: string): Promise<InstanceInfo>;
+export declare function checkRedisInstances(config: RedisInstanceConfig, checks?: RedisInstanceChecks): Promise<DoctorFinding[]>;
 type BentocacheEngineOptions = {
   readonly driver: "file";
   readonly directory: string;
@@ -55,5 +79,5 @@ export interface CacheFromConfigOptions {
 }
 export declare function engineFromConfig(config: CacheConfig, options?: CacheFromConfigOptions): CacheEngine;
 export declare function createCacheFromConfig(config: CacheConfig, options?: CacheFromConfigOptions): Cache;
-export type { BentocacheEngineOptions };
+export type { BentocacheEngineOptions, DoctorFinding, InstanceInfo, RedisInstanceChecks, RedisInstanceConfig };
 ```

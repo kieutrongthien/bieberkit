@@ -31,7 +31,7 @@ Generated from the built declaration files by `pnpm api:update`. Do not edit by 
 import { Database, OutboxDispatcher, OutboxDispatcherOptions } from "@bieberkit/data/orm";
 import { ErrorReporter, Logger } from "@bieberkit/core";
 import { PluginMigrationStep } from "@bieberkit/data";
-import { _ as queueError, a as JobContext, c as QUEUE_NAMES, d as QueueName, f as QueueStats, g as defineJob, h as defaultBackoffMs, i as Dispatched, l as Queue, m as WorkerOptions, n as DeadLetterPage, o as JobDef, p as Worker, r as DispatchOptions, s as JobInput, t as DeadJob, u as QueueError } from "./contract-xjWeN5XP.js";
+import { _ as defineJob, a as JobContext, c as QUEUE_NAMES, d as QueueName, f as QueueStats, g as defaultBackoffMs, h as WorkerOptions, i as Dispatched, l as Queue, m as Worker, n as DeadLetterPage, o as JobDef, r as DispatchOptions, s as JobInput, t as DeadJob, u as QueueError, v as queueError } from "./contract-5bhgY8ar.js";
 interface Cron {
   matches(date: Date): boolean;
 }

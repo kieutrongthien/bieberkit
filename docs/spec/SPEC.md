@@ -964,6 +964,7 @@ await queue.dispatch(sendInvoice, { invoiceId })
 * **Q-10** Every job carries the `tenantId` and the acting user or system actor of the code that dispatched it. Workers restore that context before running, so tenant filters, permission checks and audit entries behave exactly as in the original request.
 
 - **Q-11** Every queue driver passes the shared contract suite of nine tests: context restored (Q-10), `jobId` deduplication, retries with backoff, dead letters, delay, queue isolation, redelivery after a crash, exactly one run per job with two workers, and throughput (ADR 0010).
+- **Q-13** A worker on PostgreSQL MAY be woken by a notification that is sent in the transaction of the insert and delivered at the commit, so a job that another process adds starts at once. The poll stays as the fallback, and a source that cannot connect never stops the worker (ADR 0019).
 
 ### 15.2 Cache
 

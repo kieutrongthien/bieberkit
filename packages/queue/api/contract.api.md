@@ -86,10 +86,14 @@ interface DeadLetterPage {
   readonly nextCursor: string | null;
 }
 type QueueStats = Readonly<Record<QueueName, Readonly<Record<"waiting" | "active" | "done" | "dead", number>>>>;
+interface WakeSource {
+  listen(onWake: (queue: QueueName | undefined) => void): Promise<() => Promise<void>>;
+}
 interface WorkerOptions {
   readonly queues?: readonly QueueName[];
   readonly concurrency?: number | Partial<Readonly<Record<QueueName, number>>>;
   readonly pollMs?: number;
+  readonly wake?: WakeSource;
   readonly leaseMs?: number;
   readonly heartbeatMs?: number;
   readonly stopTimeoutMs?: number;
@@ -120,5 +124,5 @@ interface Queue {
 }
 declare const defaultBackoffMs: (attempt: number) => number;
 declare function defineJob<Input = unknown>(job: JobInput<Input>): JobDef<Input>;
-export { queueError as _, JobContext as a, QUEUE_NAMES as c, QueueName as d, QueueStats as f, defineJob as g, defaultBackoffMs as h, Dispatched as i, Queue as l, WorkerOptions as m, DeadLetterPage as n, JobDef as o, Worker as p, DispatchOptions as r, JobInput as s, DeadJob as t, QueueError as u };
+export { defineJob as _, JobContext as a, QUEUE_NAMES as c, QueueName as d, QueueStats as f, defaultBackoffMs as g, WorkerOptions as h, Dispatched as i, Queue as l, Worker as m, DeadLetterPage as n, JobDef as o, WakeSource as p, DispatchOptions as r, JobInput as s, DeadJob as t, QueueError as u, queueError as v };
 ```
