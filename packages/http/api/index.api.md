@@ -62,6 +62,9 @@ interface Principal {
   readonly kind: "user" | "apiKey" | "service";
   readonly via?: "cookie" | "token";
   readonly sessionId?: string;
+  readonly mfa?: boolean;
+  readonly grants?: readonly string[];
+  readonly tenantId?: string;
 }
 interface RequestInfo {
   readonly method: string;

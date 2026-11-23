@@ -213,3 +213,31 @@ revokeRole(db, { tenantId?, userId, roleId }): Promise<boolean>
 - A system role (the administrator, made by the seeder of M1.8 with `system: true`) cannot be renamed, deleted, given another flag of MFA or other permissions (`AUTH_ROLE_SYSTEM`, 409), but it can be given to a user.
 - A role is given only in its own tenant, and a role that is not in the tenant is `AUTH_ROLE_NOT_FOUND` (404), as is an unknown id. A name that the tenant has is `AUTH_ROLE_EXISTS` (409). A blank name, a blank permission, a user or a tenant that is not a UUID and more than 500 permissions are `AUTH_ROLE_INVALID` (400).
 - The routes and the screens that call it are the admin of M1.8 and later. The service checks no permission: the caller (a route with its own permission) does.
+
+## Slice C1: TOTP, passkeys, magic link and MFA (implemented on 2026-11-23)
+
+```ts
+createAuth({ ..., methods: { totp: { issuer }, passkey: { rpName, rpId? }, magicLink: { send(mail), expiresIn? } }, previousSecrets: [...] })
+AuthLimits += { magicLink?: Limit2; mfa?: Limit2 }
+Principal += { mfa?: boolean }                       // @bieberkit/http, additive
+AuthTwoFactor, AuthPasskey                           // ORM schemas of auth_two_factors, auth_passkeys; steps 0.3.0
+```
+
+### Rules
+
+1. **A method is loaded when it is asked for.** Without `methods.totp` there is no two-factor plugin, no `twoFactorEnabled` in the answers, and no need of the table. The magic link needs no table of its own (it uses `auth_verifications`). `@better-auth/passkey` is pinned to the same version as `better-auth` (a test checks it).
+2. **Tables (steps 0.3.0).** `auth_users.two_factor_enabled` (a nullable column), `auth_two_factors` (the TOTP secret and the backup codes, both encrypted by Better Auth with the secret of the application, and a lockout) and `auth_passkeys` (the public key, the credential id with a unique key, the counter). `auth_verifications.id` is text, not a UUID: Better Auth names a single-use reservation by a digest, and it does so for a magic link (see "Found while implementing").
+3. **Every cookie is a `__Host-` cookie.** The session, its cache, the "do not remember" flag, the pending second factor (`__Host-bk_two_factor`), the trusted device and the challenge of a passkey (`__Host-bk_passkey_challenge`) are `Secure`, `HttpOnly`, `Path=/`, with no `Domain`. `defaultCookieAttributes` makes a cookie that Better Auth adds later secure too. A test reads every `Set-Cookie` of the flows.
+4. **The second factor makes the session (AUTH-05).** With TOTP on, a sign in with the password alone answers `twoFactorRedirect` and sets only the pending cookie. The session exists after `POST /api/auth/two-factor/verify-totp` (or `verify-backup-code`). The authenticator gives `mfa: true` when the user has TOTP on. A role flagged `requireMfa` makes the authorizer answer 403 `AUTH_MFA_REQUIRED` (`can`, `access` and `allows`) for a principal without it, and writes `authz.mfa-required`. The routes of `/api/auth` are not behind the authorizer, so the user can turn TOTP on and then pass. A passkey is not a second factor in this slice, because a session does not say how it began.
+5. **The magic link does not make an account.** `disableSignUp` is on, and no mail goes to an address that has none, with the same answer as for one that has. A link works once and expires.
+6. **Audit and outbox.** `auth.mfa.enrolled` (the secret is made), `auth.mfa.verified` (a code is accepted, which also turns TOTP on), `auth.mfa.backup-code-used`, `auth.mfa.backup-codes-renewed`, `auth.mfa.disabled`, `auth.passkey.added`, `auth.passkey.removed`, and `auth.session.created` for a magic link and a passkey sign in. A refused code leaves `auth.mfa.failed` and a refused passkey `auth.signin.failed`, each in an entry of its own, with no code in it. `GET /magic-link/verify` writes, so it runs in the transaction like a POST.
+7. **Limits (AUTH-06).** The request of a magic link: 5 per 60 s per address and 5 per 15 min per email. The use of a link: the same limit per address. A TOTP code, a backup code and a passkey answer: 10 per 60 s per address. Better Auth locks the account of the code itself.
+8. **Rotation of the secret.** `createAuth` gives Better Auth `secrets` (the current first, then `previousSecrets`, each with a number that its own text makes, so the numbers do not move when the list does). What was encrypted with a secret in the list is read, and what is written uses the first. A test rotates and then drops the old secret.
+
+### Found while implementing
+
+- **The first answer of an enrolment replaces the session.** After `two-factor/verify-totp` confirms the enrolment, the session cookie that the user had is revoked and a new one comes with the answer. A client keeps the new one.
+- **Better Auth sets cookies that no ADR named.** With TOTP it set `better-auth.two_factor` (not `Secure`, not `__Host-`) and with passkeys `better-auth.better-auth-passkey`. Each is now named in `advanced.cookies`.
+- **A magic link failed with a 500 on the UUID type.** `reserveVerificationValue` writes a row whose id is the SHA-256 of the identifier in base64url, which is not a UUID, and `advanced.database.generateId: 'uuid'` is the only way that Better Auth makes a UUID of it (and then it gives up our UUIDv7 ids). The ids of `auth_verifications` are text, and nothing refers to them.
+- **Better Auth sends a magic link to an unknown address too**, and refuses only at the use of the link. The `send` callback of this package looks the address up first, so no mail leaves.
+- **A cookie with no value is not a session.** Better Auth takes a cookie back with `name=; Max-Age=0`. The helpers of the tests skip it.

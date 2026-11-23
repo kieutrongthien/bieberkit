@@ -47,6 +47,8 @@ interface AuthLimits {
   readonly signIn?: Limit2;
   readonly signUp?: Limit2;
   readonly passwordReset?: Limit2;
+  readonly magicLink?: Limit2;
+  readonly mfa?: Limit2;
 }
 interface Consumption {
   readonly key: string;
@@ -72,13 +74,28 @@ interface AuthMail {
   readonly url: string;
   readonly token: string;
 }
+interface AuthMethods {
+  readonly totp?: {
+    readonly issuer: string;
+  };
+  readonly passkey?: {
+    readonly rpName: string;
+    readonly rpId?: string;
+  };
+  readonly magicLink?: {
+    send(mail: AuthMail): Promise<void>;
+    readonly expiresIn?: number;
+  };
+}
 interface CreateAuthOptions {
   readonly db: Database;
   readonly dialect: Dialect;
   readonly secret: string;
   readonly baseUrl: string;
   readonly trustedOrigins?: readonly string[];
+  readonly previousSecrets?: readonly string[];
   readonly limits?: AuthLimits;
+  readonly methods?: AuthMethods;
   readonly mail?: {
     sendVerification?(mail: AuthMail): Promise<void>;
     sendResetPassword?(mail: AuthMail): Promise<void>;
@@ -130,6 +147,7 @@ interface AuthUserRow {
   email: string;
   emailVerified: boolean;
   image?: string | null;
+  twoFactorEnabled?: boolean | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -166,6 +184,28 @@ interface AuthVerificationRow {
   createdAt: Date;
   updatedAt: Date;
 }
+interface AuthTwoFactorRow {
+  id: string;
+  userId: string;
+  secret: string;
+  backupCodes: string;
+  verified?: boolean | null;
+  failedVerificationCount?: number | null;
+  lockedUntil?: Date | null;
+}
+interface AuthPasskeyRow {
+  id: string;
+  userId: string;
+  name?: string | null;
+  publicKey: string;
+  credentialID: string;
+  counter: number;
+  deviceType: string;
+  backedUp: boolean;
+  transports?: string | null;
+  createdAt?: Date | null;
+  aaguid?: string | null;
+}
 interface AuthRateLimitRow {
   id: string;
   key: string;
@@ -177,6 +217,8 @@ export declare const AuthSession: EntitySchema;
 export declare const AuthAccount: EntitySchema;
 export declare const AuthVerification: EntitySchema<AuthVerificationRow>;
 export declare const AuthRateLimit: EntitySchema<AuthRateLimitRow>;
+export declare const AuthTwoFactor: EntitySchema;
+export declare const AuthPasskey: EntitySchema;
 interface TenantResolverOptions {
   readonly db: Database;
 }
@@ -191,5 +233,5 @@ declare module "@bieberkit/core" {
     scopedPermissions?: Readonly<Record<string, ScopedPermission>>;
   }
 }
-export { AUTH_PLUGIN, type Ability, type AbilityInput, type AbilityUser, type AccessAnswer, type AccessAuthorizer, type Action, type Assignment, type AuthAccountRow, type AuthInstance, type AuthLimits, type AuthMail, type AuthRateLimitRow, AuthRole, AuthRolePermission, type AuthRolePermissionRow, type AuthRoleRow, type AuthRoutesOptions, type AuthSessionRow, AuthUserRole, type AuthUserRoleRow, type AuthUserRow, type AuthVerificationRow, type AuthorizerOptions, type BetterAuthOptions, type Condition, type CreateAuthOptions, type DriftEntity, type DriftProperty, type EntityShape, type GrantLoader, type Grants, type Limit, type Limit2, type MaskedField, NIL_TENANT, type NewRole, type PermissionEntry, type PermissionRegistry, type ScopedPermission, type TenantResolverOptions, authEntities, authMigrationSteps, buildAbility, buildPermissionRegistry, createAuthorizer, loadGrants };
+export { AUTH_PLUGIN, type Ability, type AbilityInput, type AbilityUser, type AccessAnswer, type AccessAuthorizer, type Action, type Assignment, type AuthAccountRow, type AuthInstance, type AuthLimits, type AuthMail, type AuthPasskeyRow, type AuthRateLimitRow, AuthRole, AuthRolePermission, type AuthRolePermissionRow, type AuthRoleRow, type AuthRoutesOptions, type AuthSessionRow, type AuthTwoFactorRow, AuthUserRole, type AuthUserRoleRow, type AuthUserRow, type AuthVerificationRow, type AuthorizerOptions, type BetterAuthOptions, type Condition, type CreateAuthOptions, type DriftEntity, type DriftProperty, type EntityShape, type GrantLoader, type Grants, type Limit, type Limit2, type MaskedField, NIL_TENANT, type NewRole, type PermissionEntry, type PermissionRegistry, type ScopedPermission, type TenantResolverOptions, authEntities, authMigrationSteps, buildAbility, buildPermissionRegistry, createAuthorizer, loadGrants };
 ```
