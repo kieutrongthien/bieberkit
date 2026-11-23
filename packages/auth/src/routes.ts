@@ -102,6 +102,14 @@ export function registerAuthRoutes(server: HttpServer, options: AuthRoutesOption
     prefix,
     handler: async (request) => {
       const path = new URL(request.url).pathname.slice(prefix.length);
+      // The keys are made by code (`createApiKey`). The routes of Better Auth would let a signed in user choose the permissions and
+      // the tenant of a key, so they are not served (AUTH-07).
+      if (path.startsWith('/api-key/') || path === '/api-key') {
+        return new Response(JSON.stringify({ message: 'Not found' }), {
+          status: 404,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
       const writes = request.method !== 'GET' || WRITING_GETS.has(path);
       if (!writes) return auth.handler(request);
       const recorded = RECORDED[path];

@@ -27,6 +27,7 @@ import { betterAuth } from 'better-auth';
 import type { Auth, BetterAuthOptions } from 'better-auth';
 import { APIError, createAuthMiddleware } from 'better-auth/api';
 import { magicLink, twoFactor } from 'better-auth/plugins';
+import { apiKey } from '@better-auth/api-key';
 import { passkey } from '@better-auth/passkey';
 import { createHash } from 'node:crypto';
 import type { Dialect } from '@bieberkit/core';
@@ -45,6 +46,15 @@ export interface AuthMail {
   readonly to: string;
   readonly url: string;
   readonly token: string;
+}
+
+export interface AuthApiKeys {
+  /** The life of a key that does not say, in days. Defaults to 90. */
+  readonly defaultExpiresInDays?: number;
+  /** The longest life of a key, in days. Defaults to 365. */
+  readonly maxExpiresInDays?: number;
+  /** The requests that one key may make in a window of seconds. Defaults to 600 in 60 s. */
+  readonly rateLimit?: { readonly window: number; readonly max: number };
 }
 
 export interface AuthMethods {
@@ -68,6 +78,8 @@ export interface CreateAuthOptions {
   /** The secrets that were current before, newest first (`APP_KEY_PREVIOUS`). They only decrypt, so a rotation loses nothing. */
   readonly previousSecrets?: readonly string[];
   readonly limits?: AuthLimits;
+  /** API keys for machine clients (AUTH-07). Without it there is no key plugin, and no table. */
+  readonly apiKeys?: AuthApiKeys;
   /** The sign in methods besides email and password. A method that is not here is not loaded, and needs no table. */
   readonly methods?: AuthMethods;
   /** The mail contract is M1.5, so the project says how to send. Without it the flows that need a mail answer with an error. */
@@ -194,6 +206,28 @@ export function createAuth(options: CreateAuthOptions): AuthInstance {
               ...(options.methods.magicLink.expiresIn === undefined
                 ? {}
                 : { expiresIn: options.methods.magicLink.expiresIn }),
+            }),
+          ]),
+      ...(options.apiKeys === undefined
+        ? []
+        : [
+            apiKey({
+              defaultPrefix: 'bk_',
+              apiKeyHeaders: ['x-api-key'],
+              // The permissions and the tenant of a key are in its metadata, set by `createApiKey` and by nothing else.
+              enableMetadata: true,
+              requireName: true,
+              keyExpiration: {
+                defaultExpiresIn: (options.apiKeys.defaultExpiresInDays ?? 90) * 86_400,
+                minExpiresIn: 1,
+                maxExpiresIn: options.apiKeys.maxExpiresInDays ?? 365,
+              },
+              rateLimit: {
+                enabled: true,
+                timeWindow: (options.apiKeys.rateLimit?.window ?? 60) * 1000,
+                maxRequests: options.apiKeys.rateLimit?.max ?? 600,
+              },
+              schema: { apikey: { modelName: 'authApiKey' } },
             }),
           ]),
       ...(options.methods?.passkey === undefined

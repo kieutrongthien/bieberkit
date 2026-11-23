@@ -43,6 +43,18 @@ export function createTenantResolver(options: TenantResolverOptions): TenantReso
     async resolve(request, principal) {
       const header = request.headers['x-tenant'];
       const wanted = Array.isArray(header) ? header[0] : header;
+      if (principal?.kind === 'apiKey') {
+        // The tenant of a key is the one that it was made for, and a request cannot name another (DATA-19).
+        if (wanted !== undefined && wanted !== '' && wanted.toLowerCase() !== principal.tenantId?.toLowerCase()) {
+          throw new HttpError(
+            'AUTH_TENANT_FORBIDDEN',
+            403,
+            'This key works in another tenant.',
+            'Use the key of this tenant.',
+          );
+        }
+        return principal.tenantId?.toLowerCase();
+      }
       if (wanted === undefined || wanted === '' || principal === undefined) return undefined;
       if (!isUuid(wanted)) {
         throw new HttpError('AUTH_TENANT_INVALID', 400, 'X-Tenant is not a tenant id.', 'Send the UUID of a tenant.');

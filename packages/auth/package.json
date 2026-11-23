@@ -45,6 +45,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
+    "@better-auth/api-key": "1.7.25",
     "@better-auth/kysely-adapter": "1.7.25",
     "@better-auth/passkey": "1.7.25",
     "@bieberkit/core": "workspace:*",

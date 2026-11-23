@@ -27,6 +27,7 @@ import type { BetterAuthOptions } from 'better-auth';
 import type { Database } from '@bieberkit/data/orm';
 import {
   AuthAccount,
+  AuthApiKey,
   AuthPasskey,
   AuthRateLimit,
   AuthSession,
@@ -53,6 +54,7 @@ const MODELS = {
   authRateLimit: AuthRateLimit,
   authTwoFactor: AuthTwoFactor,
   authPasskey: AuthPasskey,
+  authApiKey: AuthApiKey,
 } as const;
 
 /** The entities of the auth tables as the check wants them, read from the metadata of the ORM. */

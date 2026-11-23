@@ -35,9 +35,12 @@ export type {
   EntityShape,
   ScopedPermission,
 } from './ability.ts';
+export { API_KEY_PREFIX, createApiKey, revokeApiKey } from './api-keys.ts';
+export type { ApiKeyInput, CreatedApiKey } from './api-keys.ts';
 export { createAuthenticator } from './authenticator.ts';
 export { createAuth, limiterOf } from './better-auth.ts';
 export type {
+  AuthApiKeys,
   AuthInstance,
   AuthLimits,
   AuthMail,
@@ -55,6 +58,7 @@ export { registerAuthRoutes } from './routes.ts';
 export type { AuthRoutesOptions } from './routes.ts';
 export {
   AuthAccount,
+  AuthApiKey,
   AuthPasskey,
   AuthRateLimit,
   AuthSession,
@@ -64,6 +68,7 @@ export {
 } from './tables.ts';
 export type {
   AuthAccountRow,
+  AuthApiKeyRow,
   AuthPasskeyRow,
   AuthRateLimitRow,
   AuthSessionRow,

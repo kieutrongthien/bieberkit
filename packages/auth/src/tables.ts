@@ -103,6 +103,35 @@ export interface AuthPasskeyRow {
   aaguid?: string | null;
 }
 
+export interface AuthApiKeyRow {
+  id: string;
+  configId: string;
+  name?: string | null;
+  /** The first characters of the key, to recognise it in a list. */
+  start?: string | null;
+  /** The user who owns the key. */
+  referenceId: string;
+  prefix?: string | null;
+  /** The hash of the key. The key itself is shown once and never stored. */
+  key: string;
+  refillInterval?: number | null;
+  refillAmount?: number | null;
+  lastRefillAt?: Date | null;
+  enabled?: boolean | null;
+  rateLimitEnabled?: boolean | null;
+  rateLimitTimeWindow?: number | null;
+  rateLimitMax?: number | null;
+  requestCount?: number | null;
+  remaining?: number | null;
+  lastRequest?: Date | null;
+  expiresAt?: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+  permissions?: string | null;
+  /** JSON: the tenant and the permission strings of the key (AUTH-07). */
+  metadata?: string | null;
+}
+
 export interface AuthRateLimitRow {
   id: string;
   key: string;
@@ -241,6 +270,43 @@ export const AuthPasskey: EntitySchema = new EntitySchema({
   indexes: [{ name: 'auth_passkeys_user_index', properties: ['userId'] }],
 });
 
+export const AuthApiKey: EntitySchema = new EntitySchema({
+  name: 'authApiKey',
+  tableName: 'auth_api_keys',
+  properties: {
+    id: id(),
+    configId: { type: 'string', length: 64, fieldName: 'config_id' },
+    name: { type: 'string', length: 255, nullable: true },
+    start: { type: 'string', length: 32, nullable: true },
+    referenceId: {
+      kind: 'm:1',
+      entity: () => AuthUser,
+      mapToPk: true,
+      fieldName: 'reference_id',
+      deleteRule: 'cascade',
+    },
+    prefix: { type: 'string', length: 64, nullable: true },
+    key: { type: 'string', length: 255 },
+    refillInterval: { type: 'integer', fieldName: 'refill_interval', nullable: true },
+    refillAmount: { type: 'integer', fieldName: 'refill_amount', nullable: true },
+    lastRefillAt: { ...instant('last_refill_at'), nullable: true },
+    enabled: { type: 'boolean', nullable: true },
+    rateLimitEnabled: { type: 'boolean', fieldName: 'rate_limit_enabled', nullable: true },
+    rateLimitTimeWindow: { type: 'integer', fieldName: 'rate_limit_time_window', nullable: true },
+    rateLimitMax: { type: 'integer', fieldName: 'rate_limit_max', nullable: true },
+    requestCount: { type: 'integer', fieldName: 'request_count', nullable: true },
+    remaining: { type: 'integer', nullable: true },
+    lastRequest: { ...instant('last_request'), nullable: true },
+    expiresAt: { ...instant('expires_at'), nullable: true },
+    createdAt: instant('created_at'),
+    updatedAt: instant('updated_at'),
+    permissions: { type: 'text', nullable: true },
+    metadata: { type: 'text', nullable: true },
+  },
+  uniques: [{ name: 'auth_api_keys_key_unique', properties: ['key'] }],
+  indexes: [{ name: 'auth_api_keys_user_index', properties: ['referenceId'] }],
+});
+
 export const authTableEntities: readonly EntitySchema[] = [
   AuthUser,
   AuthSession,
@@ -249,10 +315,12 @@ export const authTableEntities: readonly EntitySchema[] = [
   AuthRateLimit,
   AuthTwoFactor,
   AuthPasskey,
+  AuthApiKey,
 ];
 
 const VERSION = '0.2.0';
 const STRONG = '0.3.0';
+const KEYS = '0.4.0';
 const instantType = (dialect: string): 'timestamptz' | 'datetime' =>
   dialect === 'postgres' ? 'timestamptz' : 'datetime';
 
@@ -388,5 +456,41 @@ export const authTableSteps: readonly PluginMigrationStep[] = [
   }),
   authStep(STRONG, 'passkeys-user-index', async (trx) => {
     await trx.schema.createIndex('auth_passkeys_user_index').on('auth_passkeys').column('user_id').execute();
+  }),
+  // Version 0.4.0: the API keys.
+  authStep(KEYS, 'api-keys-create', async (trx, dialect) => {
+    await trx.schema
+      .createTable('auth_api_keys')
+      .addColumn('id', uuidType(dialect), (c) => c.notNull())
+      .addColumn('config_id', 'varchar(64)', (c) => c.notNull())
+      .addColumn('name', 'varchar(255)')
+      .addColumn('start', 'varchar(32)')
+      .addColumn('reference_id', uuidType(dialect), (c) => c.notNull())
+      .addColumn('prefix', 'varchar(64)')
+      .addColumn('key', 'varchar(255)', (c) => c.notNull())
+      .addColumn('refill_interval', 'integer')
+      .addColumn('refill_amount', 'integer')
+      .addColumn('last_refill_at', instantType(dialect))
+      .addColumn('enabled', 'boolean')
+      .addColumn('rate_limit_enabled', 'boolean')
+      .addColumn('rate_limit_time_window', 'integer')
+      .addColumn('rate_limit_max', 'integer')
+      .addColumn('request_count', 'integer')
+      .addColumn('remaining', 'integer')
+      .addColumn('last_request', instantType(dialect))
+      .addColumn('expires_at', instantType(dialect))
+      .addColumn('created_at', instantType(dialect), (c) => c.notNull())
+      .addColumn('updated_at', instantType(dialect), (c) => c.notNull())
+      .addColumn('permissions', 'text')
+      .addColumn('metadata', 'text')
+      .addPrimaryKeyConstraint('auth_api_keys_pkey', ['id'])
+      .addUniqueConstraint('auth_api_keys_key_unique', ['key'])
+      .addForeignKeyConstraint('auth_api_keys_user_fk', ['reference_id'], 'auth_users', ['id'], (c) =>
+        c.onDelete('cascade'),
+      )
+      .execute();
+  }),
+  authStep(KEYS, 'api-keys-user-index', async (trx) => {
+    await trx.schema.createIndex('auth_api_keys_user_index').on('auth_api_keys').column('reference_id').execute();
   }),
 ];

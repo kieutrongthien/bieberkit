@@ -23,18 +23,22 @@
  */
 
 import type { Authenticator } from '@bieberkit/http';
+import { keyOf, principalOfKey } from './api-keys.ts';
 import type { AuthInstance } from './better-auth.ts';
 
 const COOKIE = '__Host-bk_session';
 
 /**
  * Reads the session cookie with Better Auth and gives the principal. A missing, forged, expired or revoked session is no principal.
- * A cookie that is not there costs no query, so a public page does not touch the database. Only the cookie is read: a token in
- * `Authorization` belongs to the API keys of another slice (AUTH-07).
+ * A cookie that is not there costs no query, so a public page does not touch the database. A key in `X-API-Key`, or a bearer token
+ * with the prefix of our keys, makes the principal of a machine client instead (AUTH-07).
  */
 export function createAuthenticator(auth: AuthInstance): Authenticator {
   return {
     async authenticate(request) {
+      // A machine client sends a key, and a key wins over a cookie (AUTH-07).
+      const key = keyOf(request.headers);
+      if (key !== undefined) return principalOfKey(auth, key);
       const header = request.headers['cookie'];
       const cookie = Array.isArray(header) ? header.join('; ') : header;
       if (cookie === undefined || !cookie.includes(`${COOKIE}=`)) return undefined;
