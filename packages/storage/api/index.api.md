@@ -28,5 +28,20 @@
 Generated from the built declaration files by `pnpm api:update`. Do not edit by hand. A change here is a change to the public API and needs a changeset (spec section 22.3).
 
 ```ts
-export declare const packageName = "@bieberkit/storage";
+import { a as DEFAULT_MAX_BYTES, c as TypeRule, i as createStorage, n as StorageOptions, o as DEFAULT_TYPES, r as StoreBody, s as StoragePolicy, t as Storage } from "./storage-mmKfH8I0.js";
+import { a as StorageError, i as SignedUpload, n as DiskBody, o as StoredFile, r as DiskObject, s as Visibility, t as Disk } from "./contract-BmeHIf6u.js";
+interface MemoryDiskOptions {
+  readonly signing?: boolean;
+  readonly publicBaseUrl?: string;
+  readonly now?: () => number;
+}
+interface MemoryDisk extends Disk {
+  upload(url: string, headers: Readonly<Record<string, string>>, body: Uint8Array): Promise<void>;
+  readonly files: ReadonlyMap<string, {
+    readonly bytes: Uint8Array;
+    readonly contentType: string;
+  }>;
+}
+export declare function createMemoryDisk(options?: MemoryDiskOptions): MemoryDisk;
+export { DEFAULT_MAX_BYTES, DEFAULT_TYPES, type Disk, type DiskBody, type DiskObject, type MemoryDisk, type MemoryDiskOptions, type SignedUpload, type Storage, StorageError, type StorageOptions, type StoragePolicy, type StoreBody, type StoredFile, type TypeRule, type Visibility, createStorage };
 ```

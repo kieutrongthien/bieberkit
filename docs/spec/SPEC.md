@@ -978,6 +978,8 @@ await queue.dispatch(sendInvoice, { invoiceId })
 - **S-02** Uploads are checked for size, MIME type by content sniffing, and an allowed extension list. A virus-scan hook MAY run as a job.
 - **S-03** Files are private by default. Public access is granted per file through `visibility: 'public'` or short-lived signed URLs.
 - **S-04** `local` is allowed in production only with `APP_SINGLE_NODE=true`.
+- **S-05** Visibility is a key prefix, `private/` or `public/`, on every disk, so it works on a local folder, S3 and R2 with no ACL. A file has one copy, and a public file is served by a bucket policy, a CDN or a static folder that allows `public/` only (ADR 0017).
+- **S-06** A signed upload fixes the size and the content type of the file, and `confirmUpload` reads the first bytes and deletes the object when they are not what the extension says. The content type of a client is never stored.
 
 ### 15.4 Mail
 
