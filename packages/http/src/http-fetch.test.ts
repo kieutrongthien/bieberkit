@@ -384,6 +384,35 @@ describe('WH-04 retries', () => {
     expect(keyed.hits()).toBe(2);
   });
 
+  it('WH-04 a body that is dropped for a retry leaves no uncaught exception, even when it is still being sent', async () => {
+    const uncaught: unknown[] = [];
+    const listener = (error: unknown) => void uncaught.push(error);
+    process.on('uncaughtException', listener);
+    try {
+      const server = await listen((_request, response, count) => {
+        if (count > 3) {
+          response.writeHead(200).end('yes');
+          return;
+        }
+        // A 503 whose body goes on after the headers: chunks are in flight when the caller cancels it.
+        response.writeHead(503);
+        let sent = 0;
+        const timer = setInterval(() => {
+          if (sent >= 20 || response.destroyed) {
+            clearInterval(timer);
+            response.end();
+          } else response.write('x'.repeat(1024 * (sent += 1)));
+        }, 2);
+      });
+      const answer = await createHttpFetch({ ...LOCAL, retries: 3 }).fetch(server.url);
+      expect(answer.status).toBe(200);
+      await new Promise((resolve) => setTimeout(resolve, 150));
+      expect(uncaught).toEqual([]);
+    } finally {
+      process.off('uncaughtException', listener);
+    }
+  });
+
   it('WH-04 retries a call that failed on the network', async () => {
     const server = await listen((request, response, count) => {
       if (count === 1) request.socket.destroy();

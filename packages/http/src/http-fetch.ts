@@ -26,7 +26,7 @@ import dns from 'node:dns';
 import http from 'node:http';
 import https from 'node:https';
 import { BlockList, isIP } from 'node:net';
-import { Readable, Transform } from 'node:stream';
+import { Transform } from 'node:stream';
 import { BkError } from '@bieberkit/core';
 
 /** An error of an outbound call. `status` is the status that a route that passes it on would answer with. */
@@ -323,9 +323,14 @@ export function createHttpFetch(options: HttpFetchOptions = {}): HttpFetch {
               if (item !== undefined) responseHeaders.append(name, item);
           }
           const status = response.statusCode ?? 502;
-          // The stream of node:stream/web and the global ReadableStream are the same object under two names of one type.
-          // oxlint-disable-next-line typescript/no-unsafe-type-assertion
-          const stream = Readable.toWeb(limited) as unknown as ReadableStream<Uint8Array>;
+          // The body is read by pull, so nothing is queued after a cancel. `Readable.toWeb` pushes on 'data', and on Node 24.12 a chunk
+          // that was already on its way reached a closed controller after `response.body.cancel()` (a retry) and threw outside any
+          // caller. Closing the limited stream also closes the socket.
+          limited.once('close', () => response.destroy());
+          // An error of the stream (a body over the limit) reaches the reader through the stream. A caller that never reads the body must
+          // not turn it into an uncaught exception.
+          limited.on('error', () => undefined);
+          const stream = ReadableStream.from<Uint8Array>(limited);
           done(new Response(NO_BODY.has(status) ? null : stream, { status, headers: responseHeaders }));
         },
       );
