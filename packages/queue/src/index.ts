@@ -43,6 +43,8 @@ export type {
 export { parseCron } from './cron.ts';
 export type { Cron } from './cron.ts';
 export { registerOutbox } from './outbox.ts';
+export { createWorkerPool } from './pool.ts';
+export type { PoolStats, RunOptions, WorkerPool, WorkerPoolOptions } from './pool.ts';
 export { createQueue } from './queue.ts';
 export type { CreateQueueOptions } from './queue.ts';
 export { createScheduler } from './scheduler.ts';
