@@ -125,7 +125,10 @@ export function knownFields(schema: OrmSchema): Map<string, Known> {
   standard('updatedAt', true);
   for (const [name, field] of Object.entries(def.fields)) {
     if (['id', 'createdAt', 'updatedAt', 'hasOne', 'hasMany'].includes(field.kind)) continue;
-    const filterable = FILTERABLE_KINDS.includes(field.kind) && (field.computed === undefined || field.computed.stored);
+    const filterable =
+      FILTERABLE_KINDS.includes(field.kind) &&
+      field.encrypted !== true &&
+      (field.computed === undefined || field.computed.stored);
     const compared =
       (field.kind === 'string' || field.kind === 'email') && field.compare !== undefined && field.compare !== 'exact';
     known.set(name, {

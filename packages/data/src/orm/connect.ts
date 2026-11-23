@@ -29,6 +29,8 @@ import type { Dialect, Logger } from '@bieberkit/core';
 import { dataError } from '../errors.ts';
 import { auditTableSink } from './audit.ts';
 import { BieberEntityManager } from './entity-manager.ts';
+import { hasEncryptionKeys, useEncryptionKeys } from './encryption.ts';
+import type { EncryptionKeys } from './encryption.ts';
 import { frameworkEntities } from './framework.ts';
 import type { ReferenceVisibility } from './references.ts';
 import { createSqliteDialect } from './sqlite.ts';
@@ -51,6 +53,11 @@ export interface DatabaseOptions {
    * Defaults to a `warn` line through `logger`, for a project that has not made them yet.
    */
   readonly audit?: AuditSink | 'table';
+  /**
+   * The keys of the encrypted fields (SEC-08): `APP_KEY`, and `APP_KEY_PREVIOUS` as `previous` after a rotation. A database that has
+   * an encrypted field does not start without a key, here or from `useEncryptionKeys`.
+   */
+  readonly encryption?: EncryptionKeys;
   /** The CASL read rule that decides which referenced ids a user may see (DATA-20). */
   readonly references?: ReferenceVisibility;
   readonly logger?: Logger;
@@ -158,6 +165,18 @@ export function resolveConnection(env: DatabaseEnv, variable = 'DATABASE_URL'): 
   return { dialect: primary.dialect, location: primary.location, readLocations };
 }
 
+/** The encrypted properties of the entities, as `entity.property`. */
+function encryptedProperties(orm: Orm): string[] {
+  const found: string[] = [];
+  for (const meta of orm.getMetadata().getAll().values()) {
+    for (const [name, property] of Object.entries(meta.properties)) {
+      if (typeof property === 'object' && property !== null && Reflect.get(property, 'bkEncrypted') === true)
+        found.push(`${meta.className}.${name}`);
+    }
+  }
+  return found;
+}
+
 /** MikroORM logs `[query] sql [took 1 ms]`. The callback gets the sql only. */
 function queryLogger(sink: (sql: string) => void): (message: string) => void {
   return (message) => {
@@ -204,6 +223,7 @@ export async function initOrm(resolved: ResolvedConnection, common: CommonOrmSet
  * can only reach the database through its own fork (DATA-04, DATA-05). Only the driver of the chosen dialect is loaded.
  */
 export async function createDatabase(env: DatabaseEnv, options: DatabaseOptions): Promise<Database> {
+  if (options.encryption !== undefined) useEncryptionKeys(options.encryption);
   const resolved = resolveConnection(env);
   const common = {
     entities: [...options.entities, ...frameworkEntities],
@@ -220,6 +240,15 @@ export async function createDatabase(env: DatabaseEnv, options: DatabaseOptions)
     subscribers: [new DataSubscriber(options.references)],
   } as const;
   const orm = await initOrm(resolved, common, env.DB_POOL_MAX);
+  if (!hasEncryptionKeys() && encryptedProperties(orm).length > 0) {
+    await orm.close();
+    throw dataError(
+      'DATA_ENCRYPTION_KEY_MISSING',
+      500,
+      `Fields are encrypted (${encryptedProperties(orm).join(', ')}), and no key was given.`,
+      'Pass encryption: { current: APP_KEY } to createDatabase, and the previous key as previous after a rotation.',
+    );
+  }
   const logger = options.logger ?? createLogger({ level: 'info', role: 'data' });
   const sink: AuditSink =
     options.audit === 'table'

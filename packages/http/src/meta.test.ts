@@ -296,7 +296,7 @@ describe('PDP-01 the metadata says which fields hold personal data', () => {
   it('PDP-01 marks a field that is pii and a field that is encrypted, and leaves the others unmarked', async () => {
     const { defineEntity, f } = await import('@bieberkit/data');
     const { testServer } = await import('./testing.ts');
-    const Person = defineEntity({
+    const Contact = defineEntity({
       name: 'crm.Contact',
       table: 'crm_contacts',
       api: { list: true, get: true },
@@ -312,14 +312,12 @@ describe('PDP-01 the metadata says which fields hold personal data', () => {
       authenticator: { authenticate: async () => ({ id: 'u', kind: 'user', via: 'token' }) },
       authorizer: { can: async () => true },
     });
-    registerMeta(server, [Person]);
+    registerMeta(server, [Contact]);
     const meta: Meta = JSON.parse((await server.inject({ method: 'GET', url: '/api/v1/_meta' })).body);
     const marked = (key: string): Record<string, unknown> => {
       const found = entity(meta, 'crm.Contact').fields.find((candidate) => candidate.key === key);
-      return {
-        pii: (found as { pii?: boolean } | undefined)?.pii,
-        encrypted: (found as { encrypted?: boolean } | undefined)?.encrypted,
-      };
+      const flags: Record<string, unknown> = found === undefined ? {} : Object.fromEntries(Object.entries(found));
+      return { pii: flags['pii'], encrypted: flags['encrypted'] };
     };
     expect(marked('taxId')).toEqual({ pii: true, encrypted: true });
     expect(marked('nick')).toEqual({ pii: true, encrypted: undefined });

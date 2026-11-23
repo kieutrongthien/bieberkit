@@ -95,6 +95,10 @@ export type { Database, DatabaseEnv, DatabaseOptions, Orm, ResolvedConnection } 
 export { openMigrator } from './migrate.ts';
 export type { MadeMigration, MigrationEnv, MigrationStatus, Migrator, MigratorOptions, UpOptions } from './migrate.ts';
 export { applyPluginMigrations, runPluginMigrations } from './plugin-migrate.ts';
+export { useEncryptionKeys } from './encryption.ts';
+export type { EncryptionKeys } from './encryption.ts';
+export { reencryptAll } from './reencrypt.ts';
+export type { ReencryptOptions, ReencryptResult } from './reencrypt.ts';
 export type { PluginRefusal, PluginRun, PluginRunOptions } from './plugin-migrate.ts';
 export { setNotNull, uuidType } from './portable.ts';
 export { createSqliteDialect } from './sqlite.ts';

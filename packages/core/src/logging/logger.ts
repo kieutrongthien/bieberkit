@@ -49,6 +49,11 @@ export interface LoggerOptions {
   readonly write?: (line: string) => void;
   /** Values that must never appear in a line, for example the secrets of the environment (CFG-05). */
   readonly secrets?: readonly string[];
+  /**
+   * Names of fields whose value is never written, at any depth and in any case: the fields of personal data (SEC-09). A project
+   * takes them from its entities (`piiFields`). A key that looks like a secret is redacted without being named.
+   */
+  readonly redactKeys?: readonly string[];
   readonly now?: () => Date;
 }
 
@@ -62,13 +67,20 @@ interface Sanitizer {
   text(value: string): string;
 }
 
-function createSanitizer(secrets: readonly string[]): Sanitizer {
+function createSanitizer(secrets: readonly string[], redactKeys: readonly string[] = []): Sanitizer {
+  const named = new Set(redactKeys.map((key) => key.toLowerCase()));
   const known = secrets.filter((secret) => secret !== '').toSorted((a, b) => b.length - a.length);
   const text = (value: string): string => known.reduce((out, secret) => out.split(secret).join(REDACTED), value);
   const ancestors = new Set<object>();
 
   const clean = (value: unknown, key?: string, depth = 0): unknown => {
-    if (key !== undefined && SECRET_KEY.test(key) && value !== undefined && value !== null) return REDACTED;
+    if (
+      key !== undefined &&
+      (SECRET_KEY.test(key) || named.has(key.toLowerCase())) &&
+      value !== undefined &&
+      value !== null
+    )
+      return REDACTED;
     switch (typeof value) {
       case 'string':
         return text(value);
@@ -120,7 +132,7 @@ function severity(level: LogLevel): number {
 export function createLogger(options: LoggerOptions): Logger {
   const write = options.write ?? ((line: string) => void process.stdout.write(`${line}\n`));
   const now = options.now ?? (() => new Date());
-  const sanitizer = createSanitizer(options.secrets ?? []);
+  const sanitizer = createSanitizer(options.secrets ?? [], options.redactKeys);
   const threshold = severity(options.level);
 
   const make = (bindings: LogFields): Logger => {

@@ -55,6 +55,8 @@ export { normalizeInput } from './normalize.ts';
 export { decimalPattern, EMAIL_PATTERN, UTC_INSTANT_PATTERN } from './patterns.ts';
 export { generateRegistrySource } from './registry.ts';
 export type { CreateInput, EntityRegistry, RegistryOptions, Row, UpdateInput } from './registry.ts';
+export { piiFields, redactPii } from './pii.ts';
+export type { PiiField } from './pii.ts';
 export { apiFields } from './shape.ts';
 export type { ApiField, SchemaMode } from './shape.ts';
 export { toZodMini } from './zod-mini.ts';

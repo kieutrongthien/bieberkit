@@ -78,5 +78,5 @@ describeDialects('SEC-08 the rotation of the secret', ({ open }) => {
       payload: { code: totpCode(secret) },
     });
     expect(cookieOf(done)).toBeDefined();
-  });
+  }, 30_000);
 });

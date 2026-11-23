@@ -79,6 +79,10 @@ export interface FieldDef {
   readonly index?: true;
   readonly searchable?: true;
   readonly aggregatable?: true;
+  /** Stored as ciphertext (SEC-08). Text only, and never searched, sorted, grouped or unique. */
+  readonly encrypted?: true;
+  /** Holds personal data (PDP-01): it is listed in the inventory, redacted in logs and in audit data. */
+  readonly pii?: true;
   readonly localized?: true;
   readonly inline?: true;
   readonly default?: unknown;
@@ -112,6 +116,8 @@ interface Chain<Self> {
   searchable(): Self;
   aggregatable(): Self;
   localized(): Self;
+  encrypted(): Self;
+  pii(): Self;
 }
 
 /** What `.computed()` returns: the field is calculated, so it takes no default and no second `.computed()`. */
@@ -251,6 +257,7 @@ export class Field {
         'A localized field cannot be unique.',
         'Uniqueness per locale is not defined. Remove .localized() or .unique().',
       );
+    this.#notWhenEncrypted('.unique()');
     return this.#with({ unique: true });
   }
 
@@ -261,17 +268,20 @@ export class Field {
         'A computed field that is not stored cannot be indexed.',
         'Pass { stored: true } to .computed(), or remove .index().',
       );
+    this.#notWhenEncrypted('.index()');
     return this.#with({ index: true });
   }
 
   searchable(): Field {
     if (!TEXT_KINDS.has(this.def.kind)) this.#reject('.searchable()');
+    this.#notWhenEncrypted('.searchable()');
     return this.#with({ searchable: true });
   }
 
   /** The field may be grouped by, or summed, in the aggregate endpoint (API-15). */
   aggregatable(): Field {
     if (!AGGREGATABLE_KINDS.has(this.def.kind)) this.#reject('.aggregatable()');
+    this.#notWhenEncrypted('.aggregatable()');
     if (this.def.computed?.stored === false)
       invalid(
         'A computed field that is not stored cannot be aggregated.',
@@ -282,12 +292,57 @@ export class Field {
 
   localized(): Field {
     if (!TEXT_KINDS.has(this.def.kind)) this.#reject('.localized()');
+    this.#notWhenEncrypted('.localized()');
     if (this.def.unique === true)
       invalid(
         'A localized field cannot be unique.',
         'Uniqueness per locale is not defined. Remove .localized() or .unique().',
       );
     return this.#with({ localized: true });
+  }
+
+  /**
+   * The value is stored as ciphertext (SEC-08). It is for text, and ciphertext cannot be searched, so an encrypted field cannot be
+   * indexed, unique, searchable, aggregated, localized or compared as folded text.
+   */
+  encrypted(): Field {
+    if (!TEXT_KINDS.has(this.def.kind)) this.#reject('.encrypted()');
+    const refused: [boolean, string][] = [
+      [this.def.index === true, '.index()'],
+      [this.def.unique === true, '.unique()'],
+      [this.def.searchable === true, '.searchable()'],
+      [this.def.aggregatable === true, '.aggregatable()'],
+      [this.def.localized === true, '.localized()'],
+      // An email is compared without case by default, and has no option for it: an encrypted one is compared as it is.
+      [
+        this.def.kind !== 'email' && this.def.compare !== undefined && this.def.compare !== 'exact',
+        'a compare mode other than exact',
+      ],
+    ];
+    for (const [present, what] of refused) {
+      if (present)
+        invalid(
+          `An encrypted field cannot have ${what}, because ciphertext cannot be searched.`,
+          `Remove ${what}, or remove .encrypted(). A lookup by the value needs a hash column of your own.`,
+        );
+    }
+    return this.#with({ encrypted: true, ...(this.def.kind === 'email' ? { compare: 'exact' as const } : {}) });
+  }
+
+  /** The field holds personal data (PDP-01). */
+  pii(): Field {
+    if (['id', 'createdAt', 'updatedAt', 'hasOne', 'hasMany', 'sequence', 'state'].includes(this.def.kind))
+      this.#reject('.pii()');
+    return this.#with({ pii: true });
+  }
+
+  #notWhenEncrypted(what: string): void {
+    if (this.def.encrypted === true) {
+      invalid(
+        `An encrypted field cannot have ${what}, because ciphertext cannot be searched.`,
+        `Remove ${what}, or remove .encrypted().`,
+      );
+    }
   }
 
   default(value: unknown): Field {

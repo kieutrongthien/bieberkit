@@ -53,6 +53,8 @@ const Vault = defineEntity({
 });
 
 const key = (): string => randomBytes(32).toString('base64');
+const raw = async (db: Database): Promise<Record<string, unknown>[]> =>
+  db.orm.em.getConnection().execute('select * from vault_secrets order by label');
 const TENANT_A = uuid7();
 const TENANT_B = uuid7();
 
@@ -89,9 +91,6 @@ describeDialects('SEC-08 encrypted fields', ({ open }) => {
         return String(row['id']);
       }),
     );
-
-  const raw = async (db: Database): Promise<Record<string, unknown>[]> =>
-    db.orm.em.getConnection().execute('select * from vault_secrets order by label');
 
   it('SEC-08 the column holds ciphertext, and the clear text is in no column of the row', async () => {
     const { db, schema } = await setup();
@@ -196,6 +195,9 @@ describeDialects('SEC-08 encrypted fields', ({ open }) => {
   });
 });
 
+const read = (db: Database, schema: Parameters<typeof listPage>[1], tenant: string) =>
+  runAsTenant(tenant, () => runInUnitOfWork(db, (em) => listPage(em, schema, { sort: [{ field: 'label' }] })));
+
 describeDialects('SEC-08 the rotation of the key', ({ open }) => {
   const OLD = key();
   const NEW = key();
@@ -220,9 +222,6 @@ describeDialects('SEC-08 the rotation of the key', ({ open }) => {
     }
     return { db, schema };
   }
-
-  const read = (db: Database, schema: Parameters<typeof listPage>[1], tenant: string) =>
-    runAsTenant(tenant, () => runInUnitOfWork(db, (em) => listPage(em, schema, { sort: [{ field: 'label' }] })));
 
   it('SEC-08 with the old key as previous, what the old key wrote is still read, and what is written is made by the new key', async () => {
     const { db, schema } = await seeded();
@@ -312,6 +311,7 @@ describe('SEC-08 boot', () => {
       { DB_CONNECTION: 'sqlite', DATABASE_URL: ':memory:', DATABASE_READ_URLS: [], DB_POOL_MAX: 1 },
       { entities: schemas, encryption: { current: key() } },
     );
+    expect(db.dialect).toBe('sqlite');
     await db.close();
   });
 });

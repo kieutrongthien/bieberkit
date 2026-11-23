@@ -25,6 +25,8 @@
 import type { EntityManager } from '@mikro-orm/core';
 import { requestContext } from '@bieberkit/core';
 import { dataError } from '../errors.ts';
+import { redactPii } from '../schema/pii.ts';
+import type { EntityDef } from '../schema/define-entity.ts';
 import type { Orm } from './connect.ts';
 import { AuditLog } from './framework.ts';
 import type { AuditSink, SystemScopeEntry } from './tenant.ts';
@@ -38,6 +40,8 @@ export interface AuditEntry {
   readonly reason?: string;
   /** What changed. Anything that JSON can hold. Never put a value of a `pii` field in it in clear text (PDP-06). */
   readonly data?: unknown;
+  /** The entity that `data` is about. The values of its `pii` fields are replaced by `[redacted]` before the entry is written. */
+  readonly piiOf?: EntityDef<string>;
   /** The tenant of the entry. Defaults to the tenant of the request. */
   readonly tenantId?: string;
 }
@@ -76,7 +80,7 @@ export function recordAudit(em: EntityManager, entry: AuditEntry): void {
     entity: entry.entity ?? null,
     recordId: entry.recordId ?? null,
     reason: entry.reason ?? null,
-    data: dataText(entry.data),
+    data: dataText(entry.piiOf === undefined ? entry.data : redactPii(entry.piiOf, entry.data)),
     tenant: entry.tenantId ?? context?.tenantId ?? null,
     actorId: context?.userId ?? null,
     requestId: context?.requestId ?? null,

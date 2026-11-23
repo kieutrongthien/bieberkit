@@ -32,6 +32,7 @@ import { Field, f } from '../schema/fields.ts';
 import type { FieldDef } from '../schema/fields.ts';
 import { fold } from '../text/fold.ts';
 import type { Compare } from '../text/fold.ts';
+import { encryptedType } from './encrypted-type.ts';
 import { isSystemScope, requireTenant } from './tenant.ts';
 import { Uuid7Type } from './uuid7-type.ts';
 
@@ -117,8 +118,20 @@ const bigint = (): BigIntType => new BigIntType('bigint');
 const currentUser = (): string | undefined => requestContext.get()?.userId;
 
 /** The columns that one declared field adds, as ORM properties. Relations are handled by the caller. */
-function columnsOf(name: string, def: FieldDef): Record<string, Property> {
+function columnsOf(entityName: string, name: string, def: FieldDef): Record<string, Property> {
   const nullable = def.optional === true;
+  if (def.encrypted === true) {
+    // Text in the column is ciphertext. A default is written by the type, encrypted, and not as a plaintext default of the table.
+    const fallback = def.default;
+    return {
+      [name]: {
+        type: encryptedType(`${entityName}.${name}`),
+        nullable,
+        bkEncrypted: true,
+        ...(fallback === undefined ? {} : { onCreate: () => fallback }),
+      },
+    };
+  }
   const column = snake(name);
   const withDefault = def.default === undefined ? {} : { default: def.default };
   switch (def.kind) {
@@ -201,9 +214,9 @@ function columnsOf(name: string, def: FieldDef): Record<string, Property> {
 }
 
 /** A stored computed field is a column filled from the row on create and on every update (MOD-08). */
-function computedColumns(name: string, def: FieldDef): Record<string, Property> {
+function computedColumns(entityName: string, name: string, def: FieldDef): Record<string, Property> {
   const fn = def.computed?.fn;
-  const props = columnsOf(name, { ...def, optional: true });
+  const props = columnsOf(entityName, name, { ...def, optional: true });
   const own = props[name];
   if (fn === undefined || own === undefined) return props;
   const calculate = (entity: Record<string, unknown>): unknown => fn(entity);
@@ -348,7 +361,8 @@ export function compileEntities(defs: readonly EntityDef<string>[], options: Com
         continue;
       }
       if (field.computed !== undefined && !field.computed.stored) continue;
-      const own = field.computed === undefined ? columnsOf(name, field) : computedColumns(name, field);
+      const own =
+        field.computed === undefined ? columnsOf(def.name, name, field) : computedColumns(def.name, name, field);
       for (const [property, value] of Object.entries(own)) {
         props[property] = value;
         const fieldName = typeof value['fieldName'] === 'string' ? value['fieldName'] : snake(property);
