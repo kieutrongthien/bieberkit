@@ -42,8 +42,10 @@ describeDialects('AUTH-01 the authenticator', ({ open }) => {
     const { id, cookie } = await app.login('an@example.vn');
     const principal = await createAuthenticator(app.auth).authenticate(info(cookie));
     expect(principal).toMatchObject({ id, kind: 'user', via: 'cookie' });
-    const [session] = await app.rows('select id from auth_sessions');
-    expect(principal?.sessionId).toBe(String(session?.['id']));
+    const shown = (await app.api('GET', '/get-session', { cookie })).body['session'];
+    expect(principal?.sessionId).toBe(
+      typeof shown === 'object' && shown !== null && 'id' in shown ? String(shown.id) : '',
+    );
   });
 
   it('AUTH-01 gives no principal and asks no question of the database when there is no cookie', async () => {

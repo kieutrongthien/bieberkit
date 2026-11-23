@@ -27,9 +27,10 @@ import { isUuid, uuid7 } from '@bieberkit/data';
 import type { PluginMigrationStep } from '@bieberkit/data';
 import { runInUnitOfWork, Uuid7Type, uuidType } from '@bieberkit/data/orm';
 import type { Database } from '@bieberkit/data/orm';
+import { AUTH_PLUGIN, authStep } from './plugin.ts';
+import { authTableEntities, authTableSteps } from './tables.ts';
 
-/** The name of this package in the ledger of plugin steps. */
-export const AUTH_PLUGIN = '@bieberkit/auth';
+export { AUTH_PLUGIN };
 
 /** The tenant of a request that has none. The roles of such a request belong to it. */
 export const NIL_TENANT = '00000000-0000-0000-0000-000000000000';
@@ -91,17 +92,17 @@ export const AuthUserRole: EntitySchema<AuthUserRoleRow> = new EntitySchema<Auth
   indexes: [{ name: 'auth_user_roles_user_index', properties: ['tenant', 'userId'] }],
 });
 
-export const authEntities: readonly EntitySchema[] = [AuthRole, AuthRolePermission, AuthUserRole];
+export const authEntities: readonly EntitySchema[] = [AuthRole, AuthRolePermission, AuthUserRole, ...authTableEntities];
 
 function step(id: string, up: PluginMigrationStep['up']): PluginMigrationStep {
-  return { plugin: AUTH_PLUGIN, version: '0.1.0', id, kind: 'expand', up };
+  return authStep('0.1.0', id, up);
 }
 
 /**
  * The steps that make the three tables of the roles (DATA-24). One step is one statement, so a failed run on MySQL can be repeated.
  * A role cannot be given in another tenant than its own (the key `(tenant_id, role_id)`), and deleting a role deletes what hangs on it.
  */
-export const authMigrationSteps: readonly PluginMigrationStep[] = [
+const roleSteps: readonly PluginMigrationStep[] = [
   step('roles-create', async (trx, dialect) => {
     await trx.schema
       .createTable('auth_roles')
@@ -150,6 +151,9 @@ export const authMigrationSteps: readonly PluginMigrationStep[] = [
       .execute();
   }),
 ];
+
+/** Every step of this package: the roles (0.1.0) and the tables of Better Auth (0.2.0). */
+export const authMigrationSteps: readonly PluginMigrationStep[] = [...roleSteps, ...authTableSteps];
 
 export interface Grants {
   /** The union of the permissions of the roles that the user has in the tenant. */

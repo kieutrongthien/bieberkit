@@ -243,6 +243,15 @@ export function currentEntityManager(): EntityManager | undefined {
   return current.getStore();
 }
 
+/**
+ * Runs `fn` in a unit of work that is also a database transaction: it commits when `fn` returns and rolls back when it throws. The
+ * ORM and every Kysely of `requestKysely` write in this one transaction. Only a service, or a boundary that stands for one (the
+ * auth routes), opens a transaction (MOD-16).
+ */
+export function runInTransaction<T>(db: Database, fn: (em: EntityManager) => Promise<T>): Promise<T> {
+  return db.fork().transactional(async (em) => current.run(em, () => fn(em)));
+}
+
 /** Runs `fn` with its own EntityManager, for one request or one job. Two units of work never share an identity map (DATA-05). */
 export function runInUnitOfWork<T>(db: Database, fn: (em: EntityManager) => Promise<T>): Promise<T> {
   const em = db.fork();

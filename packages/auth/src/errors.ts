@@ -31,3 +31,11 @@ export class AuthzError extends BkError {}
 export function authzError(code: string, status: number, message: string, fix: string): AuthzError {
   return new AuthzError(message, { code, status, fix });
 }
+
+/** An error of authentication. Its code starts with `AUTH_`. */
+export class AuthError extends BkError {}
+
+/** Builds an `AuthError` with the status and the fix text that the module spec lists for its code. */
+export function authError(code: string, status: number, message: string, fix: string): AuthError {
+  return new AuthError(message, { code, status, fix });
+}

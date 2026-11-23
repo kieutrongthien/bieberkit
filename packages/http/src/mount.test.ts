@@ -187,7 +187,8 @@ describe('AUTH-09 mount in the pipeline', () => {
     server.route(okRoute('/api/v1/t/a'));
     server.mount({ prefix: '/api/auth', handler: echoing().handler });
     expect(server.routes().map((route) => route.url)).toEqual(['/api/v1/t/a']);
-    expect(Object.keys(openApiDocument(server.routes(), { title: 't', version: '1' }).paths)).toEqual(['/api/v1/t/a']);
+    const paths = openApiDocument(server.routes(), { title: 't', version: '1' })['paths'];
+    expect(Object.keys(typeof paths === 'object' && paths !== null ? paths : {})).toEqual(['/api/v1/t/a']);
   });
 
   it('API-01 it takes the paths under the prefix only', async () => {

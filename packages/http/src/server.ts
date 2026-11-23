@@ -79,6 +79,12 @@ export interface StageContext {
 
 export type StageHook = (context: StageContext) => void | Promise<void>;
 
+export interface MountDef {
+  /** A path that starts with a slash and has no slash at its end, such as `/api/auth`. */
+  readonly prefix: string;
+  readonly handler: (request: Request) => Promise<Response>;
+}
+
 export interface HttpServerOptions {
   readonly logger?: Logger;
   readonly authenticator?: Authenticator;
@@ -120,6 +126,13 @@ export interface InjectResponse {
 export interface HttpServer {
   /** Adds a route. It throws `HTTP_ROUTE_INVALID` when the route breaks a rule, and when the server has started. */
   route(route: RouteDef): void;
+  /**
+   * Hands every request under `prefix` to a web handler, such as the one of Better Auth (AUTH-09). The request goes through the
+   * stages of the pipeline (id, limit by address, authentication, tenant, CSRF) and the handler gets a web `Request` whose
+   * `x-bk-client-ip` is the address that `TRUST_PROXY` resolved, whatever the client sent. The handler's `Response` is the answer.
+   * A mounted prefix has no schema and no permission, so it is not in `routes()` nor in the OpenAPI document.
+   */
+  mount(mount: MountDef): void;
   /** Adds a hook at one of the four stages that a plugin may use (REQ-01). */
   stage(name: StageName, hook: StageHook): void;
   inject(request: InjectOptions): Promise<InjectResponse>;
@@ -143,6 +156,8 @@ const DEFAULT_KEEP_ALIVE = 65_000;
 interface RouteState {
   readonly def: RouteDef;
   readonly internal: boolean;
+  /** A route of a mounted handler: it has no schema, and its answers are the handler's own, so no ETag is made for them. */
+  readonly mounted?: true;
   readonly params: ((data: unknown) => boolean) | undefined;
   readonly query: ((data: unknown) => boolean) | undefined;
   readonly body: ((data: unknown) => boolean) | undefined;
@@ -543,7 +558,11 @@ export function createHttpServer(env: HttpEnv, options: HttpServerOptions = {}):
     const def = route?.def;
     if (def?.deprecated !== undefined) announceDeprecation(reply, def.deprecated);
     const ok =
-      request.method === 'GET' && reply.statusCode === 200 && typeof payload === 'string' && route?.internal !== true;
+      request.method === 'GET' &&
+      reply.statusCode === 200 &&
+      typeof payload === 'string' &&
+      route?.internal !== true &&
+      route?.mounted !== true;
     if (ok && def?.cache !== undefined) announceCache(reply, def.cache);
     if (ok) {
       if (reply.getHeader('etag') === undefined) void reply.header('etag', weakEtag(payload));
@@ -807,6 +826,64 @@ export function createHttpServer(env: HttpEnv, options: HttpServerOptions = {}):
     });
   };
 
+  const mounted = new Set<string>();
+  const MOUNT_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] as const;
+  const mountPrefix = (mount: MountDef): void => {
+    const stub = { method: 'GET', url: `${mount.prefix}/*` } as const;
+    if (started) invalidRoute(stub, 'it was mounted after the server started.');
+    if (!/^\/[^/\s*?#]+(\/[^/\s*?#]+)*$/.test(mount.prefix))
+      invalidRoute(stub, 'a prefix starts with a slash, has no slash at its end and no wildcard.');
+    if (mounted.has(mount.prefix)) invalidRoute(stub, 'it is already mounted.');
+    if (added.some((route) => route.url === mount.prefix || route.url.startsWith(`${mount.prefix}/`)))
+      invalidRoute(stub, 'a route is already registered under this prefix.');
+    mounted.add(mount.prefix);
+    const state: RouteState = {
+      def: { ...stub, public: true, schema: { response: {} }, handler: () => undefined },
+      internal: false,
+      mounted: true,
+      params: undefined,
+      query: undefined,
+      body: undefined,
+      statuses: new Set(),
+    };
+    app.route({
+      method: [...MOUNT_METHODS],
+      url: `${mount.prefix}/*`,
+      config: { bk: state },
+      handler: async (request, reply) => {
+        const headers = new Headers();
+        for (const [name, value] of Object.entries(request.headers)) {
+          if (value === undefined || ['content-length', 'transfer-encoding', 'x-bk-client-ip'].includes(name)) continue;
+          for (const item of Array.isArray(value) ? value : [value]) headers.append(name, item);
+        }
+        // The address that TRUST_PROXY resolved is the only one that the handler may use (AUTH-10).
+        headers.set('x-bk-client-ip', request.ip);
+        const body =
+          request.method === 'GET' || request.body === undefined || request.body === null
+            ? undefined
+            : typeof request.body === 'string'
+              ? request.body
+              : JSON.stringify(request.body);
+        const response = await mount.handler(
+          new Request(`${request.protocol}://${request.host}${request.url}`, {
+            method: request.method,
+            headers,
+            ...(body === undefined ? {} : { body }),
+          }),
+        );
+        for (const cookie of response.headers.getSetCookie()) void reply.header('set-cookie', cookie);
+        response.headers.forEach((value, name) => {
+          if (name !== 'set-cookie') void reply.header(name, value);
+        });
+        const retry = response.headers.get('x-retry-after');
+        if (response.status === 429 && retry !== null && response.headers.get('retry-after') === null)
+          void reply.header('retry-after', retry);
+        void reply.code(response.status).send(await response.text());
+        return reply;
+      },
+    });
+  };
+
   register(
     probe('/health/live', () => undefined),
     true,
@@ -822,6 +899,7 @@ export function createHttpServer(env: HttpEnv, options: HttpServerOptions = {}):
 
   return {
     route: (route) => register(route, false),
+    mount: mountPrefix,
     stage(name, hook) {
       if (!STAGE_NAMES.includes(name)) {
         throw new HttpError(

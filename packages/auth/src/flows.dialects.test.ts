@@ -173,6 +173,7 @@ describeDialects('AUTH-09 the flows of ADR 0012', ({ open }) => {
   it('SEC-03 a sign out from another site with a cookie is refused by the check of the origin', async () => {
     const app = await authServer(open);
     const { cookie } = await app.login('an@example.vn');
+    const before = await app.count('auth_sessions');
     const reply = await app.api('POST', '/sign-out', {
       cookie,
       payload: {},
@@ -180,7 +181,7 @@ describeDialects('AUTH-09 the flows of ADR 0012', ({ open }) => {
       headers: { origin: 'https://evil.test' },
     });
     expect(reply.status).toBe(403);
-    expect(await app.count('auth_sessions')).toBe(1);
+    expect(await app.count('auth_sessions')).toBe(before);
   });
 
   it('AUTH-10 a cookie value that Better Auth did not sign is no session', async () => {

@@ -59,6 +59,7 @@ export type {
   HttpServerOptions,
   InjectOptions,
   InjectResponse,
+  MountDef,
   StageContext,
   StageHook,
   StageName,

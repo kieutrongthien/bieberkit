@@ -27,8 +27,8 @@ import { expect, it } from 'vitest';
 import { uuid7 } from '../keys/uuid7.ts';
 import { describeDialects } from '../testing/dialects.ts';
 import type { Database } from './connect.ts';
-import { runInUnitOfWork } from './connect.ts';
-import { requestKysely, runInTransaction } from './request-kysely.ts';
+import { runInTransaction, runInUnitOfWork } from './connect.ts';
+import { requestKysely } from './request-kysely.ts';
 import { Uuid7Type } from './uuid7-type.ts';
 
 interface ProbeRow {
@@ -116,6 +116,21 @@ describeDialects('AUTH-09 the Kysely of the request', ({ dialect, open }) => {
         }),
     );
     expect(await labels(db)).toEqual(['nested']);
+  });
+
+  it('AUTH-09 a connection that a library asks for inside the request transaction is the transaction itself', async () => {
+    const db = await open([Probe]);
+    await expect(
+      runInTransaction(db, async () => {
+        await requestKysely(db)
+          .connection()
+          .execute(async (connection) => {
+            await connection.insertInto('probe').values({ id: uuid7(), label: 'connected' }).execute();
+          });
+        throw new Error('forced failure');
+      }),
+    ).rejects.toThrow('forced failure');
+    expect(await labels(db)).toEqual([]);
   });
 
   it('AUTH-09 outside a transaction, transaction() is a real one: it commits, and it rolls back on a failure', async () => {

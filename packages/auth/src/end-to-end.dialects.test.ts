@@ -84,8 +84,9 @@ describeDialects('AUTH-01 sign up, sign in and the entity routes', ({ open }) =>
     expect((await app.send('GET', DEALS, { cookie, tenant: TENANT_A })).status).toBe(401);
   });
 
-  it('AUTHZ-04 a signed in user with no role is 403, and the refusal is audited with the id of the user', async () => {
+  it('AUTHZ-04 a signed in user whose roles do not allow the read is 403, and the refusal is audited with the id of the user', async () => {
     const { app, id, cookie } = await world(open);
+    await app.grant(id, ['crm.deal.create'], TENANT_A);
     const reply = await app.send('GET', DEALS, { cookie, tenant: TENANT_A });
     expect(reply.status).toBe(403);
     expect(

@@ -32,13 +32,13 @@ const make = (extra: Partial<Parameters<typeof createAuth>[0]> = {}) =>
   createAuth({ db: DB, dialect: 'sqlite', secret: 'x'.repeat(40), baseUrl: 'https://app.test', ...extra });
 
 describe('AUTH-10 the options of Better Auth', () => {
-  it('AUTH-01 names the cookie __Host-bk_session, with its attributes, and leaves useSecureCookies alone', () => {
+  it('AUTH-01 names the cookie __Host-bk_session, with its attributes, and never turns useSecureCookies on, which would prefix the name with __Secure-, even for an https base URL', () => {
     const { options } = make();
     expect(options.advanced?.cookies?.['session_token']).toEqual({
       name: '__Host-bk_session',
       attributes: { httpOnly: true, secure: true, sameSite: 'lax', path: '/' },
     });
-    expect(options.advanced?.useSecureCookies).toBeUndefined();
+    expect(options.advanced?.useSecureCookies).toBe(false);
   });
 
   it('AUTH-10 takes the client IP from x-bk-client-ip only', () => {

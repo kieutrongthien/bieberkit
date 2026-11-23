@@ -82,7 +82,15 @@ export type {
 export { bulkInsert, bulkUpdate } from './bulk.ts';
 export { compileEntities, entityOfSchema } from './compile.ts';
 export type { CompileOptions, OrmSchema } from './compile.ts';
-export { createDatabase, currentEntityManager, resolveConnection, runInUnitOfWork } from './connect.ts';
+export {
+  createDatabase,
+  currentEntityManager,
+  resolveConnection,
+  runInTransaction,
+  runInUnitOfWork,
+} from './connect.ts';
+export { requestKysely } from './request-kysely.ts';
+export type { RequestKysely } from './request-kysely.ts';
 export type { Database, DatabaseEnv, DatabaseOptions, Orm, ResolvedConnection } from './connect.ts';
 export { openMigrator } from './migrate.ts';
 export type { MadeMigration, MigrationEnv, MigrationStatus, Migrator, MigratorOptions, UpOptions } from './migrate.ts';

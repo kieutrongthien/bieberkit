@@ -35,9 +35,28 @@ export type {
   EntityShape,
   ScopedPermission,
 } from './ability.ts';
+export { createAuthenticator } from './authenticator.ts';
+export { createAuth, limiterOf } from './better-auth.ts';
+export type {
+  AuthInstance,
+  AuthLimits,
+  AuthMail,
+  BetterAuthOptions,
+  CreateAuthOptions,
+  Limit,
+  Limit2,
+} from './better-auth.ts';
+export { checkAuthDrift, driftEntities } from './drift.ts';
+export type { DriftEntity, DriftProperty } from './drift.ts';
 export { createAuthorizer } from './authorizer.ts';
+export { registerAuthRoutes } from './routes.ts';
+export type { AuthRoutesOptions } from './routes.ts';
+export { AuthAccount, AuthRateLimit, AuthSession, AuthUser, AuthVerification } from './tables.ts';
+export type { AuthAccountRow, AuthRateLimitRow, AuthSessionRow, AuthUserRow, AuthVerificationRow } from './tables.ts';
+export { createTenantResolver } from './tenant.ts';
+export type { TenantResolverOptions } from './tenant.ts';
 export type { AccessAuthorizer, AuthorizerOptions } from './authorizer.ts';
-export { AuthzError, authzError } from './errors.ts';
+export { AuthError, AuthzError, authError, authzError } from './errors.ts';
 export { buildPermissionRegistry } from './registry.ts';
 export type { Action, MaskedField, PermissionEntry, PermissionRegistry } from './registry.ts';
 export {

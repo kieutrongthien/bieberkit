@@ -44,7 +44,7 @@ describe('DATA-24 the steps of the auth tables', () => {
     expect(authMigrationSteps.length).toBeGreaterThan(0);
     expect(authMigrationSteps.every((step) => step.plugin === AUTH_PLUGIN && step.kind === 'expand')).toBe(true);
     expect(new Set(authMigrationSteps.map((step) => step.id)).size).toBe(authMigrationSteps.length);
-    expect(authEntities).toHaveLength(3);
+    expect(authEntities).toEqual(expect.arrayContaining([AuthRole, AuthRolePermission, AuthUserRole]));
   });
 });
 
