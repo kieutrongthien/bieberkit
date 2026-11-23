@@ -48,6 +48,7 @@ Status values: `Proposed`, `Accepted`, `Rejected`, `Superseded by NNNN`. Only th
 | [0014](0014-release-pipeline.md)                | Release pipeline: trusted publishing from tarballs      | Accepted |
 | [0015](0015-runtime-dependencies-of-phase-1.md) | Runtime dependencies of Phase 1                         | Proposed |
 | [0016](0016-cache-engines.md)                   | Cache engines: BentoCache drivers and ioredis           | Proposed |
+| [0017](0017-storage-disks.md)                   | Storage disks: FlyDrive, visibility as a prefix         | Proposed |
 
 ## Needed for the Phase 0 gate
 

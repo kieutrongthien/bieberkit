@@ -43,6 +43,8 @@ export default defineConfig({
       },
       // The Valkey of the cache suites of @bieberkit/cache (packages/cache/src/testing). Its policy must evict (`allkeys-lru`).
       cacheRedisUrl: process.env['CACHE_TEST_REDIS_URL'] ?? '',
+      // The S3 compatible server of the storage suites of @bieberkit/storage (packages/storage/src/testing), MinIO with the default keys.
+      storageS3Endpoint: process.env['STORAGE_TEST_S3_ENDPOINT'] ?? '',
     },
     // `pnpm test:coverage`. TST-01: 90 percent of lines for core, data, http and auth, 80 percent for the rest.
     // Each package gets its threshold when it reaches Phase 1.
@@ -56,6 +58,7 @@ export default defineConfig({
         'packages/data/src/**': { lines: 90 },
         'packages/auth/src/**': { lines: 90 },
         'packages/cache/src/**': { lines: 90 },
+        'packages/storage/src/**': { lines: 90 },
       },
     },
   },
