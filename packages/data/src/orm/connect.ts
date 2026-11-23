@@ -277,8 +277,40 @@ export function currentEntityManager(): EntityManager | undefined {
  * ORM and every Kysely of `requestKysely` write in this one transaction. Only a service, or a boundary that stands for one (the
  * auth routes), opens a transaction (MOD-16).
  */
-export function runInTransaction<T>(db: Database, fn: (em: EntityManager) => Promise<T>): Promise<T> {
-  return db.fork().transactional(async (em) => current.run(em, () => fn(em)));
+export async function runInTransaction<T>(db: Database, fn: (em: EntityManager) => Promise<T>): Promise<T> {
+  const hooks: CommitHook[] = [];
+  const result = await commitHooks.run(hooks, () =>
+    db.fork().transactional(async (em) => current.run(em, () => fn(em))),
+  );
+  for (const hook of hooks) await runHook(hook);
+  return result;
+}
+
+type CommitHook = () => Promise<void> | void;
+const commitHooks = new AsyncLocalStorage<CommitHook[]>();
+let hookLogger: Logger | undefined;
+
+/** A hook is best effort: a failure is a warning and never changes what was committed (DATA-13). */
+async function runHook(hook: CommitHook): Promise<void> {
+  try {
+    await hook();
+  } catch (error) {
+    hookLogger ??= createLogger({ level: 'warn', role: 'data' });
+    hookLogger.warn('a function after commit failed', {
+      reason: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
+/**
+ * Runs `callback` when the transaction that is running commits, in the order that it was asked, and never when it is rolled back.
+ * It is for what must follow a committed write and must not be part of it: dropping a cache tag, waking a worker. A failure only
+ * logs a warning. Outside a transaction the callback runs at once (DATA-13).
+ */
+export function afterCommit(callback: CommitHook): void {
+  const hooks = commitHooks.getStore();
+  if (hooks === undefined) void runHook(callback);
+  else hooks.push(callback);
 }
 
 /** Runs `fn` with its own EntityManager, for one request or one job. Two units of work never share an identity map (DATA-05). */

@@ -2,7 +2,7 @@
  * BieberKit
  *
  * @file        packages/cache/src/index.ts
- * @description Public entry point of @bieberkit/cache.
+ * @description Public API of @bieberkit/cache: the cache, the memory engine, the shared Idempotency-Key store and the errors.
  * @author      Bieber Kieu <kieutrongthien@gmail.com>
  * @copyright   Copyright (c) 2026 Bieber Kieu
  * @license     Apache-2.0
@@ -22,7 +22,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-// Public API of @bieberkit/cache. Implementation starts after the Phase 0 ADRs (docs/adr/README.md).
-
-/** npm name of this package. */
-export const packageName = '@bieberkit/cache';
+export { createCache } from './cache.ts';
+export type { AtomicCache, Cache, CacheOptions, CacheReader, Lock, LockOptions, TaggedCache } from './cache.ts';
+export { CacheError } from './contract.ts';
+export type { Atomic, CacheEngine, CacheValue } from './contract.ts';
+export { createCacheIdempotencyStore } from './idempotency.ts';
+export type { CacheIdempotencyOptions } from './idempotency.ts';
+export { createLayeredEngine } from './layered-engine.ts';
+export type { LayeredEngineOptions } from './layered-engine.ts';
+export { createMemoryEngine } from './memory-engine.ts';
+export type { MemoryEngineOptions } from './memory-engine.ts';

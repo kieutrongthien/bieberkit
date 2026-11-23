@@ -83,6 +83,7 @@ export { bulkInsert, bulkUpdate } from './bulk.ts';
 export { compileEntities, entityOfSchema } from './compile.ts';
 export type { CompileOptions, OrmSchema } from './compile.ts';
 export {
+  afterCommit,
   createDatabase,
   currentEntityManager,
   resolveConnection,

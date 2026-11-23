@@ -19,6 +19,16 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
+    "./bentocache": {
+      "@bieberkit/source": "./src/adapters/bentocache/index.ts",
+      "types": "./dist/bentocache.d.ts",
+      "default": "./dist/bentocache.js"
+    },
+    "./testing": {
+      "@bieberkit/source": "./src/testing/index.ts",
+      "types": "./dist/testing.d.ts",
+      "default": "./dist/testing.js"
+    },
     "./package.json": "./package.json"
   },
   "publishConfig": {
@@ -26,6 +36,14 @@
       ".": {
         "types": "./dist/index.d.ts",
         "default": "./dist/index.js"
+      },
+      "./bentocache": {
+        "types": "./dist/bentocache.d.ts",
+        "default": "./dist/bentocache.js"
+      },
+      "./testing": {
+        "types": "./dist/testing.d.ts",
+        "default": "./dist/testing.js"
       },
       "./package.json": "./package.json"
     },
@@ -36,7 +54,11 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
-    "@bieberkit/core": "workspace:*"
+    "@bieberkit/core": "workspace:*",
+    "@bieberkit/data": "workspace:*",
+    "@bieberkit/http": "workspace:*",
+    "bentocache": "1.6.1",
+    "ioredis": "5.11.1"
   },
   "engines": {
     "node": ">=24.12"

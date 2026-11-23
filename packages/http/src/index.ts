@@ -27,6 +27,8 @@ export const packageName = '@bieberkit/http';
 
 export { createCsrf, registerCsrfToken } from './csrf.ts';
 export type { CsrfProtection } from './csrf.ts';
+export { createMemoryIdempotencyStore } from './idempotency.ts';
+export type { IdempotencyBegin, IdempotencyStore, MemoryIdempotencyOptions, StoredResponse } from './idempotency.ts';
 export { createHttpFetch, HttpFetchError, isBlockedAddress } from './http-fetch.ts';
 export type { HttpFetch, HttpFetchInit, HttpFetchOptions, ResolvedAddress } from './http-fetch.ts';
 export type { CorsOptions } from './security.ts';
