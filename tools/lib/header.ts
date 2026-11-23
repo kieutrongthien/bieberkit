@@ -143,6 +143,8 @@ export function renderHeader(style: CommentStyle, fields: HeaderFields): string 
       return lines.map((l) => (l === '' ? '--' : `-- ${l}`)).join('\n');
     case 'html':
       return ['<!--', ...lines.map((l) => (l === '' ? '' : `  ${l}`)), '-->'].join('\n');
+    default:
+      return style satisfies never;
   }
 }
 

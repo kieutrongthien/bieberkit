@@ -27,6 +27,8 @@ import { describe, expect, it } from 'vitest';
 import type { Database } from '@bieberkit/data/orm';
 import { createAuth } from './better-auth.ts';
 
+// A database that `createAuth` never touches: nothing here sends a query, so a bare object is enough.
+// oxlint-disable-next-line typescript/no-unsafe-type-assertion
 const DB = {} as unknown as Database;
 const make = (extra: Partial<Parameters<typeof createAuth>[0]> = {}) =>
   createAuth({ db: DB, dialect: 'sqlite', secret: 'x'.repeat(40), baseUrl: 'https://app.test', ...extra });

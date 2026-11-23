@@ -348,14 +348,14 @@ describe('WH-04 timeouts and size', () => {
   });
 });
 
-describe('WH-04 retries', () => {
-  const flaky =
-    (failures: number): Handler =>
-    (_request, response, count) => {
-      if (count <= failures) response.writeHead(503).end('no');
-      else response.writeHead(200).end('yes');
-    };
+const flaky =
+  (failures: number): Handler =>
+  (_request, response, count) => {
+    if (count <= failures) response.writeHead(503).end('no');
+    else response.writeHead(200).end('yes');
+  };
 
+describe('WH-04 retries', () => {
   it('WH-04 retries a GET after a 503, up to twice', async () => {
     const server = await listen(flaky(2));
     const response = await createHttpFetch(LOCAL).fetch(server.url);
@@ -406,17 +406,17 @@ describe('WH-04 retries', () => {
   });
 });
 
-describe('WH-04 the circuit breaker of a host', () => {
-  async function broken() {
-    let clock = 0;
-    let healthy = false;
-    const server = await listen((_request, response) =>
-      healthy ? response.writeHead(200).end('ok') : response.writeHead(500).end('x'),
-    );
-    const http = createHttpFetch({ ...LOCAL, retries: 0, failureThreshold: 3, openMs: 1000, now: () => clock });
-    return { server, http, advance: (ms: number) => void (clock += ms), heal: () => void (healthy = true) };
-  }
+async function broken() {
+  let clock = 0;
+  let healthy = false;
+  const server = await listen((_request, response) =>
+    healthy ? response.writeHead(200).end('ok') : response.writeHead(500).end('x'),
+  );
+  const http = createHttpFetch({ ...LOCAL, retries: 0, failureThreshold: 3, openMs: 1000, now: () => clock });
+  return { server, http, advance: (ms: number) => void (clock += ms), heal: () => void (healthy = true) };
+}
 
+describe('WH-04 the circuit breaker of a host', () => {
   it('WH-04 opens after repeated failures, and then fails at once without calling the host', async () => {
     const { server, http } = await broken();
     for (let n = 0; n < 3; n += 1) expect((await http.fetch(server.url)).status).toBe(500);

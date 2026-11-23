@@ -70,7 +70,9 @@ describeDialects('AUTH-10 the drift check on the real entities', ({ open }) => {
 
 describe('AUTH-10 the drift check on its own', () => {
   it('AUTH-10 reports an entity that is missing', () => {
+    // The options are read and no query is sent, so a bare object stands for the database.
     const auth = createAuth({
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion
       db: {} as never,
       dialect: 'sqlite',
       secret: 'x'.repeat(40),

@@ -225,8 +225,11 @@ function claudeHook(): void {
   // Claude Code PostToolUse: exit 2 sends stderr back to the agent so it fixes the header itself.
   let filePath = '';
   try {
-    const payload = JSON.parse(readStdin()) as { tool_input?: { file_path?: unknown } };
-    filePath = typeof payload.tool_input?.file_path === 'string' ? payload.tool_input.file_path : '';
+    const payload: unknown = JSON.parse(readStdin());
+    const input =
+      typeof payload === 'object' && payload !== null && 'tool_input' in payload ? payload.tool_input : undefined;
+    const path = typeof input === 'object' && input !== null && 'file_path' in input ? input.file_path : undefined;
+    filePath = typeof path === 'string' ? path : '';
   } catch {
     return;
   }

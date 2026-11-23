@@ -45,6 +45,31 @@ interface Manifest {
   optionalDependencies?: Record<string, string>;
 }
 
+/** The parts of a package.json that the layer check reads. Anything else in the file is ignored. */
+function manifestOf(value: unknown): Manifest {
+  const record: Record<string, unknown> =
+    typeof value === 'object' && value !== null ? Object.fromEntries(Object.entries(value)) : {};
+  const table = (key: string): Record<string, string> | undefined => {
+    const found = record[key];
+    return typeof found === 'object' && found !== null
+      ? Object.fromEntries(
+          Object.entries(found).filter((entry): entry is [string, string] => typeof entry[1] === 'string'),
+        )
+      : undefined;
+  };
+  const manifest: Manifest = {};
+  if (typeof record['name'] === 'string') manifest.name = record['name'];
+  const dependencies = table('dependencies');
+  if (dependencies !== undefined) manifest.dependencies = dependencies;
+  const devDependencies = table('devDependencies');
+  if (devDependencies !== undefined) manifest.devDependencies = devDependencies;
+  const peerDependencies = table('peerDependencies');
+  if (peerDependencies !== undefined) manifest.peerDependencies = peerDependencies;
+  const optionalDependencies = table('optionalDependencies');
+  if (optionalDependencies !== undefined) manifest.optionalDependencies = optionalDependencies;
+  return manifest;
+}
+
 const ROOT = resolve(import.meta.dirname, '..');
 const JSON_OUT = process.argv.includes('--json');
 const DOCS = 'docs/spec/SPEC.md#43-package-layers';
@@ -93,7 +118,7 @@ function main(): void {
   const dirs = packageDirs();
   const manifests = new Map<string, { dir: string; manifest: Manifest }>();
   for (const dir of dirs) {
-    const manifest = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8')) as Manifest;
+    const manifest = manifestOf(JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8')));
     if (manifest.name) manifests.set(manifest.name, { dir, manifest });
   }
 

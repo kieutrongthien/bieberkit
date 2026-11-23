@@ -146,6 +146,8 @@ export async function aggregate(
   const meta = em.getMetadata().get(schema);
   const platform = em.getPlatform();
   const column = (property: string): string => {
+    // The metadata is keyed by property name, which TypeScript sees as a key of an enum of the ORM.
+    // oxlint-disable-next-line typescript/no-unsafe-enum-assignment
     const name = meta.properties[property]?.fieldNames[0];
     if (name === undefined) invalid(`${property} has no column.`, 'This is a bug of the compiler.');
     return platform.quoteIdentifier(name);

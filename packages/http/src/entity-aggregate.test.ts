@@ -37,9 +37,8 @@ interface Body {
   code?: string;
 }
 const json = (text: string): Body => JSON.parse(text);
-function parsed<T>(text: string): T {
-  return JSON.parse(text);
-}
+const oneOf = (text: string): { data: { id: string } } => JSON.parse(text);
+const manyOf = (text: string): { data: { id: string }[] } => JSON.parse(text);
 
 let seq = 0;
 async function seeded(app: EntityApp, rows: Record<string, unknown>[]): Promise<void> {
@@ -97,7 +96,7 @@ describe('API-15 the aggregate route', () => {
 
   it('API-15 groups by a relation with the key of the API, and gives the id', async () => {
     const app = await entityApp();
-    const person = parsed<{ data: { id: string } }>(
+    const person = oneOf(
       (await app.server.inject({ method: 'POST', url: '/api/v1/crm/people', payload: { name: 'Ann' } })).body,
     );
     await seeded(app, [{ ownerId: person.data.id }, { ownerId: person.data.id }, {}]);
@@ -171,9 +170,7 @@ describe('API-15 the aggregate route', () => {
 
   it('DATA-16 does not count a row that was deleted', async () => {
     const app = await demo();
-    const first = parsed<{ data: { id: string }[] }>(
-      (await app.server.inject({ method: 'GET', url: `${BASE}?sort=code&pageSize=1` })).body,
-    );
+    const first = manyOf((await app.server.inject({ method: 'GET', url: `${BASE}?sort=code&pageSize=1` })).body);
     await app.server.inject({ method: 'DELETE', url: `${BASE}/${first.data[0]?.id}`, headers: { 'if-match': '1' } });
     expect(json((await get(app, '')).body).data).toEqual([{ group: {}, count: 4 }]);
   });
@@ -196,18 +193,16 @@ describe('API-15 the aggregate route', () => {
 
   it('API-15 does not take the place of a row called aggregate: a get of an id still works', async () => {
     const app = await demo();
-    const first = parsed<{ data: { id: string }[] }>(
-      (await app.server.inject({ method: 'GET', url: `${BASE}?pageSize=1` })).body,
-    );
+    const first = manyOf((await app.server.inject({ method: 'GET', url: `${BASE}?pageSize=1` })).body);
     expect((await app.server.inject({ method: 'GET', url: `${BASE}/${first.data[0]?.id}` })).statusCode).toBe(200);
   });
 
   it('API-06 is in the OpenAPI document, with its parameters', async () => {
     const { openApiDocument } = await import('./openapi.ts');
     const app = await demo();
-    const doc = JSON.parse(JSON.stringify(openApiDocument(app.server.routes(), { title: 't', version: '1' }))) as {
-      paths: Record<string, Record<string, { parameters?: { name: string }[] }>>;
-    };
+    const doc: { paths: Record<string, Record<string, { parameters?: { name: string }[] }>> } = JSON.parse(
+      JSON.stringify(openApiDocument(app.server.routes(), { title: 't', version: '1' })),
+    );
     const names = (doc.paths[`${BASE}/aggregate`]?.['get']?.parameters ?? []).map((parameter) => parameter.name);
     expect(names).toEqual(expect.arrayContaining(['groupBy', 'sum', 'count', 'filter']));
   });
@@ -219,9 +214,9 @@ describe('META-02 the metadata says which fields can be aggregated', () => {
     const { Account, Hidden, Note, Person } = await import('./entity-app.ts');
     const app = await entityApp();
     registerMeta(app.server, [Person, Account, Note, Hidden]);
-    const meta = json((await app.server.inject({ method: 'GET', url: '/api/v1/_meta' })).body) as unknown as {
-      entities: { name: string; fields: { key: string; aggregatable?: boolean }[] }[];
-    };
+    const meta: { entities: { name: string; fields: { key: string; aggregatable?: boolean }[] }[] } = JSON.parse(
+      (await app.server.inject({ method: 'GET', url: '/api/v1/_meta' })).body,
+    );
     const account = meta.entities.find((entity) => entity.name === 'crm.Account');
     const flagged = (account?.fields ?? [])
       .filter((field) => field.aggregatable === true)

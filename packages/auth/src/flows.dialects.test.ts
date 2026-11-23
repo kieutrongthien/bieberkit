@@ -144,7 +144,7 @@ describeDialects('AUTH-09 the flows of ADR 0012', ({ open }) => {
     const app = await authServer(open);
     await app.signUp('an@example.vn');
     await app.api('POST', '/request-password-reset', {
-      payload: { email: 'an@example.vn', redirectTo: `${'https://app.test'}/reset` },
+      payload: { email: 'an@example.vn', redirectTo: 'https://app.test/reset' },
     });
     const mail = app.mails.find((item) => item.kind === 'reset');
     expect(mail?.token).toBeTruthy();
