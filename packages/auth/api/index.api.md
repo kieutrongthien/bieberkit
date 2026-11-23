@@ -97,6 +97,27 @@ interface DriftEntity {
 }
 export declare function driftEntities(db: Database): Record<string, DriftEntity>;
 export declare function checkAuthDrift(options: BetterAuthOptions$1, entities: Record<string, DriftEntity>): string[];
+interface NewRole {
+  readonly tenantId?: string;
+  readonly name: string;
+  readonly permissions?: readonly string[];
+  readonly requireMfa?: boolean;
+  readonly system?: boolean;
+}
+interface Assignment {
+  readonly tenantId?: string;
+  readonly userId: string;
+  readonly roleId: string;
+}
+export declare function createRole(db: Database, input: NewRole): Promise<string>;
+export declare function setRolePermissions(db: Database, roleId: string, permissions: readonly string[]): Promise<boolean>;
+export declare function updateRole(db: Database, roleId: string, changes: {
+  readonly name?: string;
+  readonly requireMfa?: boolean;
+}): Promise<boolean>;
+export declare function deleteRole(db: Database, roleId: string): Promise<void>;
+export declare function assignRole(db: Database, input: Assignment): Promise<boolean>;
+export declare function revokeRole(db: Database, input: Assignment): Promise<boolean>;
 interface AuthRoutesOptions {
   readonly auth: AuthInstance;
   readonly db: Database;
@@ -170,5 +191,5 @@ declare module "@bieberkit/core" {
     scopedPermissions?: Readonly<Record<string, ScopedPermission>>;
   }
 }
-export { AUTH_PLUGIN, type Ability, type AbilityInput, type AbilityUser, type AccessAnswer, type AccessAuthorizer, type Action, type AuthAccountRow, type AuthInstance, type AuthLimits, type AuthMail, type AuthRateLimitRow, AuthRole, AuthRolePermission, type AuthRolePermissionRow, type AuthRoleRow, type AuthRoutesOptions, type AuthSessionRow, AuthUserRole, type AuthUserRoleRow, type AuthUserRow, type AuthVerificationRow, type AuthorizerOptions, type BetterAuthOptions, type Condition, type CreateAuthOptions, type DriftEntity, type DriftProperty, type EntityShape, type GrantLoader, type Grants, type Limit, type Limit2, type MaskedField, NIL_TENANT, type PermissionEntry, type PermissionRegistry, type ScopedPermission, type TenantResolverOptions, authEntities, authMigrationSteps, buildAbility, buildPermissionRegistry, createAuthorizer, loadGrants };
+export { AUTH_PLUGIN, type Ability, type AbilityInput, type AbilityUser, type AccessAnswer, type AccessAuthorizer, type Action, type Assignment, type AuthAccountRow, type AuthInstance, type AuthLimits, type AuthMail, type AuthRateLimitRow, AuthRole, AuthRolePermission, type AuthRolePermissionRow, type AuthRoleRow, type AuthRoutesOptions, type AuthSessionRow, AuthUserRole, type AuthUserRoleRow, type AuthUserRow, type AuthVerificationRow, type AuthorizerOptions, type BetterAuthOptions, type Condition, type CreateAuthOptions, type DriftEntity, type DriftProperty, type EntityShape, type GrantLoader, type Grants, type Limit, type Limit2, type MaskedField, NIL_TENANT, type NewRole, type PermissionEntry, type PermissionRegistry, type ScopedPermission, type TenantResolverOptions, authEntities, authMigrationSteps, buildAbility, buildPermissionRegistry, createAuthorizer, loadGrants };
 ```

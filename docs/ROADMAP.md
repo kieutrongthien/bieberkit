@@ -211,7 +211,7 @@ Depends on: M1.3.
 - [x] **[D]** CASL to ORM condition translator; lists return only permitted rows (AUTHZ-02): own translator with a small operator set that fails closed with `AUTHZ_UNSUPPORTED_CONDITION` (ADR 0013)
 - [ ] `bieberkit check` rule: condition operators outside the supported set, dotted paths and unknown fields (AUTHZ-06, ADR 0013)
 - [x] **[D]** Field masks on read and write, default deny (AUTHZ-03, AUTHZ-04)
-- [ ] Audit of role changes, `asSystem()`, impersonation, failed authorization (AUTHZ-05). `asSystem()` and failed authorization (a denial, an unsupported condition, a write of a masked field) are done. Role changes wait for the service that edits roles, and impersonation for its design
+- [ ] Audit of role changes, `asSystem()`, impersonation, failed authorization (AUTHZ-05). `asSystem()`, failed authorization (a denial, an unsupported condition, a write of a masked field) and role changes (the service of roles) are done. Impersonation waits for its design
 - [ ] API keys primitive: shown once, hashed, scoped, expiring (AUTH-07)
 - [ ] `encrypted: true` fields with key rotation through `APP_KEY_PREVIOUS`; `pii: true` log redaction (SEC-08, SEC-09)
 

@@ -196,3 +196,20 @@ Organizations and teams (the plugin needs its spike), Valkey for sessions and co
 - **Better Auth 1.7.25 has an atomic rate limit storage.** `rateLimit.customStorage.consume(key, rule)` replaced `get` and `set`, so the table `auth_rate_limits` has a unique `key` and the storage is one `insert ... on conflict`. MySQL has no `returning`, so it reads the count after the write.
 - **A forged or expired cookie is no principal and no error.** `getSession` answers `null`, and the authenticator gives `undefined`.
 - **A user with no role in any tenant is refused by the tenant resolver, not by the authorizer.** `X-Tenant` names a tenant, and the membership check is a role row, so such a request is 403 `AUTH_TENANT_FORBIDDEN` and writes no `authz.denied` entry. The denial of the authorizer is for a user who is a member and lacks the permission.
+
+## The service of roles (AUTHZ-05)
+
+```ts
+createRole(db, { tenantId?, name, permissions?, requireMfa?, system? }): Promise<string>     // the id
+setRolePermissions(db, roleId, permissions): Promise<boolean>                                // true when something changed
+updateRole(db, roleId, { name?, requireMfa? }): Promise<boolean>
+deleteRole(db, roleId): Promise<void>
+assignRole(db, { tenantId?, userId, roleId }): Promise<boolean>                               // false when the user had it
+revokeRole(db, { tenantId?, userId, roleId }): Promise<boolean>
+```
+
+- Each call is one transaction (`runInTransaction`): the change, its audit entry (`auth.role.created`, `auth.role.updated`, `auth.role.deleted`, `auth.role.assigned`, `auth.role.revoked`) and its outbox event of the same name are written together, or not at all. The entry has the actor of the request, the tenant of the role and the id of the role. Its data is the names and the permission strings that changed (`added` and `removed` for a change of permissions), never a value of a user.
+- A change that changes nothing (the same permissions, the same name, a role that the user has already) leaves no entry and no event, and answers `false`.
+- A system role (the administrator, made by the seeder of M1.8 with `system: true`) cannot be renamed, deleted, given another flag of MFA or other permissions (`AUTH_ROLE_SYSTEM`, 409), but it can be given to a user.
+- A role is given only in its own tenant, and a role that is not in the tenant is `AUTH_ROLE_NOT_FOUND` (404), as is an unknown id. A name that the tenant has is `AUTH_ROLE_EXISTS` (409). A blank name, a blank permission, a user or a tenant that is not a UUID and more than 500 permissions are `AUTH_ROLE_INVALID` (400).
+- The routes and the screens that call it are the admin of M1.8 and later. The service checks no permission: the caller (a route with its own permission) does.

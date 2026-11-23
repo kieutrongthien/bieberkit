@@ -49,6 +49,8 @@ export type {
 export { checkAuthDrift, driftEntities } from './drift.ts';
 export type { DriftEntity, DriftProperty } from './drift.ts';
 export { createAuthorizer } from './authorizer.ts';
+export { assignRole, createRole, deleteRole, revokeRole, setRolePermissions, updateRole } from './role-service.ts';
+export type { Assignment, NewRole } from './role-service.ts';
 export { registerAuthRoutes } from './routes.ts';
 export type { AuthRoutesOptions } from './routes.ts';
 export { AuthAccount, AuthRateLimit, AuthSession, AuthUser, AuthVerification } from './tables.ts';
