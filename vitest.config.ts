@@ -59,6 +59,7 @@ export default defineConfig({
         'packages/auth/src/**': { lines: 90 },
         'packages/cache/src/**': { lines: 90 },
         'packages/storage/src/**': { lines: 90 },
+        'packages/mail/src/**': { lines: 90 },
       },
     },
   },
