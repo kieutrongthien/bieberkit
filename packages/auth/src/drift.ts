@@ -25,7 +25,15 @@
 import { getAuthTables } from 'better-auth/db';
 import type { BetterAuthOptions } from 'better-auth';
 import type { Database } from '@bieberkit/data/orm';
-import { AuthAccount, AuthRateLimit, AuthSession, AuthUser, AuthVerification } from './tables.ts';
+import {
+  AuthAccount,
+  AuthPasskey,
+  AuthRateLimit,
+  AuthSession,
+  AuthTwoFactor,
+  AuthUser,
+  AuthVerification,
+} from './tables.ts';
 
 export interface DriftProperty {
   nullable?: boolean;
@@ -43,6 +51,8 @@ const MODELS = {
   authAccount: AuthAccount,
   authVerification: AuthVerification,
   authRateLimit: AuthRateLimit,
+  authTwoFactor: AuthTwoFactor,
+  authPasskey: AuthPasskey,
 } as const;
 
 /** The entities of the auth tables as the check wants them, read from the metadata of the ORM. */

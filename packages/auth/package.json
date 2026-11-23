@@ -46,6 +46,7 @@
   },
   "dependencies": {
     "@better-auth/kysely-adapter": "1.7.25",
+    "@better-auth/passkey": "1.7.25",
     "@bieberkit/core": "workspace:*",
     "@bieberkit/data": "workspace:*",
     "@bieberkit/http": "workspace:*",

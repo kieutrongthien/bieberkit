@@ -26,6 +26,9 @@ import { kyselyAdapter } from '@better-auth/kysely-adapter';
 import { betterAuth } from 'better-auth';
 import type { Auth, BetterAuthOptions } from 'better-auth';
 import { APIError, createAuthMiddleware } from 'better-auth/api';
+import { magicLink, twoFactor } from 'better-auth/plugins';
+import { passkey } from '@better-auth/passkey';
+import { createHash } from 'node:crypto';
 import type { Dialect } from '@bieberkit/core';
 import { uuid7 } from '@bieberkit/data';
 import { requestKysely } from '@bieberkit/data/orm';
@@ -44,6 +47,15 @@ export interface AuthMail {
   readonly token: string;
 }
 
+export interface AuthMethods {
+  /** TOTP and backup codes, with the second factor that `requireMfa` asks for (AUTH-05). */
+  readonly totp?: { readonly issuer: string };
+  /** Passkeys. The relying party is the host of the base URL unless `rpId` says another. */
+  readonly passkey?: { readonly rpName: string; readonly rpId?: string };
+  /** A link by mail that signs the user in. The mail contract is M1.5, so the project says how to send. */
+  readonly magicLink?: { send(mail: AuthMail): Promise<void>; readonly expiresIn?: number };
+}
+
 export interface CreateAuthOptions {
   readonly db: Database;
   readonly dialect: Dialect;
@@ -53,7 +65,11 @@ export interface CreateAuthOptions {
   readonly baseUrl: string;
   /** Origins that may call the API besides the base URL. */
   readonly trustedOrigins?: readonly string[];
+  /** The secrets that were current before, newest first (`APP_KEY_PREVIOUS`). They only decrypt, so a rotation loses nothing. */
+  readonly previousSecrets?: readonly string[];
   readonly limits?: AuthLimits;
+  /** The sign in methods besides email and password. A method that is not here is not loaded, and needs no table. */
+  readonly methods?: AuthMethods;
   /** The mail contract is M1.5, so the project says how to send. Without it the flows that need a mail answer with an error. */
   readonly mail?: {
     sendVerification?(mail: AuthMail): Promise<void>;
@@ -64,6 +80,12 @@ export interface CreateAuthOptions {
 export type AuthInstance = Auth;
 
 const limiters = new WeakMap<object, RateLimiter>();
+
+const COOKIE_ATTRIBUTES = { httpOnly: true, secure: true, sameSite: 'lax', path: '/' } as const;
+
+/** The number that names a secret in the envelope of Better Auth: it comes from the secret, so it does not move when the list does. */
+const versionOf = (secret: string): number =>
+  Number.parseInt(createHash('sha256').update(secret).digest('hex').slice(0, 8), 16);
 
 /** The counters of the limits of an auth instance. `registerAuthRoutes` uses it to count a request that was rolled back. */
 export function limiterOf(auth: AuthInstance): RateLimiter | undefined {
@@ -110,6 +132,11 @@ export function createAuth(options: CreateAuthOptions): AuthInstance {
   const config: BetterAuthOptions = {
     database: kyselyAdapter(requestKysely(options.db), { type: options.dialect, transaction: false }),
     secret: options.secret,
+    // Always the envelope with a key id, so that a later rotation can still open what was written now (APP_KEY_PREVIOUS).
+    secrets: [options.secret, ...(options.previousSecrets ?? [])].map((value) => ({
+      version: versionOf(value),
+      value,
+    })),
     baseURL: base.origin,
     trustedOrigins: [base.origin, ...(options.trustedOrigins ?? [])],
     telemetry: { enabled: false },
@@ -144,6 +171,42 @@ export function createAuth(options: CreateAuthOptions): AuthInstance {
             }) => mail.sendVerification?.({ to: user.email, url, token }),
           },
         }),
+    plugins: [
+      ...(options.methods?.totp === undefined
+        ? []
+        : [twoFactor({ issuer: options.methods.totp.issuer, twoFactorTable: 'authTwoFactor' })]),
+      ...(options.methods?.magicLink === undefined
+        ? []
+        : [
+            magicLink({
+              // A link does not make an account: an address that has none gets the same answer and no mail.
+              disableSignUp: true,
+              sendMagicLink: async ({ email, url, token }) => {
+                // No mail goes to an address that has no account: the answer is the same, and the form tells nothing.
+                const known = await requestKysely(options.db)
+                  .selectFrom('authUser')
+                  .select('id')
+                  .where('email', '=', email.toLowerCase())
+                  .executeTakeFirst();
+                if (known === undefined) return;
+                await options.methods?.magicLink?.send({ to: email, url, token });
+              },
+              ...(options.methods.magicLink.expiresIn === undefined
+                ? {}
+                : { expiresIn: options.methods.magicLink.expiresIn }),
+            }),
+          ]),
+      ...(options.methods?.passkey === undefined
+        ? []
+        : [
+            passkey({
+              rpID: options.methods.passkey.rpId ?? base.hostname,
+              rpName: options.methods.passkey.rpName,
+              origin: base.origin,
+              schema: { passkey: { modelName: 'authPasskey' } },
+            }),
+          ]),
+    ],
     rateLimit: {
       enabled: true,
       modelName: 'authRateLimit',
@@ -172,12 +235,20 @@ export function createAuth(options: CreateAuthOptions): AuthInstance {
       useSecureCookies: false,
       database: { generateId: () => uuid7() },
       ipAddress: { ipAddressHeaders: ['x-bk-client-ip'] },
-      cookies: {
-        session_token: {
-          name: '__Host-bk_session',
-          attributes: { httpOnly: true, secure: true, sameSite: 'lax', path: '/' },
-        },
-      },
+      // Every cookie of Better Auth is a `__Host-` cookie: secure, for this host only, for the whole path (AUTH-01). The names of the
+      // second factor are here too, or Better Auth would set `better-auth.two_factor` with no `Secure` and no `__Host-`.
+      cookies: Object.fromEntries(
+        [
+          ['session_token', 'session'],
+          ['session_data', 'session_data'],
+          ['dont_remember', 'dont_remember'],
+          ['two_factor', 'two_factor'],
+          ['trust_device', 'trust_device'],
+          ['better-auth-passkey', 'passkey_challenge'],
+        ].map(([key, name]) => [key, { name: `__Host-bk_${name}`, attributes: COOKIE_ATTRIBUTES }]),
+      ),
+      // A cookie that Better Auth adds later and that is not named above is still secure and for this host only.
+      defaultCookieAttributes: COOKIE_ATTRIBUTES,
     },
   };
   const auth: AuthInstance = betterAuth(config);

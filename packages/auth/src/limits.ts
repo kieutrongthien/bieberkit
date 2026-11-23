@@ -45,6 +45,10 @@ export interface AuthLimits {
   readonly signIn?: Limit2;
   readonly signUp?: Limit2;
   readonly passwordReset?: Limit2;
+  /** The magic link: the request by email, and the use of the link. */
+  readonly magicLink?: Limit2;
+  /** The second factor: a TOTP code and a backup code. Only per address, because Better Auth locks the account of the code itself. */
+  readonly mfa?: Limit2;
 }
 
 /** What a project gets when it says nothing (SEC-10). */
@@ -52,6 +56,8 @@ export const DEFAULT_LIMITS: Required<AuthLimits> = {
   signIn: { perIp: { window: 60, max: 5 }, perAccount: { window: 900, max: 10 } },
   signUp: { perIp: { window: 60, max: 5 } },
   passwordReset: { perIp: { window: 900, max: 3 }, perAccount: { window: 900, max: 3 } },
+  magicLink: { perIp: { window: 60, max: 5 }, perAccount: { window: 900, max: 5 } },
+  mfa: { perIp: { window: 60, max: 10 } },
 };
 
 export interface Consumption {
@@ -86,6 +92,8 @@ export function rulesOf(limits: AuthLimits = {}): {
   const signIn = pick('signIn');
   const signUp = pick('signUp');
   const reset = pick('passwordReset');
+  const link = pick('magicLink');
+  const mfa = pick('mfa');
   const on = (rule: Limit | undefined, paths: string[]): [string, Limit][] =>
     rule === undefined ? [] : paths.map((path) => [path, rule]);
   return {
@@ -93,10 +101,13 @@ export function rulesOf(limits: AuthLimits = {}): {
       ...on(signIn.perIp, ['/sign-in/email']),
       ...on(signUp.perIp, ['/sign-up/email']),
       ...on(reset.perIp, ['/request-password-reset', '/reset-password']),
+      ...on(link.perIp, ['/sign-in/magic-link', '/magic-link/verify']),
+      ...on(mfa.perIp, ['/two-factor/verify-totp', '/two-factor/verify-backup-code', '/passkey/verify-authentication']),
     ]),
     perAccount: Object.fromEntries([
       ...on(signIn.perAccount, ['/sign-in/email']),
       ...on(reset.perAccount, ['/request-password-reset']),
+      ...on(link.perAccount, ['/sign-in/magic-link']),
     ]),
   };
 }

@@ -40,7 +40,9 @@ export function createAuthenticator(auth: AuthInstance): Authenticator {
       if (cookie === undefined || !cookie.includes(`${COOKIE}=`)) return undefined;
       const session = await auth.api.getSession({ headers: new Headers({ cookie }) });
       if (session === null) return undefined;
-      return { id: session.user.id, kind: 'user', via: 'cookie', sessionId: session.session.id };
+      // The user has a second factor when he turned it on. A session of such a user is made only after the code (AUTH-05).
+      const mfa = 'twoFactorEnabled' in session.user && session.user.twoFactorEnabled === true;
+      return { id: session.user.id, kind: 'user', via: 'cookie', sessionId: session.session.id, mfa };
     },
   };
 }

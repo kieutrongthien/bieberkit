@@ -43,10 +43,28 @@ const RECORDED: Readonly<Record<string, string>> = {
   '/sign-out': 'auth.session.revoked',
   '/reset-password': 'auth.password.reset',
   '/verify-email': 'auth.email.verified',
+  // The second factor: the secret is made (`enrolled`), a code is accepted (`verified`, which also turns it on), and so on.
+  '/two-factor/enable': 'auth.mfa.enrolled',
+  '/two-factor/verify-totp': 'auth.mfa.verified',
+  '/two-factor/verify-backup-code': 'auth.mfa.backup-code-used',
+  '/two-factor/generate-backup-codes': 'auth.mfa.backup-codes-renewed',
+  '/two-factor/disable': 'auth.mfa.disabled',
+  '/magic-link/verify': 'auth.session.created',
+  '/passkey/verify-registration': 'auth.passkey.added',
+  '/passkey/verify-authentication': 'auth.session.created',
+  '/passkey/delete-passkey': 'auth.passkey.removed',
+};
+
+/** What a refused attempt leaves, in an entry of its own, because the request is rolled back. */
+const FAILED: Readonly<Record<string, string>> = {
+  '/sign-in/email': 'auth.signin.failed',
+  '/passkey/verify-authentication': 'auth.signin.failed',
+  '/two-factor/verify-totp': 'auth.mfa.failed',
+  '/two-factor/verify-backup-code': 'auth.mfa.failed',
 };
 
 /** A GET that changes data, and so needs the transaction like a POST does. */
-const WRITING_GETS = new Set(['/verify-email']);
+const WRITING_GETS = new Set(['/verify-email', '/magic-link/verify']);
 
 /** Thrown inside the transaction to roll it back, with the answer that the caller gets. */
 class RolledBack extends Error {
@@ -118,11 +136,12 @@ export function registerAuthRoutes(server: HttpServer, options: AuthRoutesOption
       if (value.status >= 400) {
         // The transaction was rolled back, and with it the counters that the request had written.
         await limiter?.replay(consumed);
-        if (path === '/sign-in/email' && value.status === 401) {
+        const failed = FAILED[path];
+        if (failed !== undefined && (value.status === 401 || value.status === 400)) {
           // Best effort: a failure to write the entry never changes the answer.
           try {
             const em = db.fork();
-            recordAudit(em, { action: 'auth.signin.failed', entity: 'authUser' });
+            recordAudit(em, { action: failed, entity: 'authUser' });
             await em.flush();
           } catch {
             // The audit table is the one place that cannot report its own failure.

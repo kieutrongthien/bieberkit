@@ -53,8 +53,24 @@ export { assignRole, createRole, deleteRole, revokeRole, setRolePermissions, upd
 export type { Assignment, NewRole } from './role-service.ts';
 export { registerAuthRoutes } from './routes.ts';
 export type { AuthRoutesOptions } from './routes.ts';
-export { AuthAccount, AuthRateLimit, AuthSession, AuthUser, AuthVerification } from './tables.ts';
-export type { AuthAccountRow, AuthRateLimitRow, AuthSessionRow, AuthUserRow, AuthVerificationRow } from './tables.ts';
+export {
+  AuthAccount,
+  AuthPasskey,
+  AuthRateLimit,
+  AuthSession,
+  AuthTwoFactor,
+  AuthUser,
+  AuthVerification,
+} from './tables.ts';
+export type {
+  AuthAccountRow,
+  AuthPasskeyRow,
+  AuthRateLimitRow,
+  AuthSessionRow,
+  AuthTwoFactorRow,
+  AuthUserRow,
+  AuthVerificationRow,
+} from './tables.ts';
 export { createTenantResolver } from './tenant.ts';
 export type { TenantResolverOptions } from './tenant.ts';
 export type { AccessAuthorizer, AuthorizerOptions } from './authorizer.ts';

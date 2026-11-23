@@ -26,6 +26,7 @@ import { requestContext } from '@bieberkit/core';
 import type { EntityDef } from '@bieberkit/data';
 import { AuditLog } from '@bieberkit/data/orm';
 import type { Database, OrmSchema } from '@bieberkit/data/orm';
+import { HttpError } from '@bieberkit/http';
 import type { AccessAnswer, Authorizer, HttpServer, Principal, RequestInfo, StageContext } from '@bieberkit/http';
 import { buildAbility } from './ability.ts';
 import type { Ability, EntityShape, ScopedPermission } from './ability.ts';
@@ -65,8 +66,14 @@ interface Denial {
   readonly reason: 'no-permission' | 'unsupported-condition';
 }
 
+/** The ability of one caller in one request, and whether his roles ask for a second factor. */
+interface Loaded {
+  readonly ability: Ability;
+  readonly requireMfa: boolean;
+}
+
 interface RequestRecord {
-  readonly abilities: Map<string, Promise<Ability>>;
+  readonly abilities: Map<string, Promise<Loaded>>;
   denial: Denial | undefined;
 }
 
@@ -88,6 +95,7 @@ const AUDIT_ACTIONS: Readonly<Record<string, string>> = {
   AUTHZ_DENIED: 'authz.denied',
   AUTHZ_FIELD_FORBIDDEN: 'authz.field-forbidden',
   AUTHZ_UNSUPPORTED_CONDITION: 'authz.unsupported-condition',
+  AUTH_MFA_REQUIRED: 'authz.mfa-required',
 };
 
 const textOf = (value: unknown): string | undefined => (typeof value === 'string' ? value : undefined);
@@ -118,26 +126,47 @@ export function createAuthorizer(options: AuthorizerOptions): AccessAuthorizer {
     return record;
   };
 
-  const abilityFor = (principal: Principal): Promise<Ability> => {
+  const abilityFor = (principal: Principal): Promise<Loaded> => {
     const tenantId = requestContext.get()?.tenantId;
-    const build = async (): Promise<Ability> => {
-      const grants = await load(options.db, tenantId, principal.id);
-      return buildAbility({
-        registry,
-        granted: grants.permissions,
-        ...(options.scoped === undefined ? {} : { scoped: options.scoped }),
-        user: { id: principal.id, ...(tenantId === undefined ? {} : { tenantId }) },
-      });
+    const build = async (): Promise<Loaded> => {
+      // A machine client has the permissions of its key and no roles. A user has the roles that he holds in the tenant.
+      const grants =
+        principal.grants === undefined
+          ? await load(options.db, tenantId, principal.id)
+          : { permissions: new Set(principal.grants), roles: [], requireMfa: false };
+      return {
+        requireMfa: grants.requireMfa,
+        ability: buildAbility({
+          registry,
+          granted: grants.permissions,
+          ...(options.scoped === undefined ? {} : { scoped: options.scoped }),
+          user: { id: principal.id, ...(tenantId === undefined ? {} : { tenantId }) },
+        }),
+      };
     };
     const record = recordOf();
     if (record === undefined) return build();
     const key = `${principal.id}|${tenantId ?? ''}`;
-    let ability = record.abilities.get(key);
-    if (ability === undefined) {
-      ability = build();
-      record.abilities.set(key, ability);
+    let loaded = record.abilities.get(key);
+    if (loaded === undefined) {
+      loaded = build();
+      record.abilities.set(key, loaded);
     }
-    return ability;
+    return loaded;
+  };
+
+  /** The ability of the caller, unless a role of his asks for a second factor that his session does not have (AUTH-05). */
+  const ready = async (principal: Principal): Promise<Ability> => {
+    const loaded = await abilityFor(principal);
+    if (loaded.requireMfa && principal.mfa !== true) {
+      throw new HttpError(
+        'AUTH_MFA_REQUIRED',
+        403,
+        'A second factor is needed for this.',
+        'Turn on two-factor sign in (POST /api/auth/two-factor/enable), then sign in with the code.',
+      );
+    }
+    return loaded.ability;
   };
 
   const deny = (denial: Denial): void => {
@@ -147,7 +176,7 @@ export function createAuthorizer(options: AuthorizerOptions): AccessAuthorizer {
 
   return {
     async can(principal, permission) {
-      const ability = await abilityFor(principal);
+      const ability = await ready(principal);
       if (ability.covers(permission)) return true;
       const entry = registry.entriesOf(permission).find((candidate) => candidate.field === undefined);
       deny({
@@ -161,7 +190,7 @@ export function createAuthorizer(options: AuthorizerOptions): AccessAuthorizer {
     async access(principal: Principal, entity: string, action: string, _request: RequestInfo): Promise<AccessAnswer> {
       const shape = shapes.get(entity);
       if (shape === undefined || !isAction(action)) return { allowed: false, reason: 'no-permission' };
-      const answer = (await abilityFor(principal)).access(shape, action);
+      const answer = (await ready(principal)).access(shape, action);
       if (!answer.allowed) deny({ entity, action, reason: answer.reason ?? 'no-permission' });
       return answer;
     },
@@ -169,7 +198,7 @@ export function createAuthorizer(options: AuthorizerOptions): AccessAuthorizer {
     async allows(principal, entity, action, row) {
       const shape = shapes.get(entity);
       if (shape === undefined || !isAction(action)) return false;
-      const allowed = (await abilityFor(principal)).allows(shape, action, { ...row });
+      const allowed = (await ready(principal)).allows(shape, action, { ...row });
       if (!allowed) deny({ entity, action, reason: 'no-permission' });
       return allowed;
     },
