@@ -99,3 +99,24 @@ queueContractSuite(name, make, { skip? })            // the nine cases of ADR 00
 - **A job id is text, and the job table has no UUID type.** The dispatcher of the outbox hands its raw Kysely transaction to the publisher, with no conversion of values, so `bk_jobs` keeps ids as `varchar(36)` and times as `bigint`.
 - **An `active` job whose lease ran out may have no delivery left.** The claim counts the delivery and would run it once more than `attempts`, so it is made dead instead, with the reason.
 - **Case 6 needs a slot count for each queue.** One shared pool lets four slow `reports` jobs keep `critical` waiting, so each queue has its own loop and slots.
+
+## Worker pool for CPU-heavy work (Q-09)
+
+Prepared on 2026-11-23. `createWorkerPool` runs a task on a `worker_threads` thread, so a PDF, a spreadsheet or an image transform that holds the CPU for seconds does not stop the timers, the heartbeats and the other jobs of the worker role. It needs no dependency.
+
+```ts
+createWorkerPool({ size?, maxQueued?, idleMs?, maxHeapMb?, logger? }): WorkerPool
+pool.run<Result>(task: URL | string, input, { timeoutMs?, signal?, transfer? }): Promise<Result>
+pool.stats(): { threads, busy, queued, completed, failed }
+pool.close()
+```
+
+1. **A task is a module.** Its default export is `async (input) => result`. `task` is the URL or the absolute path of a file of the project, never a value that a user can choose: a relative path, a name, `http:`, `data:` or `node:` is `QUEUE_TASK_INVALID`. Input and result are copied (structured clone); an input that cannot be cloned is `QUEUE_TASK_INVALID`, and `transfer` moves buffers instead.
+2. **A job uses it.** A handler of a job calls `pool.run`, so retries, the dead-letter list, the context of the dispatcher and the lease are the ones of any job. The thread has no request context, so the task gets the ids it needs in its input.
+3. **Size and queue.** At most `size` threads (cores minus one, between 1 and 4), made when needed. A task waits in a FIFO queue of at most `maxQueued` (100), and one that does not fit is `QUEUE_POOL_FULL` (503). A thread with no task for `idleMs` (30 s) ends, and the next task starts a new one.
+4. **A task that goes wrong costs its thread, not the process.** Over its `timeoutMs` (60 s): the thread is ended and the call is `QUEUE_TASK_TIMEOUT` (504). A thread that ends (`process.exit`), throws outside the task or passes `maxHeapMb` (256): `QUEUE_TASK_CRASHED`. A task that throws: `QUEUE_TASK_FAILED`, with the error of the task, its name, message and stack, as the `cause`, and the thread goes on. In every case the tasks behind it run on a thread of their own.
+5. **Cancelling.** An `AbortSignal` takes a task out of the queue, or ends the thread of a task that runs (`QUEUE_TASK_ABORTED`).
+6. **Closing.** `close` fails the tasks that wait and the ones that run with `QUEUE_POOL_CLOSED` and ends the threads. A closed pool refuses tasks.
+7. **Source and build.** The code of a thread is a string inside the pool, so it works the same from the source and from the build. A task in TypeScript runs on Node 24.12 and later, which strip the types.
+
+Tests: `pool.test.ts` (22 cases, on Node 24.12 and 26): result and clone, the task URL, errors, an event loop that stays free (a task that burns 400 ms does not delay a timer of 10 ms by more than 150 ms), size, order, reuse, a full queue, idle threads, a timeout, an exit, an error outside the task, memory, aborting and closing.
