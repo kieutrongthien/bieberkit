@@ -52,6 +52,11 @@ interface IdempotencyStore {
   complete(key: string, response: StoredResponse): Promise<void>;
   abandon(key: string): Promise<void>;
 }
+interface MemoryIdempotencyOptions {
+  readonly ttlMs?: number;
+  readonly now?: () => number;
+}
+export declare function createMemoryIdempotencyStore(options?: MemoryIdempotencyOptions): IdempotencyStore;
 interface CorsOptions {
   readonly origins: readonly string[];
   readonly credentials?: boolean;
@@ -318,5 +323,5 @@ interface Problem {
   readonly [extension: string]: unknown;
 }
 export declare const packageName = "@bieberkit/http";
-export type { AccessAnswer, Authenticator, Authorizer, CorsOptions, CsrfProtection, EntityRoutesContext, ErrorContext, HttpEnv, HttpFetch, HttpFetchInit, HttpFetchOptions, HttpServer, HttpServerOptions, InjectOptions, InjectResponse, Method, MountDef, OpenApiDocument, OpenApiInfo, Principal, Problem, RateLimitResult, RateLimiter, RegisterHttpOptions, RequestInfo, ResolvedAddress, RouteContext, RouteDef, RouteSchema, StageContext, StageHook, StageName, TenantResolver };
+export type { AccessAnswer, Authenticator, Authorizer, CorsOptions, CsrfProtection, EntityRoutesContext, ErrorContext, HttpEnv, HttpFetch, HttpFetchInit, HttpFetchOptions, HttpServer, HttpServerOptions, IdempotencyBegin, IdempotencyStore, InjectOptions, InjectResponse, MemoryIdempotencyOptions, Method, MountDef, OpenApiDocument, OpenApiInfo, Principal, Problem, RateLimitResult, RateLimiter, RegisterHttpOptions, RequestInfo, ResolvedAddress, RouteContext, RouteDef, RouteSchema, StageContext, StageHook, StageName, StoredResponse, TenantResolver };
 ```

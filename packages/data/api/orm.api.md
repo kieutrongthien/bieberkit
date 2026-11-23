@@ -110,6 +110,8 @@ export declare function resolveConnection(env: DatabaseEnv, variable?: string): 
 export declare function createDatabase(env: DatabaseEnv, options: DatabaseOptions): Promise<Database>;
 export declare function currentEntityManager(): EntityManager | undefined;
 export declare function runInTransaction<T>(db: Database, fn: (em: EntityManager) => Promise<T>): Promise<T>;
+type CommitHook = () => Promise<void> | void;
+export declare function afterCommit(callback: CommitHook): void;
 export declare function runInUnitOfWork<T>(db: Database, fn: (em: EntityManager) => Promise<T>): Promise<T>;
 interface AuditEntry {
   readonly action: string;

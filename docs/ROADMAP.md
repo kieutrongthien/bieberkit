@@ -224,13 +224,13 @@ Depends on: M1.2. Can run in parallel with M1.4 (no shared files).
 - [ ] **[M]** Queue contract, `defineJob`, `sync`, `database` and `redis` (BullMQ) drivers under `@bieberkit/queue` subpaths (PKG-02, PKG-03, §15.1)
 - [ ] Queues `critical`, `default`, `reports`; dead-letter list; input validated on dispatch and execution; stable `jobId` (Q-01 to Q-04)
 - [ ] Bulk requests of 101 to 500 rows as a queued job, with the result kept for the client (API-14, PERF-05)
-- [ ] A shared store for `Idempotency-Key` on the cache contract (§13.1)
+- [x] A shared store for `Idempotency-Key` on the cache contract (§13.1). `createCacheIdempotencyStore(cache)` implements the `IdempotencyStore` port on `atomic` keys, and `@bieberkit/http` exports the port and its memory store
 - [ ] After-commit dispatch through the outbox (Q-06): the `OutboxPublisher` of each driver, with the `database` driver inserting its job in the transaction of the claim, and a `LISTEN/NOTIFY` wake on PostgreSQL (needs `pg` as a dependency and its ADR line, P9); job carries tenant and actor and restores them (Q-10)
 - [ ] Scheduler under a distributed lock per tick (Q-07)
 - [ ] `worker_threads` pool for CPU-heavy work (Q-09)
-- [ ] Cache contract on BentoCache: `get`, `set`, `remember`, `forget`, `tags`, `lock`; prefix and tenant namespacing; stampede lock (C-01 to C-03)
-- [ ] Tag generations bumped right after commit; 5 s memory TTL; read-your-write window; failed purge only warns (DATA-13)
-- [ ] Separate cache instance through `CACHE_REDIS_URL` (Q-08)
+- [x] Cache contract on BentoCache: `get`, `set`, `remember`, `forget`, `tags`, `lock`; prefix and tenant namespacing; stampede lock (C-01 to C-03). The drivers are `memory`, `file` and `redis`; the engine contract and the libraries are in ADR 0016 (Proposed)
+- [ ] Tag generations bumped right after commit; 5 s memory TTL; read-your-write window; failed purge only warns (DATA-13). Done: `afterCommit`, `flushAfterCommit`, the 5 s layered engine, a failed purge only warns. Open: the read-your-write window, which belongs to the read replicas of `@bieberkit/data`
+- [x] Separate cache instance through `CACHE_REDIS_URL` (Q-08). `createCacheFromConfig` reads it, and `checkEvictionPolicy` is what `bieberkit doctor` will call
 - [ ] Storage contract on FlyDrive: local and S3-compatible, signed upload URLs, private by default, content sniffing (S-01 to S-04)
 - [ ] Mail contract with `log` and `smtp`, sent through the queue (M-01)
 - [ ] Error-reporter contract with an optional Sentry-compatible driver (OBS-06)

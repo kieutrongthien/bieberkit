@@ -28,5 +28,24 @@
 Generated from the built declaration files by `pnpm api:update`. Do not edit by hand. A change here is a change to the public API and needs a changeset (spec section 22.3).
 
 ```ts
-export declare const packageName = "@bieberkit/cache";
+import { IdempotencyStore } from "@bieberkit/http";
+import { a as Lock, c as createCache, i as CacheReader, n as Cache, o as LockOptions, r as CacheOptions, s as TaggedCache, t as AtomicCache } from "./cache-Ck2Ln4Bi.js";
+import { i as CacheValue, n as CacheEngine, r as CacheError, t as Atomic } from "./contract--ExGYgOW.js";
+interface CacheIdempotencyOptions {
+  readonly ttlMs?: number;
+  readonly pendingTtlMs?: number;
+}
+export declare function createCacheIdempotencyStore(cache: Cache, options?: CacheIdempotencyOptions): IdempotencyStore;
+interface LayeredEngineOptions {
+  readonly first: CacheEngine;
+  readonly shared: CacheEngine;
+  readonly firstTtlMs?: number;
+}
+export declare function createLayeredEngine(options: LayeredEngineOptions): CacheEngine;
+interface MemoryEngineOptions {
+  readonly maxEntries?: number;
+  readonly now?: () => number;
+}
+export declare function createMemoryEngine(options?: MemoryEngineOptions): CacheEngine;
+export { type Atomic, type AtomicCache, type Cache, type CacheEngine, CacheError, type CacheIdempotencyOptions, type CacheOptions, type CacheReader, type CacheValue, type LayeredEngineOptions, type Lock, type LockOptions, type MemoryEngineOptions, type TaggedCache, createCache };
 ```

@@ -969,6 +969,7 @@ await queue.dispatch(sendInvoice, { invoiceId })
 - **C-01** Keys are namespaced by `CACHE_PREFIX` and by tenant for tenant-scoped data.
 - **C-02** `memory` is per process. It is allowed in production only as a short-lived first level in front of `redis`, or as the only cache when APP\_SINGLE\_NODE=true (CFG-07).
 - **C-03** `remember` prevents stampedes with a lock, so one caller computes while others wait.
+- **C-04** The memory level in front of `redis` is a separate first level with a TTL of 5 seconds (DATA-13), never the BentoCache L1. Locks, tag generations and the claims of `Idempotency-Key` use `atomic` keys that skip it and go to the shared store (ADR 0016).
 
 ### 15.3 Storage
 
