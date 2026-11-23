@@ -223,3 +223,36 @@ describe('CFG-05 secrets in log lines', () => {
     expect(parsed()[0]?.['msg']).toBe('hello');
   });
 });
+
+describe('SEC-09 fields of personal data in log lines', () => {
+  it('SEC-09 removes the value of a key that was named, at any depth and in any case, and keeps the rest', () => {
+    const { logger, parsed } = capture({ redactKeys: ['email', 'taxId'] });
+    logger.info('saved', {
+      email: 'a@b.vn',
+      Email: 'c@d.vn',
+      row: { taxId: '123', code: 'C1' },
+      list: [{ EMAIL: 'x' }],
+      name: 'visible',
+    });
+    const [line] = parsed();
+    expect(line).toMatchObject({
+      email: '[redacted]',
+      Email: '[redacted]',
+      row: { taxId: '[redacted]', code: 'C1' },
+      list: [{ EMAIL: '[redacted]' }],
+      name: 'visible',
+    });
+  });
+
+  it('SEC-09 leaves an empty value empty, and keeps the keys that match a secret redacted as before', () => {
+    const { logger, parsed } = capture({ redactKeys: ['email'] });
+    logger.info('saved', { email: null, password: 'p' });
+    expect(parsed()[0]).toMatchObject({ email: null, password: '[redacted]' });
+  });
+
+  it('SEC-09 with no list of keys, a field of personal data is logged as it is: the list comes from the entities', () => {
+    const { logger, parsed } = capture();
+    logger.info('saved', { email: 'a@b.vn' });
+    expect(parsed()[0]).toMatchObject({ email: 'a@b.vn' });
+  });
+});

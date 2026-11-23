@@ -540,3 +540,95 @@ describe('API-15 .aggregatable()', () => {
     expect(field.def).toMatchObject({ index: true, aggregatable: true });
   });
 });
+
+describe('SEC-08 .encrypted() and .pii() on a field', () => {
+  it('SEC-08 .encrypted() is for text, and sets a flag on a new field', () => {
+    for (const field of [f.string({ max: 20 }), f.text(), f.email()]) {
+      const marked = field.encrypted();
+      expect(marked.def.encrypted).toBe(true);
+      expect(field.def.encrypted).toBeUndefined();
+    }
+  });
+
+  it('SEC-08 .encrypted() is refused for a field that is not text', () => {
+    for (const field of [
+      f.int(),
+      f.boolean(),
+      f.date(),
+      f.dateTime(),
+      f.oneOf(['a', 'b']),
+      f.decimal({ precision: 10, scale: 2 }),
+      f.id(),
+      f.belongsTo(() => Target),
+    ]) {
+      expect([field.def.kind, codeOf(() => field.encrypted())]).toEqual([field.def.kind, 'DATA_FIELD_INVALID']);
+    }
+  });
+
+  it('SEC-08 an encrypted field cannot be searched, so it cannot be indexed, unique, searchable, aggregated, localized or compared', () => {
+    const base = f.string({ max: 20 });
+    expect(codeOf(() => base.encrypted().index())).toBe('DATA_FIELD_INVALID');
+    expect(codeOf(() => base.encrypted().unique())).toBe('DATA_FIELD_INVALID');
+    expect(codeOf(() => base.encrypted().searchable())).toBe('DATA_FIELD_INVALID');
+    expect(codeOf(() => base.encrypted().aggregatable())).toBe('DATA_FIELD_INVALID');
+    expect(codeOf(() => base.encrypted().localized())).toBe('DATA_FIELD_INVALID');
+  });
+
+  it('SEC-08 the same is refused when .encrypted() comes last', () => {
+    const base = f.string({ max: 20 });
+    expect(codeOf(() => base.index().encrypted())).toBe('DATA_FIELD_INVALID');
+    expect(codeOf(() => base.unique().encrypted())).toBe('DATA_FIELD_INVALID');
+    expect(codeOf(() => base.searchable().encrypted())).toBe('DATA_FIELD_INVALID');
+    expect(codeOf(() => base.localized().encrypted())).toBe('DATA_FIELD_INVALID');
+    expect(codeOf(() => f.string({ max: 20, compare: 'ci' }).encrypted())).toBe('DATA_FIELD_INVALID');
+    expect(codeOf(() => f.string({ max: 20, compare: 'exact' }).encrypted())).toBeUndefined();
+  });
+
+  it('SEC-08 an encrypted field may be optional, have a default and a length, and the length is of the clear text', () => {
+    const field = f.string({ min: 2, max: 20 }).optional().default('ab').encrypted();
+    expect(field.def).toMatchObject({
+      kind: 'string',
+      optional: true,
+      default: 'ab',
+      min: 2,
+      max: 20,
+      encrypted: true,
+    });
+    expect(codeOf(() => f.string({ max: 3 }).encrypted().default('toolong'))).toBe('DATA_FIELD_INVALID');
+  });
+
+  it('PDP-01 .pii() marks a field of personal data, for any kind that holds a value', () => {
+    for (const field of [
+      f.string({ max: 20 }),
+      f.text(),
+      f.email(),
+      f.int(),
+      f.boolean(),
+      f.date(),
+      f.dateTime(),
+      f.oneOf(['a']),
+      f.decimal({ precision: 10, scale: 2 }),
+      f.money({ currency: 'VND' }),
+    ]) {
+      expect(field.pii().def.pii).toBe(true);
+    }
+    expect(f.string({ max: 20 }).pii().encrypted().def).toMatchObject({ pii: true, encrypted: true });
+  });
+
+  it('PDP-01 .pii() is refused for the keys, the dates of the record, a sequence, a state and a relation to many', () => {
+    for (const field of [f.id(), f.createdAt(), f.updatedAt()]) {
+      expect([field.def.kind, codeOf(() => field.pii())]).toEqual([field.def.kind, 'DATA_FIELD_INVALID']);
+    }
+  });
+
+  it('SEC-08 the flags do not change the JSON Schema of the field, and are in the definition of the entity', () => {
+    const Entity = defineEntity({
+      name: 'test.Person',
+      table: 'test_people',
+      fields: { id: f.id(), taxId: f.string({ max: 20 }).encrypted().pii(), nick: f.string({ max: 20 }).pii() },
+    });
+    expect(Entity.fields['taxId']?.encrypted).toBe(true);
+    expect(Entity.fields['taxId']?.pii).toBe(true);
+    expect(Entity.fields['nick']?.encrypted).toBeUndefined();
+  });
+});
