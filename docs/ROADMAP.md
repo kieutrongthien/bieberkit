@@ -221,7 +221,7 @@ Done when: generated permission and tenant tests pass for the sample entity and 
 
 Depends on: M1.2. Can run in parallel with M1.4 (no shared files).
 
-- [ ] **[M]** Queue contract, `defineJob`, `sync`, `database` and `redis` (BullMQ) drivers under `@bieberkit/queue` subpaths (PKG-02, PKG-03, §15.1)
+- [ ] **[M]** Queue contract, `defineJob`, `sync`, `database` and `redis` (BullMQ) drivers under `@bieberkit/queue` subpaths (PKG-02, PKG-03, §15.1). Slice Q1 is prepared on the branch `feat/queue-contract` (contract, `defineJob`, `sync` and `database` drivers, worker, outbox glue, scheduler, the contract suite) and waits for the maintainer. The `redis` driver is slice Q2
 - [ ] Queues `critical`, `default`, `reports`; dead-letter list; input validated on dispatch and execution; stable `jobId` (Q-01 to Q-04)
 - [ ] Bulk requests of 101 to 500 rows as a queued job, with the result kept for the client (API-14, PERF-05)
 - [x] A shared store for `Idempotency-Key` on the cache contract (§13.1). `createCacheIdempotencyStore(cache)` implements the `IdempotencyStore` port on `atomic` keys, and `@bieberkit/http` exports the port and its memory store

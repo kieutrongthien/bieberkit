@@ -292,6 +292,7 @@ export declare function transitionOf(schema: OrmSchema, name: string): Transitio
 export declare function availableTransitions(schema: OrmSchema, row: Row$5): readonly AvailableTransition[];
 export declare function entityEventName(entity: string, name: string): string;
 export declare function transition(em: EntityManager, schema: OrmSchema, row: Row$5, name: string, input?: unknown): Promise<TransitionResult>;
+export declare function retryOnDeadlock<T>(run: () => Promise<T>): Promise<T>;
 interface OutboxEvent {
   readonly name: string;
   readonly version?: number;
@@ -359,6 +360,11 @@ export declare function bulkInsert(em: EntityManager, schema: OrmSchema, rows: r
 export declare function bulkUpdate(em: EntityManager, schema: OrmSchema, where: Row$4, data: Row$4): Promise<number>;
 type RequestKysely = Kysely<StepDatabase>;
 export declare function requestKysely(db: Database): RequestKysely;
+export declare function rawKysely(db: {
+  readonly orm: {
+    readonly em: EntityManager;
+  };
+}): Promise<Kysely<StepDatabase>>;
 interface PluginRefusal {
   readonly step: string;
   readonly code: string;
