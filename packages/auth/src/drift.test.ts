@@ -23,7 +23,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { twoFactor } from 'better-auth/plugins';
+import { organization } from 'better-auth/plugins';
 import { createAuth } from './better-auth.ts';
 import { checkAuthDrift, driftEntities } from './drift.ts';
 import { describeDialects } from './testing/dialects.ts';
@@ -62,9 +62,41 @@ describeDialects('AUTH-10 the drift check on the real entities', ({ open }) => {
 
   it('AUTH-10 sees a plugin that wants a table or a column that the entities do not have', async () => {
     const { auth, entities } = await setup();
-    const problems = checkAuthDrift({ ...auth.options, plugins: [twoFactor()] }, entities);
-    expect(problems.join('\n')).toContain('twoFactorEnabled');
-    expect(problems.join('\n')).toMatch(/twoFactor/);
+    const problems = checkAuthDrift({ ...auth.options, plugins: [organization()] }, entities);
+    expect(problems.join('\n')).toMatch(/organization/);
+    expect(problems.join('\n')).toMatch(/member/);
+  });
+});
+
+describeDialects('AUTH-10 the drift check with each method on', ({ open }) => {
+  const check = async (methods: Parameters<typeof createAuth>[0]['methods']) => {
+    const db = await open([]);
+    const auth = createAuth({
+      db,
+      dialect: db.dialect,
+      secret: 'x'.repeat(40),
+      baseUrl: 'https://app.test',
+      ...(methods === undefined ? {} : { methods }),
+    });
+    return checkAuthDrift(auth.options, driftEntities(db));
+  };
+
+  it('AUTH-10 TOTP: the table and the flag of the user agree with the entities', async () => {
+    expect(await check({ totp: { issuer: 'x' } })).toEqual([]);
+  });
+
+  it('AUTH-10 passkeys: the table agrees with the entity', async () => {
+    expect(await check({ passkey: { rpName: 'x' } })).toEqual([]);
+  });
+
+  it('AUTH-10 the magic link needs no table of its own', async () => {
+    expect(await check({ magicLink: { send: async () => undefined } })).toEqual([]);
+  });
+
+  it('AUTH-10 all of them together agree too', async () => {
+    expect(
+      await check({ totp: { issuer: 'x' }, passkey: { rpName: 'x' }, magicLink: { send: async () => undefined } }),
+    ).toEqual([]);
   });
 });
 

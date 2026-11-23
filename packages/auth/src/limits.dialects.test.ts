@@ -23,7 +23,7 @@
  */
 
 import { expect, it } from 'vitest';
-import { authServer } from './testing/auth-server.ts';
+import { authServer, cookieNamed } from './testing/auth-server.ts';
 import type { AuthServer } from './testing/auth-server.ts';
 import { describeDialects } from './testing/dialects.ts';
 
@@ -125,5 +125,59 @@ describeDialects('AUTH-06 limits', ({ open }) => {
     for (let n = 0; n < 7; n += 1) statuses.push((await wrong(app, 'an@example.vn', '203.0.113.9')).status);
     expect(statuses.slice(0, 5)).toEqual([401, 401, 401, 401, 401]);
     expect(statuses.slice(5)).toEqual([429, 429]);
+  });
+
+  it('AUTH-06 the magic link is limited per address: the request by mail, whoever the email is', async () => {
+    const app = await authServer(open, { magicLink: true, limits: { magicLink: { perIp: { window: 60, max: 2 } } } });
+    const ask = (email: string) => app.api('POST', '/sign-in/magic-link', { ip: '203.0.113.9', payload: { email } });
+    expect([
+      (await ask('a@example.vn')).status,
+      (await ask('b@example.vn')).status,
+      (await ask('c@example.vn')).status,
+    ]).toEqual([200, 200, 429]);
+  });
+
+  it('AUTH-06 the magic link is limited per account: many addresses, one email', async () => {
+    const app = await authServer(open, {
+      magicLink: true,
+      limits: { magicLink: { perAccount: { window: 60, max: 2 } } },
+    });
+    await app.signUp('an@example.vn', { ip: '203.0.113.50' });
+    const statuses = [];
+    for (let n = 0; n < 3; n += 1) {
+      statuses.push(
+        (
+          await app.api('POST', '/sign-in/magic-link', {
+            ip: `203.0.113.${n + 1}`,
+            payload: { email: 'an@example.vn' },
+          })
+        ).status,
+      );
+    }
+    expect(statuses).toEqual([200, 200, 429]);
+    expect(app.mails.filter((mail) => mail.kind === 'magic')).toHaveLength(2);
+  });
+
+  it('AUTH-06 the use of the link is limited per address too, so a link cannot be guessed', async () => {
+    const app = await authServer(open, { magicLink: true, limits: { magicLink: { perIp: { window: 60, max: 2 } } } });
+    const use = () => app.send('GET', '/api/auth/magic-link/verify?token=guess&callbackURL=%2F', { ip: '203.0.113.9' });
+    expect([(await use()).status === 429, (await use()).status === 429, (await use()).status === 429]).toEqual([
+      false,
+      false,
+      true,
+    ]);
+  });
+
+  it('AUTH-06 a TOTP code and a backup code are limited per address, so a code cannot be guessed', async () => {
+    const app = await authServer(open, { totp: true, limits: { mfa: { perIp: { window: 60, max: 3 } } } });
+    const { cookie } = await app.login('an@example.vn');
+    await app.enableTotp(cookie);
+    const first = await app.signIn('an@example.vn', { ip: '203.0.113.7' });
+    const pending = cookieNamed(first, '__Host-bk_two_factor') ?? '';
+    const guess = () =>
+      app.api('POST', '/two-factor/verify-totp', { cookie: pending, ip: '203.0.113.7', payload: { code: '000000' } });
+    const statuses = [];
+    for (let n = 0; n < 4; n += 1) statuses.push((await guess()).status === 429);
+    expect(statuses).toEqual([false, false, false, true]);
   });
 });

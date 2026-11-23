@@ -36,6 +36,7 @@ import { registerAuthRoutes } from '../routes.ts';
 import { createTenantResolver } from '../tenant.ts';
 import type { AuthDialectContext } from './dialects.ts';
 import { Deal, SCOPED } from './sample.ts';
+import { secretOf, totpCode } from './totp.ts';
 
 export const BASE_URL = 'https://app.test';
 export const PASSWORD = 'correct horse battery staple';
@@ -61,7 +62,7 @@ export interface SendOptions {
 }
 
 export interface MailRecord extends AuthMail {
-  readonly kind: 'verify' | 'reset';
+  readonly kind: 'verify' | 'reset' | 'magic';
 }
 
 export interface AuthServer {
@@ -78,16 +79,37 @@ export interface AuthServer {
   signIn(email: string, options?: SendOptions & { password?: string }): Promise<ServerReply>;
   /** Signs up and signs in, and gives the id of the user and the cookie. */
   login(email: string): Promise<{ id: string; cookie: string }>;
+  /** Turns TOTP on for the user of `cookie` and confirms it with a code. It gives the secret, the backup codes and the new session cookie. */
+  enableTotp(cookie: string): Promise<{ secret: string; backupCodes: string[]; cookie: string }>;
+  /** Signs in with the password and then with a TOTP code. It gives the cookie of the session. */
+  signInTotp(
+    email: string,
+    secret: string,
+    options?: SendOptions,
+  ): Promise<{ cookie: string; first: ServerReply; second: ServerReply }>;
   count(table: string): Promise<number>;
   rows(sql: string): Promise<Record<string, unknown>[]>;
   /** Gives the user a new role in the tenant with these permissions. */
-  grant(userId: string, permissions: readonly string[], tenant?: string): Promise<void>;
+  grant(
+    userId: string,
+    permissions: readonly string[],
+    tenant?: string,
+    options?: { requireMfa?: boolean },
+  ): Promise<void>;
   seed(tenant: string, rows: readonly Record<string, unknown>[]): Promise<Record<string, string>>;
   audit(): Promise<{ action: string; actorId: string | null; data: unknown }[]>;
   outbox(): Promise<string[]>;
 }
 
 export interface AuthServerOptions {
+  /** Which methods besides email and password are on. */
+  readonly totp?: boolean;
+  readonly passkey?: boolean;
+  readonly magicLink?: boolean;
+  /** Use this database (the same one as another server) instead of opening a new one. */
+  readonly db?: Database;
+  readonly secret?: string;
+  readonly previousSecrets?: readonly string[];
   readonly limits?: AuthLimits;
   readonly trustProxy?: boolean;
 }
@@ -106,7 +128,8 @@ const asBody = (text: string): Record<string, unknown> => {
 export function cookieOf(reply: ServerReply): string | undefined {
   const header = reply.headers['set-cookie'];
   const all = Array.isArray(header) ? header : typeof header === 'string' ? [header] : [];
-  const found = all.find((line) => line.startsWith('__Host-bk_session='));
+  // A cookie with no value is the server taking the cookie back, not a session.
+  const found = all.find((line) => line.startsWith('__Host-bk_session=') && !line.startsWith('__Host-bk_session=;'));
   return found?.split(';')[0];
 }
 
@@ -114,7 +137,15 @@ export function cookieOf(reply: ServerReply): string | undefined {
 export function setCookieOf(reply: ServerReply): string | undefined {
   const header = reply.headers['set-cookie'];
   const all = Array.isArray(header) ? header : typeof header === 'string' ? [header] : [];
-  return all.find((line) => line.startsWith('__Host-bk_session='));
+  return all.find((line) => line.startsWith('__Host-bk_session=') && !line.startsWith('__Host-bk_session=;'));
+}
+
+/** The `name=value` of any cookie that an answer sets, or `undefined`. */
+export function cookieNamed(reply: ServerReply, name: string): string | undefined {
+  const header = reply.headers['set-cookie'];
+  const all = Array.isArray(header) ? header : typeof header === 'string' ? [header] : [];
+  const found = all.find((line) => line.startsWith(`${name}=`) && !line.startsWith(`${name}=;`));
+  return found?.split(';')[0];
 }
 
 export async function authServer(
@@ -123,13 +154,21 @@ export async function authServer(
 ): Promise<AuthServer> {
   const schemas = compileEntities([Deal]);
   const queries: string[] = [];
-  const db = await open(schemas, { queryLog: (text) => void queries.push(text) });
+  const db = options.db ?? (await open(schemas, { queryLog: (text) => void queries.push(text) }));
   const mails: MailRecord[] = [];
   const auth = createAuth({
     db,
     dialect: db.dialect,
-    secret: 'test-secret-that-is-long-enough-for-the-rule',
+    secret: options.secret ?? 'test-secret-that-is-long-enough-for-the-rule',
+    ...(options.previousSecrets === undefined ? {} : { previousSecrets: options.previousSecrets }),
     baseUrl: BASE_URL,
+    methods: {
+      ...(options.totp === true ? { totp: { issuer: 'BieberKit Test' } } : {}),
+      ...(options.passkey === true ? { passkey: { rpName: 'BieberKit Test' } } : {}),
+      ...(options.magicLink === true
+        ? { magicLink: { send: async (mail: AuthMail) => void mails.push({ kind: 'magic', ...mail }) } }
+        : {}),
+    },
     ...(options.limits === undefined ? {} : { limits: options.limits }),
     mail: {
       sendVerification: async (mail) => void mails.push({ kind: 'verify', ...mail }),
@@ -190,12 +229,39 @@ export async function authServer(
       const reply = await signIn(email);
       return { id, cookie: cookieOf(reply) ?? '' };
     },
+    enableTotp: async (cookie) => {
+      const enabled = await api('POST', '/two-factor/enable', { cookie, payload: { password: PASSWORD } });
+      const secret = secretOf(String(enabled.body['totpURI']));
+      const codes = enabled.body['backupCodes'];
+      const confirmed = await api('POST', '/two-factor/verify-totp', { cookie, payload: { code: totpCode(secret) } });
+      return {
+        secret,
+        backupCodes: Array.isArray(codes) ? codes.map(String) : [],
+        cookie: cookieOf(confirmed) ?? '',
+      };
+    },
+    signInTotp: async (email, secret, sent = {}) => {
+      const first = await signIn(email, sent);
+      const pending = cookieNamed(first, '__Host-bk_two_factor');
+      const second = await api('POST', '/two-factor/verify-totp', {
+        ...sent,
+        cookie: pending ?? '',
+        payload: { code: totpCode(secret) },
+      });
+      return { cookie: cookieOf(second) ?? '', first, second };
+    },
     count: async (table) => Number((await rows(`select count(*) as n from ${table}`))[0]?.['n']),
     rows,
-    grant: async (userId, permissions, tenant = TENANT_A) => {
+    grant: async (userId, permissions, tenant = TENANT_A, grantOptions = {}) => {
       const id = uuid7();
       await runInUnitOfWork(db, async (em) => {
-        em.create(AuthRole, { id, tenant, name: `role-${id}`, system: false, requireMfa: false });
+        em.create(AuthRole, {
+          id,
+          tenant,
+          name: `role-${id}`,
+          system: false,
+          requireMfa: grantOptions.requireMfa === true,
+        });
         await em.flush();
         for (const permission of permissions) em.create(AuthRolePermission, { roleId: id, permission });
         em.create(AuthUserRole, { tenant, userId, roleId: id });

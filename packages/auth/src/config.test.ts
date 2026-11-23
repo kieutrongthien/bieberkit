@@ -96,17 +96,59 @@ describe('AUTH-10 the options of Better Auth', () => {
   });
 });
 
+const ids = (methods?: Parameters<typeof createAuth>[0]['methods']) =>
+  (make(methods === undefined ? {} : { methods }).options.plugins ?? [])
+    .map((plugin) => plugin.id)
+    .toSorted((a, b) => a.localeCompare(b));
+
+describe('AUTH-01 the cookies and the secrets of the methods', () => {
+  it('AUTH-01 every cookie of Better Auth is a __Host- cookie that is secure and for this host only', () => {
+    const cookies = make().options.advanced?.cookies ?? {};
+    expect(Object.keys(cookies).toSorted((a, b) => a.localeCompare(b))).toEqual([
+      'better-auth-passkey',
+      'dont_remember',
+      'session_data',
+      'session_token',
+      'trust_device',
+      'two_factor',
+    ]);
+    for (const cookie of Object.values(cookies)) {
+      expect(cookie.name?.startsWith('__Host-bk_')).toBe(true);
+      expect(cookie.attributes).toMatchObject({ httpOnly: true, secure: true, path: '/' });
+      expect(cookie.attributes).not.toHaveProperty('domain');
+    }
+    expect(make().options.advanced?.defaultCookieAttributes).toMatchObject({ secure: true, httpOnly: true, path: '/' });
+  });
+
+  it('SEC-08 gives the secret and the previous ones to Better Auth as a list, the current first, each with a number that its text makes', () => {
+    const list =
+      make({ secret: 'a'.repeat(40), previousSecrets: ['b'.repeat(40), 'c'.repeat(40)] }).options.secrets ?? [];
+    expect(list.map((item) => item.value)).toEqual(['a'.repeat(40), 'b'.repeat(40), 'c'.repeat(40)]);
+    expect(new Set(list.map((item) => item.version)).size).toBe(3);
+    const again = make({ secret: 'b'.repeat(40) }).options.secrets ?? [];
+    expect(again[0]?.version).toBe(list[1]?.version);
+  });
+
+  it('AUTH-03 loads the plugin of a method that is asked for, and none of the others', () => {
+    expect(ids()).toEqual([]);
+    expect(ids({ totp: { issuer: 'x' } })).toEqual(['two-factor']);
+    expect(ids({ passkey: { rpName: 'x' } })).toEqual(['passkey']);
+    expect(ids({ magicLink: { send: async () => undefined } })).toEqual(['magic-link']);
+  });
+});
+
 describe('AUTH-11 the version of Better Auth', () => {
   it('AUTH-11 is pinned to one exact version of 1.7.16 or later, in the package and in its adapter', () => {
     const manifest: { dependencies: Record<string, string> } = JSON.parse(
       readFileSync(new URL('../package.json', import.meta.url), 'utf8'),
     );
-    for (const name of ['better-auth', '@better-auth/kysely-adapter']) {
+    for (const name of ['better-auth', '@better-auth/kysely-adapter', '@better-auth/passkey']) {
       const version = manifest.dependencies[name] ?? '';
       expect(version).toMatch(/^\d+\.\d+\.\d+$/);
       const [major = 0, minor = 0, patch = 0] = version.split('.').map(Number);
       expect(major * 1_000_000 + minor * 1_000 + patch).toBeGreaterThanOrEqual(1_007_016);
     }
     expect(manifest.dependencies['better-auth']).toBe(manifest.dependencies['@better-auth/kysely-adapter']);
+    expect(manifest.dependencies['better-auth']).toBe(manifest.dependencies['@better-auth/passkey']);
   });
 });
