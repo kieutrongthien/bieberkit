@@ -2,7 +2,7 @@
  * BieberKit
  *
  * @file        packages/storage/src/index.ts
- * @description Public entry point of @bieberkit/storage.
+ * @description Public API of @bieberkit/storage: the storage, the policy, the memory disk and the errors.
  * @author      Bieber Kieu <kieutrongthien@gmail.com>
  * @copyright   Copyright (c) 2026 Bieber Kieu
  * @license     Apache-2.0
@@ -22,7 +22,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-// Public API of @bieberkit/storage. Implementation starts after the Phase 0 ADRs (docs/adr/README.md).
-
-/** npm name of this package. */
-export const packageName = '@bieberkit/storage';
+export { DEFAULT_MAX_BYTES, DEFAULT_TYPES } from './content.ts';
+export type { StoragePolicy, TypeRule } from './content.ts';
+export { StorageError } from './contract.ts';
+export type { Disk, DiskBody, DiskObject, SignedUpload, StoredFile, Visibility } from './contract.ts';
+export { createMemoryDisk } from './memory-disk.ts';
+export type { MemoryDisk, MemoryDiskOptions } from './memory-disk.ts';
+export { createStorage } from './storage.ts';
+export type { Storage, StorageOptions, StoreBody } from './storage.ts';

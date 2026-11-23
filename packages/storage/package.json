@@ -19,6 +19,16 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
+    "./flydrive": {
+      "@bieberkit/source": "./src/adapters/flydrive/index.ts",
+      "types": "./dist/flydrive.d.ts",
+      "default": "./dist/flydrive.js"
+    },
+    "./testing": {
+      "@bieberkit/source": "./src/testing/index.ts",
+      "types": "./dist/testing.d.ts",
+      "default": "./dist/testing.js"
+    },
     "./package.json": "./package.json"
   },
   "publishConfig": {
@@ -26,6 +36,14 @@
       ".": {
         "types": "./dist/index.d.ts",
         "default": "./dist/index.js"
+      },
+      "./flydrive": {
+        "types": "./dist/flydrive.d.ts",
+        "default": "./dist/flydrive.js"
+      },
+      "./testing": {
+        "types": "./dist/testing.d.ts",
+        "default": "./dist/testing.js"
       },
       "./package.json": "./package.json"
     },
@@ -36,7 +54,12 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
-    "@bieberkit/core": "workspace:*"
+    "@aws-sdk/client-s3": "3.1169.0",
+    "@aws-sdk/s3-request-presigner": "3.1169.0",
+    "@bieberkit/core": "workspace:*",
+    "@bieberkit/data": "workspace:*",
+    "file-type": "22.3.0",
+    "flydrive": "2.2.0"
   },
   "engines": {
     "node": ">=24.12"

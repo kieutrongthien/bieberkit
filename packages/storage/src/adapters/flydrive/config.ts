@@ -1,8 +1,8 @@
 /**
  * BieberKit
  *
- * @file        packages/storage/src/index.test.ts
- * @description Smoke test for the @bieberkit/storage entry point.
+ * @file        packages/storage/src/adapters/flydrive/config.ts
+ * @description The part of the validated config that decides the storage: STORAGE_DISK, STORAGE_LOCAL_ROOT and S3_*.
  * @author      Bieber Kieu <kieutrongthien@gmail.com>
  * @copyright   Copyright (c) 2026 Bieber Kieu
  * @license     Apache-2.0
@@ -22,11 +22,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, expect, it } from 'vitest';
-import { packageName } from './index.ts';
-
-describe('@bieberkit/storage', () => {
-  it('exposes its npm name', () => {
-    expect(packageName).toBe('@bieberkit/storage');
-  });
-});
+/** The part of the validated config (`CoreEnv`) that decides the storage. */
+export interface StorageConfig {
+  readonly STORAGE_DISK: 'local' | 's3';
+  readonly STORAGE_LOCAL_ROOT: string;
+  readonly S3_BUCKET: string | undefined;
+  readonly S3_REGION: string | undefined;
+  readonly S3_ENDPOINT: string | undefined;
+  readonly S3_ACCESS_KEY_ID: string | undefined;
+  readonly S3_SECRET_ACCESS_KEY: string | undefined;
+  readonly S3_FORCE_PATH_STYLE: boolean;
+}
