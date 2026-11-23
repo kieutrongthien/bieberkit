@@ -131,7 +131,7 @@ In `packages/auth/src`: `registry.test.ts`, `ability.test.ts` (with the language
 - **The matrix found a weak spot of the first design of the mutants.** The tenant fault cannot be a wrapper over the authorizer, because the tenant filter of the rows lives in the data layer. The sixth mutant is `tenant-blind-grants`: the roles of every tenant grant. The tenant filter of the rows has its own tests in `@bieberkit/data`. Each mutant is caught by the cases that are meant to catch it: `conditions:*`, `mask-hidden`, `mask-write-rejected`, `read-does-not-grant-write`, `unsupported-denies:*` and `tenant-isolation-roles`.
 - **An empty update is a validation error for everyone.** The schema refuses `{}` before the permission is asked, so the case `update-empty-payload` of ADR 0013 is an update that names no masked field, by a caller who may only read.
 
-## Slice B: authentication (proposed on 2026-11-23)
+## Slice B: authentication (implemented on 2026-11-23)
 
 Who the caller is. Better Auth 1.7.25 (pinned exactly, AUTH-11) runs on the EntityManager of the request through its own Kysely adapter (ADR 0012), and plugs into the ports of `@bieberkit/http`. The plan is in the roadmap item M1.4. Passkeys, TOTP, magic link, API keys and `requireMfa` are slice C.
 
@@ -161,7 +161,7 @@ AuthUser, AuthSession, AuthAccount, AuthVerification, AuthRateLimit             
 
 1. **One Kysely for the request.** `requestKysely(db)` is a proxy whose every call goes to `em.getKysely(...)` of the EntityManager in the async context (a fork outside a request), with `tableNamingStrategy: 'entity'`, `columnNamingStrategy: 'property'`, `convertValues`, `processOnCreateHooks` and `processOnUpdateHooks`. Inside a transaction, `transaction()` returns an object whose `execute(cb)` calls `cb` with the same Kysely, so a nested transaction joins (ADR 0012, decision 2). Outside one it is a real transaction.
 2. **Tables.** `authUser`, `authSession`, `authAccount`, `authVerification` and `authRateLimit` are the model names, `auth_users` and the rest the tables, made by steps 0.2.0 of the plugin `@bieberkit/auth` and described by ORM schemas. Ids are UUIDv7 from `advanced.database.generateId`, the type refuses text that is not a UUID, `account.accountId` is the column `external_account_ref`, and deleting a user deletes its sessions and accounts.
-3. **Cookie (AUTH-01).** `__Host-bk_session`, `HttpOnly`, `Secure`, `SameSite=Lax`, `Path=/`, no `Domain`, and `useSecureCookies` is not set.
+3. **Cookie (AUTH-01).** `__Host-bk_session`, `HttpOnly`, `Secure`, `SameSite=Lax`, `Path=/`, no `Domain`, and `useSecureCookies` is set to `false`: Better Auth turns it on by itself for an https base URL, and the name would become `__Secure-__Host-bk_session`.
 4. **Client IP (AUTH-10).** The mount removes the `x-bk-client-ip` of the request, sets its own from the address that `TRUST_PROXY` resolved, and Better Auth reads only that header. An `X-Forwarded-For` that the proxy setting does not trust has no effect.
 5. **A request is one unit.** A change (not a GET) under `/api/auth` runs in a unit of work with a transaction. A status below 400 commits it, together with the audit entry (`auth.user.signed-up`, `auth.session.created`, `auth.session.revoked`, `auth.password.reset`, `auth.email.verified`) and the outbox event of the same name. Any other status rolls everything back. A failed sign-in writes `auth.signin.failed` in a transaction of its own.
 6. **Limits survive a rollback (AUTH-06).** The counters are written through a fork with no transaction. Per IP, Better Auth's rules for sign-in, sign-up and the password reset. Per account, a counter that is keyed by the hash of the address and the path, so the address is never stored in clear text. Over the limit is 429 with `Retry-After`. Defaults: sign-in 5 per 60 s per IP and 10 per 15 min per account, sign-up 5 per 60 s per IP, reset 3 per 15 min per IP and per account.
@@ -179,10 +179,20 @@ AuthUser, AuthSession, AuthAccount, AuthVerification, AuthRateLimit             
 | `AUTH_TENANT_INVALID`   | 400    | `X-Tenant` is the UUID of a tenant                          |
 | `AUTH_TENANT_FORBIDDEN` | 403    | The user has no role in this tenant                         |
 
-### Tests (red until implemented)
+### Tests
 
 `packages/data/src/orm/request-kysely.dialects.test.ts`, `packages/http/src/mount.test.ts`, and in `packages/auth/src`: `tables.dialects.test.ts`, `flows.dialects.test.ts`, `limits.dialects.test.ts`, `authenticator.dialects.test.ts`, `tenant.dialects.test.ts`, `end-to-end.dialects.test.ts`, `config.test.ts`, `drift.test.ts`.
 
 ### Left out of slice B
 
 Organizations and teams (the plugin needs its spike), Valkey for sessions and counters (M1.5), the breached-password check, OAuth providers, and everything of slice C.
+
+### Found while implementing slice B
+
+- **`@better-auth/kysely-adapter` is a direct dependency.** `better-auth` does not export it, and pnpm does not let a package import a dependency of a dependency. It is pinned to the same version as `better-auth` (a test checks both). `kysely` 0.29.8 is a direct dependency too, for the counters of the limits (the same version as `@bieberkit/data`).
+- **`useSecureCookies` must be `false`.** Better Auth turns it on by itself when the base URL is https, and the cookie is then `__Secure-__Host-bk_session`. ADR 0012 tested a `http://localhost` base URL, where it stays off. The attributes already make the cookie `Secure`.
+- **Better Auth also asks for `connection()`.** Besides `transaction()`, the adapter calls `db.connection()` on PostgreSQL and MySQL, and Kysely refuses that on a transaction too. `requestKysely` joins both.
+- **A single connection cannot hold a rolled back counter and a kept one.** SQLite has one connection, and a Kysely that is "outside" the transaction would wait for it forever. So the counters are written inside the transaction like everything else, and when the request is rolled back the routes count them again, outside the transaction (`capture` and `replay` of `limits.ts`). The check and the count are one statement (an upsert), so requests at the same time cannot all pass a stale read.
+- **Better Auth 1.7.25 has an atomic rate limit storage.** `rateLimit.customStorage.consume(key, rule)` replaced `get` and `set`, so the table `auth_rate_limits` has a unique `key` and the storage is one `insert ... on conflict`. MySQL has no `returning`, so it reads the count after the write.
+- **A forged or expired cookie is no principal and no error.** `getSession` answers `null`, and the authenticator gives `undefined`.
+- **A user with no role in any tenant is refused by the tenant resolver, not by the authorizer.** `X-Tenant` names a tenant, and the membership check is a role row, so such a request is 403 `AUTH_TENANT_FORBIDDEN` and writes no `authz.denied` entry. The denial of the authorizer is for a user who is a member and lacks the permission.

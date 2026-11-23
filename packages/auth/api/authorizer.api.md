@@ -124,5 +124,5 @@ interface AccessAuthorizer extends Authorizer {
   install(server: HttpServer): void;
 }
 declare function createAuthorizer(options: AuthorizerOptions): AccessAuthorizer;
-export { ScopedPermission as C, PermissionEntry as D, MaskedField as E, PermissionRegistry as O, EntityShape as S, Action as T, Ability as _, AuthRole as a, AccessAnswer as b, AuthRoleRow as c, GrantLoader as d, Grants as f, loadGrants as g, authMigrationSteps as h, AUTH_PLUGIN as i, buildPermissionRegistry as k, AuthUserRole as l, authEntities as m, AuthorizerOptions as n, AuthRolePermission as o, NIL_TENANT as p, createAuthorizer as r, AuthRolePermissionRow as s, AccessAuthorizer as t, AuthUserRoleRow as u, AbilityInput as v, buildAbility as w, Condition as x, AbilityUser as y };
+export { ScopedPermission as C, PermissionEntry as D, MaskedField as E, PermissionRegistry as O, EntityShape as S, Action as T, Ability as _, AuthRolePermission as a, AccessAnswer as b, AuthUserRole as c, Grants as d, NIL_TENANT as f, AUTH_PLUGIN as g, loadGrants as h, AuthRole as i, buildPermissionRegistry as k, AuthUserRoleRow as l, authMigrationSteps as m, AuthorizerOptions as n, AuthRolePermissionRow as o, authEntities as p, createAuthorizer as r, AuthRoleRow as s, AccessAuthorizer as t, GrantLoader as u, AbilityInput as v, buildAbility as w, Condition as x, AbilityUser as y };
 ```

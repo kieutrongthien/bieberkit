@@ -166,6 +166,10 @@ interface StageContext {
   readonly details?: Readonly<Record<string, unknown>>;
 }
 type StageHook = (context: StageContext) => void | Promise<void>;
+interface MountDef {
+  readonly prefix: string;
+  readonly handler: (request: Request) => Promise<Response>;
+}
 interface HttpServerOptions {
   readonly logger?: Logger;
   readonly authenticator?: Authenticator;
@@ -195,6 +199,7 @@ interface InjectResponse {
 }
 interface HttpServer {
   route(route: RouteDef): void;
+  mount(mount: MountDef): void;
   stage(name: StageName, hook: StageHook): void;
   inject(request: InjectOptions): Promise<InjectResponse>;
   listen(options?: {
@@ -310,5 +315,5 @@ interface Problem {
   readonly [extension: string]: unknown;
 }
 export declare const packageName = "@bieberkit/http";
-export type { AccessAnswer, Authenticator, Authorizer, CorsOptions, CsrfProtection, EntityRoutesContext, ErrorContext, HttpEnv, HttpFetch, HttpFetchInit, HttpFetchOptions, HttpServer, HttpServerOptions, InjectOptions, InjectResponse, Method, OpenApiDocument, OpenApiInfo, Principal, Problem, RateLimitResult, RateLimiter, RegisterHttpOptions, RequestInfo, ResolvedAddress, RouteContext, RouteDef, RouteSchema, StageContext, StageHook, StageName, TenantResolver };
+export type { AccessAnswer, Authenticator, Authorizer, CorsOptions, CsrfProtection, EntityRoutesContext, ErrorContext, HttpEnv, HttpFetch, HttpFetchInit, HttpFetchOptions, HttpServer, HttpServerOptions, InjectOptions, InjectResponse, Method, MountDef, OpenApiDocument, OpenApiInfo, Principal, Problem, RateLimitResult, RateLimiter, RegisterHttpOptions, RequestInfo, ResolvedAddress, RouteContext, RouteDef, RouteSchema, StageContext, StageHook, StageName, TenantResolver };
 ```

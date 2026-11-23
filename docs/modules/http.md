@@ -541,3 +541,12 @@ The route permission says whether a caller may call a route. The access port say
 | `AUTHZ_DENIED`                | 403    | The caller has no permission for this data                             |
 | `AUTHZ_FIELD_FORBIDDEN`       | 403    | Remove the fields that the caller has no permission for                |
 | `AUTHZ_UNSUPPORTED_CONDITION` | 403    | A condition of a role uses an operator that the language does not have |
+
+## mount (AUTH-09, AUTH-10, M1.4)
+
+`server.mount({ prefix, handler })` hands every request under `prefix` to a web handler, `(request: Request) => Promise<Response>`, such as `auth.handler` of Better Auth. It is not a route: it has no schema and no permission, and it is not in `routes()` nor in the OpenAPI document.
+
+- It goes through the stages of the pipeline: the request id, the limit by address, authentication, the tenant and CSRF (so a sign out with a cookie from another site is 403 like any change). The body limit applies.
+- The handler gets a web `Request` with an absolute URL, the headers of the request, and a body that is the JSON of the parsed body (or the text). `x-bk-client-ip` is removed from what the client sent and set from the address that `TRUST_PROXY` resolved, and a handler may trust only that header.
+- The `Response` is the answer: the status, every header (several `Set-Cookie` stay several), and the text of the body. No problem is made of a 4xx of the handler. A 429 with `X-Retry-After` also gets `Retry-After`. No ETag is made for it. A handler that throws is a 500 problem with no detail.
+- A prefix starts with a slash, has no slash at its end and no wildcard, can be mounted once, may not hold a route, and cannot be mounted after the server started (`HTTP_ROUTE_INVALID`). Only JSON and empty bodies are read.

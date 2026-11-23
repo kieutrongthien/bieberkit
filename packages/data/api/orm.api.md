@@ -103,6 +103,7 @@ interface ResolvedConnection {
 export declare function resolveConnection(env: DatabaseEnv, variable?: string): ResolvedConnection;
 export declare function createDatabase(env: DatabaseEnv, options: DatabaseOptions): Promise<Database>;
 export declare function currentEntityManager(): EntityManager | undefined;
+export declare function runInTransaction<T>(db: Database, fn: (em: EntityManager) => Promise<T>): Promise<T>;
 export declare function runInUnitOfWork<T>(db: Database, fn: (em: EntityManager) => Promise<T>): Promise<T>;
 interface AuditEntry {
   readonly action: string;
@@ -347,6 +348,8 @@ export declare function purgeProcessed(db: Database, options?: PurgeOptions): Pr
 type Row$4 = Record<string, unknown>;
 export declare function bulkInsert(em: EntityManager, schema: OrmSchema, rows: readonly Row$4[]): Promise<void>;
 export declare function bulkUpdate(em: EntityManager, schema: OrmSchema, where: Row$4, data: Row$4): Promise<number>;
+type RequestKysely = Kysely<StepDatabase>;
+export declare function requestKysely(db: Database): RequestKysely;
 interface PluginRefusal {
   readonly step: string;
   readonly code: string;
@@ -457,5 +460,5 @@ export declare function setTranslation(em: EntityManager, schema: OrmSchema, rec
 type Row = Record<string, unknown>;
 export declare function toApiRow(schema: OrmSchema, row: Row): Row;
 export declare function toOrmData(schema: OrmSchema, input: Row, _mode: "create" | "update"): Row;
-export type { AggregateOptions, AggregateResult, AggregateRow, AttachmentInput, AttachmentRow, AuditEntry, AuditLogRow, AuditSink, AvailableTransition, CommentRow, CompileOptions, Database, DatabaseEnv, DatabaseOptions, DispatchResult, FeaturePage, ListOptions, MadeMigration, MigrationEnv, MigrationStatus, Migrator, MigratorOptions, Orm, OrmSchema, OutboxDispatcher, OutboxDispatcherOptions, OutboxEntryRow, OutboxEvent, OutboxLag, OutboxMessage, OutboxProcessedRow, OutboxPublisher, Page, PageRequest, PluginRefusal, PluginRun, PluginRunOptions, PurgeOptions, ReferenceVisibility, ResolvedConnection, SequenceKey, SequenceOptions, SequenceRow, SortOption, SqliteOptions, SystemScopeEntry, TagRow, TimelineInput, TimelineRow, TransitionResult, UpOptions };
+export type { AggregateOptions, AggregateResult, AggregateRow, AttachmentInput, AttachmentRow, AuditEntry, AuditLogRow, AuditSink, AvailableTransition, CommentRow, CompileOptions, Database, DatabaseEnv, DatabaseOptions, DispatchResult, FeaturePage, ListOptions, MadeMigration, MigrationEnv, MigrationStatus, Migrator, MigratorOptions, Orm, OrmSchema, OutboxDispatcher, OutboxDispatcherOptions, OutboxEntryRow, OutboxEvent, OutboxLag, OutboxMessage, OutboxProcessedRow, OutboxPublisher, Page, PageRequest, PluginRefusal, PluginRun, PluginRunOptions, PurgeOptions, ReferenceVisibility, RequestKysely, ResolvedConnection, SequenceKey, SequenceOptions, SequenceRow, SortOption, SqliteOptions, SystemScopeEntry, TagRow, TimelineInput, TimelineRow, TransitionResult, UpOptions };
 ```
