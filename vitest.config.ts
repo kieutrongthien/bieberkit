@@ -41,6 +41,8 @@ export default defineConfig({
         mysql: process.env['DATABASE_URL_MYSQL'] ?? '',
         require: process.env['BK_REQUIRE_DIALECTS'] ?? '',
       },
+      // The Valkey of the cache suites of @bieberkit/cache (packages/cache/src/testing). Its policy must evict (`allkeys-lru`).
+      cacheRedisUrl: process.env['CACHE_TEST_REDIS_URL'] ?? '',
     },
     // `pnpm test:coverage`. TST-01: 90 percent of lines for core, data, http and auth, 80 percent for the rest.
     // Each package gets its threshold when it reaches Phase 1.
@@ -53,6 +55,7 @@ export default defineConfig({
         'packages/core/src/**': { lines: 90 },
         'packages/data/src/**': { lines: 90 },
         'packages/auth/src/**': { lines: 90 },
+        'packages/cache/src/**': { lines: 90 },
       },
     },
   },
