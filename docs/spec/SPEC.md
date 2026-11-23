@@ -993,6 +993,7 @@ await queue.dispatch(sendInvoice, { invoiceId })
 ### 15.5 CPU-heavy work
 
 - **Q-09** PDF rendering, spreadsheet import and export, and image transforms run in a `worker_threads` pool inside the worker role, so one heavy job never blocks the event loop of others.
+- **Q-12** A pool task is a module that is named by a URL or an absolute path of the project, never by a user. A task that runs over its time, ends its thread or passes its memory limit costs that thread and no more: the others run, and the call fails with a stable code.
 
 ### 15.6 Realtime
 

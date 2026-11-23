@@ -39,6 +39,31 @@ export declare function parseCron(expression: string): Cron;
 export declare function registerOutbox(db: Database, queue: Queue, options?: Omit<OutboxDispatcherOptions, "publisher"> & {
   readonly logger?: Logger;
 }): OutboxDispatcher;
+interface WorkerPoolOptions {
+  readonly size?: number;
+  readonly maxQueued?: number;
+  readonly idleMs?: number;
+  readonly maxHeapMb?: number;
+  readonly logger?: Logger;
+}
+interface RunOptions {
+  readonly timeoutMs?: number;
+  readonly signal?: AbortSignal;
+  readonly transfer?: readonly ArrayBuffer[];
+}
+interface PoolStats {
+  readonly threads: number;
+  readonly busy: number;
+  readonly queued: number;
+  readonly completed: number;
+  readonly failed: number;
+}
+interface WorkerPool {
+  run<Result = unknown>(task: string | URL, input: unknown, options?: RunOptions): Promise<Result>;
+  stats(): PoolStats;
+  close(): Promise<void>;
+}
+export declare function createWorkerPool(options?: WorkerPoolOptions): WorkerPool;
 interface CreateQueueOptions {
   readonly driver: "sync" | "database";
   readonly jobs: readonly JobDef[];
@@ -76,5 +101,5 @@ declare module "@bieberkit/core" {
     jobs?: readonly JobDef[];
   }
 }
-export { type CreateQueueOptions, type Cron, type DeadJob, type DeadLetterPage, type DispatchOptions, type Dispatched, type JobContext, type JobDef, type JobInput, QUEUE_NAMES, type Queue, QueueError, type QueueName, type QueueStats, type Schedule, type Scheduler, type SchedulerOptions, type Worker, type WorkerOptions, defaultBackoffMs, defineJob, queueError };
+export { type CreateQueueOptions, type Cron, type DeadJob, type DeadLetterPage, type DispatchOptions, type Dispatched, type JobContext, type JobDef, type JobInput, type PoolStats, QUEUE_NAMES, type Queue, QueueError, type QueueName, type QueueStats, type RunOptions, type Schedule, type Scheduler, type SchedulerOptions, type Worker, type WorkerOptions, type WorkerPool, type WorkerPoolOptions, defaultBackoffMs, defineJob, queueError };
 ```
