@@ -83,3 +83,16 @@ cacheContractSuite(name, make)                                  // every engine 
 - `cache.test.ts` on the memory engine: namespacing and the tenant view, TTL and value rules, `remember` (50 concurrent callers compute once, a failing factory, a stuck lock), tags and generations, locks, `afterCommit`.
 - `idempotency.test.ts`: the four states, two stores on one engine behave as two processes.
 - `adapters/bentocache`: the suite on `file` and on `redis` (Valkey with `allkeys-lru`, `CACHE_TEST_REDIS_URL`; `BK_REQUIRE_DIALECTS=all` makes a missing URL fail), the first level of `redis` (a second node sees a write after the short TTL, and never through `atomic`), and `checkEvictionPolicy`.
+
+## Checks for `bieberkit doctor` on the instances of Valkey (Q-08)
+
+Prepared on 2026-11-24. `checkRedisInstances(config, { read? })` in `@bieberkit/cache/bentocache` answers a list of findings (`id`, `level` of `ok`, `warning` or `error`, `message`, `fix`), which `doctor` prints.
+
+1. The queue instance (`QUEUE_DRIVER=redis`, `REDIS_URL`) must have `maxmemory-policy noeviction`: with another policy a full server deletes jobs. Any other value is an error with the command that fixes it.
+2. The cache instance (`CACHE_DRIVER=redis`, `CACHE_REDIS_URL`) must have an evicting policy (`allkeys-*` or `volatile-*`, because every key has a TTL): with `noeviction` a full cache fails every write. A cache instance with no `maxmemory` is a warning, because its policy never runs.
+3. The two must not be one server. A server has one policy, and logical databases of one server share it, so `redis://a:6379/0` and `redis://a:6379/5` are one instance. It is an error in production, and a warning in development, where `CACHE_REDIS_URL` falls back to `REDIS_URL`.
+4. An instance of a driver that is not selected is not read. A driver that needs a URL and has none is an error.
+5. An instance that cannot be reached is an error with its host and port, and never its user or password. One that does not allow `CONFIG` (managed services often turn it off) is a warning to check by hand, not an error.
+6. The read is `CONFIG GET maxmemory-policy` and `maxmemory` with a connect timeout of 3 seconds and no retry.
+
+Tests: `doctor.test.ts`: every rule above with a reader that is injected, and against the Valkey of the tests (the real read, a server that is not there, no password in a finding).

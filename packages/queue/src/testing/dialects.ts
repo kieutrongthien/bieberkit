@@ -46,6 +46,8 @@ export interface QueueDialectContext {
    * makes them, and the tables of `entities` come from the schema. It is closed after the test and dropped after the suite.
    */
   readonly open: (entities: readonly OrmSchema[], options?: Pick<DatabaseOptions, 'queryLog'>) => Promise<Database>;
+  /** The connection URL (or the file) of a database that `open` made, for a test that needs a connection of its own. */
+  readonly urlOf: (database: Database) => string;
 }
 
 const ENV_NAME = { postgres: 'DATABASE_URL_POSTGRES', mysql: 'DATABASE_URL_MYSQL' } as const;
@@ -96,6 +98,7 @@ export function describeDialects(name: string, suite: (context: QueueDialectCont
     describe(title, () => {
       const cleanups: (() => Promise<void>)[] = [];
       const closers: (() => Promise<void>)[] = [];
+      const urlsOf = new WeakMap<Database, string>();
       afterEach(async () => {
         for (const close of closers.splice(0)) await close();
       });
@@ -122,6 +125,7 @@ export function describeDialects(name: string, suite: (context: QueueDialectCont
           ...options,
         });
         closers.push(() => database.close());
+        urlsOf.set(database, url);
         await applyPluginMigrations(database, [...dataMigrationSteps, ...queueMigrationSteps], {
           pluginOrder: [DATA_PLUGIN, QUEUE_PLUGIN],
         });
@@ -133,7 +137,7 @@ export function describeDialects(name: string, suite: (context: QueueDialectCont
         for (const text of own) await database.orm.em.getConnection().execute(text);
         return database;
       };
-      suite({ dialect, open: make });
+      suite({ dialect, open: make, urlOf: (database) => urlsOf.get(database) ?? '' });
     });
   }
 }

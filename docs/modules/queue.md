@@ -120,3 +120,22 @@ pool.close()
 7. **Source and build.** The code of a thread is a string inside the pool, so it works the same from the source and from the build. A task in TypeScript runs on Node 24.12 and later, which strip the types.
 
 Tests: `pool.test.ts` (22 cases, on Node 24.12 and 26): result and clone, the task URL, errors, an event loop that stays free (a task that burns 400 ms does not delay a timer of 10 ms by more than 150 ms), size, order, reuse, a full queue, idle threads, a timeout, an exit, an error outside the task, memory, aborting and closing.
+
+## Wake by LISTEN/NOTIFY on PostgreSQL (Q-06, ADR 0019)
+
+Prepared on 2026-11-24.
+
+```ts
+interface WakeSource { listen(onWake: (queue: QueueName | undefined) => void): Promise<() => Promise<void>> }
+createWorker({ pollMs?, wake?: WakeSource, ... })
+// @bieberkit/queue/postgres
+pgWakeSource({ url, logger?, retryMs?, maxRetryMs? }): WakeSource
+```
+
+1. **The notification is part of the insert.** On PostgreSQL `insertJob` also runs `pg_notify('bk_jobs', <queue>)` in the same transaction, for a job that was added (a duplicate `jobId` adds none). PostgreSQL holds it until the commit, so a worker never wakes for a job that is not there, and an insert that is rolled back wakes nobody. The path of the outbox is the same: the publisher inserts in the claiming transaction of the dispatcher.
+2. **The worker takes a hint.** `start()` calls `wake.listen`, and `stop()` and `crash()` call the function that it answered. A hint wakes the loops of the worker at once. If `listen` fails, the worker logs one warning and polls.
+3. **The poll stays.** A hint is never the truth. With a source the poll can be long (`pollMs: 30_000`), and it also covers a job whose `delayMs` has just passed, which no notification announces.
+4. **`pgWakeSource`** holds one connection of its own (`application_name = bieberkit-queue-listener`), outside the pool, with `LISTEN`. It needs a direct connection or a pooler in session mode: PgBouncer in transaction mode cannot serve `LISTEN`. When the connection is lost it connects again after 500 ms, doubled up to 30 s, with one warning for a loss; each time it is connected it calls `onWake(undefined)`, "look at every queue", because the notifications of the time away are gone. A payload that is not a queue name is the same hint. A notification on another channel is ignored.
+5. **Other dialects** have no notification and poll as before. A `WakeSource` is a port, so another one (a broker) is a new adapter.
+
+Tests: `wake.dialects.test.ts`, on PostgreSQL: a worker that polls every 30 s takes a job of another queue object within a moment (and does not without a source), the hint carries the queue, a duplicate announces once, a rolled back insert and an uncommitted one wake nobody, the connection that is killed comes back and the next job wakes, `stop` closes the connection, other channels and bad payloads, a source that cannot connect, a source that throws; on every dialect, a worker that stops before its source is ready stops it.
