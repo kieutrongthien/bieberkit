@@ -371,6 +371,15 @@ importers:
       '@bieberkit/core':
         specifier: workspace:*
         version: link:../core
+      '@bieberkit/data':
+        specifier: workspace:*
+        version: link:../data
+      kysely:
+        specifier: 0.29.8
+        version: 0.29.8
+      zod:
+        specifier: 4.6.7
+        version: 4.6.7
 
   packages/search:
     dependencies:

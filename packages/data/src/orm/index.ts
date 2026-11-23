@@ -68,7 +68,14 @@ export { formatSequence, nextSequence, periodOf } from './sequence.ts';
 export type { SequenceKey, SequenceOptions } from './sequence.ts';
 export { availableTransitions, entityEventName, transition, transitionOf } from './state.ts';
 export type { AvailableTransition, TransitionResult } from './state.ts';
-export { createOutboxDispatcher, emitEvent, outboxLag, processOnce, purgeProcessed } from './outbox.ts';
+export {
+  createOutboxDispatcher,
+  emitEvent,
+  outboxLag,
+  processOnce,
+  purgeProcessed,
+  retryOnDeadlock,
+} from './outbox.ts';
 export type {
   DispatchResult,
   OutboxDispatcher,
@@ -93,6 +100,7 @@ export {
 export { requestKysely } from './request-kysely.ts';
 export type { RequestKysely } from './request-kysely.ts';
 export type { Database, DatabaseEnv, DatabaseOptions, Orm, ResolvedConnection } from './connect.ts';
+export { rawKysely } from './internals.ts';
 export { openMigrator } from './migrate.ts';
 export type { MadeMigration, MigrationEnv, MigrationStatus, Migrator, MigratorOptions, UpOptions } from './migrate.ts';
 export { applyPluginMigrations, runPluginMigrations } from './plugin-migrate.ts';

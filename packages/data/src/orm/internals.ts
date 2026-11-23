@@ -42,6 +42,14 @@ export function isNewRow(entity: object): boolean {
 }
 
 /**
+ * The Kysely of a database, with the real names of tables and columns and no conversion of values: for the tables of the framework
+ * that no entity describes (the queue, the outbox) and for statements that the ORM cannot write. It is not tied to a request.
+ */
+export async function rawKysely(db: { readonly orm: { readonly em: EntityManager } }): Promise<Kysely<StepDatabase>> {
+  return kyselyOf(db.orm.em);
+}
+
+/**
  * The Kysely of an EntityManager, for the schema work of migrations. It reaches tables that no entity describes. MySQL opens its
  * pool on the first query, so one is sent here, and the caller gets a Kysely that is ready.
  */

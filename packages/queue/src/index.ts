@@ -2,7 +2,7 @@
  * BieberKit
  *
  * @file        packages/queue/src/index.ts
- * @description Public entry point of @bieberkit/queue.
+ * @description Public API of @bieberkit/queue: the contract of the queue, jobs, the sync and database drivers, the worker, the outbox glue and the scheduler (Q-01 to Q-11).
  * @author      Bieber Kieu <kieutrongthien@gmail.com>
  * @copyright   Copyright (c) 2026 Bieber Kieu
  * @license     Apache-2.0
@@ -22,7 +22,38 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-// Public API of @bieberkit/queue. Implementation starts after the Phase 0 ADRs (docs/adr/README.md).
-
 /** npm name of this package. */
 export const packageName = '@bieberkit/queue';
+
+export { defineJob, QUEUE_NAMES, QueueError, queueError, defaultBackoffMs } from './contract.ts';
+export type {
+  DeadJob,
+  DeadLetterPage,
+  DispatchOptions,
+  Dispatched,
+  JobContext,
+  JobDef,
+  JobInput,
+  Queue,
+  QueueName,
+  QueueStats,
+  Worker,
+  WorkerOptions,
+} from './contract.ts';
+export { parseCron } from './cron.ts';
+export type { Cron } from './cron.ts';
+export { registerOutbox } from './outbox.ts';
+export { createQueue } from './queue.ts';
+export type { CreateQueueOptions } from './queue.ts';
+export { createScheduler } from './scheduler.ts';
+export type { Schedule, Scheduler, SchedulerOptions } from './scheduler.ts';
+export { JOBS_TABLE, LOCKS_TABLE, QUEUE_PLUGIN, queueMigrationSteps } from './tables.ts';
+
+import type { JobDef } from './contract.ts';
+
+declare module '@bieberkit/core' {
+  interface ModuleContributions {
+    /** The jobs of the module (Q-02). They are given to `createQueue` with the jobs of the other modules. */
+    jobs?: readonly JobDef[];
+  }
+}
