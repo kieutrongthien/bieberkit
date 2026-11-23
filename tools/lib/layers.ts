@@ -75,10 +75,12 @@ export const DRIVER_LIBRARIES: readonly string[] = [
   'bentocache',
   'flydrive',
   'ioredis',
+  'pg',
   'iovalkey',
   'nodemailer',
   'meilisearch',
   'typesense',
   '@aws-sdk/client-s3',
+  '@aws-sdk/s3-request-presigner',
   '@sentry/node',
 ];

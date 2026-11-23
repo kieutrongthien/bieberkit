@@ -28,7 +28,7 @@ import type { Kysely } from 'kysely';
 import type { Dialect } from '@bieberkit/core';
 import type { StepDatabase } from '@bieberkit/data';
 import { QUEUE_NAMES } from './contract.ts';
-import type { QueueName, Worker, WorkerOptions } from './contract.ts';
+import type { QueueName, WakeSource, Worker, WorkerOptions } from './contract.ts';
 import { reportDead, runDelivery } from './shared.ts';
 import type { Shared } from './shared.ts';
 import { JOBS_TABLE } from './tables.ts';
@@ -77,6 +77,7 @@ export function createDatabaseWorker(
   const running = new Set<Promise<void>>();
   const wakers = new Set<() => void>();
   const heartbeats = new Set<NodeJS.Timeout>();
+  let unlisten: (() => Promise<void>) | undefined;
 
   async function claim(queue: QueueName, limit: number): Promise<Claimed[]> {
     const now = shared.now();
@@ -278,14 +279,31 @@ export function createDatabaseWorker(
     }
   }
 
+  /** The source is a hint. If it cannot be reached the worker keeps polling, so a failure here is a warning and nothing more. */
+  async function startWake(source: WakeSource): Promise<void> {
+    try {
+      const stop = await source.listen(() => wakeAll());
+      if (state.running && !state.crashed) unlisten = stop;
+      else await stop();
+    } catch (error) {
+      shared.logger.warn('the wake source could not start; the worker polls', {
+        reason: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
   return {
     start() {
       if (state.running || state.crashed) return;
       state.running = true;
       for (const queue of queues) loops.push(loop(queue));
+      if (options.wake !== undefined) void startWake(options.wake);
     },
     async stop() {
       state.running = false;
+      const stopListening = unlisten;
+      unlisten = undefined;
+      await stopListening?.().catch(() => undefined);
       wakeAll();
       await Promise.all(loops);
       loops.length = 0;
@@ -303,6 +321,8 @@ export function createDatabaseWorker(
     crash() {
       state.crashed = true;
       state.running = false;
+      void unlisten?.().catch(() => undefined);
+      unlisten = undefined;
       for (const beat of heartbeats) clearInterval(beat);
       heartbeats.clear();
       wakeAll();

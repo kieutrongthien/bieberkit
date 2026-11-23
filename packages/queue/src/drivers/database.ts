@@ -44,7 +44,7 @@ import type {
 } from '../contract.ts';
 import { prepare } from '../shared.ts';
 import type { Prepared, Shared } from '../shared.ts';
-import { JOBS_TABLE } from '../tables.ts';
+import { JOBS_TABLE, WAKE_CHANNEL } from '../tables.ts';
 import { createDatabaseWorker } from '../worker.ts';
 
 type Raw = Kysely<StepDatabase> | Transaction<StepDatabase>;
@@ -73,7 +73,11 @@ async function insertJob(db: Raw, dialect: Dialect, prepared: Prepared, now: num
     dialect === 'mysql'
       ? await insert.ignore().executeTakeFirst()
       : await insert.onConflict((conflict) => conflict.column('job_id').doNothing()).executeTakeFirst();
-  return Number(result.numInsertedOrUpdatedRows ?? 0) > 0;
+  const inserted = Number(result.numInsertedOrUpdatedRows ?? 0) > 0;
+  // PostgreSQL holds a notification until the transaction commits, so a worker that wakes finds the job, and a rolled back insert wakes
+  // nobody. The other dialects have no notification: their workers poll.
+  if (inserted && dialect === 'postgres') await sql`select pg_notify(${WAKE_CHANNEL}, ${prepared.queue})`.execute(db);
+  return inserted;
 }
 
 const numberOf = (value: unknown): number => Number(value ?? 0);

@@ -121,13 +121,27 @@ export interface DeadLetterPage {
 
 export type QueueStats = Readonly<Record<QueueName, Readonly<Record<'waiting' | 'active' | 'done' | 'dead', number>>>>;
 
+/**
+ * Tells a worker that a job was added, from any process, so that it does not wait for its next poll. A source is a hint and never the
+ * truth: the poll stays, and a hint that is lost costs one poll time (Q-06).
+ */
+export interface WakeSource {
+  /**
+   * Calls `onWake(queue)` when a job is added to `queue`, and `onWake(undefined)` when the worker should look at every queue (the source
+   * has just connected, or connected again, and may have missed hints). Answers a function that stops listening.
+   */
+  listen(onWake: (queue: QueueName | undefined) => void): Promise<() => Promise<void>>;
+}
+
 export interface WorkerOptions {
   /** The queues to take jobs from. Defaults to all three. */
   readonly queues?: readonly QueueName[];
   /** Jobs that run at once, for each queue (a number) or by queue. Defaults to 4. A queue has its own slots, so a busy one never blocks another. */
   readonly concurrency?: number | Partial<Readonly<Record<QueueName, number>>>;
-  /** Milliseconds between looks at an empty queue. Defaults to 200. */
+  /** Milliseconds between looks at an empty queue. Defaults to 200. With a `wake` source it can be much longer, because a new job wakes the worker. */
   readonly pollMs?: number;
+  /** Wakes the worker when a job is added by another process. For PostgreSQL: `pgWakeSource` of `@bieberkit/queue/postgres`. */
+  readonly wake?: WakeSource;
   /** How long a claimed job is the worker's before another may take it. Defaults to 30 000. */
   readonly leaseMs?: number;
   /** How often the lease is renewed while a job runs. Defaults to a third of the lease. */

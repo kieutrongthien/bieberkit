@@ -19,6 +19,11 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
+    "./postgres": {
+      "@bieberkit/source": "./src/adapters/postgres/index.ts",
+      "types": "./dist/postgres.d.ts",
+      "default": "./dist/postgres.js"
+    },
     "./testing": {
       "@bieberkit/source": "./src/testing/index.ts",
       "types": "./dist/testing.d.ts",
@@ -31,6 +36,10 @@
       ".": {
         "types": "./dist/index.d.ts",
         "default": "./dist/index.js"
+      },
+      "./postgres": {
+        "types": "./dist/postgres.d.ts",
+        "default": "./dist/postgres.js"
       },
       "./testing": {
         "types": "./dist/testing.d.ts",
@@ -48,7 +57,11 @@
     "@bieberkit/core": "workspace:*",
     "@bieberkit/data": "workspace:*",
     "kysely": "0.29.8",
+    "pg": "8.23.1",
     "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@types/pg": "8.23.1"
   },
   "engines": {
     "node": ">=24.12"

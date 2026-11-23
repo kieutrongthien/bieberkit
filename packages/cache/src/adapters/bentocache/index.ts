@@ -31,6 +31,8 @@ import { createMemoryEngine } from '../../memory-engine.ts';
 import type { Logger } from '@bieberkit/core';
 import { bentocacheEngine } from './engine.ts';
 
+export { checkRedisInstances, describeInstance, readInstance, sameInstance } from './doctor.ts';
+export type { DoctorFinding, InstanceInfo, RedisInstanceChecks, RedisInstanceConfig } from './doctor.ts';
 export { bentocacheEngine, checkEvictionPolicy } from './engine.ts';
 export type { BentocacheEngineOptions } from './engine.ts';
 

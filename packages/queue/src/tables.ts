@@ -27,6 +27,9 @@ import type { PluginMigrationStep } from '@bieberkit/data';
 /** The name of this package in the ledger of plugin steps. */
 export const QUEUE_PLUGIN = '@bieberkit/queue';
 
+/** The channel of PostgreSQL on which a job that is added is announced (`pg_notify`, `LISTEN`). */
+export const WAKE_CHANNEL: string = 'bk_jobs';
+
 export const JOBS_TABLE = 'bk_jobs';
 export const LOCKS_TABLE = 'bk_locks';
 
