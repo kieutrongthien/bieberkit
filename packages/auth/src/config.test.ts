@@ -134,6 +134,7 @@ describe('AUTH-01 the cookies and the secrets of the methods', () => {
     expect(ids({ totp: { issuer: 'x' } })).toEqual(['two-factor']);
     expect(ids({ passkey: { rpName: 'x' } })).toEqual(['passkey']);
     expect(ids({ magicLink: { send: async () => undefined } })).toEqual(['magic-link']);
+    expect((make({ apiKeys: {} }).options.plugins ?? []).map((plugin) => plugin.id)).toEqual(['api-key']);
   });
 });
 
@@ -142,7 +143,7 @@ describe('AUTH-11 the version of Better Auth', () => {
     const manifest: { dependencies: Record<string, string> } = JSON.parse(
       readFileSync(new URL('../package.json', import.meta.url), 'utf8'),
     );
-    for (const name of ['better-auth', '@better-auth/kysely-adapter', '@better-auth/passkey']) {
+    for (const name of ['better-auth', '@better-auth/kysely-adapter', '@better-auth/passkey', '@better-auth/api-key']) {
       const version = manifest.dependencies[name] ?? '';
       expect(version).toMatch(/^\d+\.\d+\.\d+$/);
       const [major = 0, minor = 0, patch = 0] = version.split('.').map(Number);
@@ -150,5 +151,6 @@ describe('AUTH-11 the version of Better Auth', () => {
     }
     expect(manifest.dependencies['better-auth']).toBe(manifest.dependencies['@better-auth/kysely-adapter']);
     expect(manifest.dependencies['better-auth']).toBe(manifest.dependencies['@better-auth/passkey']);
+    expect(manifest.dependencies['better-auth']).toBe(manifest.dependencies['@better-auth/api-key']);
   });
 });

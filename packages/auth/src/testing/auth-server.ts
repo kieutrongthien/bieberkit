@@ -29,6 +29,8 @@ import { createHttpServer, registerEntityRoutes } from '@bieberkit/http';
 import type { HttpServer } from '@bieberkit/http';
 import { createAuthorizer } from '../authorizer.ts';
 import { createAuthenticator } from '../authenticator.ts';
+import { createApiKey, revokeApiKey } from '../api-keys.ts';
+import type { ApiKeyInput, CreatedApiKey } from '../api-keys.ts';
 import { createAuth } from '../better-auth.ts';
 import type { AuthInstance, AuthLimits, AuthMail } from '../better-auth.ts';
 import { AuthRole, AuthRolePermission, AuthUserRole } from '../roles.ts';
@@ -79,6 +81,9 @@ export interface AuthServer {
   signIn(email: string, options?: SendOptions & { password?: string }): Promise<ServerReply>;
   /** Signs up and signs in, and gives the id of the user and the cookie. */
   login(email: string): Promise<{ id: string; cookie: string }>;
+  /** Makes an API key for a user, as the code of a project does. */
+  createKey(input: ApiKeyInput): Promise<CreatedApiKey>;
+  revokeKey(id: string): Promise<void>;
   /** Turns TOTP on for the user of `cookie` and confirms it with a code. It gives the secret, the backup codes and the new session cookie. */
   enableTotp(cookie: string): Promise<{ secret: string; backupCodes: string[]; cookie: string }>;
   /** Signs in with the password and then with a TOTP code. It gives the cookie of the session. */
@@ -108,6 +113,8 @@ export interface AuthServerOptions {
   readonly magicLink?: boolean;
   /** Use this database (the same one as another server) instead of opening a new one. */
   readonly db?: Database;
+  /** Turns the API keys on, with this limit for a key (requests in a window of seconds). */
+  readonly apiKeys?: { readonly rateLimit?: { readonly window: number; readonly max: number } } | true;
   readonly secret?: string;
   readonly previousSecrets?: readonly string[];
   readonly limits?: AuthLimits;
@@ -161,6 +168,7 @@ export async function authServer(
     dialect: db.dialect,
     secret: options.secret ?? 'test-secret-that-is-long-enough-for-the-rule',
     ...(options.previousSecrets === undefined ? {} : { previousSecrets: options.previousSecrets }),
+    ...(options.apiKeys === undefined ? {} : { apiKeys: options.apiKeys === true ? {} : options.apiKeys }),
     baseUrl: BASE_URL,
     methods: {
       ...(options.totp === true ? { totp: { issuer: 'BieberKit Test' } } : {}),
@@ -229,6 +237,8 @@ export async function authServer(
       const reply = await signIn(email);
       return { id, cookie: cookieOf(reply) ?? '' };
     },
+    createKey: (input) => createApiKey(auth, db, input),
+    revokeKey: (id) => revokeApiKey(db, { id }),
     enableTotp: async (cookie) => {
       const enabled = await api('POST', '/two-factor/enable', { cookie, payload: { password: PASSWORD } });
       const secret = secretOf(String(enabled.body['totpURI']));

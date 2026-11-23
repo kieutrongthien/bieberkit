@@ -69,7 +69,10 @@ describeDialects('AUTH-10 the drift check on the real entities', ({ open }) => {
 });
 
 describeDialects('AUTH-10 the drift check with each method on', ({ open }) => {
-  const check = async (methods: Parameters<typeof createAuth>[0]['methods']) => {
+  const check = async (
+    methods: Parameters<typeof createAuth>[0]['methods'],
+    apiKeys?: Parameters<typeof createAuth>[0]['apiKeys'],
+  ) => {
     const db = await open([]);
     const auth = createAuth({
       db,
@@ -77,9 +80,14 @@ describeDialects('AUTH-10 the drift check with each method on', ({ open }) => {
       secret: 'x'.repeat(40),
       baseUrl: 'https://app.test',
       ...(methods === undefined ? {} : { methods }),
+      ...(apiKeys === undefined ? {} : { apiKeys }),
     });
     return checkAuthDrift(auth.options, driftEntities(db));
   };
+
+  it('AUTH-10 API keys: the table agrees with the entity', async () => {
+    expect(await check(undefined, {})).toEqual([]);
+  });
 
   it('AUTH-10 TOTP: the table and the flag of the user agree with the entities', async () => {
     expect(await check({ totp: { issuer: 'x' } })).toEqual([]);
