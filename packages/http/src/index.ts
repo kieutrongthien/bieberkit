@@ -55,7 +55,6 @@ export { defineRoute, METHODS } from './route.ts';
 export type { Method, RouteContext, RouteDef, RouteSchema } from './route.ts';
 export { createHttpServer, STAGE_NAMES } from './server.ts';
 export type {
-  ErrorContext,
   HttpEnv,
   HttpServer,
   HttpServerOptions,

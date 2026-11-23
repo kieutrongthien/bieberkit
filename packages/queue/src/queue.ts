@@ -22,8 +22,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { createLogger } from '@bieberkit/core';
-import type { Logger } from '@bieberkit/core';
+import { createLogger, createNoopReporter } from '@bieberkit/core';
+import type { ErrorReporter, Logger } from '@bieberkit/core';
 import type { Database } from '@bieberkit/data/orm';
 import { queueError } from './contract.ts';
 import type { JobDef, Queue } from './contract.ts';
@@ -38,6 +38,8 @@ export interface CreateQueueOptions {
   /** The database of the `database` driver. It needs the tables of `queueMigrationSteps`. */
   readonly db?: Database;
   readonly logger?: Logger;
+  /** Receives a job that failed for good, with its name, its queue and the tenant and user that dispatched it (OBS-06). */
+  readonly errorReporter?: ErrorReporter;
   /** The clock, in epoch milliseconds. For tests. */
   readonly now?: () => number;
 }
@@ -57,6 +59,7 @@ export async function createQueue(options: CreateQueueOptions): Promise<Queue> {
     jobs,
     subscriptions: new Map(),
     logger: options.logger ?? createLogger({ level: 'info', role: 'worker' }),
+    reporter: options.errorReporter ?? createNoopReporter(),
     now: options.now ?? Date.now,
   };
   if (options.driver === 'sync') return createSyncQueue(shared);

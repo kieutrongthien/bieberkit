@@ -50,6 +50,25 @@ export { loadEnv } from './config/load-env.ts';
 export type { LoadEnvOptions } from './config/load-env.ts';
 export { LOG_LEVELS } from './logging/levels.ts';
 export type { LogLevel } from './logging/levels.ts';
+export { createErrorReporterFromConfig } from './reporting/from-config.ts';
+export type { ReporterConfig, ReporterFromConfigOptions } from './reporting/from-config.ts';
+export { installProcessHandlers } from './reporting/process-handlers.ts';
+export type { ProcessHandlerOptions, ProcessLike } from './reporting/process-handlers.ts';
+export {
+  createCompositeReporter,
+  createMemoryReporter,
+  createNoopReporter,
+  reportError,
+} from './reporting/reporter.ts';
+export type {
+  ErrorReporter,
+  ErrorReportContext,
+  MemoryReporter,
+  ReportLevel,
+  ReportSource,
+} from './reporting/reporter.ts';
+export { createSentryReporter, framesOf, parseDsn } from './reporting/sentry.ts';
+export type { ParsedDsn, SentryReporterOptions } from './reporting/sentry.ts';
 export { createLogger } from './logging/logger.ts';
 export type { LogFields, Logger, LoggerOptions } from './logging/logger.ts';
 export { requestContext } from './logging/request-context.ts';

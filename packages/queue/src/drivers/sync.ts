@@ -35,7 +35,7 @@ import type {
   QueueStats,
   Worker,
 } from '../contract.ts';
-import { prepare, runDelivery, sleep } from '../shared.ts';
+import { prepare, reportDead, runDelivery, sleep } from '../shared.ts';
 import type { Shared } from '../shared.ts';
 
 interface Entry {
@@ -78,6 +78,11 @@ export function createSyncQueue(shared: Shared): Queue {
       if (!outcome.retry || attempt >= record.job.attempts) {
         record.status = 'dead';
         record.diedAt = shared.now();
+        reportDead(
+          shared,
+          { jobId, name: record.job.name, queue: record.queue, attempt, context: record.context },
+          outcome.cause,
+        );
         return;
       }
       await sleep(record.job.backoffMs(attempt));

@@ -29,7 +29,7 @@ import type { Dialect } from '@bieberkit/core';
 import type { StepDatabase } from '@bieberkit/data';
 import { QUEUE_NAMES } from './contract.ts';
 import type { QueueName, Worker, WorkerOptions } from './contract.ts';
-import { runDelivery } from './shared.ts';
+import { reportDead, runDelivery } from './shared.ts';
 import type { Shared } from './shared.ts';
 import { JOBS_TABLE } from './tables.ts';
 
@@ -40,6 +40,7 @@ interface Claimed {
   readonly input: string;
   readonly attempt: number;
   readonly maxAttempts: number;
+  readonly queue: QueueName;
   readonly context: { tenantId?: string; userId?: string; requestId?: string };
 }
 
@@ -105,6 +106,21 @@ export function createDatabaseWorker(
         // A job whose lease ran out so often that it has no delivery left is dead, and does not run again.
         if (textOf(row['status']) === 'active' && attempt > maxAttempts) {
           exhausted.push(textOf(row['id']));
+          reportDead(
+            shared,
+            {
+              jobId: textOf(row['job_id']),
+              name: textOf(row['name']),
+              queue,
+              attempt: maxAttempts,
+              context: {
+                ...(optional(row['tenant_id']) === undefined ? {} : { tenantId: textOf(row['tenant_id']) }),
+                ...(optional(row['user_id']) === undefined ? {} : { userId: textOf(row['user_id']) }),
+                ...(optional(row['request_id']) === undefined ? {} : { requestId: textOf(row['request_id']) }),
+              },
+            },
+            new Error('The lease ran out on every delivery.'),
+          );
           continue;
         }
         taken.push(textOf(row['id']));
@@ -118,6 +134,7 @@ export function createDatabaseWorker(
           input: textOf(row['input']),
           attempt,
           maxAttempts,
+          queue,
           context: {
             ...(tenantId === undefined ? {} : { tenantId }),
             ...(userId === undefined ? {} : { userId }),
@@ -162,6 +179,7 @@ export function createDatabaseWorker(
     }
     const definition = shared.jobs.get(job.name);
     const last = !outcome.retry || job.attempt >= job.maxAttempts;
+    if (last) reportDead(shared, job, outcome.cause);
     await kysely
       .updateTable(JOBS_TABLE)
       .set(

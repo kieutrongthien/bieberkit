@@ -25,8 +25,8 @@
 import { createHash } from 'node:crypto';
 import Fastify, { LogController } from 'fastify';
 import type { FastifyReply, FastifyRequest } from 'fastify';
-import { createLogger, requestContext } from '@bieberkit/core';
-import type { Logger } from '@bieberkit/core';
+import { createLogger, reportError, requestContext } from '@bieberkit/core';
+import type { ErrorReporter, Logger } from '@bieberkit/core';
 import { createAjv, issuesOf } from '@bieberkit/data/build';
 import { normalizeInput } from '@bieberkit/data/schema';
 import type { AjvError, AjvInstance } from '@bieberkit/data/build';
@@ -48,13 +48,6 @@ export interface HttpEnv {
   readonly TRUST_PROXY: boolean | number;
   /** Whether `openapi.json` is public in production (API-06). */
   readonly API_DOCS_PUBLIC: boolean;
-}
-
-export interface ErrorContext {
-  readonly method: string;
-  readonly path: string;
-  readonly requestId: string;
-  readonly traceId: string;
 }
 
 export const STAGE_NAMES = ['afterAuth', 'beforeHandler', 'afterHandler', 'onResponse'] as const;
@@ -106,8 +99,8 @@ export interface HttpServerOptions {
   readonly csrf?: CsrfProtection;
   /** Where the answers of idempotent requests are kept. Defaults to a memory store, which is for one process. */
   readonly idempotencyStore?: IdempotencyStore;
-  /** Called for an error that is a bug of ours (a 5xx), after it was logged (OBS-06). */
-  readonly onError?: (error: unknown, context: ErrorContext) => void;
+  /** Receives an error that is a bug of ours (a 5xx), after it was logged, with the route, the request and the user (OBS-06). */
+  readonly errorReporter?: ErrorReporter;
 }
 
 export interface InjectOptions {
@@ -708,12 +701,13 @@ export function createHttpServer(env: HttpEnv, options: HttpServerOptions = {}):
         reason: error instanceof Error ? error.message : String(error),
         ...(error instanceof Error && error.cause instanceof Error ? { cause: error.cause.message } : {}),
       });
-      options.onError?.(error, {
-        method: request.method,
-        path: pickInfo(request).path,
-        requestId: request.id,
-        traceId: traceIdNow(),
-      });
+      if (options.errorReporter !== undefined) {
+        reportError(options.errorReporter, error, {
+          source: 'http',
+          requestId: request.id,
+          http: { method: request.method, path: pickInfo(request).path, status: described.problem.status },
+        });
+      }
     }
     return reply
       .code(described.problem.status)

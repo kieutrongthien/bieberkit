@@ -23,7 +23,8 @@
  */
 
 import { randomUUID } from 'node:crypto';
-import type { Logger } from '@bieberkit/core';
+import { reportError } from '@bieberkit/core';
+import type { ErrorReporter, Logger } from '@bieberkit/core';
 import type { OutboxMessage } from '@bieberkit/data/orm';
 import { captureContext, checkInput, runAs } from './context.ts';
 import type { CarriedContext } from './context.ts';
@@ -39,6 +40,8 @@ export interface Shared {
   readonly jobs: ReadonlyMap<string, JobDef>;
   readonly subscriptions: Map<string, Subscription>;
   readonly logger: Logger;
+  /** Receives a job that failed for good (OBS-06). */
+  readonly reporter: ErrorReporter;
   readonly now: () => number;
 }
 
@@ -93,7 +96,9 @@ export async function prepare(
   return { job, input: checked, jobId, queue, delayMs, context };
 }
 
-export type Outcome = { readonly ok: true } | { readonly ok: false; readonly retry: boolean; readonly error: string };
+export type Outcome =
+  | { readonly ok: true }
+  | { readonly ok: false; readonly retry: boolean; readonly error: string; readonly cause: unknown };
 
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -108,12 +113,17 @@ export async function runDelivery(
 ): Promise<Outcome> {
   const job = shared.jobs.get(delivery.name);
   if (job === undefined)
-    return { ok: false, retry: false, error: `The job ${delivery.name} is not registered with this worker.` };
+    return {
+      ok: false,
+      retry: false,
+      error: `The job ${delivery.name} is not registered with this worker.`,
+      cause: new Error(`The job ${delivery.name} is not registered with this worker.`),
+    };
   let input: unknown;
   try {
     input = await checkInput(job.name, job.input, JSON.parse(delivery.input));
   } catch (error) {
-    return { ok: false, retry: false, error: error instanceof Error ? error.message : String(error) };
+    return { ok: false, retry: false, error: error instanceof Error ? error.message : String(error), cause: error };
   }
   const requestId = delivery.context.requestId ?? `job-${delivery.jobId}`;
   const context: JobContext = {
@@ -137,10 +147,32 @@ export async function runDelivery(
     ]);
     return { ok: true };
   } catch (error) {
-    return { ok: false, retry: true, error: error instanceof Error ? error.message : String(error) };
+    return { ok: false, retry: true, error: error instanceof Error ? error.message : String(error), cause: error };
   } finally {
     if (timer !== undefined) clearTimeout(timer);
   }
+}
+
+/** A job that will not run again: it is logged, and reported with its name, its queue and the tenant and user that dispatched it. */
+export function reportDead(
+  shared: Shared,
+  job: { jobId: string; name: string; queue: string; attempt: number; context: CarriedContext },
+  cause: unknown,
+): void {
+  shared.logger.error('job failed for good', {
+    jobId: job.jobId,
+    job: job.name,
+    queue: job.queue,
+    attempt: job.attempt,
+    reason: cause instanceof Error ? cause.message : String(cause),
+  });
+  reportError(shared.reporter, cause, {
+    source: 'job',
+    requestId: job.context.requestId ?? `job-${job.jobId}`,
+    ...(job.context.tenantId === undefined ? {} : { tenantId: job.context.tenantId }),
+    ...(job.context.userId === undefined ? {} : { userId: job.context.userId }),
+    job: { name: job.name, id: job.jobId, queue: job.queue, attempt: job.attempt },
+  });
 }
 
 export { sleep };

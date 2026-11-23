@@ -67,6 +67,8 @@ export interface CoreEnvValues {
   MAIL_DRIVER: 'log' | 'smtp';
   SMTP_URL: string | undefined;
   MAIL_FROM: string | undefined;
+  ERROR_REPORTER_DSN: string | undefined;
+  ERROR_REPORTER_SAMPLE_PERCENT: number;
   OTEL_EXPORTER_OTLP_ENDPOINT: string | undefined;
   METRICS_PORT: number;
   API_DOCS_PUBLIC: boolean;
@@ -151,6 +153,15 @@ export const coreEnv: EnvSchema<CoreEnvValues> = defineEnv({
   MAIL_DRIVER: env.enum(['log', 'smtp']).default('log').describe('Mail driver'),
   SMTP_URL: env.url().secret().optional().describe('SMTP connection URL'),
   MAIL_FROM: env.string().optional().describe('Default sender address'),
+  ERROR_REPORTER_DSN: env
+    .url()
+    .secret()
+    .optional()
+    .describe('DSN of a Sentry, GlitchTip or Bugsink project. Errors are not sent when empty'),
+  ERROR_REPORTER_SAMPLE_PERCENT: env
+    .int({ min: 0, max: 100 })
+    .default(100)
+    .describe('Share of error reports that is sent, in percent. Fatal ones are always sent'),
   OTEL_EXPORTER_OTLP_ENDPOINT: env.url().optional().describe('OpenTelemetry endpoint. Tracing is off when empty'),
   METRICS_PORT: env.int({ min: 1, max: 65535 }).default(9464).describe('Prometheus endpoint, on its own port'),
   API_DOCS_PUBLIC: env.boolean().default(false).describe('Serve openapi.json publicly in production'),
