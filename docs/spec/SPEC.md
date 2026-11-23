@@ -987,6 +987,8 @@ await queue.dispatch(sendInvoice, { invoiceId })
 
 - **M-01** Mail is sent through the queue by default, so a slow SMTP server never delays a request.
 - **M-02** Templates are React Email components with vi, en and zh variants. Block content renders into emails through the HTML serializer (CNT-05).
+- **M-03** A message is checked when it is sent: addresses, names and the subject cannot hold a line break (no header injection), there are at most 50 recipients and 1 MiB for each part. A server that refuses a message for good is logged and reported and the job is not retried, and every other failure is retried with a backoff (ADR 0018).
+- **M-04** The `log` driver writes no address and no body in production. In production a plain `smtp://` URL to a host that is not the loopback address is refused at boot unless it asks for TLS.
 
 ### 15.5 CPU-heavy work
 

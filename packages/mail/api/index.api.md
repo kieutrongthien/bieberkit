@@ -28,5 +28,17 @@
 Generated from the built declaration files by `pnpm api:update`. Do not edit by hand. A change here is a change to the public API and needs a changeset (spec section 22.3).
 
 ```ts
-export declare const packageName = "@bieberkit/mail";
+import { Logger } from "@bieberkit/core";
+import { a as createMailer, c as MailError, d as Mailbox, f as Message, h as prepareMessage, i as MailerOptions, l as MailReceipt, m as parseSender, n as Mail, o as Address, p as PreparedMessage, r as Mailer, s as MAX_RECIPIENTS, t as MAIL_JOB, u as MailTransport } from "./mailer-8U5QtmVF.js";
+interface LogTransportOptions {
+  readonly logger: Logger;
+  readonly verbose?: boolean;
+}
+export declare function createLogTransport(options: LogTransportOptions): MailTransport;
+interface MemoryTransport extends MailTransport {
+  readonly sent: readonly PreparedMessage[];
+  failWith(...errors: MailError[]): void;
+}
+export declare function createMemoryTransport(): MemoryTransport;
+export { type Address, type LogTransportOptions, MAIL_JOB, MAX_RECIPIENTS, type Mail, MailError, type MailReceipt, type MailTransport, type Mailbox, type Mailer, type MailerOptions, type MemoryTransport, type Message, type PreparedMessage, createMailer, parseSender, prepareMessage };
 ```
