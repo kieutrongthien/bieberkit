@@ -241,3 +241,29 @@ AuthTwoFactor, AuthPasskey                           // ORM schemas of auth_two_
 - **A magic link failed with a 500 on the UUID type.** `reserveVerificationValue` writes a row whose id is the SHA-256 of the identifier in base64url, which is not a UUID, and `advanced.database.generateId: 'uuid'` is the only way that Better Auth makes a UUID of it (and then it gives up our UUIDv7 ids). The ids of `auth_verifications` are text, and nothing refers to them.
 - **Better Auth sends a magic link to an unknown address too**, and refuses only at the use of the link. The `send` callback of this package looks the address up first, so no mail leaves.
 - **A cookie with no value is not a session.** Better Auth takes a cookie back with `name=; Max-Age=0`. The helpers of the tests skip it.
+
+## Slice C2: API keys (implemented on 2026-11-23)
+
+```ts
+createAuth({ ..., apiKeys: { defaultExpiresInDays?, maxExpiresInDays?, rateLimit?: { window, max } } })
+createApiKey(auth, db, { userId, tenantId?, name, permissions, expiresInDays? }): Promise<{ id, key, expiresAt }>
+revokeApiKey(db, { id }): Promise<void>
+Principal += { grants?: readonly string[]; tenantId?: string }          // @bieberkit/http, additive
+AuthApiKey                                                               // ORM schema of auth_api_keys; steps 0.4.0
+```
+
+### Rules
+
+1. **Made by code.** A key is made by `createApiKey` and revoked by `revokeApiKey`, in one transaction each with an audit entry (`auth.apikey.created`, `auth.apikey.revoked`) and an outbox event of the same name. The entry has the name, the permissions, the expiry, the tenant and the owner, never the key. The routes of Better Auth for keys (`/api/auth/api-key/*`) answer 404: through them a signed in user could choose the permissions and the tenant of his key.
+2. **Shown once, stored hashed.** The key (`bk_` and random characters) is in the answer of `createApiKey` and nowhere else. Better Auth stores its hash. A key lasts 1 to 365 days, 90 by default, and always ends.
+3. **The permissions and the tenant are the key's own.** They are in its metadata, as opaque strings like every permission. The principal of a request that carries the key is `{ id: <key id>, kind: 'apiKey', via: 'token', grants, tenantId }`. The authorizer builds the ability from `grants` and from nothing else: the roles of the owner give the key nothing, and a role flag `requireMfa` does not apply to it. Scoped permissions see the key as the user, so `user.id` in a condition is the id of the key.
+4. **The tenant.** `X-Tenant` for a key must be the tenant of the key (`AUTH_TENANT_FORBIDDEN` otherwise), and without the header the tenant is the one of the key. A key made with no tenant has none and refuses an `X-Tenant`.
+5. **How a key is read.** `X-API-Key: bk_...`, or `Authorization: Bearer bk_...` when the token has the prefix of our keys, and a key wins over a cookie. A key that is wrong, expired, revoked or switched off is no principal (401 on a route that needs one). A key over its limit is 429 with `Retry-After`. Nothing is asked of the database when no key and no cookie come.
+6. **No CSRF for a key.** The principal says `via: 'token'`, because no browser sends a key by itself (SEC-03).
+7. **The owner.** A key is deleted with its owner by the foreign key.
+8. **The limit of a key** is Better Auth's own, 600 requests in 60 s by default, in front of the limit of the address and of the pipeline.
+
+### Found while implementing
+
+- **A key made over HTTP would be an escalation.** With `enableMetadata` on, the create route of Better Auth takes a metadata from the client. So the routes are blocked and the one way to make a key is the function, which writes the metadata from its own arguments.
+- **A key is a user for a condition.** The ability gets `{ id: principal.id }` as its user, which for a key is the id of the key. A project that wants rows "of this key" names it in the data.

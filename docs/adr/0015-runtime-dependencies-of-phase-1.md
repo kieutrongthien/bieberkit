@@ -60,6 +60,7 @@ Option A. The runtime dependencies below are the ones of Phase 1 up to M1.4. The
 | `better-auth`                                                           | 1.7.25  | auth                       | MIT     | bekacru                                               | Sessions, email and password, and later the strong methods                                                                         | 0012           |
 | `@better-auth/kysely-adapter`                                           | 1.7.25  | auth                       | MIT     | bekacru, better-gustavo                               | The adapter of ADR 0012. `better-auth` does not export it                                                                          | 0012           |
 | `@better-auth/passkey`                                                  | 1.7.25  | auth                       | MIT     | bekacru, better-gustavo                               | Passkeys (WebAuthn) as a sign in method (AUTH-03). It brings `@simplewebauthn/server` and `@simplewebauthn/browser` (MIT, iamkale) | 0012           |
+| `@better-auth/api-key`                                                  | 1.7.25  | auth                       | MIT     | bekacru, better-gustavo                               | API keys for machine clients (AUTH-07): hashed, with an expiry and a limit                                                         | 0012           |
 
 Rules that go with it:
 

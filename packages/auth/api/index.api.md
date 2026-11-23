@@ -32,7 +32,7 @@ import "@bieberkit/data";
 import { Auth, BetterAuthOptions, BetterAuthOptions as BetterAuthOptions$1 } from "better-auth";
 import { Authenticator, HttpServer, TenantResolver } from "@bieberkit/http";
 import { BkError, Dialect } from "@bieberkit/core";
-import { C as ScopedPermission, D as PermissionEntry, E as MaskedField, O as PermissionRegistry, S as EntityShape, T as Action, _ as Ability, a as AuthRolePermission, b as AccessAnswer, c as AuthUserRole, d as Grants, f as NIL_TENANT, g as AUTH_PLUGIN, h as loadGrants, i as AuthRole, k as buildPermissionRegistry, l as AuthUserRoleRow, m as authMigrationSteps, n as AuthorizerOptions, o as AuthRolePermissionRow, p as authEntities, r as createAuthorizer, s as AuthRoleRow, t as AccessAuthorizer, u as GrantLoader, v as AbilityInput, w as buildAbility, x as Condition, y as AbilityUser } from "./authorizer-DnBhrCWS.js";
+import { C as ScopedPermission, D as PermissionEntry, E as MaskedField, O as PermissionRegistry, S as EntityShape, T as Action, _ as Ability, a as AuthRolePermission, b as AccessAnswer, c as AuthUserRole, d as Grants, f as NIL_TENANT, g as AUTH_PLUGIN, h as loadGrants, i as AuthRole, k as buildPermissionRegistry, l as AuthUserRoleRow, m as authMigrationSteps, n as AuthorizerOptions, o as AuthRolePermissionRow, p as authEntities, r as createAuthorizer, s as AuthRoleRow, t as AccessAuthorizer, u as GrantLoader, v as AbilityInput, w as buildAbility, x as Condition, y as AbilityUser } from "./authorizer-CqvOMK08.js";
 import { Database } from "@bieberkit/data/orm";
 import { EntitySchema } from "@mikro-orm/core";
 interface Limit {
@@ -74,6 +74,14 @@ interface AuthMail {
   readonly url: string;
   readonly token: string;
 }
+interface AuthApiKeys {
+  readonly defaultExpiresInDays?: number;
+  readonly maxExpiresInDays?: number;
+  readonly rateLimit?: {
+    readonly window: number;
+    readonly max: number;
+  };
+}
 interface AuthMethods {
   readonly totp?: {
     readonly issuer: string;
@@ -95,6 +103,7 @@ interface CreateAuthOptions {
   readonly trustedOrigins?: readonly string[];
   readonly previousSecrets?: readonly string[];
   readonly limits?: AuthLimits;
+  readonly apiKeys?: AuthApiKeys;
   readonly methods?: AuthMethods;
   readonly mail?: {
     sendVerification?(mail: AuthMail): Promise<void>;
@@ -104,6 +113,23 @@ interface CreateAuthOptions {
 type AuthInstance = Auth;
 export declare function limiterOf(auth: AuthInstance): RateLimiter | undefined;
 export declare function createAuth(options: CreateAuthOptions): AuthInstance;
+export declare const API_KEY_PREFIX = "bk_";
+interface ApiKeyInput {
+  readonly userId: string;
+  readonly tenantId?: string;
+  readonly name: string;
+  readonly permissions: readonly string[];
+  readonly expiresInDays?: number;
+}
+interface CreatedApiKey {
+  readonly id: string;
+  readonly key: string;
+  readonly expiresAt: string;
+}
+export declare function createApiKey(auth: AuthInstance, db: Database, input: ApiKeyInput): Promise<CreatedApiKey>;
+export declare function revokeApiKey(db: Database, input: {
+  readonly id: string;
+}): Promise<void>;
 export declare function createAuthenticator(auth: AuthInstance): Authenticator;
 interface DriftProperty {
   nullable?: boolean;
@@ -206,6 +232,30 @@ interface AuthPasskeyRow {
   createdAt?: Date | null;
   aaguid?: string | null;
 }
+interface AuthApiKeyRow {
+  id: string;
+  configId: string;
+  name?: string | null;
+  start?: string | null;
+  referenceId: string;
+  prefix?: string | null;
+  key: string;
+  refillInterval?: number | null;
+  refillAmount?: number | null;
+  lastRefillAt?: Date | null;
+  enabled?: boolean | null;
+  rateLimitEnabled?: boolean | null;
+  rateLimitTimeWindow?: number | null;
+  rateLimitMax?: number | null;
+  requestCount?: number | null;
+  remaining?: number | null;
+  lastRequest?: Date | null;
+  expiresAt?: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+  permissions?: string | null;
+  metadata?: string | null;
+}
 interface AuthRateLimitRow {
   id: string;
   key: string;
@@ -219,6 +269,7 @@ export declare const AuthVerification: EntitySchema<AuthVerificationRow>;
 export declare const AuthRateLimit: EntitySchema<AuthRateLimitRow>;
 export declare const AuthTwoFactor: EntitySchema;
 export declare const AuthPasskey: EntitySchema;
+export declare const AuthApiKey: EntitySchema;
 interface TenantResolverOptions {
   readonly db: Database;
 }
@@ -233,5 +284,5 @@ declare module "@bieberkit/core" {
     scopedPermissions?: Readonly<Record<string, ScopedPermission>>;
   }
 }
-export { AUTH_PLUGIN, type Ability, type AbilityInput, type AbilityUser, type AccessAnswer, type AccessAuthorizer, type Action, type Assignment, type AuthAccountRow, type AuthInstance, type AuthLimits, type AuthMail, type AuthPasskeyRow, type AuthRateLimitRow, AuthRole, AuthRolePermission, type AuthRolePermissionRow, type AuthRoleRow, type AuthRoutesOptions, type AuthSessionRow, type AuthTwoFactorRow, AuthUserRole, type AuthUserRoleRow, type AuthUserRow, type AuthVerificationRow, type AuthorizerOptions, type BetterAuthOptions, type Condition, type CreateAuthOptions, type DriftEntity, type DriftProperty, type EntityShape, type GrantLoader, type Grants, type Limit, type Limit2, type MaskedField, NIL_TENANT, type NewRole, type PermissionEntry, type PermissionRegistry, type ScopedPermission, type TenantResolverOptions, authEntities, authMigrationSteps, buildAbility, buildPermissionRegistry, createAuthorizer, loadGrants };
+export { AUTH_PLUGIN, type Ability, type AbilityInput, type AbilityUser, type AccessAnswer, type AccessAuthorizer, type Action, type ApiKeyInput, type Assignment, type AuthAccountRow, type AuthApiKeyRow, type AuthApiKeys, type AuthInstance, type AuthLimits, type AuthMail, type AuthPasskeyRow, type AuthRateLimitRow, AuthRole, AuthRolePermission, type AuthRolePermissionRow, type AuthRoleRow, type AuthRoutesOptions, type AuthSessionRow, type AuthTwoFactorRow, AuthUserRole, type AuthUserRoleRow, type AuthUserRow, type AuthVerificationRow, type AuthorizerOptions, type BetterAuthOptions, type Condition, type CreateAuthOptions, type CreatedApiKey, type DriftEntity, type DriftProperty, type EntityShape, type GrantLoader, type Grants, type Limit, type Limit2, type MaskedField, NIL_TENANT, type NewRole, type PermissionEntry, type PermissionRegistry, type ScopedPermission, type TenantResolverOptions, authEntities, authMigrationSteps, buildAbility, buildPermissionRegistry, createAuthorizer, loadGrants };
 ```
