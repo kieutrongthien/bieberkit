@@ -28,7 +28,7 @@
 Generated from the built declaration files by `pnpm api:update`. Do not edit by hand. A change here is a change to the public API and needs a changeset (spec section 22.3).
 
 ```ts
-import { C as ResetEvery, E as TransitionDef, a as EntityDef } from "./define-entity-BWQ7TmhE.js";
+import { C as ResetEvery, E as TransitionDef, a as EntityDef } from "./define-entity-CMoIdUz2.js";
 import { Dialect, Logger } from "@bieberkit/core";
 import { EntityData, EntityManager, EntityName, EntityProperty, EntitySchema, FilterOptions, FilterQuery, FindOneOptions, FindOptions, IDatabaseDriver, MikroORM, NativeInsertUpdateOptions, Platform, Primary, RequiredEntityData, Type, UpdateOptions } from "@mikro-orm/core";
 import { Kysely, RawBuilder, SqliteDialect, Transaction } from "kysely";
@@ -59,6 +59,11 @@ interface AggregateResult {
   readonly rows: AggregateRow[];
 }
 export declare function aggregate(em: EntityManager, schema: OrmSchema, options?: AggregateOptions): Promise<AggregateResult>;
+interface EncryptionKeys {
+  readonly current: string;
+  readonly previous?: readonly string[];
+}
+export declare function useEncryptionKeys(keys: EncryptionKeys | undefined): void;
 interface ReferenceVisibility {
   visible(entity: string, ids: readonly string[]): Promise<readonly string[]>;
 }
@@ -83,6 +88,7 @@ interface DatabaseEnv {
 interface DatabaseOptions {
   readonly entities: readonly EntitySchema[];
   readonly audit?: AuditSink | "table";
+  readonly encryption?: EncryptionKeys;
   readonly references?: ReferenceVisibility;
   readonly logger?: Logger;
   readonly queryLog?: (sql: string) => void;
@@ -111,6 +117,7 @@ interface AuditEntry {
   readonly recordId?: string;
   readonly reason?: string;
   readonly data?: unknown;
+  readonly piiOf?: EntityDef<string>;
   readonly tenantId?: string;
 }
 export declare function recordAudit(em: EntityManager, entry: AuditEntry): void;
@@ -401,6 +408,14 @@ interface Migrator {
   close(): Promise<void>;
 }
 export declare function openMigrator(env: MigrationEnv, options: MigratorOptions): Promise<Migrator>;
+interface ReencryptOptions {
+  readonly batchSize?: number;
+}
+interface ReencryptResult {
+  readonly rows: number;
+  readonly fields: number;
+}
+export declare function reencryptAll(db: Database, schemas: readonly OrmSchema[], options?: ReencryptOptions): Promise<ReencryptResult>;
 export declare function uuidType(dialect: Dialect): RawBuilder<unknown>;
 export declare function setNotNull(db: Kysely<StepDatabase>, dialect: Dialect, table: string, column: string, type: string): Promise<void>;
 interface SqliteOptions {
@@ -460,5 +475,5 @@ export declare function setTranslation(em: EntityManager, schema: OrmSchema, rec
 type Row = Record<string, unknown>;
 export declare function toApiRow(schema: OrmSchema, row: Row): Row;
 export declare function toOrmData(schema: OrmSchema, input: Row, _mode: "create" | "update"): Row;
-export type { AggregateOptions, AggregateResult, AggregateRow, AttachmentInput, AttachmentRow, AuditEntry, AuditLogRow, AuditSink, AvailableTransition, CommentRow, CompileOptions, Database, DatabaseEnv, DatabaseOptions, DispatchResult, FeaturePage, ListOptions, MadeMigration, MigrationEnv, MigrationStatus, Migrator, MigratorOptions, Orm, OrmSchema, OutboxDispatcher, OutboxDispatcherOptions, OutboxEntryRow, OutboxEvent, OutboxLag, OutboxMessage, OutboxProcessedRow, OutboxPublisher, Page, PageRequest, PluginRefusal, PluginRun, PluginRunOptions, PurgeOptions, ReferenceVisibility, RequestKysely, ResolvedConnection, SequenceKey, SequenceOptions, SequenceRow, SortOption, SqliteOptions, SystemScopeEntry, TagRow, TimelineInput, TimelineRow, TransitionResult, UpOptions };
+export type { AggregateOptions, AggregateResult, AggregateRow, AttachmentInput, AttachmentRow, AuditEntry, AuditLogRow, AuditSink, AvailableTransition, CommentRow, CompileOptions, Database, DatabaseEnv, DatabaseOptions, DispatchResult, EncryptionKeys, FeaturePage, ListOptions, MadeMigration, MigrationEnv, MigrationStatus, Migrator, MigratorOptions, Orm, OrmSchema, OutboxDispatcher, OutboxDispatcherOptions, OutboxEntryRow, OutboxEvent, OutboxLag, OutboxMessage, OutboxProcessedRow, OutboxPublisher, Page, PageRequest, PluginRefusal, PluginRun, PluginRunOptions, PurgeOptions, ReencryptOptions, ReencryptResult, ReferenceVisibility, RequestKysely, ResolvedConnection, SequenceKey, SequenceOptions, SequenceRow, SortOption, SqliteOptions, SystemScopeEntry, TagRow, TimelineInput, TimelineRow, TransitionResult, UpOptions };
 ```

@@ -203,17 +203,17 @@ Depends on: M1.3.
 - [ ] **[D]** Better Auth configuration: client IP from `TRUST_PROXY`, rate-limit counters in shared store, snake_case, UUID ids, organization set per request from the tenant (AUTH-10). The client IP, the counters in the database, snake_case and UUID ids are done. The organization plugin waits for its spike, and the tenant comes from `X-Tenant` and the roles until then
 - [x] CI job compares Better Auth's expected schema with BieberKit entities and fails on drift (AUTH-10). It is a test (`drift.test.ts`) that the existing test job runs, and it covers the options of this package and a plugin that is added to them
 - [x] **[D]** Session cookie `__Host-bk_session` without `useSecureCookies`, trusted `x-bk-client-ip` header, UUID type that rejects invalid strings, Better Auth pinned exactly with telemetry off (AUTH-01, AUTH-10, AUTH-11, ADR 0012). `useSecureCookies` is set to `false`, because Better Auth turns it on for an https base URL
-- [ ] Server-side sessions, `__Host-` cookie, database or Valkey storage (AUTH-01, AUTH-02). The database storage and the cookie are done, and Valkey comes with the cache of M1.5
-- [ ] Email and password with ASVS rules (AUTH-04); magic link, TOTP and passkeys (AUTH-03). Email and password, verification and reset are done (slice B); magic link, TOTP and passkeys are slice C
-- [ ] MFA required for roles flagged `requireMfa` (AUTH-05)
-- [ ] Per-IP and per-account limits on login, OTP, magic link and reset (AUTH-06, SEC-10). Sign in, sign up and reset are done; OTP and magic link come with their flows
+- [ ] Server-side sessions, `__Host-` cookie, database or Valkey storage (AUTH-01, AUTH-02). The database storage and the cookie are done (every cookie of Better Auth is a `__Host-` cookie), and Valkey comes with the cache of M1.5
+- [x] Email and password with ASVS rules (AUTH-04); magic link, TOTP and passkeys (AUTH-03). OAuth and OIDC providers are not in this item, and wait for a project that needs one
+- [x] MFA required for roles flagged `requireMfa` (AUTH-05). The second factor is TOTP; a passkey is not counted as one yet, because a session does not say how it began
+- [x] Per-IP and per-account limits on login, OTP, magic link and reset (AUTH-06, SEC-10)
 - [x] **[D]** CASL ability per request from role data; permissions in code, roles in database (AUTHZ-01, §14.2). Roles are per tenant, a condition is code attached to a permission string (`scopedPermissions`), and the ability lives for one request
 - [x] **[D]** CASL to ORM condition translator; lists return only permitted rows (AUTHZ-02): own translator with a small operator set that fails closed with `AUTHZ_UNSUPPORTED_CONDITION` (ADR 0013)
 - [ ] `bieberkit check` rule: condition operators outside the supported set, dotted paths and unknown fields (AUTHZ-06, ADR 0013)
 - [x] **[D]** Field masks on read and write, default deny (AUTHZ-03, AUTHZ-04)
 - [ ] Audit of role changes, `asSystem()`, impersonation, failed authorization (AUTHZ-05). `asSystem()`, failed authorization (a denial, an unsupported condition, a write of a masked field) and role changes (the service of roles) are done. Impersonation waits for its design
-- [ ] API keys primitive: shown once, hashed, scoped, expiring (AUTH-07)
-- [ ] `encrypted: true` fields with key rotation through `APP_KEY_PREVIOUS`; `pii: true` log redaction (SEC-08, SEC-09)
+- [x] API keys primitive: shown once, hashed, scoped, expiring (AUTH-07)
+- [x] `encrypted: true` fields with key rotation through `APP_KEY_PREVIOUS`; `pii: true` log redaction (SEC-08, SEC-09). Crypto-shredding of audit data (PDP-06) waits for the `privacy` plugin
 
 Done when: generated permission and tenant tests pass for the sample entity and an unpermitted row never leaves the database.
 

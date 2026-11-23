@@ -28,7 +28,7 @@
 Generated from the built declaration files by `pnpm api:update`. Do not edit by hand. A change here is a change to the public API and needs a changeset (spec section 22.3).
 
 ```ts
-import { a as EntityDef } from "./define-entity-BWQ7TmhE.js";
+import { a as EntityDef } from "./define-entity-CMoIdUz2.js";
 interface EntityRegistry {}
 type Row<N extends keyof EntityRegistry> = EntityRegistry[N] extends {
   row: infer R;

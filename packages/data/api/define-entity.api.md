@@ -55,6 +55,8 @@ interface FieldDef {
   readonly index?: true;
   readonly searchable?: true;
   readonly aggregatable?: true;
+  readonly encrypted?: true;
+  readonly pii?: true;
   readonly localized?: true;
   readonly inline?: true;
   readonly default?: unknown;
@@ -89,6 +91,8 @@ interface Chain<Self> {
   searchable(): Self;
   aggregatable(): Self;
   localized(): Self;
+  encrypted(): Self;
+  pii(): Self;
 }
 type ComputedField = Chain<ComputedField>;
 interface Scalar<Self, Default> extends Chain<Self> {
@@ -150,6 +154,8 @@ declare class Field {
   searchable(): Field;
   aggregatable(): Field;
   localized(): Field;
+  encrypted(): Field;
+  pii(): Field;
   default(value: unknown): Field;
   computed(fn: ComputedFn, options?: {
     stored?: boolean;

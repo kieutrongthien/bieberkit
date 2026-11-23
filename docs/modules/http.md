@@ -550,3 +550,7 @@ The route permission says whether a caller may call a route. The access port say
 - The handler gets a web `Request` with an absolute URL, the headers of the request, and a body that is the JSON of the parsed body (or the text). `x-bk-client-ip` is removed from what the client sent and set from the address that `TRUST_PROXY` resolved, and a handler may trust only that header.
 - The `Response` is the answer: the status, every header (several `Set-Cookie` stay several), and the text of the body. No problem is made of a 4xx of the handler. A 429 with `X-Retry-After` also gets `Retry-After`. No ETag is made for it. A handler that throws is a 500 problem with no detail.
 - A prefix starts with a slash, has no slash at its end and no wildcard, can be mounted once, may not hold a route, and cannot be mounted after the server started (`HTTP_ROUTE_INVALID`). Only JSON and empty bodies are read.
+
+## The metadata and personal data (PDP-01)
+
+A field of `/api/v1/_meta` that was declared `.pii()` has `pii: true`, and one that was declared `.encrypted()` has `encrypted: true`, so an admin screen can say that a value is personal or hidden at rest. The flags are left out when they are not set, and the published JSON Schema of `_meta` has both.

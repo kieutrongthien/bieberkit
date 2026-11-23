@@ -223,6 +223,7 @@ interface LoggerOptions {
   readonly role: string;
   readonly write?: (line: string) => void;
   readonly secrets?: readonly string[];
+  readonly redactKeys?: readonly string[];
   readonly now?: () => Date;
 }
 export declare function createLogger(options: LoggerOptions): Logger;

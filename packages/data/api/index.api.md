@@ -28,8 +28,8 @@
 Generated from the built declaration files by `pnpm api:update`. Do not edit by hand. A change here is a change to the public API and needs a changeset (spec section 22.3).
 
 ```ts
-import { A as fold, C as ResetEvery, D as f, E as TransitionDef, O as Compare, S as FieldKind, T as StateOptions, _ as ColumnDef, a as EntityDef, b as FieldBuilders, c as FieldLike, d as StandardColumn, f as TableConstraints, g as tableConstraints, h as standardColumns, i as ConstraintDef, j as nfc, k as codePointLength, l as OrmOverride, m as snake, n as AdminOptions, o as EntityOptions, p as defineEntity, r as ApiOptions, s as Feature, t as ActionDef, u as Permissions, v as ComputedFn, w as SchemaValue, x as FieldDef, y as Field } from "./define-entity-BWQ7TmhE.js";
-import { a as UpdateInput, i as Row, n as EntityRegistry, t as CreateInput } from "./registry-D4WIZE30.js";
+import { A as fold, C as ResetEvery, D as f, E as TransitionDef, O as Compare, S as FieldKind, T as StateOptions, _ as ColumnDef, a as EntityDef, b as FieldBuilders, c as FieldLike, d as StandardColumn, f as TableConstraints, g as tableConstraints, h as standardColumns, i as ConstraintDef, j as nfc, k as codePointLength, l as OrmOverride, m as snake, n as AdminOptions, o as EntityOptions, p as defineEntity, r as ApiOptions, s as Feature, t as ActionDef, u as Permissions, v as ComputedFn, w as SchemaValue, x as FieldDef, y as Field } from "./define-entity-CMoIdUz2.js";
+import { a as UpdateInput, i as Row, n as EntityRegistry, t as CreateInput } from "./registry-CFbTH7iw.js";
 import { a as compareVersions, c as stepName, d as DestructiveKind, f as detectDestructive, h as dataError, i as StepRisk, l as validateSteps, m as DataError, n as StepDatabase, o as findStepRisks, p as upStatementsOfMigration, r as StepKind, s as orderSteps, t as PluginMigrationStep, u as DestructiveFinding } from "./steps-BowZpLj1.js";
 interface Uuid7Options {
   readonly now?: () => number;

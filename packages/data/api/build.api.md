@@ -30,7 +30,7 @@ Generated from the built declaration files by `pnpm api:update`. Do not edit by 
 ```ts
 import AjvModule from "ajv/dist/2020.js";
 import { Options } from "ajv";
-import { a as EntityDef } from "./define-entity-BWQ7TmhE.js";
+import { a as EntityDef } from "./define-entity-CMoIdUz2.js";
 declare const Ajv: typeof AjvModule.default;
 type AjvInstance = InstanceType<typeof Ajv>;
 export declare function createAjv(options?: Options): AjvInstance;

@@ -66,7 +66,7 @@ function loadEnv(options?: { source?: EnvSource; envFile?: string | false; extra
 
 // logging
 interface Logger { level: LogLevel; fatal/error/warn/info/debug/trace(msg: string, fields?: LogFields): void; child(bindings: LogFields): Logger }
-function createLogger(options: { level: LogLevel; role: string; write?: (line: string) => void; secrets?: readonly string[] }): Logger
+function createLogger(options: { level: LogLevel; role: string; write?: (line: string) => void; secrets?: readonly string[]; redactKeys?: readonly string[] }): Logger
 const requestContext: { run<T>(ctx: RequestContext, fn: () => T): T; get(): RequestContext | undefined; update(patch: Partial<RequestContext>): void }
 
 // container
@@ -242,3 +242,7 @@ Other calls made while writing the tests, marked for review:
 - **`PLG_MANIFEST_NAME`** is added to the three manifest codes of ADR 0011. It was in the spike and needs a line in section 11.2.
 - **`defineConfig` validates nothing.** It is a typing helper, like Vite's. Validation needs the sections, so it happens in `validateConfig` at build and at boot (CFG-09).
 - **New codes:** `MOD_NAME_INVALID`, `CFG_CONFIG_INVALID`, `CFG_CONFIG_UNKNOWN`, `CFG_CONFIG_SECRET`, `PLG_BAD_VERSION`, `PLG_BAD_RANGE`, `PLG_MANIFEST_NAME`.
+
+## Fields of personal data in log lines (SEC-09)
+
+`createLogger({ redactKeys })` takes the names of fields whose value is never written, at any depth and in any case (`email` also covers `Email` and `EMAIL`), and an empty value stays empty. A key that looks like a secret (`password`, `token`, `cookie`, `api key` and the like) is redacted without being named. A project builds the list from its entities (`piiFields` of `@bieberkit/data/schema`). Without the option, nothing is redacted by name, so the list is the project's to give.

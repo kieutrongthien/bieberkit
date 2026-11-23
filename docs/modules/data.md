@@ -545,7 +545,7 @@ All of it about MikroORM 7.2.9 and the databases.
 
 - **`LISTEN/NOTIFY`** (see Run loop) and the metrics export. `outboxLag` returns the numbers. The observability package turns them into the metric.
 - **Reading the audit log** for the admin UI. It needs the permission model, so it comes with the `audit-log` plugin of M1.8. Until then a reader filters on the tenant itself.
-- **Encrypted `pii` values in audit data** (PDP-06) come with the privacy work. `data` holds what the caller gives.
+- **Crypto-shredding of audit data** (PDP-06, a key for each person that a deletion request destroys) comes with the `privacy` plugin. Until then `recordAudit` redacts the values of `pii` fields (see "Encrypted and personal data fields").
 - **An audit entry for every row change** is written by the services and the generated routes of M1.3, which know the action. This slice gives them the table and the call.
 
 ## Slice 7: state machines and sequences
@@ -772,3 +772,43 @@ aggregate(em, schema, { groupBy?: string[]; sum?: string[]; count?: boolean; whe
 - `requestKysely(db)` is one Kysely for the whole process that always acts for the request that is running: each use asks the EntityManager in the async context (a fork of the root one outside a request) for its Kysely, with the entity names as table names, the property names as column names, and MikroORM's conversion of values and hooks. A library that holds one Kysely, such as Better Auth, then writes in the transaction of the request.
 - Kysely refuses `transaction()` and `connection()` on a transaction. Inside one, the proxy gives an object whose `execute(cb)` calls `cb` with the same Kysely, so a transaction or a connection that a library asks for joins the outer one. Outside a transaction they are the real ones.
 - `runInTransaction(db, fn)` is a unit of work that is also a transaction: it commits when `fn` returns and rolls back when it throws. The ORM and `requestKysely` write in the same one. Only a service, or a boundary that stands for one (the auth routes), opens a transaction (MOD-16).
+
+## Encrypted and personal data fields (SEC-08, SEC-09, PDP-01, PDP-06)
+
+```ts
+f.text().optional().encrypted()                      // ciphertext in the column, clear text for the code
+f.string({ max: 20 }).optional().encrypted().pii()   // personal data that is also encrypted
+f.email().pii()                                      // personal data, in clear text
+createDatabase(env, { entities, encryption: { current: APP_KEY, previous: [APP_KEY_PREVIOUS] } })
+useEncryptionKeys(keys | undefined)                  // what createDatabase calls
+reencryptAll(db, schemas, { batchSize? }): Promise<{ rows, fields }>
+piiFields(entities): PiiField[]                      // @bieberkit/data/schema: the inventory of PDP-01
+redactPii(entity, data): unknown                     // @bieberkit/data/schema
+recordAudit(em, { ..., piiOf: Customer })           // the values of its pii fields are written as [redacted]
+```
+
+### Rules
+
+1. **`.encrypted()` is for `string`, `text` and `email`**, and an encrypted field cannot be searched, so it cannot be `.index()`, `.unique()`, `.searchable()`, `.aggregatable()`, `.localized()` or have a `compare` other than exact, in whatever order the calls are written (`DATA_FIELD_INVALID`). An `email` is compared as it is when it is encrypted. A lookup by the value needs a hash column of the project's own, which is a follow-up. A length is the length of the clear text. A default is written by the type, encrypted, and is not a plaintext default of the table.
+2. **The value in the column** is `bk1.<key id>.<nonce>.<ciphertext and tag>` in base64url, AES-256-GCM, with a key for each field from HKDF-SHA-256 over `APP_KEY` (`bk:field:<entity>.<field>:v1`) and the entity and the field as authenticated data. So the same text is different every time, a value moved to another field does not open, and a value says which key made it (`key id` is 8 hex characters of the SHA-256 of the key). `null` is `null` and is not encrypted. The column is `text`.
+3. **A MikroORM type does it.** Every read and write of the ORM, the services, the generated routes and `listPage` sees clear text. A filter, a scope and a group by an encrypted field are refused (`DATA_FIELD_NOT_INDEXED`, `DATA_QUERY_INVALID`, `DATA_AGGREGATE_INVALID`).
+4. **Keys.** `encryption: { current, previous }` is `APP_KEY` and `APP_KEY_PREVIOUS` in base64, 32 or more bytes each (`DATA_ENCRYPTION_KEY_INVALID`). A database that has an encrypted field and no keys does not start (`DATA_ENCRYPTION_KEY_MISSING`). A value that no key of the ring opens is `DATA_DECRYPTION_FAILED`, and the message names the key id and never the value. A process has one ring: the type of a field is made before the database, so `useEncryptionKeys` is global and the last call wins.
+5. **Rotation.** Make the old key `previous` and the new key `current`, run `reencryptAll`, and drop the old key. It reads every encrypted column in batches, as the system (and the use is audited), and writes again each value that the current key did not make, in every tenant. It says how many rows and values it wrote, a second run finds none, and a ring that cannot open a value stops it with `DATA_DECRYPTION_FAILED` before it damages anything.
+6. **A value from before.** A stored text that is not in the format is read as it is, so a field can be made `.encrypted()` on a table that has data, and `reencryptAll` encrypts what is there.
+7. **`.pii()`** is for any kind that holds a value (not the keys, the dates of the record, a sequence, a state or a relation to many). `piiFields` lists each such field with its entity, its key in the API and whether it is encrypted, in a fixed order, for the data inventory of PDP-01. `redactPii` copies data with the value of each pii field (by name and by API key) replaced by `[redacted]`, at any depth, and leaves empty values empty. `recordAudit` calls it when it is given `piiOf`, so personal data does not rest in audit data. `createLogger` takes `redactKeys` for the same names, in `@bieberkit/core`.
+
+### Errors
+
+| Code                          | Status | Fix                                                                     |
+| ----------------------------- | ------ | ----------------------------------------------------------------------- |
+| `DATA_ENCRYPTION_KEY_MISSING` | 500    | Pass `encryption` to `createDatabase`                                   |
+| `DATA_ENCRYPTION_KEY_INVALID` | 500    | Give a key of 32 or more random bytes in base64                         |
+| `DATA_DECRYPTION_FAILED`      | 500    | Use the key that made the data, and `APP_KEY_PREVIOUS` after a rotation |
+| `DATA_REENCRYPT_INVALID`      | 400    | The batch size is a whole number of 1 or more                           |
+
+### Found while implementing
+
+- **MikroORM calls a type without its `this`.** A class with a private field failed inside the generated code of the ORM ("Cannot read private member"). The type is made by a function that closes over the context of the field.
+- **`ensureComparable` must be off.** Otherwise the ORM compares what would be written, which has a new nonce each time, and every flush would update every encrypted column.
+- **An email is `ci` by default.** `.encrypted()` on an email switches it to exact, because the shadow column of a folded compare would keep the clear text.
+- **`getAll()` of the metadata is a `Map`.** The boot check, which looks for the flag `bkEncrypted` on the properties, iterates its values.
