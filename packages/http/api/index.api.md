@@ -306,6 +306,7 @@ interface EntityRoutesContext {
   readonly bulk?: BulkQueue;
   readonly background?: true;
 }
+declare function pathOf(def: EntityDef<string>): string;
 export declare function entityRoutes(schema: OrmSchema, context: EntityRoutesContext): RouteDef[];
 export declare function registerEntityRoutes(server: HttpServer, schemas: readonly OrmSchema[], options: {
   db: Database;
@@ -357,5 +358,10 @@ interface Problem {
   readonly [extension: string]: unknown;
 }
 export declare const packageName = "@bieberkit/http";
-export type { AccessAnswer, Authenticator, Authorization, Authorizer, BulkInput, BulkJob, BulkJobOptions, BulkQueue, CorsOptions, CsrfProtection, EntityRoutesContext, HttpEnv, HttpFetch, HttpFetchInit, HttpFetchOptions, HttpServer, HttpServerOptions, IdempotencyBegin, IdempotencyStore, InjectOptions, InjectResponse, MemoryIdempotencyOptions, Method, MountDef, OpenApiDocument, OpenApiInfo, Principal, Problem, RateLimitResult, RateLimiter, RegisterHttpOptions, RequestInfo, ResolvedAddress, RouteContext, RouteDef, RouteSchema, StageContext, StageHook, StageName, StoredResponse, TenantResolver };
+declare module "@bieberkit/core" {
+  interface ModuleContributions {
+    routes?: readonly RouteDef[];
+  }
+}
+export { type AccessAnswer, type Authenticator, type Authorization, type Authorizer, type BulkInput, type BulkJob, type BulkJobOptions, type BulkQueue, type CorsOptions, type CsrfProtection, type EntityRoutesContext, type HttpEnv, type HttpFetch, type HttpFetchInit, type HttpFetchOptions, type HttpServer, type HttpServerOptions, type IdempotencyBegin, type IdempotencyStore, type InjectOptions, type InjectResponse, type MemoryIdempotencyOptions, type Method, type MountDef, type OpenApiDocument, type OpenApiInfo, type Principal, type Problem, type RateLimitResult, type RateLimiter, type RegisterHttpOptions, type RequestInfo, type ResolvedAddress, type RouteContext, type RouteDef, type RouteSchema, type StageContext, type StageHook, type StageName, type StoredResponse, type TenantResolver, pathOf as entityPath };
 ```

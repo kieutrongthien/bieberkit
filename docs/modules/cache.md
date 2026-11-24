@@ -96,3 +96,7 @@ Prepared on 2026-11-24. `checkRedisInstances(config, { read? })` in `@bieberkit/
 6. The read is `CONFIG GET maxmemory-policy` and `maxmemory` with a connect timeout of 3 seconds and no retry.
 
 Tests: `doctor.test.ts`: every rule above with a reader that is injected, and against the Valkey of the tests (the real read, a server that is not there, no password in a finding).
+
+## Traces and metrics (OBS-02, OBS-03, ADR 0023)
+
+`createCache` and `createCacheFromConfig` take `tracer` and `metrics`. Each call (`get`, `set`, `has`, `forget`, `remember`, `lock` and the atomic calls) is a `client` span named `cache <operation>` with `bk.cache.op`, and `bk.cache.hit` for a lookup. A span never holds a key, which can hold an id or an address. `bk_cache_lookups_total{result=hit|miss}` counts `get`, `has` and `remember`, and the atomic calls are left out because their keys are counters and claims. The hit ratio is `rate(hit) / rate(hit + miss)`.

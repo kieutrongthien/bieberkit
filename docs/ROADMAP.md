@@ -245,10 +245,10 @@ Depends on: M1.3, M1.4, M1.5.
 - [x] `@bieberkit/log`: pino adapter under `@bieberkit/log/pino` with SEC-09 redaction, JSON logs with the fields of OBS-01, and a shared contract test run against it and the core default logger (OBS-01, SEC-09, PKG-02, PKG-03, ADR 0003). Done: `createPinoLogger` redacts with the sanitizer of core (ADR 0022), and `loggerContractSuite` passes on both loggers
 - [x] OpenTelemetry traces over HTTP, database, cache, queue, jobs with context carried into jobs (OBS-02). Done without an SDK (ADR 0023): OTLP over HTTP from core, a span for each request, ORM query, cache call, dispatch and delivery, and the `traceparent` kept in the outbox row and the job row. The kernel builds the tracer from the config with the CLI (M1.7)
 - [x] Prometheus metrics on `METRICS_PORT`, not routed publicly (OBS-03, OBS-04). Done: the registry and the server in core (a request that a proxy touched is refused), and the figures of http, data, queue and cache. Starting the server at boot comes with the CLI (M1.7)
-- [ ] `@bieberkit/testing`: `createTestApp`, entity factories, `actingAs`, `withTenant` (TST-02)
-- [ ] Generated contract tests per entity: permissions, field masks, tenant isolation, validation, pagination limits (§21). Generated from the `permissions` block, with a mutation job that proves they catch six known faults (ADR 0013). The permission part is done in `@bieberkit/auth/testing` (M1.4); validation and pagination limits are left
-- [ ] Testcontainers setup for PostgreSQL, MySQL and Valkey; network calls outside containers fail tests (TST-03)
-- [ ] Coverage gates: 90% core, data, http, auth; 80% elsewhere (TST-01)
+- [x] `@bieberkit/testing`: `createTestApp`, entity factories, `actingAs`, `withTenant` (TST-02). Done on real databases, with `describeDialects` for every dialect and the module contributions `entities` and `routes`
+- [x] Generated contract tests per entity: permissions, field masks, tenant isolation, validation, pagination limits (§21). Generated from the `permissions` block, with a mutation job that proves they catch six known faults (ADR 0013). The permission part is done in `@bieberkit/auth/testing` (M1.4); validation and pagination limits are `describeEntityContracts` of `@bieberkit/testing`. Done
+- [x] Testcontainers setup for PostgreSQL, MySQL and Valkey; network calls outside containers fail tests (TST-03). Done with `tools/test-services.sh` and the `services` of CI (ADR-free: the containers are plain Docker), `describeDialects` and `BK_REQUIRE_DIALECTS=all`, and a guard on `net.Socket#connect` that every test file installs
+- [x] Coverage gates: 90% core, data, http, auth; 80% elsewhere (TST-01). Done in `vitest.config.ts`: 90 for core, data, http, auth, cache, storage and mail, and 80 for everything else; `pnpm test:coverage` fails below them
 
 ### M1.7 CLI and scaffolder
 

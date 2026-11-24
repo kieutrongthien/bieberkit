@@ -55,5 +55,10 @@ export declare function encodeCursor(position: readonly CursorValue[]): string;
 export declare function decodeCursor(cursor: string): readonly CursorValue[];
 export declare function migrationFileName(timestamp: string, name: string | undefined, taken: (candidate: string) => boolean): string;
 export declare const packageName = "@bieberkit/data";
+declare module "@bieberkit/core" {
+  interface ModuleContributions {
+    entities?: readonly EntityDef<string>[];
+  }
+}
 export { type ActionDef, type AdminOptions, type ApiOptions, type ColumnDef, type Compare, type ComputedFn, type ConstraintDef, type CreateInput, type CursorValue, DataError, type DestructiveFinding, type DestructiveKind, type EntityDef, type EntityOptions, type EntityRegistry, type Feature, Field, type FieldBuilders, type FieldDef, type FieldKind, type FieldLike, type OrmOverride, type Permissions, type PluginMigrationStep, type ResetEvery, type Row, type SchemaValue, type StandardColumn, type StateOptions, type StepDatabase, type StepKind, type StepRisk, type TableConstraints, type TransitionDef, type UpdateInput, type Uuid7Options, codePointLength, compareVersions, dataError, defineEntity, detectDestructive, f, findStepRisks, fold, nfc, orderSteps, snake, standardColumns, stepName, tableConstraints, upStatementsOfMigration, validateSteps };
 ```

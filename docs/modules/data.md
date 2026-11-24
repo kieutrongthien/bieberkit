@@ -834,3 +834,9 @@ Tests: `read-your-writes.test.ts` (the memory store), `read-your-writes.dialects
 ## The wake signal (MOD-18, 2026-11-24)
 
 `createWakeSignal(): { sleep(ms), wake() }` is the sleep of the outbox dispatcher and of the loops of the queue worker. A `wake` ends the sleep that is running, and a `wake` that finds nobody asleep is kept for the next `sleep`, so a dispatcher that is in the middle of a batch when `wake` is called does not sleep a whole poll afterwards. The outbox test `MOD-18 start delivers new rows by itself` failed once in a run of the whole suite because of this, and now cannot.
+
+## Traces and metrics (OBS-02, OBS-03, ADR 0023)
+
+`createDatabase` takes `tracer` and `metrics`. With an enabled tracer MikroORM reports each query after it ran, and each one is recorded as a `client` span named `db <kind>` (`select`, `insert`, `update`, `delete`, `begin`, `commit`, `rollback`, `savepoint`, `release`, `with` or `other`) with `db.system` and the time that the driver measured, as a child of the code that ran it. A span never holds the text of a statement or a value of it (SEC-09). The queries that code writes with `rawKysely` (the outbox, the queue and the audit tables) do not go through the ORM and are not spans. `bk_db_pool_connections{state=in_use|idle|waiting}` is read from the pool of the driver when the metrics are scraped, on PostgreSQL and MySQL. The outbox keeps the `traceparent` of the code that emitted an event (`OutboxMessage.traceparent`, step 0.4.0), for the job to continue.
+
+The module contribution `entities` (`defineModule({ entities })`) lists the entities of a module for `createTestApp` and for the project that compiles them.
