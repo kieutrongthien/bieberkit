@@ -28,6 +28,8 @@ import { ignored } from '../check/rule.ts';
 import type { Violation } from '../check/rule.ts';
 import type { Command } from '../command.ts';
 import { usageError } from '../errors.ts';
+import { loadApp } from '../app.ts';
+import type { App } from '../app.ts';
 import { loadConfig } from '../project.ts';
 
 const order = (a: Violation, b: Violation): number =>
@@ -50,8 +52,10 @@ export const checkCommand: Command = {
     const { root, config } = await loadConfig(context.cwd);
     const files = readProject(root);
     const byPath = new Map(files.map((file) => [file.path, file]));
-    const violations = rules
-      .flatMap((rule) => rule.run({ files, config, root }))
+    let loaded: Promise<App> | undefined;
+    const app = (): Promise<App> => (loaded ??= loadApp(context.cwd));
+    const violations = (await Promise.all(rules.map(async (rule) => rule.run({ files, config, root, app }))))
+      .flat()
       .filter((found) => {
         const file = byPath.get(found.file);
         return file === undefined || !ignored(file, found);

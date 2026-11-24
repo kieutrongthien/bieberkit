@@ -289,6 +289,12 @@ importers:
       '@bieberkit/data':
         specifier: workspace:*
         version: link:../data
+      '@bieberkit/http':
+        specifier: workspace:*
+        version: link:../http
+      '@bieberkit/queue':
+        specifier: workspace:*
+        version: link:../queue
 
   packages/content: {}
 

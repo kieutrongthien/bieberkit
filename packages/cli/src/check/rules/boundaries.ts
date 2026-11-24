@@ -79,13 +79,13 @@ export const boundariesRule: Rule = {
           const target = posix.normalize(posix.join(posix.dirname(file.path), specifier));
           const theirs = MODULES.exec(`${target}/`);
           const rest = theirs === null ? '' : target.slice((theirs[1]?.length ?? 0) + (theirs[2]?.length ?? 0) + 1);
-          // Another module is reached through its `index`, which says what it publishes (MOD-01).
+          // Another module is reached through its `module.ts` or its `index`, which say what it publishes (MOD-01, section 7.4).
           if (
             mine !== null &&
             theirs !== null &&
             mine[2] !== theirs[2] &&
             rest !== '' &&
-            !/^\/?(?:index(?:\.[cm]?[jt]s)?)?$/.test(rest)
+            !/^\/?(?:(?:index|module)(?:\.[cm]?[jt]s)?)?$/.test(rest)
           ) {
             add(
               'BK_BOUNDARY_MODULE',

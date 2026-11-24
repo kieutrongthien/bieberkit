@@ -23,6 +23,7 @@
  */
 
 import type { ProjectConfigInput } from '@bieberkit/core';
+import type { App } from '../app.ts';
 import { docsLink } from '../errors.ts';
 
 export interface SourceFile {
@@ -49,13 +50,15 @@ export interface RuleInput {
   readonly config: ProjectConfigInput;
   /** The root of the project on disk, for a rule that reads `node_modules`. */
   readonly root: string;
+  /** The application, loaded when a rule asks (it imports the code of the project). */
+  readonly app: () => Promise<App>;
 }
 
 export interface Rule {
   /** The name that `bieberkit check <rule>` takes. */
   readonly name: string;
   readonly summary: string;
-  run(input: RuleInput): Violation[];
+  run(input: RuleInput): Violation[] | Promise<Violation[]>;
 }
 
 export const violation = (

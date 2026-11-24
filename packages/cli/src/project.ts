@@ -71,7 +71,7 @@ function isPluginDef(value: unknown): value is PluginDef<unknown> {
   return typeof value === 'object' && value !== null && Reflect.get(value, 'kind') === 'plugin';
 }
 
-async function importFile(path: string): Promise<unknown> {
+export async function importFile(path: string): Promise<unknown> {
   // The time of the file is part of the address, so a file that was edited since it was first read is read again.
   const url = `${pathToFileURL(path).href}?v=${String(statSync(path).mtimeMs)}`;
   const loaded: unknown = await import(url);

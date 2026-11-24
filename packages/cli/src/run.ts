@@ -31,7 +31,11 @@ import type { Command } from './command.ts';
 import { checkCommand } from './commands/check.ts';
 import { envCheckCommand } from './commands/env-check.ts';
 import { envExampleCommand } from './commands/env-example.ts';
+import { clientGenerateCommand, generateCommand } from './commands/generate.ts';
+import { makeEntityCommand, makeJobCommand, makeModuleCommand } from './commands/make.ts';
+import { openapiCommand } from './commands/openapi.ts';
 import { pluginsCommand } from './commands/plugins.ts';
+import { routesCommand } from './commands/routes.ts';
 import { failureOf, usageError } from './errors.ts';
 import type { ExitCode, Failure } from './errors.ts';
 
@@ -44,7 +48,19 @@ export interface Io {
   readonly env?: EnvSource;
 }
 
-export const COMMANDS: readonly Command[] = [checkCommand, pluginsCommand, envCheckCommand, envExampleCommand];
+export const COMMANDS: readonly Command[] = [
+  checkCommand,
+  generateCommand,
+  clientGenerateCommand,
+  openapiCommand,
+  routesCommand,
+  makeModuleCommand,
+  makeEntityCommand,
+  makeJobCommand,
+  pluginsCommand,
+  envCheckCommand,
+  envExampleCommand,
+];
 
 function version(): string {
   const found: unknown = createRequire(import.meta.url)('../package.json');

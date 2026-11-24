@@ -25,8 +25,10 @@
 import { boundariesRule } from './rules/boundaries.ts';
 import { envAccessRule } from './rules/env-access.ts';
 import { headersRule } from './rules/headers.ts';
+import { generatedRule } from './rules/generated.ts';
 import { migrationsRule } from './rules/migrations.ts';
 import { ormRule } from './rules/orm.ts';
+import { routesRule } from './rules/routes.ts';
 import { sqlRule } from './rules/sql.ts';
 import { transactionsRule } from './rules/transactions.ts';
 import type { Rule } from './rule.ts';
@@ -39,4 +41,6 @@ export const RULES: readonly Rule[] = [
   sqlRule,
   transactionsRule,
   migrationsRule,
+  routesRule,
+  generatedRule,
 ];

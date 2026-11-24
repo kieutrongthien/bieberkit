@@ -56,7 +56,7 @@ export interface Fixture {
   cleanup(): void;
 }
 
-const CORE = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'core');
+const PACKAGES = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 
 function pluginSource(plugin: FixturePlugin): string {
   const keys = Object.entries(plugin.env ?? {})
@@ -69,12 +69,15 @@ function pluginSource(plugin: FixturePlugin): string {
   ].join('\n');
 }
 
-/** A project in a new directory. `node_modules/@bieberkit/core` is the one of this repository, so the plugins import the real core. */
+/** A project in a new directory. `node_modules/@bieberkit/*` are the ones of this repository, so the plugins import the real core. */
 export function makeProject(options: FixtureOptions = {}): Fixture {
   const root = mkdtempSync(join(tmpdir(), 'bk-cli-'));
   const modules = join(root, 'node_modules');
   mkdirSync(join(modules, '@bieberkit'), { recursive: true });
-  symlinkSync(CORE, join(modules, '@bieberkit', 'core'), 'dir');
+  // The framework packages of this repository, so that the project and its plugins import the real ones.
+  for (const name of ['core', 'data', 'http', 'queue'])
+    symlinkSync(join(PACKAGES, name), join(modules, '@bieberkit', name), 'dir');
+  symlinkSync(join(PACKAGES, 'data', 'node_modules', 'zod'), join(modules, 'zod'), 'dir');
   for (const plugin of options.plugins ?? []) {
     const folder = join(modules, plugin.name);
     mkdirSync(folder, { recursive: true });
@@ -122,3 +125,26 @@ export default defineConfig({
   }
   return { root, cleanup: () => rmSync(root, { recursive: true, force: true }) };
 }
+
+/** A module of the project with a person entity (no tenant), an account entity that points at it, and a route of its own. */
+export const CRM_MODULE = `import { defineModule } from '@bieberkit/core';
+import { defineEntity, f } from '@bieberkit/data';
+
+const Person = defineEntity({
+  name: 'crm.Person',
+  table: 'crm_people',
+  fields: { id: f.id(), name: f.string({ min: 1, max: 50 }).index(), email: f.email().unique() },
+  permissions: { read: 'crm.person.read', create: 'crm.person.create' },
+  api: { list: true, get: true, create: true, update: true, delete: true },
+});
+
+const route = {
+  method: 'GET',
+  url: '/api/v1/crm/ping',
+  public: true,
+  schema: { response: { 200: { type: 'object', properties: { pong: { type: 'boolean' } }, required: ['pong'] } } },
+  handler: () => ({ pong: true }),
+};
+
+export default defineModule({ name: 'crm', entities: [Person], routes: [route] });
+`;
