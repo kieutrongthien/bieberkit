@@ -260,26 +260,30 @@ git commit -s -m "feat(server,testing): register mail, queue and cache for every
   - `export function applySubscriptions(queue: Queue, subscriptions: readonly QueueSubscription[]): void`
   - `ModuleContributions.subscriptions?: readonly QueueSubscription[]` (declaration merging in `packages/queue/src/index.ts`).
 
-- [ ] **Step 1: Write the failing tests:**
+- [x] **Step 1: Write the failing tests:**
   - `subscriptions.test.ts`: `it('BPL-04 applySubscriptions subscribes each event to its job')` and `it('BPL-04 a second subscription of one event to the same job is refused')` (the rule of `Queue.subscribe`; assert whatever error it throws, by its code).
   - `app.test.ts`: `it('BPL-04 an event written in a transaction runs its job after the commit, once')`: a fixture module with a job that records its input and a `subscriptions` entry; a route that calls `emitEvent(em, { name: 'fixture.thing.done', payload })` inside `runInTransaction`; after the request the job has not run; after `await app.runOutbox()` it has run once; a second `runOutbox()` runs nothing.
   - `app.test.ts`: `it('BPL-04 a failed transaction leaves no event, so the job never runs')`.
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `pnpm test packages/queue/src/subscriptions.test.ts packages/testing/src/app.test.ts`
 Expected: FAIL (no `subscriptions` export).
 
-- [ ] **Step 3: GATE.** Show the maintainer the tests and wait.
+**Execution record (2026-11-25):** The subscriptions, boot and test-app files ran on the three configured dialects: **8 expected failures, 60 passes, no skips**. The failures prove the missing `applySubscriptions` export, ignored contributions in boot and the test app, and silent overwrite by `Queue.subscribe`. Default payload and explicit mapping are covered by real publishing with a real SQLite transaction; the test-app cases use a service-owned transaction and the actual outbox dispatcher. The three rollback cases already pass and are retained. A web integration fixture proves boot wiring independently. `pnpm check`, `pnpm typecheck`, `pnpm lint` and `git diff --check` passed. The maintainer approved Gate 4 and the duplicate-event rule ("Duyệt Task 4 và quy tắc trùng event").
 
-- [ ] **Step 4: Implement** `applySubscriptions` as a loop over `queue.subscribe`, add the contribution key, and call it in `boot.ts` (`contributed<QueueSubscription>(modules, 'subscriptions')`, right after the queue is made) and in `createTestApp`.
+**Plan correction for Gate 4:** The plan assumes `Queue.subscribe` already refuses duplicate subscriptions. In fact the sync and database drivers simply overwrite the subscription map entry. Approved correction: reject a second subscription for the same event with `QUEUE_SUBSCRIPTION_DUPLICATE` (500), including when it points to a different job, so configuration cannot silently discard an earlier mapping. Apply that rule consistently across queue drivers and keep `applySubscriptions` as the planned loop over `queue.subscribe`. The RED tests explicitly expose this contract gap for maintainer review. Direct imports and the typed contribution replaced the temporary RED structural lookup/types.
 
-- [ ] **Step 5: Run to verify it passes**
+- [x] **Step 3: GATE.** Show the maintainer the tests and wait.
+
+- [x] **Step 4: Implement** `applySubscriptions` as a loop over `queue.subscribe`, add the contribution key, and call it in `boot.ts` (`contributed<QueueSubscription>(modules, 'subscriptions')`, right after the queue is made) and in `createTestApp`.
+
+- [x] **Step 5: Run to verify it passes**
 
 Run: `BK_REQUIRE_DIALECTS=all pnpm test packages/queue packages/server packages/testing`
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add packages
@@ -287,6 +291,8 @@ git commit -s -m "feat(queue): let a module map an outbox event to a job"
 ```
 
 ---
+
+**Task 4 GREEN record:** The focused suite passed **68 tests, no skips**. An additional shared-contract case first failed on all five configurations (sync, database on three dialects, Redis), then passed with the shared `registerSubscription` rule. The complete queue/server/testing command passed **506 tests, 27 skipped, across 24 files**. `pnpm check`, `pnpm typecheck`, `pnpm lint`, the queue/server/testing builds, generated API reports and `pnpm check:api` passed. Real-package fixtures initially loaded the previous queue build without the new export; building queue resolved that integration precondition, without changing assertions. Boot and seed use the shared platform helper to install contributions; the test app does the same before booting its modules.
 
 ### Task 5: A plugin contributes a service that another reads (BPL-03)
 

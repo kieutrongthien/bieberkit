@@ -68,6 +68,22 @@ export function queueContractSuite(
   };
 
   describe(`Q-11 the contract of the queue on ${name}`, () => {
+    it('BPL-04 rejects a duplicate event subscription without overwriting it', async () => {
+      const job = defineJob({ name: 'contract.subscription', input: empty, handler: async () => {} });
+      const other = defineJob({ name: 'contract.subscription-other', input: empty, handler: async () => {} });
+      const { queue, close } = await make([job, other]);
+      try {
+        queue.subscribe('contract.event', job);
+        expect(() => queue.subscribe('contract.event', job)).toThrowError(
+          expect.objectContaining({ code: 'QUEUE_SUBSCRIPTION_DUPLICATE' }),
+        );
+        expect(() => queue.subscribe('contract.event', other)).toThrowError(
+          expect.objectContaining({ code: 'QUEUE_SUBSCRIPTION_DUPLICATE' }),
+        );
+      } finally {
+        await close();
+      }
+    });
     run(
       1,
       'a job runs as the code that dispatched it, with its tenant, its user and its Unicode input (Q-10)',

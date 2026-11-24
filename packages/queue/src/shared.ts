@@ -49,7 +49,26 @@ export interface Shared {
   readonly jobDuration: Histogram;
 }
 
+/** One event has one job; a second owner is a configuration error rather than an overwrite. */
+export function registerSubscription<Input>(
+  shared: Shared,
+  event: string,
+  job: JobDef<Input>,
+  map?: (message: OutboxMessage) => Input,
+): void {
+  if (shared.subscriptions.has(event)) {
+    throw queueError(
+      'QUEUE_SUBSCRIPTION_DUPLICATE',
+      500,
+      `The event ${event} has a subscription already.`,
+      'Register one job for each event.',
+    );
+  }
+  shared.subscriptions.set(event, { job, map: map ?? ((message) => message.payload) });
+}
+
 /** The registry that `bk_job_duration_seconds` and the depth of the queues are counted in. */
+
 export function jobDurationOf(metrics: Metrics = createNoopMetrics()): Histogram {
   return metrics.histogram(
     'bk_job_duration_seconds',

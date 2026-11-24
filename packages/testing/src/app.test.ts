@@ -24,6 +24,12 @@
 
 import { expect, it, onTestFinished } from 'vitest';
 import { emitEvent, runInTransaction } from '@bieberkit/data/orm';
+import type { Database, OutboxMessage } from '@bieberkit/data/orm';
+import { BkError, defineModule } from '@bieberkit/core';
+import { defineJob } from '@bieberkit/queue';
+import type { RouteDef } from '@bieberkit/http';
+import { z } from 'zod';
+import type { OpenDatabase } from './database.ts';
 import { createTestApp, describeDialects } from './index.ts';
 import { Account, crm, touchJob } from './fixtures.ts';
 
@@ -103,6 +109,63 @@ describeDialects('BPL-02 the platform of the test app', ({ open }) => {
     const unknown = await auth.api.requestPasswordReset({ body: { email: 'nobody@example.test' }, headers });
     expect(unknown).toEqual(known);
     expect(app.mailbox).toHaveLength(1);
+  });
+});
+async function eventApp(open: OpenDatabase, rollback = false) {
+  const seen: number[] = [];
+  const job = defineJob({
+    name: 'fixture.receive',
+    input: z.object({ value: z.number() }),
+    handler: async ({ value }) => {
+      seen.push(value);
+    },
+  });
+  // The route calls this service; the service owns the transaction (MOD-16).
+  const writeEvent = async (db: Database): Promise<void> => {
+    await runInTransaction(db, async (em) => {
+      emitEvent(em, { name: 'fixture.thing.done', version: 3, payload: { value: 999 } });
+      await em.flush();
+      if (rollback) throw new BkError('Intentional rollback', { code: 'FIXTURE_ROLLBACK', status: 409 });
+    });
+  };
+  const route: RouteDef = {
+    method: 'POST',
+    url: '/api/v1/fixture/event',
+    public: true,
+    schema: {
+      response: { 200: { type: 'object', properties: { queued: { type: 'boolean' } }, required: ['queued'] } },
+    },
+    handler: async (context) => {
+      await writeEvent(context.services.database);
+      return { queued: true };
+    },
+  };
+  const subscriptions = [
+    { event: 'fixture.thing.done', job, map: (event: OutboxMessage) => ({ value: event.version }) },
+  ];
+  const module = defineModule({ name: 'fixture', jobs: [job], routes: [route], subscriptions });
+  const app = await createTestApp({ modules: [module], open });
+  onTestFinished(() => app.close());
+  return { app, seen };
+}
+
+describeDialects('BPL-04 contributed outbox jobs', ({ open }) => {
+  it('BPL-04 an event written in a transaction runs its job after the commit, once', async () => {
+    const { app, seen } = await eventApp(open);
+    expect((await app.anonymous().post('/api/v1/fixture/event', {})).status).toBe(200);
+    expect(seen).toEqual([]);
+    expect(await app.runOutbox()).toBe(1);
+    expect(seen).toEqual([3]);
+    expect(await app.runOutbox()).toBe(0);
+    expect(seen).toEqual([3]);
+  });
+
+  it('BPL-04 a failed transaction leaves no event, so the job never runs', async () => {
+    const { app, seen } = await eventApp(open, true);
+    expect((await app.anonymous().post('/api/v1/fixture/event', {})).status).toBe(409);
+    expect(seen).toEqual([]);
+    expect(await app.runOutbox()).toBe(0);
+    expect(seen).toEqual([]);
   });
 });
 const dataOf = (body: Readonly<Record<string, unknown>>): Record<string, unknown>[] => {

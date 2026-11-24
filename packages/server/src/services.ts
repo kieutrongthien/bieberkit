@@ -28,7 +28,8 @@ import type { Cache } from '@bieberkit/cache';
 import { createCacheFromConfig } from '@bieberkit/cache/bentocache';
 import type { Mail } from '@bieberkit/mail';
 import { createMailerFromConfig } from '@bieberkit/mail/nodemailer';
-import type { Queue } from '@bieberkit/queue';
+import { applySubscriptions } from '@bieberkit/queue';
+import type { Queue, QueueSubscription } from '@bieberkit/queue';
 import { createQueueFromConfig } from '@bieberkit/queue/redis';
 import type { QueueFromConfigOptions } from '@bieberkit/queue/redis';
 import type { EntityDef } from '@bieberkit/data';
@@ -64,12 +65,18 @@ interface RuntimePlatform {
 /** The platform shared by process boot and seeders, with one owner for its resources. */
 export async function createRuntimePlatform(
   env: CoreEnv,
-  options: QueueFromConfigOptions & { readonly logger: Logger },
+  options: QueueFromConfigOptions & { readonly logger: Logger; readonly subscriptions?: readonly QueueSubscription[] },
 ): Promise<RuntimePlatform> {
   const mailer = createMailerFromConfig(env, options);
   const cache = createCacheFromConfig(env, options);
   try {
     const queue = await createQueueFromConfig(env, { ...options, jobs: [...options.jobs, mailer.job] });
+    try {
+      applySubscriptions(queue, options.subscriptions ?? []);
+    } catch (error) {
+      await queue.close();
+      throw error;
+    }
     return {
       mail: mailer.over(queue),
       queue,

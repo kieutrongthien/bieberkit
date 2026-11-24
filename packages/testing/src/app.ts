@@ -35,10 +35,10 @@ import type { PreparedMessage } from '@bieberkit/mail';
 import type { Database, OrmSchema } from '@bieberkit/data/orm';
 import { createHttpServer, registerEntityRoutes } from '@bieberkit/http';
 import type { HttpServer, Principal, RouteDef } from '@bieberkit/http';
-import { createQueue } from '@bieberkit/queue';
+import { applySubscriptions, createQueue } from '@bieberkit/queue';
 import { createMemoryDisk, createStorage } from '@bieberkit/storage';
 import type { MemoryDisk } from '@bieberkit/storage';
-import type { JobDef, Queue } from '@bieberkit/queue';
+import type { JobDef, Queue, QueueSubscription } from '@bieberkit/queue';
 import { createClient, TENANT_HEADER, USER_HEADER } from './client.ts';
 import type { Client } from './client.ts';
 import { openMemoryDatabase } from './database.ts';
@@ -157,6 +157,7 @@ export async function createTestApp(options: TestAppOptions = {}): Promise<TestA
     jobs: [...contributed<JobDef>(modules, 'jobs'), mailer.job],
     logger,
   });
+  applySubscriptions(queue, contributed<QueueSubscription>(modules, 'subscriptions'));
   const mail = mailer.over(queue);
   const cache = createCache({ engine: createMemoryEngine() });
   const dispatcher = createOutboxDispatcher(db, { publisher: queue.publisher, logger });

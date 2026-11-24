@@ -401,6 +401,45 @@ describe('BPL-02 platform services on the web role', () => {
   });
 });
 
+it('BPL-04 boot applies the subscriptions contributed by a module', async () => {
+  const { one } = await start(
+    'web',
+    {},
+    {
+      'apps/server/src/modules/events/module.ts': `
+import { defineModule } from '@bieberkit/core';
+import { defineJob } from '@bieberkit/queue';
+import { z } from 'zod';
+import { rawKysely } from '@bieberkit/data/orm';
+let seen = 0;
+const job = defineJob({ name: 'events.receive', input: z.object({ value: z.number() }), handler: async ({ value }) => { seen = value; } });
+async function publishEvent(services) {
+  const sql = await rawKysely(services.database);
+  await sql.transaction().execute((trx) => services.queue.publisher.publish({
+    id: '0190f6b2-7c4e-7000-8000-0000000000a1', jobId: 'ob-events-probe',
+    name: 'events.probe', version: 8, payload: { value: 999 }, createdAt: new Date(),
+  }, trx));
+}
+const route = {
+  method: 'GET', url: '/api/v1/events/probe', public: true,
+  schema: { response: { 200: { type: 'object', properties: { seen: { type: 'number' } }, required: ['seen'] } } },
+  handler: async ({ services }) => {
+    await publishEvent(services);
+    return { seen };
+  },
+};
+export default defineModule({
+  name: 'events', jobs: [job], routes: [route],
+  subscriptions: [{ event: 'events.probe', job, map: (event) => ({ value: event.version }) }],
+});
+`,
+    },
+  );
+  const response = await get(one.port, '/api/v1/events/probe');
+  expect(response.status).toBe(200);
+  expect(JSON.parse(response.body)).toEqual({ seen: 8 });
+});
+
 describe('section 7.2 a process that cannot start', () => {
   it('CFG-09 an environment that is not valid stops the boot with the code of the key, before anything starts', async () => {
     const fixture = makeProject();

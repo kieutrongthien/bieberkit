@@ -39,7 +39,7 @@ import type { Database } from '@bieberkit/data/orm';
 import { createHttpServer, registerEntityRoutes, registerMeta, registerOpenApi } from '@bieberkit/http';
 import type { HttpServer, RouteDef } from '@bieberkit/http';
 import { createScheduler } from '@bieberkit/queue';
-import type { JobDef } from '@bieberkit/queue';
+import type { JobDef, QueueSubscription } from '@bieberkit/queue';
 import { ServerError } from './errors.ts';
 import { adminLocation, registerAdmin } from './admin.ts';
 import { migrate } from './migrate.ts';
@@ -140,6 +140,7 @@ export async function boot(options: BootOptions): Promise<Running> {
   let server: HttpServer | undefined;
   const platform = await createRuntimePlatform(env, {
     jobs: contributed<JobDef>(modules, 'jobs'),
+    subscriptions: contributed<QueueSubscription>(modules, 'subscriptions'),
     db,
     logger,
     errorReporter: reporter,

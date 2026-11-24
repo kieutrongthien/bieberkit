@@ -44,7 +44,7 @@ import type {
   Worker,
   WorkerOptions,
 } from '../contract.ts';
-import { dispatching, prepare } from '../shared.ts';
+import { dispatching, prepare, registerSubscription } from '../shared.ts';
 import type { Prepared, Shared } from '../shared.ts';
 import { JOBS_TABLE, WAKE_CHANNEL } from '../tables.ts';
 import { createDatabaseWorker } from '../worker.ts';
@@ -140,10 +140,7 @@ export async function createDatabaseQueue(db: Database, shared: Shared): Promise
     driver: 'database',
     dispatch,
     subscribe(event, job, map) {
-      shared.subscriptions.set(event, {
-        job: job,
-        map: map === undefined ? (message) => message.payload : map,
-      });
+      registerSubscription(shared, event, job, map);
     },
     publisher,
     createWorker(options?: WorkerOptions): Worker {

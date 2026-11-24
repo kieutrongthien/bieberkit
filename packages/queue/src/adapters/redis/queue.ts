@@ -45,7 +45,7 @@ import type {
 } from '../../contract.ts';
 import { createShared } from '../../queue.ts';
 import { carry } from '../../context.ts';
-import { dispatching, observeQueue, prepare, reportDead, runDelivery } from '../../shared.ts';
+import { dispatching, observeQueue, prepare, registerSubscription, reportDead, runDelivery } from '../../shared.ts';
 import type { Prepared } from '../../shared.ts';
 import { slotsOf } from '../../worker.ts';
 
@@ -337,7 +337,7 @@ export async function createRedisQueue(options: RedisQueueOptions): Promise<Queu
     driver: 'redis',
     dispatch,
     subscribe(event, job, map) {
-      shared.subscriptions.set(event, { job, map: map === undefined ? (message) => message.payload : map });
+      registerSubscription(shared, event, job, map);
     },
     publisher,
     createWorker,

@@ -25,7 +25,7 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { createContainer, createLogger, loadEnv, registerModule } from '@bieberkit/core';
-import type { JobDef } from '@bieberkit/queue';
+import type { JobDef, QueueSubscription } from '@bieberkit/queue';
 import type { EnvSource, ServiceRegistry } from '@bieberkit/core';
 import { createDatabase, compileEntities } from '@bieberkit/data/orm';
 import type { EntityDef } from '@bieberkit/data';
@@ -64,6 +64,7 @@ export async function seed(options: SeedOptions = {}): Promise<Seeded> {
   const db = await createDatabase(env, { entities: [...compileEntities(entities), ...authEntities], audit: 'table' });
   const platform = await createRuntimePlatform(env, {
     jobs: contributed<JobDef>(modules, 'jobs'),
+    subscriptions: contributed<QueueSubscription>(modules, 'subscriptions'),
     db,
     logger: createLogger({ level: env.LOG_LEVEL, role: 'migrate' }),
   });
