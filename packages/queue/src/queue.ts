@@ -22,13 +22,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { createLogger, createNoopReporter } from '@bieberkit/core';
-import type { ErrorReporter, Logger } from '@bieberkit/core';
+import { createLogger, createNoopMetrics, createNoopReporter, createNoopTracer } from '@bieberkit/core';
+import type { ErrorReporter, Logger, Metrics, Tracer } from '@bieberkit/core';
 import type { Database } from '@bieberkit/data/orm';
 import { queueError } from './contract.ts';
 import type { JobDef, Queue } from './contract.ts';
 import { createDatabaseQueue } from './drivers/database.ts';
 import { createSyncQueue } from './drivers/sync.ts';
+import { jobDurationOf, observeQueue } from './shared.ts';
 import type { Shared } from './shared.ts';
 
 export interface CreateQueueOptions {
@@ -40,6 +41,10 @@ export interface CreateQueueOptions {
   readonly logger?: Logger;
   /** Receives a job that failed for good, with its name, its queue and the tenant and user that dispatched it (OBS-06). */
   readonly errorReporter?: ErrorReporter;
+  /** Records a span for each dispatch and each delivery, and the job in it continues the trace of the code that dispatched it (OBS-02). */
+  readonly tracer?: Tracer;
+  /** Counts the jobs of each queue and times each delivery (OBS-03). */
+  readonly metrics?: Metrics;
   /** The clock, in epoch milliseconds. For tests. */
   readonly now?: () => number;
 }
@@ -50,6 +55,12 @@ export interface CreateQueueOptions {
  */
 export async function createQueue(options: CreateQueueOptions): Promise<Queue> {
   const shared = createShared(options);
+  const queue = await createDriver(options, shared);
+  if (options.metrics !== undefined) observeQueue(options.metrics, queue);
+  return queue;
+}
+
+async function createDriver(options: CreateQueueOptions, shared: Shared): Promise<Queue> {
   if (options.driver === 'sync') return createSyncQueue(shared);
   if (options.driver === 'database') {
     if (options.db === undefined)
@@ -70,7 +81,9 @@ export async function createQueue(options: CreateQueueOptions): Promise<Queue> {
 }
 
 /** What every driver needs: the jobs by name (a name is registered once), the subscriptions, the logger, the reporter and the clock. */
-export function createShared(options: Pick<CreateQueueOptions, 'jobs' | 'logger' | 'errorReporter' | 'now'>): Shared {
+export function createShared(
+  options: Pick<CreateQueueOptions, 'jobs' | 'logger' | 'errorReporter' | 'now' | 'tracer' | 'metrics'>,
+): Shared {
   const jobs = new Map<string, JobDef>();
   for (const job of options.jobs) {
     if (jobs.has(job.name))
@@ -83,5 +96,7 @@ export function createShared(options: Pick<CreateQueueOptions, 'jobs' | 'logger'
     logger: options.logger ?? createLogger({ level: 'info', role: 'worker' }),
     reporter: options.errorReporter ?? createNoopReporter(),
     now: options.now ?? Date.now,
+    tracer: options.tracer ?? createNoopTracer(),
+    jobDuration: jobDurationOf(options.metrics ?? createNoopMetrics()),
   };
 }

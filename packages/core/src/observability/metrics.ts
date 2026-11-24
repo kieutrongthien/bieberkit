@@ -65,7 +65,10 @@ export interface Metrics {
   counter(name: string, help: string, options?: MetricOptions): Counter;
   gauge(name: string, help: string, options?: MetricOptions): Gauge;
   histogram(name: string, help: string, options?: HistogramOptions): Histogram;
-  /** A metric whose samples are read at scrape time, for a value that another module owns (the depth of a queue, a pool). */
+  /**
+   * A metric whose samples are read at scrape time, for a value that another module owns (the depth of a queue, a pool). Asking again for
+   * the same name replaces the reader, so a module that is made twice in one process reports the one that was made last.
+   */
   collect(
     name: string,
     help: string,
@@ -260,7 +263,9 @@ export function createMetrics(): Metrics {
     collect(name, help, options, read) {
       const labels = options.labels ?? [];
       const kind = options.type ?? 'gauge';
-      if (known(name, kind, labels) !== undefined) throw invalid(`"${name}" exists already.`);
+      const existing = known(name, kind, labels);
+      if (existing !== undefined && existing.handle.is !== 'collector')
+        throw invalid(`"${name}" has a counter, a gauge or a histogram already.`);
       families.set(name, {
         kind,
         help,

@@ -22,7 +22,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { ErrorReporter, Logger } from '@bieberkit/core';
+import type { ErrorReporter, Logger, Metrics, Tracer } from '@bieberkit/core';
 import type { Database } from '@bieberkit/data/orm';
 import { queueError } from '../../contract.ts';
 import type { JobDef, Queue } from '../../contract.ts';
@@ -44,6 +44,8 @@ export interface QueueFromConfigOptions {
   readonly db?: Database;
   readonly logger?: Logger;
   readonly errorReporter?: ErrorReporter;
+  readonly tracer?: Tracer;
+  readonly metrics?: Metrics;
   /** Isolates apps that share one Valkey. Defaults to `bk`. */
   readonly prefix?: string;
 }
@@ -54,6 +56,8 @@ export async function createQueueFromConfig(config: QueueConfig, options: QueueF
     jobs: options.jobs,
     ...(options.logger === undefined ? {} : { logger: options.logger }),
     ...(options.errorReporter === undefined ? {} : { errorReporter: options.errorReporter }),
+    ...(options.tracer === undefined ? {} : { tracer: options.tracer }),
+    ...(options.metrics === undefined ? {} : { metrics: options.metrics }),
   };
   if (config.QUEUE_DRIVER === 'redis') {
     if (config.REDIS_URL === undefined) {

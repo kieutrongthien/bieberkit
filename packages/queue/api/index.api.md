@@ -29,7 +29,7 @@ Generated from the built declaration files by `pnpm api:update`. Do not edit by 
 
 ```ts
 import { Database, OutboxDispatcher, OutboxDispatcherOptions } from "@bieberkit/data/orm";
-import { ErrorReporter, Logger } from "@bieberkit/core";
+import { ErrorReporter, Logger, Metrics, Tracer } from "@bieberkit/core";
 import { PluginMigrationStep } from "@bieberkit/data";
 import { _ as WorkerOptions, a as JobContext, b as queueError, c as JobResult, d as Queue, f as QueueError, g as Worker, i as Dispatched, l as JobStatus, m as QueueStats, n as DeadLetterPage, o as JobDef, p as QueueName, r as DispatchOptions, s as JobInput, t as DeadJob, u as QUEUE_NAMES, v as defaultBackoffMs, y as defineJob } from "./contract-DjjfZ0pN.js";
 interface Cron {
@@ -70,6 +70,8 @@ interface CreateQueueOptions {
   readonly db?: Database;
   readonly logger?: Logger;
   readonly errorReporter?: ErrorReporter;
+  readonly tracer?: Tracer;
+  readonly metrics?: Metrics;
   readonly now?: () => number;
 }
 export declare function createQueue(options: CreateQueueOptions): Promise<Queue>;

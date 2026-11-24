@@ -23,8 +23,8 @@
  */
 
 import { randomUUID } from 'node:crypto';
-import { createLogger } from '@bieberkit/core';
-import type { Logger } from '@bieberkit/core';
+import { createLogger, createNoopMetrics, createNoopTracer } from '@bieberkit/core';
+import type { Logger, Metrics, Span, Tracer } from '@bieberkit/core';
 import { afterCommit, currentTenantId } from '@bieberkit/data/orm';
 import { cacheError, checkName, checkTtl, encodeValue } from './contract.ts';
 import type { CacheEngine, CacheValue } from './contract.ts';
@@ -42,6 +42,10 @@ export interface CacheOptions {
   /** How long the other callers of a `remember` wait for the first one. Defaults to 5 seconds. */
   readonly rememberWaitMs?: number;
   readonly logger?: Logger;
+  /** Records a span for each call of the cache. A span names the operation and says hit or miss, and never holds a key (OBS-02). */
+  readonly tracer?: Tracer;
+  /** Counts the lookups by result, `bk_cache_lookups_total{result=hit|miss}`, for the hit ratio (OBS-03). */
+  readonly metrics?: Metrics;
 }
 
 export interface Lock {
@@ -130,6 +134,19 @@ export function createCache(options: CacheOptions): Cache {
   const rememberWaitMs = options.rememberWaitMs ?? 5_000;
   const logger = options.logger ?? createLogger({ level: 'warn', role: 'cache' });
   const inflight = new Map<string, Promise<unknown>>();
+  const tracer = options.tracer ?? createNoopTracer();
+  const lookups = (options.metrics ?? createNoopMetrics()).counter(
+    'bk_cache_lookups_total',
+    'Lookups of the cache by result, for the hit ratio.',
+    { labels: ['result'] },
+  );
+  const traced = <T>(operation: string, run: (span: Span) => Promise<T>): Promise<T> =>
+    tracer.span(`cache ${operation}`, { kind: 'client', attributes: { 'bk.cache.op': operation } }, run);
+  /** Counts a lookup, and says on the span whether it found the value. */
+  const noted = (span: Span, hit: boolean): void => {
+    lookups.inc({ result: hit ? 'hit' : 'miss' });
+    span.setAttribute('bk.cache.hit', hit);
+  };
 
   const full = (kind: string, scope: string, name: string): string => `${prefix}:${scope}${kind}:${name}`;
 
@@ -156,12 +173,14 @@ export function createCache(options: CacheOptions): Cache {
   }
 
   async function remember<T extends CacheValue>(
+    span: Span,
     valueKey: string,
     ttlMs: number,
     factory: () => Promise<T> | T,
   ): Promise<T> {
     const ttl = checkTtl(ttlMs, maxTtlMs);
     const hit = parse<T>(await engine.get(valueKey));
+    noted(span, hit !== undefined);
     if (hit !== undefined) return hit;
     const running = inflight.get(valueKey);
     // oxlint-disable-next-line typescript/no-unsafe-type-assertion
@@ -191,23 +210,30 @@ export function createCache(options: CacheOptions): Cache {
   /** The calls on values, for a scope and for tags. `place` turns a key into the stored key, reading tag generations when needed. */
   function reader(place: (key: string) => Promise<string>): CacheReader {
     return {
-      async get<T extends CacheValue>(key: string) {
-        return parse<T>(await engine.get(await place(key)));
-      },
-      async set(key, value, ttlMs = defaultTtlMs) {
-        const text = encodeValue(value);
-        const ttl = checkTtl(ttlMs, maxTtlMs);
-        await engine.set(await place(key), text, ttl);
-      },
-      async has(key) {
-        return (await engine.get(await place(key))) !== undefined;
-      },
-      async forget(key) {
-        await engine.delete(await place(key));
-      },
-      async remember(key, ttlMs, factory) {
-        return remember(await place(key), ttlMs, factory);
-      },
+      get: <T extends CacheValue>(key: string) =>
+        traced('get', async (span) => {
+          const value = parse<T>(await engine.get(await place(key)));
+          noted(span, value !== undefined);
+          return value;
+        }),
+      set: (key, value, ttlMs = defaultTtlMs) =>
+        traced('set', async () => {
+          const text = encodeValue(value);
+          const ttl = checkTtl(ttlMs, maxTtlMs);
+          await engine.set(await place(key), text, ttl);
+        }),
+      has: (key) =>
+        traced('has', async (span) => {
+          const found = (await engine.get(await place(key))) !== undefined;
+          noted(span, found);
+          return found;
+        }),
+      forget: (key) =>
+        traced('forget', async () => {
+          await engine.delete(await place(key));
+        }),
+      remember: (key, ttlMs, factory) =>
+        traced('remember', async (span) => remember(span, await place(key), ttlMs, factory)),
     };
   }
 
@@ -257,23 +283,26 @@ export function createCache(options: CacheOptions): Cache {
           },
         };
       },
-      async lock(key, ttlMs, lockOptions = {}) {
-        const ttl = checkTtl(ttlMs, maxTtlMs);
-        return acquire(full('l', scopeOf(), checkName('key', key)), ttl, lockOptions.waitMs ?? 0);
-      },
+      lock: (key, ttlMs, lockOptions = {}) =>
+        traced('lock', async () => {
+          const ttl = checkTtl(ttlMs, maxTtlMs);
+          return acquire(full('l', scopeOf(), checkName('key', key)), ttl, lockOptions.waitMs ?? 0);
+        }),
       atomic: {
-        async add(key, value, ttlMs) {
-          return engine.atomic.add(atomicKey(key), encodeValue(value), checkTtl(ttlMs, maxTtlMs));
-        },
-        async get<T extends CacheValue>(key: string) {
-          return parse<T>(await engine.atomic.get(atomicKey(key)));
-        },
-        async set(key, value, ttlMs) {
-          await engine.atomic.set(atomicKey(key), encodeValue(value), checkTtl(ttlMs, maxTtlMs));
-        },
-        async delete(key) {
-          await engine.atomic.delete(atomicKey(key));
-        },
+        add: (key, value, ttlMs) =>
+          traced('atomic add', async () =>
+            engine.atomic.add(atomicKey(key), encodeValue(value), checkTtl(ttlMs, maxTtlMs)),
+          ),
+        get: <T extends CacheValue>(key: string) =>
+          traced('atomic get', async () => parse<T>(await engine.atomic.get(atomicKey(key)))),
+        set: (key, value, ttlMs) =>
+          traced('atomic set', async () => {
+            await engine.atomic.set(atomicKey(key), encodeValue(value), checkTtl(ttlMs, maxTtlMs));
+          }),
+        delete: (key) =>
+          traced('atomic delete', async () => {
+            await engine.atomic.delete(atomicKey(key));
+          }),
       },
       get tenant() {
         return scopeOf === tenantScope ? root : view(tenantScope);

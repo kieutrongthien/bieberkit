@@ -53,8 +53,11 @@ export interface Span {
 
 /** A span that the caller ends: for work that starts in one place and finishes in another, like a request of the server. */
 export interface OpenSpan extends Span {
-  /** Ends the span and gives it to the exporter. Ending twice does nothing. */
-  end(): void;
+  /**
+   * Ends the span and gives it to the exporter. Ending twice does nothing. With `durationNs` the span is drawn as having started that
+   * long before now: for work that a driver reports after it ran.
+   */
+  end(durationNs?: number): void;
 }
 
 /** A span that has ended, as an exporter receives it. Times are nanoseconds since the Unix epoch. */
@@ -89,6 +92,11 @@ export interface Tracer {
   startSpan(name: string, options: SpanOptions): OpenSpan;
   /** Runs `fn` with `span` as the current span, and the context of the request, if any, naming it. */
   within<T>(span: Span, fn: () => T): T;
+  /**
+   * Records a span for work that has finished and took `durationMs`, as a child of the current span: a query that a driver reports
+   * after it ran. Nothing is current while it ran, so it has no children.
+   */
+  record(name: string, options: SpanOptions & { readonly durationMs: number; readonly failed?: boolean }): void;
   /** The trace of the current span, to store in a job or send in a header. */
   current(): TraceParent | undefined;
   flush(timeoutMs?: number): Promise<boolean>;
@@ -109,6 +117,7 @@ export function createNoopTracer(): Tracer {
     span: async (_name, _options, fn) => fn(NOOP_SPAN),
     startSpan: () => NOOP_SPAN,
     within: (_span, fn) => fn(),
+    record: () => undefined,
     current: () => requestTrace(),
     flush: async () => true,
   };
@@ -160,9 +169,10 @@ export function createTracer(options: TracerOptions): Tracer {
     const startNs = nowNs();
     let failed = false;
     let ended = false;
-    const end = (): void => {
+    const end = (durationNs?: number): void => {
       if (ended) return;
       ended = true;
+      const finishedAt = nowNs();
       try {
         options.exporter.export({
           traceId,
@@ -170,8 +180,8 @@ export function createTracer(options: TracerOptions): Tracer {
           ...(parent?.spanId === undefined ? {} : { parentSpanId: parent.spanId }),
           name,
           kind: spanOptions.kind ?? 'internal',
-          startNs,
-          endNs: nowNs(),
+          startNs: durationNs === undefined ? startNs : finishedAt - BigInt(durationNs),
+          endNs: finishedAt,
           attributes,
           failed,
         });
@@ -213,6 +223,11 @@ export function createTracer(options: TracerOptions): Tracer {
     },
     startSpan: start,
     within,
+    record(name, recordOptions) {
+      const span = start(name, recordOptions);
+      if (recordOptions.failed === true) span.fail(undefined);
+      span.end(Math.max(0, Math.round(recordOptions.durationMs * 1e6)));
+    },
     current: () => active.getStore() ?? requestTrace(),
     flush: (timeoutMs) => options.exporter.flush(timeoutMs),
   };

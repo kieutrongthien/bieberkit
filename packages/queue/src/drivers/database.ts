@@ -29,6 +29,7 @@ import type { Dialect } from '@bieberkit/core';
 import type { StepDatabase } from '@bieberkit/data';
 import { rawKysely, retryOnDeadlock } from '@bieberkit/data/orm';
 import type { Database, OutboxPublisher } from '@bieberkit/data/orm';
+import { carry } from '../context.ts';
 import { emptyCounts, isQueueName, queueError } from '../contract.ts';
 import type {
   DeadJob,
@@ -43,7 +44,7 @@ import type {
   Worker,
   WorkerOptions,
 } from '../contract.ts';
-import { prepare } from '../shared.ts';
+import { dispatching, prepare } from '../shared.ts';
 import type { Prepared, Shared } from '../shared.ts';
 import { JOBS_TABLE, WAKE_CHANNEL } from '../tables.ts';
 import { createDatabaseWorker } from '../worker.ts';
@@ -63,6 +64,7 @@ async function insertJob(db: Raw, dialect: Dialect, prepared: Prepared, now: num
     tenant_id: prepared.context.tenantId ?? null,
     user_id: prepared.context.userId ?? null,
     request_id: prepared.context.requestId ?? null,
+    traceparent: prepared.context.traceparent ?? null,
     status: 'waiting',
     attempts: 0,
     max_attempts: prepared.job.attempts,
@@ -91,9 +93,12 @@ export async function createDatabaseQueue(db: Database, shared: Shared): Promise
   const dialect = db.dialect;
 
   async function dispatch<Input>(job: JobDef<Input>, input: Input, options?: DispatchOptions): Promise<Dispatched> {
-    const prepared = await prepare(shared, job, input, options);
-    const inserted = await retryOnDeadlock(() => insertJob(kysely, dialect, prepared, shared.now()));
-    return { id: prepared.jobId, duplicate: !inserted };
+    return dispatching(shared, job.name, async (span) => {
+      const prepared = await prepare(shared, job, input, options);
+      span.setAttribute('bk.queue', prepared.queue);
+      const inserted = await retryOnDeadlock(() => insertJob(kysely, dialect, prepared, shared.now()));
+      return { id: prepared.jobId, duplicate: !inserted };
+    });
   }
 
   const publisher: OutboxPublisher = {
@@ -105,11 +110,7 @@ export async function createDatabaseQueue(db: Database, shared: Shared): Promise
         subscription.job,
         subscription.map(message),
         { jobId: message.jobId },
-        {
-          ...(message.tenantId === undefined ? {} : { tenantId: message.tenantId }),
-          ...(message.userId === undefined ? {} : { userId: message.userId }),
-          ...(message.requestId === undefined ? {} : { requestId: message.requestId }),
-        },
+        carry(message),
       );
       // The claiming transaction of the dispatcher inserts the job, so the move from the outbox to the queue is one commit (ADR 0010).
       await insertJob(trx, dialect, prepared, shared.now());

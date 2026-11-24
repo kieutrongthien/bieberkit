@@ -172,6 +172,21 @@ describe('OBS-02 tracer', () => {
     open.end();
   });
 
+  it('OBS-02 a span that is recorded after the work ran is drawn with the time it took, as a child of the current span', async () => {
+    const exporter = createMemorySpanExporter();
+    const tracer = createTracer({ exporter, nowNs: () => 5_000_000_000n });
+    await tracer.span('request', {}, () => {
+      tracer.record('db select', { kind: 'client', durationMs: 2.5, attributes: { 'db.operation': 'select' } });
+      tracer.record('db insert', { durationMs: 1, failed: true });
+    });
+    const [select, insert, request] = exporter.spans;
+    expect(select).toMatchObject({ name: 'db select', kind: 'client', parentSpanId: request?.spanId, failed: false });
+    expect(select?.endNs).toBe(5_000_000_000n);
+    expect(select?.startNs).toBe(5_000_000_000n - 2_500_000n);
+    expect(insert).toMatchObject({ failed: true });
+    createNoopTracer().record('x', { durationMs: 1 });
+  });
+
   it('OBS-02 the no-op tracer runs the code and records nothing', async () => {
     const tracer = createNoopTracer();
     expect(tracer.enabled).toBe(false);

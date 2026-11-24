@@ -125,7 +125,7 @@ describe('OBS-03 metrics text', () => {
     expect(() => metrics.counter('bk_k_total', 'x', { labels: ['a'] })).toThrow(/labels/);
     expect(() => metrics.collect('bk_k_total', 'x', {}, () => [])).toThrow(/exists as a counter/);
     metrics.collect('bk_col', 'x', {}, () => []);
-    expect(() => metrics.collect('bk_col', 'x', {}, () => [])).toThrow(/exists already/);
+    expect(() => metrics.collect('bk_k_total', 'x', {}, () => [])).toThrow(/exists as a counter/);
   });
 
   it('OBS-03 a metric that has too many series keeps the ones it has and drops the new ones', async () => {
@@ -150,6 +150,15 @@ describe('OBS-03 metrics text', () => {
     const text = await metrics.render();
     expect(text).toContain('bk_queue_jobs{queue="default"} 4\n');
     expect(text).toContain('# TYPE bk_async counter\nbk_async 9\n');
+  });
+
+  it('OBS-03 a collector that is declared again replaces the reader, so the last module made is the one reported', async () => {
+    const metrics = createMetrics();
+    metrics.collect('bk_depth', 'Depth.', {}, () => [{ value: 1 }]);
+    metrics.collect('bk_depth', 'Depth.', {}, () => [{ value: 2 }]);
+    const text = await metrics.render();
+    expect(text).toContain('bk_depth 2\n');
+    expect(text).not.toContain('bk_depth 1\n');
   });
 
   it('OBS-03 a collector that throws or is too slow is left out, and the others are still served', async () => {

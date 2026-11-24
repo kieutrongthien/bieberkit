@@ -25,7 +25,7 @@
 import { UniqueConstraintViolationException } from '@mikro-orm/core';
 import type { EntityManager } from '@mikro-orm/core';
 import type { Transaction } from 'kysely';
-import { createLogger, requestContext } from '@bieberkit/core';
+import { createLogger, formatTraceparent, requestContext } from '@bieberkit/core';
 import type { Logger } from '@bieberkit/core';
 import { dataError } from '../errors.ts';
 import { isUuid, uuid7FromBytes } from '../keys/uuid7.ts';
@@ -109,6 +109,10 @@ export function emitEvent(em: EntityManager, event: OutboxEvent): void {
     tenant: context?.tenantId ?? null,
     userId: context?.userId ?? null,
     requestId: context?.requestId ?? null,
+    traceparent:
+      context?.traceId === undefined || context.spanId === undefined
+        ? null
+        : formatTraceparent({ traceId: context.traceId, spanId: context.spanId }),
     entity: event.record?.entity ?? null,
     recordId: event.record?.id ?? null,
     recordVersion: event.record?.version ?? null,
@@ -129,6 +133,8 @@ export interface OutboxMessage {
   readonly tenantId?: string;
   readonly userId?: string;
   readonly requestId?: string;
+  /** The trace of the code that emitted the event, as a W3C `traceparent`, for the job to continue (OBS-02). */
+  readonly traceparent?: string;
   readonly entity?: string;
   readonly recordId?: string;
   readonly recordVersion?: number;
@@ -211,6 +217,7 @@ function toMessage(row: Row): OutboxMessage {
     tenantId: uuidOf(row['tenant_id']),
     userId: uuidOf(row['user_id']),
     requestId: textOf(row['request_id']),
+    traceparent: textOf(row['traceparent']),
     entity: textOf(row['entity']),
     recordId: uuidOf(row['record_id']),
     recordVersion: numberOf(row['record_version']),

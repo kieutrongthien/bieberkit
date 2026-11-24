@@ -29,7 +29,7 @@ Generated from the built declaration files by `pnpm api:update`. Do not edit by 
 
 ```ts
 import { Database } from "@bieberkit/data/orm";
-import { ErrorReporter, Logger } from "@bieberkit/core";
+import { ErrorReporter, Logger, Metrics, Tracer } from "@bieberkit/core";
 import { d as Queue, o as JobDef } from "./contract-DjjfZ0pN.js";
 interface RedisQueueOptions {
   readonly url: string;
@@ -37,6 +37,8 @@ interface RedisQueueOptions {
   readonly prefix?: string;
   readonly logger?: Logger;
   readonly errorReporter?: ErrorReporter;
+  readonly tracer?: Tracer;
+  readonly metrics?: Metrics;
   readonly now?: () => number;
 }
 export declare function createRedisQueue(options: RedisQueueOptions): Promise<Queue>;
@@ -49,6 +51,8 @@ export interface QueueFromConfigOptions {
   readonly db?: Database;
   readonly logger?: Logger;
   readonly errorReporter?: ErrorReporter;
+  readonly tracer?: Tracer;
+  readonly metrics?: Metrics;
   readonly prefix?: string;
 }
 export declare function createQueueFromConfig(config: QueueConfig, options: QueueFromConfigOptions): Promise<Queue>;

@@ -25,7 +25,8 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import type { EntityManager, EntitySchema, IDatabaseDriver, MikroORM } from '@mikro-orm/core';
 import { createLogger } from '@bieberkit/core';
-import type { Dialect, Logger } from '@bieberkit/core';
+import type { Dialect, Logger, Metrics, Tracer } from '@bieberkit/core';
+import { observePool } from './pool-metrics.ts';
 import { dataError } from '../errors.ts';
 import { auditTableSink } from './audit.ts';
 import { BieberEntityManager } from './entity-manager.ts';
@@ -63,6 +64,13 @@ export interface DatabaseOptions {
   readonly logger?: Logger;
   /** Receives the text of every query. For tests that count queries (PERF-04). */
   readonly queryLog?: (sql: string) => void;
+  /**
+   * Records a span for each query of the ORM, with its kind (`select`, `insert`...) and its time, and never its text or its values
+   * (OBS-02, SEC-09). The queries that code writes with `rawKysely` do not go through the ORM and are not spans.
+   */
+  readonly tracer?: Tracer;
+  /** Reports the connections of the pool, `bk_db_pool_connections{state}`, on PostgreSQL and MySQL (OBS-03). */
+  readonly metrics?: Metrics;
 }
 
 /** The MikroORM instance, whichever driver it runs on. */
@@ -177,12 +185,31 @@ function encryptedProperties(orm: Orm): string[] {
   return found;
 }
 
-/** MikroORM logs `[query] sql [took 1 ms]`. The callback gets the sql only. */
-function queryLogger(sink: (sql: string) => void): (message: string) => void {
+/** MikroORM logs `[query] sql [took 1 ms]`. The callback gets the sql, and the milliseconds when the line says them. */
+function queryLogger(sink: (sql: string, tookMs: number | undefined) => void): (message: string) => void {
   return (message) => {
-    const match = /^\[query\]\s*([\s\S]*?)(?:\s*\[took [\s\S]*)?$/.exec(message);
-    if (match?.[1] !== undefined) sink(match[1]);
+    const match = /^\[query\]\s*([\s\S]*?)(?:\s*\[took (\d+(?:\.\d+)?) ms[\s\S]*)?$/.exec(message);
+    if (match?.[1] !== undefined) sink(match[1], match[2] === undefined ? undefined : Number(match[2]));
   };
+}
+
+const OPERATIONS = new Set([
+  'select',
+  'insert',
+  'update',
+  'delete',
+  'begin',
+  'commit',
+  'rollback',
+  'savepoint',
+  'release',
+  'with',
+]);
+
+/** The kind of a statement, from a fixed list, so that a span never holds a word of the statement that was not meant to be there. */
+function operationOf(sql: string): string {
+  const word = /^\s*([a-z]+)/i.exec(sql)?.[1]?.toLowerCase();
+  return word !== undefined && OPERATIONS.has(word) ? word : 'other';
 }
 
 /** The settings of MikroORM that the dialects share. Everything else is chosen from the dialect in `initOrm`. */
@@ -234,9 +261,20 @@ export async function createDatabase(env: DatabaseEnv, options: DatabaseOptions)
     // The class extends the EntityManager of every SQL driver, and MikroORM types it per driver.
     // oxlint-disable-next-line typescript/no-unsafe-type-assertion
     entityManager: BieberEntityManager as never,
-    ...(options.queryLog === undefined
+    ...(options.queryLog === undefined && options.tracer?.enabled !== true
       ? {}
-      : { debug: ['query'] as ['query'], colors: false, logger: queryLogger(options.queryLog) }),
+      : {
+          debug: ['query'] as ['query'],
+          colors: false,
+          logger: queryLogger((sql, tookMs) => {
+            options.queryLog?.(sql);
+            options.tracer?.record(`db ${operationOf(sql)}`, {
+              kind: 'client',
+              attributes: { 'db.system': resolved.dialect, 'db.operation': operationOf(sql) },
+              durationMs: tookMs ?? 0,
+            });
+          }),
+        }),
     subscribers: [new DataSubscriber(options.references, resolved.readLocations.length > 0)],
   } as const;
   const orm = await initOrm(resolved, common, env.DB_POOL_MAX);
@@ -249,6 +287,7 @@ export async function createDatabase(env: DatabaseEnv, options: DatabaseOptions)
       'Pass encryption: { current: APP_KEY } to createDatabase, and the previous key as previous after a rotation.',
     );
   }
+  if (options.metrics !== undefined) observePool(options.metrics, orm);
   const logger = options.logger ?? createLogger({ level: 'info', role: 'data' });
   const sink: AuditSink =
     options.audit === 'table'

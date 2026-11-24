@@ -28,6 +28,8 @@ import type { Kysely } from 'kysely';
 import type { Dialect } from '@bieberkit/core';
 import type { StepDatabase } from '@bieberkit/data';
 import { createWakeSignal } from '@bieberkit/data/orm';
+import { carry } from './context.ts';
+import type { CarriedContext } from './context.ts';
 import { QUEUE_NAMES } from './contract.ts';
 import type { QueueName, WakeSource, Worker, WorkerOptions } from './contract.ts';
 import { reportDead, runDelivery } from './shared.ts';
@@ -42,13 +44,22 @@ interface Claimed {
   readonly attempt: number;
   readonly maxAttempts: number;
   readonly queue: QueueName;
-  readonly context: { tenantId?: string; userId?: string; requestId?: string };
+  readonly context: CarriedContext;
 }
 
 const numberOf = (value: unknown): number => Number(value ?? 0);
 const textOf = (value: unknown): string => (typeof value === 'string' ? value : '');
 const optional = (value: unknown): string | undefined =>
   typeof value === 'string' && value !== '' ? value : undefined;
+
+/** Who dispatched the job, as the row of the table says. */
+const rowContext = (row: Record<string, unknown>): CarriedContext =>
+  carry({
+    tenantId: optional(row['tenant_id']),
+    userId: optional(row['user_id']),
+    requestId: optional(row['request_id']),
+    traceparent: optional(row['traceparent']),
+  });
 
 export function slotsOf(options: WorkerOptions, queue: QueueName): number {
   const set = options.concurrency;
@@ -118,20 +129,13 @@ export function createDatabaseWorker(
               name: textOf(row['name']),
               queue,
               attempt: maxAttempts,
-              context: {
-                ...(optional(row['tenant_id']) === undefined ? {} : { tenantId: textOf(row['tenant_id']) }),
-                ...(optional(row['user_id']) === undefined ? {} : { userId: textOf(row['user_id']) }),
-                ...(optional(row['request_id']) === undefined ? {} : { requestId: textOf(row['request_id']) }),
-              },
+              context: rowContext(row),
             },
             new Error('The lease ran out on every delivery.'),
           );
           continue;
         }
         taken.push(textOf(row['id']));
-        const tenantId = optional(row['tenant_id']);
-        const userId = optional(row['user_id']);
-        const requestId = optional(row['request_id']);
         claimed.push({
           id: textOf(row['id']),
           jobId: textOf(row['job_id']),
@@ -140,11 +144,7 @@ export function createDatabaseWorker(
           attempt,
           maxAttempts,
           queue,
-          context: {
-            ...(tenantId === undefined ? {} : { tenantId }),
-            ...(userId === undefined ? {} : { userId }),
-            ...(requestId === undefined ? {} : { requestId }),
-          },
+          context: rowContext(row),
         });
       }
       if (taken.length > 0) {
@@ -233,6 +233,7 @@ export function createDatabaseWorker(
       const outcome = await runDelivery(shared, {
         jobId: job.jobId,
         name: job.name,
+        queue: job.queue,
         input: job.input,
         attempt: job.attempt,
         context: job.context,

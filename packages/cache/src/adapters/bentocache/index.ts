@@ -28,7 +28,7 @@ import { cacheError } from '../../contract.ts';
 import type { CacheEngine } from '../../contract.ts';
 import { createLayeredEngine } from '../../layered-engine.ts';
 import { createMemoryEngine } from '../../memory-engine.ts';
-import type { Logger } from '@bieberkit/core';
+import type { Logger, Metrics, Tracer } from '@bieberkit/core';
 import { bentocacheEngine } from './engine.ts';
 
 export { checkRedisInstances, describeInstance, readInstance, sameInstance } from './doctor.ts';
@@ -47,6 +47,8 @@ export interface CacheConfig {
 
 export interface CacheFromConfigOptions {
   readonly logger?: Logger;
+  readonly tracer?: Tracer;
+  readonly metrics?: Metrics;
   /** Where the `file` driver keeps its files. Defaults to `.bieberkit/cache`. */
   readonly directory?: string;
   /** How long the memory level in front of Redis keeps a value. Defaults to 5 seconds (DATA-13). */
@@ -87,5 +89,7 @@ export function createCacheFromConfig(config: CacheConfig, options: CacheFromCon
     engine: engineFromConfig(config, options),
     prefix: config.CACHE_PREFIX,
     ...(options.logger === undefined ? {} : { logger: options.logger }),
+    ...(options.tracer === undefined ? {} : { tracer: options.tracer }),
+    ...(options.metrics === undefined ? {} : { metrics: options.metrics }),
   });
 }

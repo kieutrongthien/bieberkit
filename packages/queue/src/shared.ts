@@ -23,13 +23,13 @@
  */
 
 import { randomUUID } from 'node:crypto';
-import { reportError } from '@bieberkit/core';
-import type { ErrorReporter, Logger } from '@bieberkit/core';
+import { createNoopMetrics, parseTraceparent, reportError } from '@bieberkit/core';
+import type { ErrorReporter, Histogram, Logger, Metrics, Span, Tracer } from '@bieberkit/core';
 import type { OutboxMessage } from '@bieberkit/data/orm';
 import { captureContext, checkInput, runAs } from './context.ts';
 import type { CarriedContext } from './context.ts';
 import { QUEUE_NAMES, queueError } from './contract.ts';
-import type { DispatchOptions, JobContext, JobDef, QueueName } from './contract.ts';
+import type { DispatchOptions, JobContext, JobDef, Queue, QueueName } from './contract.ts';
 
 export interface Subscription {
   readonly job: JobDef;
@@ -43,6 +43,40 @@ export interface Shared {
   /** Receives a job that failed for good (OBS-06). */
   readonly reporter: ErrorReporter;
   readonly now: () => number;
+  /** Records a span for each dispatch and each delivery (OBS-02). */
+  readonly tracer: Tracer;
+  /** The time that a delivery took, by queue, job and outcome (OBS-03). */
+  readonly jobDuration: Histogram;
+}
+
+/** The registry that `bk_job_duration_seconds` and the depth of the queues are counted in. */
+export function jobDurationOf(metrics: Metrics = createNoopMetrics()): Histogram {
+  return metrics.histogram(
+    'bk_job_duration_seconds',
+    'Time that one delivery of a job took, by queue, job and outcome.',
+    {
+      labels: ['queue', 'job', 'outcome'],
+      buckets: [0.01, 0.05, 0.1, 0.5, 1, 5, 15, 60, 300],
+    },
+  );
+}
+
+/** The jobs that wait, run, are done and are dead, for each queue, read when the metrics are scraped (OBS-03). */
+export function observeQueue(metrics: Metrics, queue: Pick<Queue, 'stats'>): void {
+  metrics.collect('bk_queue_jobs', 'Jobs by queue and status.', { labels: ['queue', 'status'] }, async () => {
+    const stats = await queue.stats();
+    return QUEUE_NAMES.flatMap((name) =>
+      (['waiting', 'active', 'done', 'dead'] as const).map((status) => ({
+        labels: { queue: name, status },
+        value: stats[name][status],
+      })),
+    );
+  });
+}
+
+/** Runs the dispatch of a job in a producer span, so the job that it stores continues this trace (OBS-02). */
+export function dispatching<T>(shared: Shared, jobName: string, run: (span: Span) => Promise<T>): Promise<T> {
+  return shared.tracer.span(`dispatch ${jobName}`, { kind: 'producer', attributes: { 'bk.job.name': jobName } }, run);
 }
 
 /** A job that was checked and is ready to be stored or run. */
@@ -141,7 +175,7 @@ const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout
  */
 export async function runDelivery(
   shared: Shared,
-  delivery: { jobId: string; name: string; input: string; attempt: number; context: CarriedContext },
+  delivery: { jobId: string; name: string; queue: QueueName; input: string; attempt: number; context: CarriedContext },
 ): Promise<Outcome> {
   const job = shared.jobs.get(delivery.name);
   if (job === undefined)
@@ -166,23 +200,43 @@ export async function runDelivery(
     requestId,
     log: shared.logger.child({ jobId: delivery.jobId, job: job.name }),
   };
+  // The delivery is a span of the trace that dispatched the job. Without a tracer the log lines still carry that trace.
+  const caller = parseTraceparent(delivery.context.traceparent);
+  const span = shared.tracer.startSpan(`job ${job.name}`, {
+    kind: 'consumer',
+    ...(caller === undefined ? {} : { parent: caller }),
+    attributes: { 'bk.job.name': job.name, 'bk.queue': delivery.queue, 'bk.job.attempt': delivery.attempt },
+  });
+  const trace = shared.tracer.enabled ? { traceId: span.traceId, spanId: span.spanId } : caller;
+  const startedAt = performance.now();
   let timer: NodeJS.Timeout | undefined;
+  let failed = false;
   try {
-    const value: unknown = await Promise.race([
-      runAs(delivery.context, requestId, async () => job.handler(input, context)),
-      new Promise<never>((_resolve, reject) => {
-        timer = setTimeout(
-          () => reject(new Error(`The job ran over its timeout of ${job.timeoutMs} ms.`)),
-          job.timeoutMs,
-        );
-      }),
-    ]);
+    const value: unknown = await shared.tracer.within(span, () =>
+      Promise.race([
+        runAs(delivery.context, requestId, async () => job.handler(input, context), trace),
+        new Promise<never>((_resolve, reject) => {
+          timer = setTimeout(
+            () => reject(new Error(`The job ran over its timeout of ${job.timeoutMs} ms.`)),
+            job.timeoutMs,
+          );
+        }),
+      ]),
+    );
     const result = encodeResult(shared, job.name, value);
     return result === undefined ? { ok: true } : { ok: true, result };
   } catch (error) {
+    failed = true;
+    span.fail(error);
     return { ok: false, retry: true, error: error instanceof Error ? error.message : String(error), cause: error };
   } finally {
     if (timer !== undefined) clearTimeout(timer);
+    span.end();
+    shared.jobDuration.observe((performance.now() - startedAt) / 1000, {
+      queue: delivery.queue,
+      job: job.name,
+      outcome: failed ? 'failed' : 'ok',
+    });
   }
 }
 

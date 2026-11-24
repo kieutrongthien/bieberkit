@@ -28,7 +28,7 @@
 Generated from the built declaration files by `pnpm api:update`. Do not edit by hand. A change here is a change to the public API and needs a changeset (spec section 22.3).
 
 ```ts
-import { Logger } from "@bieberkit/core";
+import { Logger, Metrics, Tracer } from "@bieberkit/core";
 import { i as CacheValue, n as CacheEngine } from "./contract--ExGYgOW.js";
 interface CacheOptions {
   readonly engine: CacheEngine;
@@ -38,6 +38,8 @@ interface CacheOptions {
   readonly rememberLockMs?: number;
   readonly rememberWaitMs?: number;
   readonly logger?: Logger;
+  readonly tracer?: Tracer;
+  readonly metrics?: Metrics;
 }
 interface Lock {
   release(): Promise<boolean>;

@@ -26,7 +26,7 @@ import { randomUUID } from 'node:crypto';
 import { Queue as BullQueue, UnrecoverableError, Worker as BullWorker } from 'bullmq';
 import type { Job, Processor } from 'bullmq';
 import { Redis } from 'ioredis';
-import type { ErrorReporter, Logger } from '@bieberkit/core';
+import type { ErrorReporter, Logger, Metrics, Tracer } from '@bieberkit/core';
 import { QUEUE_NAMES, queueError } from '../../contract.ts';
 import type { QueueError } from '../../contract.ts';
 import type {
@@ -44,7 +44,8 @@ import type {
   WorkerOptions,
 } from '../../contract.ts';
 import { createShared } from '../../queue.ts';
-import { prepare, reportDead, runDelivery } from '../../shared.ts';
+import { carry } from '../../context.ts';
+import { dispatching, observeQueue, prepare, reportDead, runDelivery } from '../../shared.ts';
 import type { Prepared } from '../../shared.ts';
 import { slotsOf } from '../../worker.ts';
 
@@ -56,6 +57,10 @@ export interface RedisQueueOptions {
   readonly prefix?: string;
   readonly logger?: Logger;
   readonly errorReporter?: ErrorReporter;
+  /** Records a span for each dispatch and each delivery (OBS-02). */
+  readonly tracer?: Tracer;
+  /** Counts the jobs of each queue and times each delivery (OBS-03). */
+  readonly metrics?: Metrics;
   readonly now?: () => number;
 }
 
@@ -68,6 +73,8 @@ interface JobData {
   readonly tenantId?: string;
   readonly userId?: string;
   readonly requestId?: string;
+  /** The trace of the code that dispatched, for the job to continue (OBS-02). */
+  readonly traceparent?: string;
   /** Who added it: a second `add` with the same id answers the first job, and the token says which one is ours (Q-01). */
   readonly token: string;
 }
@@ -141,6 +148,7 @@ export async function createRedisQueue(options: RedisQueueOptions): Promise<Queu
       ...(prepared.context.tenantId === undefined ? {} : { tenantId: prepared.context.tenantId }),
       ...(prepared.context.userId === undefined ? {} : { userId: prepared.context.userId }),
       ...(prepared.context.requestId === undefined ? {} : { requestId: prepared.context.requestId }),
+      ...(prepared.context.traceparent === undefined ? {} : { traceparent: prepared.context.traceparent }),
     };
     const queue = queueOf(prepared.queue);
     const stored = encodeId(prepared.jobId);
@@ -171,7 +179,11 @@ export async function createRedisQueue(options: RedisQueueOptions): Promise<Queu
     input: Input,
     dispatchOptions?: DispatchOptions,
   ): Promise<Dispatched> {
-    return add(await prepare(shared, job, input, dispatchOptions));
+    return dispatching(shared, job.name, async (span) => {
+      const prepared = await prepare(shared, job, input, dispatchOptions);
+      span.setAttribute('bk.queue', prepared.queue);
+      return add(prepared);
+    });
   }
 
   const publisher: Queue['publisher'] = {
@@ -181,17 +193,7 @@ export async function createRedisQueue(options: RedisQueueOptions): Promise<Queu
       // The transaction of the dispatcher is not used: Redis has no part in it. If the row is not deleted after this, it is published
       // again, and the id of the message makes the second add a no-op (Q-01).
       await add(
-        await prepare(
-          shared,
-          subscription.job,
-          subscription.map(message),
-          { jobId: message.jobId },
-          {
-            ...(message.tenantId === undefined ? {} : { tenantId: message.tenantId }),
-            ...(message.userId === undefined ? {} : { userId: message.userId }),
-            ...(message.requestId === undefined ? {} : { requestId: message.requestId }),
-          },
-        ),
+        await prepare(shared, subscription.job, subscription.map(message), { jobId: message.jobId }, carry(message)),
       );
     },
   };
@@ -224,13 +226,10 @@ export async function createRedisQueue(options: RedisQueueOptions): Promise<Queu
       const outcome = await runDelivery(shared, {
         jobId: data.id,
         name: data.name,
+        queue: QUEUE_NAMES.find((name) => name === job.queueName) ?? 'default',
         input: data.input,
         attempt: job.attemptsStarted,
-        context: {
-          ...(data.tenantId === undefined ? {} : { tenantId: data.tenantId }),
-          ...(data.userId === undefined ? {} : { userId: data.userId }),
-          ...(data.requestId === undefined ? {} : { requestId: data.requestId }),
-        },
+        context: carry(data),
       });
       if (outcome.ok) return outcome.result === undefined ? undefined : JSON.parse(outcome.result);
       if (job.id !== undefined) causes.set(job.id, outcome.cause);
@@ -255,11 +254,7 @@ export async function createRedisQueue(options: RedisQueueOptions): Promise<Queu
           name: job.data.name,
           queue,
           attempt: job.attemptsMade,
-          context: {
-            ...(job.data.tenantId === undefined ? {} : { tenantId: job.data.tenantId }),
-            ...(job.data.userId === undefined ? {} : { userId: job.data.userId }),
-            ...(job.data.requestId === undefined ? {} : { requestId: job.data.requestId }),
-          },
+          context: carry(job.data),
         },
         cause ?? error,
       );
@@ -338,7 +333,7 @@ export async function createRedisQueue(options: RedisQueueOptions): Promise<Queu
     return out;
   };
 
-  return {
+  const redisQueue: Queue = {
     driver: 'redis',
     dispatch,
     subscribe(event, job, map) {
@@ -418,4 +413,6 @@ export async function createRedisQueue(options: RedisQueueOptions): Promise<Queu
       connection.disconnect();
     },
   };
+  if (options.metrics !== undefined) observeQueue(options.metrics, redisQueue);
+  return redisQueue;
 }

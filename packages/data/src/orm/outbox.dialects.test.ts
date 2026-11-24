@@ -128,6 +128,29 @@ describeDialects('MOD-18 outbox dispatcher', ({ dialect, openFramework }) => {
     expect(await db.fork().count(OutboxEntry)).toBe(0);
   });
 
+  it('OBS-02 keeps the trace of the code that emitted the event, and none when there was none', async () => {
+    const db = await openFramework();
+    const TRACE = '0af7651916cd43dd8448eb211c80319c';
+    const SPAN = 'b7ad6b7169203331';
+    await requestContext.run({ requestId: 'req-1', traceId: TRACE, spanId: SPAN }, () =>
+      runInUnitOfWork(db, async (em) => {
+        emitEvent(em, { name: 'traced.event', payload: {} });
+        await em.flush();
+      }),
+    );
+    await requestContext.run({ requestId: 'req-2' }, () =>
+      runInUnitOfWork(db, async (em) => {
+        emitEvent(em, { name: 'untraced.event', payload: {} });
+        await em.flush();
+      }),
+    );
+    const { messages, publisher } = collector();
+    await createOutboxDispatcher(db, { publisher }).dispatchOnce();
+    const byName = new Map(messages.map((message) => [message.name, message]));
+    expect(byName.get('traced.event')?.traceparent).toBe(`00-${TRACE}-${SPAN}-01`);
+    expect(byName.get('untraced.event')).not.toHaveProperty('traceparent');
+  });
+
   it('MOD-18 gives the same jobId to a row that is delivered again', async () => {
     const db = await openFramework();
     await emitMany(db, 1);

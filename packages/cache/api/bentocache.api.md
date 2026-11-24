@@ -28,8 +28,8 @@
 Generated from the built declaration files by `pnpm api:update`. Do not edit by hand. A change here is a change to the public API and needs a changeset (spec section 22.3).
 
 ```ts
-import { Logger } from "@bieberkit/core";
-import { n as Cache } from "./cache-Ck2Ln4Bi.js";
+import { Logger, Metrics, Tracer } from "@bieberkit/core";
+import { n as Cache } from "./cache-CvFo_4dY.js";
 import { n as CacheEngine } from "./contract--ExGYgOW.js";
 interface InstanceInfo {
   readonly policy: string;
@@ -87,6 +87,8 @@ export interface CacheConfig {
 }
 export interface CacheFromConfigOptions {
   readonly logger?: Logger;
+  readonly tracer?: Tracer;
+  readonly metrics?: Metrics;
   readonly directory?: string;
   readonly memoryTtlMs?: number;
 }

@@ -23,6 +23,7 @@
  */
 
 import type { OutboxPublisher } from '@bieberkit/data/orm';
+import { carry } from '../context.ts';
 import { emptyCounts, queueError } from '../contract.ts';
 import type {
   DeadJob,
@@ -36,7 +37,7 @@ import type {
   JobStatus,
   Worker,
 } from '../contract.ts';
-import { prepare, reportDead, runDelivery, sleep } from '../shared.ts';
+import { dispatching, prepare, reportDead, runDelivery, sleep } from '../shared.ts';
 import type { Shared } from '../shared.ts';
 
 interface Entry {
@@ -70,6 +71,7 @@ export function createSyncQueue(shared: Shared): Queue {
       const outcome = await runDelivery(shared, {
         jobId,
         name: record.job.name,
+        queue: record.queue,
         input: JSON.stringify(record.input),
         attempt,
         context: record.context,
@@ -97,8 +99,11 @@ export function createSyncQueue(shared: Shared): Queue {
   }
 
   async function dispatch<Input>(job: JobDef<Input>, input: Input, options?: DispatchOptions): Promise<Dispatched> {
-    const prepared = await prepare(shared, job, input, options);
-    return start(prepared);
+    return dispatching(shared, job.name, async (span) => {
+      const prepared = await prepare(shared, job, input, options);
+      span.setAttribute('bk.queue', prepared.queue);
+      return start(prepared);
+    });
   }
 
   async function start(prepared: Prepared): Promise<Dispatched> {
@@ -131,11 +136,7 @@ export function createSyncQueue(shared: Shared): Queue {
         subscription.job,
         subscription.map(message),
         { jobId: message.jobId },
-        {
-          ...(message.tenantId === undefined ? {} : { tenantId: message.tenantId }),
-          ...(message.userId === undefined ? {} : { userId: message.userId }),
-          ...(message.requestId === undefined ? {} : { requestId: message.requestId }),
-        },
+        carry(message),
       );
       await start(prepared);
     },

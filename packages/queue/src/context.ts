@@ -22,7 +22,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { requestContext } from '@bieberkit/core';
+import { formatTraceparent, requestContext } from '@bieberkit/core';
 import type { SchemaValue } from '@bieberkit/data';
 import { queueError } from './contract.ts';
 
@@ -31,25 +31,56 @@ export interface CarriedContext {
   readonly tenantId?: string;
   readonly userId?: string;
   readonly requestId?: string;
+  /** The trace of the code that dispatched, as a W3C `traceparent`: the job continues it (OBS-02). */
+  readonly traceparent?: string;
+}
+
+/** What the parts of a stored job or an outbox row say about who dispatched it, without the parts that are missing. */
+export function carry(source: {
+  readonly tenantId?: string | undefined;
+  readonly userId?: string | undefined;
+  readonly requestId?: string | undefined;
+  readonly traceparent?: string | undefined;
+}): CarriedContext {
+  return {
+    ...(source.tenantId === undefined ? {} : { tenantId: source.tenantId }),
+    ...(source.userId === undefined ? {} : { userId: source.userId }),
+    ...(source.requestId === undefined ? {} : { requestId: source.requestId }),
+    ...(source.traceparent === undefined ? {} : { traceparent: source.traceparent }),
+  };
 }
 
 /** What `requestContext` holds now. A job dispatched outside a request carries nothing. */
 export function captureContext(): CarriedContext {
   const now = requestContext.get();
-  return {
-    ...(now?.tenantId === undefined ? {} : { tenantId: now.tenantId }),
-    ...(now?.userId === undefined ? {} : { userId: now.userId }),
-    ...(now?.requestId === undefined ? {} : { requestId: now.requestId }),
-  };
+  return carry({
+    tenantId: now?.tenantId,
+    userId: now?.userId,
+    requestId: now?.requestId,
+    traceparent:
+      now?.traceId === undefined || now.spanId === undefined
+        ? undefined
+        : formatTraceparent({ traceId: now.traceId, spanId: now.spanId }),
+  });
 }
 
-/** Runs `run` as the code that dispatched the job: its request id (or the job's), its tenant and its user. */
-export function runAs<T>(carried: CarriedContext, fallbackRequestId: string, run: () => T): T {
+/**
+ * Runs `run` as the code that dispatched the job: its request id (or the job's), its tenant and its user, and inside the trace of
+ * the delivery, so that the log lines and the reports of the job carry its ids.
+ */
+export function runAs<T>(
+  carried: CarriedContext,
+  fallbackRequestId: string,
+  run: () => T,
+  trace?: { readonly traceId: string; readonly spanId?: string },
+): T {
   return requestContext.run(
     {
       requestId: carried.requestId ?? fallbackRequestId,
       ...(carried.tenantId === undefined ? {} : { tenantId: carried.tenantId }),
       ...(carried.userId === undefined ? {} : { userId: carried.userId }),
+      ...(trace === undefined ? {} : { traceId: trace.traceId }),
+      ...(trace?.spanId === undefined ? {} : { spanId: trace.spanId }),
     },
     run,
   );

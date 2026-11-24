@@ -58,6 +58,8 @@ export interface OutboxEntryRow {
   payload: string;
   idempotencyKey?: string | null;
   requestId?: string | null;
+  /** The trace of the code that emitted the event (W3C `traceparent`), so the job that it becomes continues the trace (OBS-02). */
+  traceparent?: string | null;
   userId?: string | null;
   createdAt: number | string;
   availableAt: number | string;
@@ -143,6 +145,7 @@ export const OutboxEntry: EntitySchema<OutboxEntryRow> = new EntitySchema<Outbox
     payload: { type: 'text' },
     idempotencyKey: { type: 'string', length: 120, nullable: true },
     requestId: { type: 'string', length: 64, nullable: true },
+    traceparent: { type: 'string', length: 64, nullable: true },
     userId: uuid({ nullable: true }),
     createdAt: { type: 'bigint', onCreate: () => Date.now() },
     availableAt: { type: 'bigint', onCreate: () => 0 },
@@ -484,6 +487,15 @@ export const dataMigrationSteps: readonly PluginMigrationStep[] = [
     '0.2.0',
   ),
   ...featureSteps(),
+  // The trace that an event continues in the job it becomes (OBS-02). A row written before this step has none, and its job starts a trace.
+  step(
+    'outbox-traceparent',
+    'expand',
+    async (trx: Trx) => {
+      await trx.schema.alterTable(OUTBOX_TABLE).addColumn('traceparent', 'varchar(64)').execute();
+    },
+    '0.4.0',
+  ),
 ];
 
 const ROLE = /^[A-Za-z_][A-Za-z0-9_]*$/;

@@ -103,4 +103,12 @@ export const queueMigrationSteps: readonly PluginMigrationStep[] = [
     },
     '0.2.0',
   ),
+  // Version 0.3.0: the trace of the code that dispatched the job, for the job to continue (OBS-02). A job stored before it starts a trace.
+  step(
+    'jobs-traceparent',
+    async (trx) => {
+      await trx.schema.alterTable(JOBS_TABLE).addColumn('traceparent', 'varchar(64)').execute();
+    },
+    '0.3.0',
+  ),
 ];

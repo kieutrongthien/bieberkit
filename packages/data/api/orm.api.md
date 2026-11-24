@@ -29,7 +29,7 @@ Generated from the built declaration files by `pnpm api:update`. Do not edit by 
 
 ```ts
 import { C as ResetEvery, E as TransitionDef, a as EntityDef } from "./define-entity-CMoIdUz2.js";
-import { Dialect, Logger } from "@bieberkit/core";
+import { Dialect, Logger, Metrics, Tracer } from "@bieberkit/core";
 import { EntityData, EntityManager, EntityName, EntityProperty, EntitySchema, FilterOptions, FilterQuery, FindOneOptions, FindOptions, IDatabaseDriver, MikroORM, NativeInsertUpdateOptions, Platform, Primary, RequiredEntityData, Type, UpdateOptions } from "@mikro-orm/core";
 import { Kysely, RawBuilder, SqliteDialect, Transaction } from "kysely";
 import { SqlEntityManager } from "@mikro-orm/sql";
@@ -92,6 +92,8 @@ interface DatabaseOptions {
   readonly references?: ReferenceVisibility;
   readonly logger?: Logger;
   readonly queryLog?: (sql: string) => void;
+  readonly tracer?: Tracer;
+  readonly metrics?: Metrics;
 }
 type Orm = MikroORM<IDatabaseDriver, EntityManager, readonly EntitySchema[]>;
 interface Database {
@@ -136,6 +138,7 @@ interface OutboxEntryRow {
   payload: string;
   idempotencyKey?: string | null;
   requestId?: string | null;
+  traceparent?: string | null;
   userId?: string | null;
   createdAt: number | string;
   availableAt: number | string;
@@ -313,6 +316,7 @@ interface OutboxMessage {
   readonly tenantId?: string;
   readonly userId?: string;
   readonly requestId?: string;
+  readonly traceparent?: string;
   readonly entity?: string;
   readonly recordId?: string;
   readonly recordVersion?: number;

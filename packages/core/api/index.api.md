@@ -322,6 +322,140 @@ interface Frame {
 }
 export declare function framesOf(stack: string | undefined): Frame[];
 export declare function createSentryReporter(options: SentryReporterOptions): ErrorReporter;
+interface TraceParent {
+  readonly traceId: string;
+  readonly spanId: string;
+}
+export declare function parseTraceparent(header: string | readonly string[] | undefined): TraceParent | undefined;
+export declare function formatTraceparent(trace: TraceParent): string;
+type AttributeValue = string | number | boolean;
+type SpanAttributes = Readonly<Record<string, AttributeValue | undefined>>;
+type SpanKind = "internal" | "server" | "client" | "producer" | "consumer";
+interface SpanOptions {
+  readonly kind?: SpanKind;
+  readonly attributes?: SpanAttributes;
+  readonly parent?: {
+    readonly traceId: string;
+    readonly spanId?: string;
+  };
+}
+interface Span {
+  readonly traceId: string;
+  readonly spanId: string;
+  setAttribute(key: string, value: AttributeValue): void;
+  fail(error: unknown): void;
+}
+interface OpenSpan extends Span {
+  end(durationNs?: number): void;
+}
+interface FinishedSpan {
+  readonly traceId: string;
+  readonly spanId: string;
+  readonly parentSpanId?: string;
+  readonly name: string;
+  readonly kind: SpanKind;
+  readonly startNs: bigint;
+  readonly endNs: bigint;
+  readonly attributes: Readonly<Record<string, AttributeValue>>;
+  readonly failed: boolean;
+}
+interface SpanExporter {
+  export(span: FinishedSpan): void;
+  flush(timeoutMs?: number): Promise<boolean>;
+}
+interface Tracer {
+  readonly enabled: boolean;
+  span<T>(name: string, options: SpanOptions, fn: (span: Span) => T | Promise<T>): Promise<T>;
+  startSpan(name: string, options: SpanOptions): OpenSpan;
+  within<T>(span: Span, fn: () => T): T;
+  record(name: string, options: SpanOptions & {
+    readonly durationMs: number;
+    readonly failed?: boolean;
+  }): void;
+  current(): TraceParent | undefined;
+  flush(timeoutMs?: number): Promise<boolean>;
+}
+export declare function createNoopTracer(): Tracer;
+interface TracerOptions {
+  readonly exporter: SpanExporter;
+  readonly nowNs?: () => bigint;
+}
+export declare function createTracer(options: TracerOptions): Tracer;
+interface MemorySpanExporter extends SpanExporter {
+  readonly spans: readonly FinishedSpan[];
+}
+export declare function createMemorySpanExporter(): MemorySpanExporter;
+interface OtlpExporterOptions {
+  readonly endpoint: string;
+  readonly resource: Readonly<Record<string, string>>;
+  readonly logger?: Logger;
+  readonly batchSize?: number;
+  readonly maxQueue?: number;
+  readonly intervalMs?: number;
+  readonly timeoutMs?: number;
+  readonly fetch?: typeof fetch;
+}
+export declare function otlpTraceBody(spans: readonly FinishedSpan[], resource: Readonly<Record<string, string>>): unknown;
+export declare function createOtlpExporter(options: OtlpExporterOptions): SpanExporter & {
+  readonly dropped: () => number;
+};
+interface TracingConfig {
+  readonly APP_ENV: string;
+  readonly OTEL_EXPORTER_OTLP_ENDPOINT: string | undefined;
+}
+interface TracerFromConfigOptions {
+  readonly logger: Logger;
+  readonly role: string;
+  readonly serviceName?: string;
+  readonly release?: string;
+  readonly fetch?: typeof fetch;
+}
+export declare function createTracerFromConfig(config: TracingConfig, options: TracerFromConfigOptions): Tracer;
+type MetricLabels = Readonly<Record<string, string>>;
+interface Counter {
+  inc(labels?: MetricLabels, by?: number): void;
+}
+interface Gauge {
+  set(value: number, labels?: MetricLabels): void;
+}
+interface Histogram {
+  observe(value: number, labels?: MetricLabels): void;
+}
+interface MetricOptions {
+  readonly labels?: readonly string[];
+}
+interface HistogramOptions extends MetricOptions {
+  readonly buckets?: readonly number[];
+}
+interface MetricSample {
+  readonly value: number;
+  readonly labels?: MetricLabels;
+}
+interface CollectorOptions extends MetricOptions {
+  readonly type?: "gauge" | "counter";
+}
+interface Metrics {
+  counter(name: string, help: string, options?: MetricOptions): Counter;
+  gauge(name: string, help: string, options?: MetricOptions): Gauge;
+  histogram(name: string, help: string, options?: HistogramOptions): Histogram;
+  collect(name: string, help: string, options: CollectorOptions, read: () => readonly MetricSample[] | Promise<readonly MetricSample[]>): void;
+  render(): Promise<string>;
+}
+export declare const DEFAULT_BUCKETS: readonly number[];
+export declare function createMetrics(): Metrics;
+export declare function createNoopMetrics(): Metrics;
+interface MetricsServerOptions {
+  readonly metrics: Metrics;
+  readonly port: number;
+  readonly host?: string;
+  readonly logger?: Logger;
+}
+interface MetricsServer {
+  readonly port: number;
+  close(): Promise<void>;
+}
+export declare function startMetricsServer(options: MetricsServerOptions): Promise<MetricsServer>;
+export declare function registerProcessMetrics(metrics: Metrics): () => void;
 interface RequestContext {
   requestId: string;
   traceId?: string;
@@ -541,5 +675,5 @@ export declare function defineConfig(input: ProjectConfigInput): ProjectConfigIn
 export declare function defineConfigSection<K extends keyof ConfigSections>(key: K, parser: Parser<ConfigSections[K]>): ConfigSection<K>;
 export declare function validateConfig(input: unknown, options?: ValidateConfigOptions): ProjectConfigInput;
 export declare const packageName = "@bieberkit/core";
-export type { AppEnv, BkErrorOptions, ConfigProblem, ConfigSection, ConfigSections, Container, CoreEnv, CoreEnvResult, CoreEnvValues, Dialect, EmitResult, EnvCustomParse, EnvDescription, EnvKeyBuilder, EnvKeyDef, EnvKind, EnvOwner, EnvProblem, EnvSchema, EnvSource, EnvValues, ErrorBody, ErrorReportContext, ErrorReporter, EventBus, EventBusOptions, EventHandler, EventName, EventRegistry, HandlerFailure, Hook, HookFailure, Installed, IntOptions, KeyCollector, Lifecycle, LifecycleOptions, LoadEnvOptions, LogFields, LogLevel, LogSanitizer, Logger, LoggerOptions, Manifest, ManifestCheck, MemoryReporter, ModuleContributions, ModuleDef, ModuleEmitter, ModuleInput, OnOptions, ParsedDsn, Parser, Phase, PluginDef, PluginEntry, PluginInput, PluginProblem, ProcessHandlerOptions, ProcessLike, ProjectConfigInput, ReadCoreEnvOptions, Registration, ReportLevel, ReportSource, ReporterConfig, ReporterFromConfigOptions, RequestContext, RequestScope, Resolution, ResolveContext, Role, SeedFn, SentryReporterOptions, ServiceDefs, ServiceName, ServiceRegistry, ServiceScope, StopResult, ValidateConfigOptions };
+export type { AppEnv, AttributeValue, BkErrorOptions, CollectorOptions, ConfigProblem, ConfigSection, ConfigSections, Container, CoreEnv, CoreEnvResult, CoreEnvValues, Counter, Dialect, EmitResult, EnvCustomParse, EnvDescription, EnvKeyBuilder, EnvKeyDef, EnvKind, EnvOwner, EnvProblem, EnvSchema, EnvSource, EnvValues, ErrorBody, ErrorReportContext, ErrorReporter, EventBus, EventBusOptions, EventHandler, EventName, EventRegistry, FinishedSpan, Gauge, HandlerFailure, Histogram, HistogramOptions, Hook, HookFailure, Installed, IntOptions, KeyCollector, Lifecycle, LifecycleOptions, LoadEnvOptions, LogFields, LogLevel, LogSanitizer, Logger, LoggerOptions, Manifest, ManifestCheck, MemoryReporter, MemorySpanExporter, MetricLabels, MetricOptions, MetricSample, Metrics, MetricsServer, MetricsServerOptions, ModuleContributions, ModuleDef, ModuleEmitter, ModuleInput, OnOptions, OpenSpan, OtlpExporterOptions, ParsedDsn, Parser, Phase, PluginDef, PluginEntry, PluginInput, PluginProblem, ProcessHandlerOptions, ProcessLike, ProjectConfigInput, ReadCoreEnvOptions, Registration, ReportLevel, ReportSource, ReporterConfig, ReporterFromConfigOptions, RequestContext, RequestScope, Resolution, ResolveContext, Role, SeedFn, SentryReporterOptions, ServiceDefs, ServiceName, ServiceRegistry, ServiceScope, Span, SpanAttributes, SpanExporter, SpanKind, SpanOptions, StopResult, TraceParent, Tracer, TracerFromConfigOptions, TracerOptions, TracingConfig, ValidateConfigOptions };
 ```
