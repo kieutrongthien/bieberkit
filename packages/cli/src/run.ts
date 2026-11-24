@@ -28,6 +28,7 @@ import type { EnvSource } from '@bieberkit/core';
 import { GLOBAL_FLAGS, parseArgs, splitCommand } from './args.ts';
 import type { FlagDef } from './args.ts';
 import type { Command } from './command.ts';
+import { checkCommand } from './commands/check.ts';
 import { envCheckCommand } from './commands/env-check.ts';
 import { envExampleCommand } from './commands/env-example.ts';
 import { pluginsCommand } from './commands/plugins.ts';
@@ -43,7 +44,7 @@ export interface Io {
   readonly env?: EnvSource;
 }
 
-export const COMMANDS: readonly Command[] = [pluginsCommand, envCheckCommand, envExampleCommand];
+export const COMMANDS: readonly Command[] = [checkCommand, pluginsCommand, envCheckCommand, envExampleCommand];
 
 function version(): string {
   const found: unknown = createRequire(import.meta.url)('../package.json');

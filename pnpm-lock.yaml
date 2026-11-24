@@ -286,6 +286,9 @@ importers:
       '@bieberkit/core':
         specifier: workspace:*
         version: link:../core
+      '@bieberkit/data':
+        specifier: workspace:*
+        version: link:../data
 
   packages/content: {}
 

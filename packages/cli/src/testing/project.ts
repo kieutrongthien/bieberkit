@@ -47,6 +47,8 @@ export interface FixtureOptions {
   readonly config?: string;
   readonly dotenv?: string;
   readonly dialect?: 'sqlite' | 'postgres' | 'mysql';
+  /** More files, by path relative to the root. A folder is made when it is needed. */
+  readonly files?: Readonly<Record<string, string>>;
 }
 
 export interface Fixture {
@@ -91,7 +93,17 @@ export function makeProject(options: FixtureOptions = {}): Fixture {
   writeFileSync(
     join(root, 'bieberkit.config.ts'),
     options.config ??
-      `import { defineConfig } from '@bieberkit/core';
+      `/**
+ * demo
+ *
+ * @file        bieberkit.config.ts
+ * @description The configuration of the project.
+ * @author      Test <test@example.com>
+ * @copyright   Copyright (c) 2026 Test
+ * @license     UNLICENSED
+ */
+
+import { defineConfig } from '@bieberkit/core';
 export default defineConfig({
   name: 'demo',
   author: 'Test <test@example.com>',
@@ -104,5 +116,9 @@ export default defineConfig({
 `,
   );
   if (options.dotenv !== undefined) writeFileSync(join(root, '.env'), options.dotenv);
+  for (const [path, text] of Object.entries(options.files ?? {})) {
+    mkdirSync(dirname(join(root, path)), { recursive: true });
+    writeFileSync(join(root, path), text);
+  }
   return { root, cleanup: () => rmSync(root, { recursive: true, force: true }) };
 }

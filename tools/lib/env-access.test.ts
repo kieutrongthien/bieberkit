@@ -33,6 +33,11 @@ describe('CFG-02 findEnvAccess', () => {
     expect(findEnvAccess(CONFIG, 'const real = process.env;')).toEqual([]);
   });
 
+  it('CFG-02 does not scan the rules of bieberkit check, which hold the patterns and the samples that they look for', () => {
+    expect(findEnvAccess('packages/cli/src/check/rules/env-access.ts', "const text = 'process.env';")).toEqual([]);
+    expect(findEnvAccess('packages/cli/src/run.ts', 'const a = process.env.X;')).toHaveLength(1);
+  });
+
   it('CFG-02 flags process.env anywhere else, with the line number', () => {
     const found = findEnvAccess(OTHER, 'const a = 1;\nconst key = process.env.APP_KEY;\n');
     expect(found).toHaveLength(1);

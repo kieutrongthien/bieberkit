@@ -108,11 +108,14 @@ export function envOwnersOf(project: Pick<Project, 'plugins'>): EnvOwner[] {
   }));
 }
 
-/**
- * Loads the project at or above `cwd`: reads and checks `bieberkit.config.ts`, loads the plugins that it lists, checks their
- * options, and resolves them into boot order. Every problem has a code, and the config and the plugins report all of theirs together.
- */
-export async function loadProject(cwd: string): Promise<Project> {
+export interface ProjectConfig {
+  readonly root: string;
+  readonly configPath: string;
+  readonly config: ProjectConfigInput;
+}
+
+/** The root and the checked config of the project at or above `cwd`, without its plugins: for a command that reads files only. */
+export async function loadConfig(cwd: string): Promise<ProjectConfig> {
   const root = findProjectRoot(cwd);
   if (root === undefined) {
     throw new CliError(`There is no ${CONFIG_FILE} in ${resolve(cwd)} or above it.`, {
@@ -121,7 +124,15 @@ export async function loadProject(cwd: string): Promise<Project> {
     });
   }
   const configPath = join(root, CONFIG_FILE);
-  const config = validateConfig(await importFile(configPath));
+  return { root, configPath, config: validateConfig(await importFile(configPath)) };
+}
+
+/**
+ * Loads the project at or above `cwd`: reads and checks `bieberkit.config.ts`, loads the plugins that it lists, checks their
+ * options, and resolves them into boot order. Every problem has a code, and the config and the plugins report all of theirs together.
+ */
+export async function loadProject(cwd: string): Promise<Project> {
+  const { root, configPath, config } = await loadConfig(cwd);
   const rooted = createRequire(configPath);
   const entries = config.plugins.map((entry) => (typeof entry === 'string' ? ([entry, undefined] as const) : entry));
   const loaded = new Map<string, LoadedPlugin>();

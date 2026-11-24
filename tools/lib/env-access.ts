@@ -25,6 +25,12 @@
 /** The only place that may read the process environment. */
 export const ALLOWED_PREFIX = 'packages/core/src/config/';
 
+/**
+ * The rule that `bieberkit check` runs on a project, and its tests, are made of the patterns and the sample code that they look for,
+ * so a line scan of them finds the environment in a string. They read nothing.
+ */
+export const PATTERN_FILES: readonly string[] = ['packages/cli/src/check/'];
+
 /** Top-level folders that hold framework or project code. `tools/` is covered by the lint rule `node/no-process-env`. */
 export const SCANNED_ROOTS: readonly string[] = ['packages', 'plugins', 'templates', 'examples'];
 
@@ -62,7 +68,7 @@ function isComment(line: string): boolean {
 
 /** Returns one violation per line that reads the environment. `file` is relative to the repository root, with `/`. */
 export function findEnvAccess(file: string, source: string): EnvAccessViolation[] {
-  if (file.startsWith(ALLOWED_PREFIX)) return [];
+  if (file.startsWith(ALLOWED_PREFIX) || PATTERN_FILES.some((prefix) => file.startsWith(prefix))) return [];
   const found: EnvAccessViolation[] = [];
   const lines = source.split('\n');
   for (const [index, text] of lines.entries()) {

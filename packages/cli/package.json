@@ -39,7 +39,8 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
-    "@bieberkit/core": "workspace:*"
+    "@bieberkit/core": "workspace:*",
+    "@bieberkit/data": "workspace:*"
   },
   "engines": {
     "node": ">=24.12"
