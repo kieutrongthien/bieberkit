@@ -554,3 +554,23 @@ The route permission says whether a caller may call a route. The access port say
 ## The metadata and personal data (PDP-01)
 
 A field of `/api/v1/_meta` that was declared `.pii()` has `pii: true`, and one that was declared `.encrypted()` has `encrypted: true`, so an admin screen can say that a value is personal or hidden at rest. The flags are left out when they are not set, and the published JSON Schema of `_meta` has both.
+
+## Bulk calls above 100 rows run as a job (API-14, PERF-05, Q-10, Q-15)
+
+Prepared on 2026-11-24. A bulk call of up to 100 rows is one transaction and is answered at once, as before. A call of 101 to 500 rows is a job on the queue, so a web request never holds a worker for it (PERF-05).
+
+```ts
+createBulkJob({ db, schemas, authorizer? }): { job, over(queue): BulkQueue }    // register `job` in createQueue({ jobs })
+registerEntityRoutes(server, schemas, { db, bulk: bulkJob.over(queue) })
+registerJobRoutes(server, { queue })                                          // GET /api/v1/_jobs/:id
+authorizationFor(authorizer, principal, info): { can, allows, access }       // the one place of the three questions
+```
+
+1. **At the request.** The route checks the shape of the body (the schema), the operation and its permission, the rows that the caller may write (`access`), and the fields that it may write, as for a small call. A caller who may not is refused with 403 now, and nothing is queued. Then it queues the job `http.bulk` with the entity, the body and the principal, and answers `202` with `{ data: { jobId, status: 'queued' } }` and `Location: /api/v1/_jobs/<jobId>`. The route is `idempotent`, so a call sent again with the same `Idempotency-Key` gets the first answer and one job (§13.1).
+2. **In the job (Q-10).** The queue restores the tenant, the user and the request id of the code that dispatched it. The job runs the bulk route of the entity again, with the same body and the principal as it was (an API key keeps its grants and its tenant), and asks the authorizer again for the permission, the rows and the fields: a role that was taken away while the job waited is honoured, and the job is then dead and changes nothing. Each row is checked, as in a small call, and the outcome of each row (`ok`, `conflict`, `not_found`, `invalid`) is the result of the job: the same `{ data, meta }` that a small call answers. The calls to the authorizer go through `authorizationFor`, the helper that the server uses too, so a request and a job cannot disagree.
+3. **One attempt.** The job has one attempt. The call is one transaction, so a failure leaves nothing, but a worker that died after the commit could repeat a transition if the job were delivered again. A dead job is for a person to read in the dead letters.
+4. **Reading it.** `GET /api/v1/_jobs/:id` answers `{ data: { id, status, attempts, result?, error?, createdAt, finishedAt? } }` for the user and the tenant that sent the job. For anyone else, and for an id that does not exist, it is the same 404, so an id tells nothing; with no principal it is 401. The error of a job that is dead is a fixed sentence: the reason is in the logs and in the dead letters, where an administrator reads it. The result is kept for 7 days with the job.
+5. **Without a queue.** A server that gives no `bulk` to `registerEntityRoutes` still refuses 101 or more rows with 422 `HTTP_BULK_TOO_LARGE`, and says that it has no queue. More than 500 rows is 400 by the schema.
+6. **Not done.** A route to list or cancel the jobs of a user, progress while a job runs, and an administrator who reads the jobs of others (the screens of M1.8, with `system.queue.manage`).
+
+Tests: `bulk-job.test.ts` on a SQLite file with the `database` queue and a real worker: 202 and `Location`, a call of 100 rows still inline, the job waiting then done with the result of each row, the update, delete and transition operations, rows that the database changed, the audit entries that carry the user, an `Idempotency-Key` that gives one job, a permission taken away while the job waits (dead, nothing changed, a fixed error), the grants of an API key kept in the job, a caller who may not is refused at once, the job read by its owner only, the same 404 for another user, another tenant and an id that does not exist, 401 with no principal, and a server with no queue.
