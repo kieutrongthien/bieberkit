@@ -1,15 +1,24 @@
 {
   "name": "@bieberkit/site-kit",
   "version": "0.0.0",
-  "private": true,
   "description": "SEO head, sitemap, preview and cache helpers for the public site.",
   "keywords": [
     "bieberkit"
   ],
+  "homepage": "https://github.com/kieutrongthien/bieberkit#readme",
+  "bugs": {
+    "url": "https://github.com/kieutrongthien/bieberkit/issues"
+  },
   "license": "Apache-2.0",
   "author": "Bieber Kieu <kieutrongthien@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kieutrongthien/bieberkit.git",
+    "directory": "packages/site-kit"
+  },
   "files": [
-    "dist"
+    "dist",
+    "NOTICE"
   ],
   "type": "module",
   "sideEffects": false,

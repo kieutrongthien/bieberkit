@@ -26,19 +26,25 @@
 // The release build job writes this file next to the tarballs. The publish job reads it, because that job
 // has no checkout (SEC-21) and cannot run this tool. Fields are separated by a tab.
 
-import { readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { type Pkg, publishOrder } from './lib/release-order.ts';
 
 const ROOT = resolve(import.meta.dirname, '..');
-const PACKAGES = join(ROOT, 'packages');
+// The framework packages and the first-party plugins: a generated project depends on both.
+const GROUPS = ['packages', 'plugins'];
 
 const packages: Pkg[] = [];
-for (const dir of readdirSync(PACKAGES).toSorted()) {
-  const parsed: unknown = JSON.parse(readFileSync(join(PACKAGES, dir, 'package.json'), 'utf8'));
-  if (typeof parsed !== 'object' || parsed === null || !('name' in parsed) || !('version' in parsed)) {
-    throw new Error(`packages/${dir}/package.json needs a name and a version.`);
+for (const group of GROUPS) {
+  for (const dir of readdirSync(join(ROOT, group)).toSorted()) {
+    const path = join(ROOT, group, dir, 'package.json');
+    // `plugins/` also holds a README, and a folder without a manifest is not a package.
+    if (!existsSync(path)) continue;
+    const parsed: unknown = JSON.parse(readFileSync(path, 'utf8'));
+    if (typeof parsed !== 'object' || parsed === null || !('name' in parsed) || !('version' in parsed)) {
+      throw new Error(`${group}/${dir}/package.json needs a name and a version.`);
+    }
+    packages.push({ name: String(parsed.name), version: String(parsed.version) });
   }
-  packages.push({ name: String(parsed.name), version: String(parsed.version) });
 }
 for (const e of publishOrder(packages)) process.stdout.write(`${e.name}\t${e.version}\t${e.file}\n`);

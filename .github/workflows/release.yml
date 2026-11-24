@@ -84,7 +84,7 @@ jobs:
       - name: Pack every package, record the publish order and the checksums
         run: |
           mkdir -p artifacts
-          pnpm --filter "./packages/*" exec pnpm pack --pack-destination "$GITHUB_WORKSPACE/artifacts"
+          pnpm --filter "./packages/*" --filter "./plugins/*" exec pnpm pack --pack-destination "$GITHUB_WORKSPACE/artifacts"
           node tools/release-order.ts > artifacts/PUBLISH_ORDER
           cd artifacts
           tarballs=(./*.tgz)
@@ -127,5 +127,11 @@ jobs:
               echo "skip $name@$version, already published"
               continue
             fi
-            npm publish "./$file" --access public
+            # Every 0.x version is a beta: it goes under the beta tag, so a request without a tag never gets it.
+            # `latest` is for 1.0.0 and later (spec section 24.2, roadmap M3.5).
+            case "$version" in
+              0.*) tag=beta ;;
+              *) tag=latest ;;
+            esac
+            npm publish "./$file" --access public --tag "$tag"
           done < PUBLISH_ORDER

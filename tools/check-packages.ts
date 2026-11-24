@@ -36,14 +36,26 @@ const ROOT = resolve(import.meta.dirname, '..');
 const out = mkdtempSync(join(tmpdir(), 'bieberkit-pack-'));
 let failures = 0;
 try {
-  execFileSync('pnpm', ['--filter', './packages/*', 'exec', 'pnpm', 'pack', '--pack-destination', out], {
-    cwd: ROOT,
-    stdio: ['ignore', 'ignore', 'inherit'],
-  });
+  execFileSync(
+    'pnpm',
+    ['--filter', './packages/*', '--filter', './plugins/*', 'exec', 'pnpm', 'pack', '--pack-destination', out],
+    {
+      cwd: ROOT,
+      stdio: ['ignore', 'ignore', 'inherit'],
+    },
+  );
   const tarballs = readdirSync(out)
     .filter((f) => f.endsWith('.tgz'))
     .toSorted();
   for (const tgz of tarballs) {
+    // Apache-2.0 asks that a copy of the licence and of the NOTICE travel with the code. npm adds LICENSE and README on its own and NOTICE only when `files` lists it.
+    const listing = spawnSync('tar', ['-tzf', join(out, tgz)], { encoding: 'utf8' }).stdout.split('\n');
+    for (const required of ['package/LICENSE', 'package/NOTICE', 'package/README.md']) {
+      if (!listing.includes(required)) {
+        failures++;
+        process.stdout.write(`${tgz}  has no ${required.replace('package/', '')}\n`);
+      }
+    }
     for (const check of packageChecks(join(out, tgz))) {
       const r = spawnSync('pnpm', ['exec', check.tool, ...check.args], { cwd: ROOT, encoding: 'utf8' });
       if (r.status !== 0) {
@@ -58,15 +70,17 @@ try {
       }
     }
   }
-  const isPrivate = (dir: string): boolean => {
+  const isPrivate = (path: string): boolean => {
     try {
-      const parsed: unknown = JSON.parse(readFileSync(join(ROOT, 'packages', dir, 'package.json'), 'utf8'));
+      const parsed: unknown = JSON.parse(readFileSync(join(ROOT, path, 'package.json'), 'utf8'));
       return typeof parsed === 'object' && parsed !== null && 'private' in parsed && parsed.private === true;
     } catch {
       return false;
     }
   };
-  const privateCount = readdirSync(join(ROOT, 'packages')).filter(isPrivate).length;
+  const privateCount = ['packages', 'plugins']
+    .flatMap((group) => readdirSync(join(ROOT, group)).map((dir) => `${group}/${dir}`))
+    .filter(isPrivate).length;
   if (failures > 0) {
     process.stdout.write(
       `\n${failures} package check(s) failed. Fix the package exports or types, then run pnpm build and this check again.\n`,

@@ -49,8 +49,8 @@ The workflow files are in the repository. The settings below live on GitHub and 
 3. **Tag ruleset.** A ruleset on `refs/tags/v*` that restricts creation to the maintainer and blocks updates and deletion. Check: another account cannot create `v0.0.1`.
 4. **Environment `release`.** Settings, Environments. Required reviewer: the maintainer. Deployment branches and tags: only tags matching `v*`. Leave "prevent self-review" off, since there is one maintainer: the approval is a deliberate pause before publishing, not a second reviewer. Check: a run of `release.yml` stops at the `publish` job and waits.
 5. **npm names.** Reserve the `@bieberkit` scope and the names `bieberkit` and `create-bieberkit` (an open item of roadmap M0.2). Check: you can publish under all three.
-6. **Trusted publisher, once per package** (18 packages). On npmjs.com, for each package: provider GitHub Actions, the organization and repository, workflow file `release.yml`, environment `release`. See npm's documentation on trusted publishers, and verify the current steps there, because they are outside this repository. npm CLI 11.5.1 or later is required, and Node.js 24.12 and 26 both bundle a newer one. Check: the package settings page lists the publisher.
-7. **Remove `private: true`** from the 18 `packages/*/package.json` in one pull request with a changeset. Until then `npm publish` refuses the tarballs. `pnpm check:packages` prints how many are still private.
+6. **Trusted publisher, once per package** (26: the 20 in `packages/` and the 6 in `plugins/`). On npmjs.com, for each package: provider GitHub Actions, the organization and repository, workflow file `release.yml`, environment `release`. See npm's documentation on trusted publishers, and verify the current steps there, because they are outside this repository. npm CLI 11.5.1 or later is required, and Node.js 24.12 and 26 both bundle a newer one. Check: the package settings page lists the publisher.
+7. **`private: true`** is removed from the 26 manifests, which also carry `repository`, `homepage` and `bugs` (npm checks `repository.url` against the repository of the provenance statement, so it must be `https://github.com/kieutrongthien/bieberkit`) and ship `LICENSE`, `NOTICE` and `README.md` (`pnpm check:packages` fails when a tarball lacks one). Done for the first beta; a new package starts with the same fields.
 8. **Renovate.** Install the Renovate app on the repository. `renovate.json` is already in place. Check: it opens a "Configure" or dependency dashboard issue.
 9. **Repository setting (optional).** In Actions settings, require that actions are pinned to a full commit SHA. The workflows already comply (SEC-13).
 
@@ -64,10 +64,21 @@ Do this before the first real release, and tick "Dry-run release publishes a thr
 4. Check that: the run used OIDC and no token, the npm page shows the provenance statement, `npm audit signatures` passes for it, a second run of the job publishes nothing, and a tag created by someone else is refused by the ruleset.
 5. Deprecate or unpublish the throwaway package. Registry rules limit unpublishing, so deprecate if it is too late.
 
+## Beta releases (0.x)
+
+Until 1.0.0 (roadmap M3.5) every package is released as `0.<minor>.0`, and the whole set shares that one number.
+
+- **The version has no suffix.** `0.1.0`, `0.2.0` and so on. The resolver of plugins accepts `major.minor.patch` only (PLG-08), so a `-beta.1` suffix is not used.
+- **The npm tag is `beta`.** `release.yml` publishes every `0.x` version with `--tag beta` and `1.0.0` or later with `latest`. A request without a tag does not get a beta. Install with `pnpm add @bieberkit/core@beta` or `pnpm create bieberkit@beta`.
+- **A minor version may break.** Use `minor` in a changeset for a breaking change and `patch` for a fix. The caret range of `0.1.0` stays inside `0.1.x`.
+- **After the first publish of a package**, run `npm dist-tag ls <name>` and check what `latest` points at. If the registry set it to the beta, move it as the maintainer decides. This is the one thing about the first publish that has not been seen yet.
+- **A project made from a fresh release waits.** The generated `pnpm-workspace.yaml` has `minimumReleaseAge: 10080` (SEC-11), so a version younger than 7 days cannot be installed. `pnpm create bieberkit` works for a beta only seven days after its publication. The setting is not relaxed for first-party packages without a decision of the maintainer.
+- **Changelogs.** `pnpm changeset version` writes a `CHANGELOG.md` in each package, and the header rule (HDR-01) rejects it, since the tool puts its entries after the first line of the file. The first beta ships without them. Decide before the second release: exempt `CHANGELOG.md` from the header rule, or turn changelogs off in `.changeset/config.json` and use release notes.
+
 ## Cutting a release
 
 1. Merge the pull request that versions the packages (`pnpm changeset version`). All `@bieberkit/*`, `bieberkit` and `create-bieberkit` share one version (section 24.2).
-2. Create a signed tag on `main`: `git tag -s v1.0.0 -m "v1.0.0"` and `git push origin v1.0.0`.
+2. Create a signed tag on `main`: `git tag -s v0.1.0 -m "v0.1.0"` and `git push origin v0.1.0` (the tag is `v` and the version in the root `package.json`, which must match).
 3. Open the `Release` run and approve the `release` environment when `verify` and `build` are green.
 4. After `publish`, check one package on npmjs.com for the provenance statement and the right version.
 
