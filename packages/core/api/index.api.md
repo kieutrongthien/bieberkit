@@ -228,6 +228,12 @@ interface LoggerOptions {
   readonly redactKeys?: readonly string[];
   readonly now?: () => Date;
 }
+export declare const RESERVED_LOG_FIELDS: ReadonlySet<string>;
+interface LogSanitizer {
+  clean(value: unknown, key?: string): unknown;
+  text(value: string): string;
+}
+export declare function createLogSanitizer(secrets: readonly string[], redactKeys?: readonly string[]): LogSanitizer;
 export declare function createLogger(options: LoggerOptions): Logger;
 type ReportSource = "http" | "job" | "process" | "client";
 type ReportLevel = "warning" | "error" | "fatal";
@@ -535,5 +541,5 @@ export declare function defineConfig(input: ProjectConfigInput): ProjectConfigIn
 export declare function defineConfigSection<K extends keyof ConfigSections>(key: K, parser: Parser<ConfigSections[K]>): ConfigSection<K>;
 export declare function validateConfig(input: unknown, options?: ValidateConfigOptions): ProjectConfigInput;
 export declare const packageName = "@bieberkit/core";
-export type { AppEnv, BkErrorOptions, ConfigProblem, ConfigSection, ConfigSections, Container, CoreEnv, CoreEnvResult, CoreEnvValues, Dialect, EmitResult, EnvCustomParse, EnvDescription, EnvKeyBuilder, EnvKeyDef, EnvKind, EnvOwner, EnvProblem, EnvSchema, EnvSource, EnvValues, ErrorBody, ErrorReportContext, ErrorReporter, EventBus, EventBusOptions, EventHandler, EventName, EventRegistry, HandlerFailure, Hook, HookFailure, Installed, IntOptions, KeyCollector, Lifecycle, LifecycleOptions, LoadEnvOptions, LogFields, LogLevel, Logger, LoggerOptions, Manifest, ManifestCheck, MemoryReporter, ModuleContributions, ModuleDef, ModuleEmitter, ModuleInput, OnOptions, ParsedDsn, Parser, Phase, PluginDef, PluginEntry, PluginInput, PluginProblem, ProcessHandlerOptions, ProcessLike, ProjectConfigInput, ReadCoreEnvOptions, Registration, ReportLevel, ReportSource, ReporterConfig, ReporterFromConfigOptions, RequestContext, RequestScope, Resolution, ResolveContext, Role, SeedFn, SentryReporterOptions, ServiceDefs, ServiceName, ServiceRegistry, ServiceScope, StopResult, ValidateConfigOptions };
+export type { AppEnv, BkErrorOptions, ConfigProblem, ConfigSection, ConfigSections, Container, CoreEnv, CoreEnvResult, CoreEnvValues, Dialect, EmitResult, EnvCustomParse, EnvDescription, EnvKeyBuilder, EnvKeyDef, EnvKind, EnvOwner, EnvProblem, EnvSchema, EnvSource, EnvValues, ErrorBody, ErrorReportContext, ErrorReporter, EventBus, EventBusOptions, EventHandler, EventName, EventRegistry, HandlerFailure, Hook, HookFailure, Installed, IntOptions, KeyCollector, Lifecycle, LifecycleOptions, LoadEnvOptions, LogFields, LogLevel, LogSanitizer, Logger, LoggerOptions, Manifest, ManifestCheck, MemoryReporter, ModuleContributions, ModuleDef, ModuleEmitter, ModuleInput, OnOptions, ParsedDsn, Parser, Phase, PluginDef, PluginEntry, PluginInput, PluginProblem, ProcessHandlerOptions, ProcessLike, ProjectConfigInput, ReadCoreEnvOptions, Registration, ReportLevel, ReportSource, ReporterConfig, ReporterFromConfigOptions, RequestContext, RequestScope, Resolution, ResolveContext, Role, SeedFn, SentryReporterOptions, ServiceDefs, ServiceName, ServiceRegistry, ServiceScope, StopResult, ValidateConfigOptions };
 ```

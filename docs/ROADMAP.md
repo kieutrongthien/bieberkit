@@ -242,7 +242,7 @@ Done when: each contract passes its shared driver tests, and switching `QUEUE_DR
 
 Depends on: M1.3, M1.4, M1.5.
 
-- [ ] `@bieberkit/log`: pino adapter under `@bieberkit/log/pino` with SEC-09 redaction, JSON logs with the fields of OBS-01, and a shared contract test run against it and the core default logger (OBS-01, SEC-09, PKG-02, PKG-03, ADR 0003)
+- [x] `@bieberkit/log`: pino adapter under `@bieberkit/log/pino` with SEC-09 redaction, JSON logs with the fields of OBS-01, and a shared contract test run against it and the core default logger (OBS-01, SEC-09, PKG-02, PKG-03, ADR 0003). Done: `createPinoLogger` redacts with the sanitizer of core (ADR 0022), and `loggerContractSuite` passes on both loggers
 - [ ] OpenTelemetry traces over HTTP, database, cache, queue, jobs with context carried into jobs (OBS-02)
 - [ ] Prometheus metrics on `METRICS_PORT`, not routed publicly (OBS-03, OBS-04)
 - [ ] `@bieberkit/testing`: `createTestApp`, entity factories, `actingAs`, `withTenant` (TST-02)
