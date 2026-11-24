@@ -94,4 +94,13 @@ export const queueMigrationSteps: readonly PluginMigrationStep[] = [
     },
     '0.2.0',
   ),
+  // Also 0.2.0: the input of a job. MySQL's TEXT is 64 KB, and a bulk call of 500 rows with a patch can come near it. A job takes up to 1 MiB.
+  step(
+    'jobs-input-wide',
+    async (trx, dialect) => {
+      if (dialect === 'mysql')
+        await sql`alter table ${sql.table(JOBS_TABLE)} modify ${sql.ref('input')} mediumtext not null`.execute(trx);
+    },
+    '0.2.0',
+  ),
 ];

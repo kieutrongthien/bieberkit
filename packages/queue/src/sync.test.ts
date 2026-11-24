@@ -192,3 +192,21 @@ describe('Q-11 the result of a job on the sync driver', () => {
     expect((await queue.status('fine-1'))?.result).toHaveLength(500_000);
   });
 });
+
+describe('Q-02 the size of the input', () => {
+  it('Q-02 an input over 1 MiB is refused before anything is stored, and one just under it is taken', async () => {
+    const received: number[] = [];
+    const job = defineJob<{ text: string }>({
+      name: 'sync.large',
+      input: z.object({ text: z.string() }),
+      handler: async (input) => void received.push(input.text.length),
+    });
+    const queue = await createQueue({ driver: 'sync', jobs: [job] });
+    await expect(queue.dispatch(job, { text: 'x'.repeat(1_048_576) })).rejects.toMatchObject({
+      code: 'QUEUE_INPUT_TOO_LARGE',
+      status: 413,
+    });
+    await queue.dispatch(job, { text: 'x'.repeat(1_000_000) });
+    expect(received).toEqual([1_000_000]);
+  });
+});

@@ -113,6 +113,7 @@ queue.status(jobId): Promise<JobStatus | undefined>          // { id, name, queu
 2. **Limits.** A result that is not JSON (a `bigint`, a cycle) or is over 1 MiB is not kept, a warning is logged, and the job is still done: its work was done, and a retry would do it twice.
 3. **`status(jobId)`** answers where the job is (`waiting`, `active`, `done`, `dead`), its attempts, its result when done, its last error when it failed, and the tenant and the user that dispatched it, so that a route can show a job to its owner only. An id that does not exist is `undefined`. It lasts as long as the job does: 7 days after it ends.
 4. **Same on every driver.** The contract suite has a tenth case for it.
+5. **The input too.** An input of a job is at most 1 MiB as JSON on every driver (`QUEUE_INPUT_TOO_LARGE`, 413): a job that fits on one driver fits on all. On MySQL the column `input` is made `MEDIUMTEXT` by the step `jobs-input-wide` (0.2.0), because `TEXT` holds 64 KB.
 
 ## Worker pool for CPU-heavy work (Q-09)
 

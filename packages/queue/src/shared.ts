@@ -55,6 +55,7 @@ export interface Prepared {
   readonly context: CarriedContext;
 }
 
+const MAX_INPUT_BYTES = 1024 * 1024;
 const JOB_ID = /^[\x21-\x7e]{1,200}$/;
 
 /** Checks a dispatch: the job is known, the input fits its schema, the id and the delay are sane. */
@@ -74,6 +75,15 @@ export async function prepare(
     );
   }
   const checked = await checkInput(job.name, job.input, input);
+  // The same limit for every driver, so a job that fits on one fits on all. Put a large body in the storage and the path of it in the job.
+  if (Buffer.byteLength(JSON.stringify(checked ?? null)) > MAX_INPUT_BYTES) {
+    throw queueError(
+      'QUEUE_INPUT_TOO_LARGE',
+      413,
+      `The input of ${job.name} is over 1 MiB.`,
+      'Keep the data in the storage or the database, and put its id in the input of the job.',
+    );
+  }
   const queue = options.queue ?? job.queue;
   if (!QUEUE_NAMES.includes(queue))
     throw queueError('QUEUE_JOB_INVALID', 400, `"${queue}" is not a queue.`, `Use ${QUEUE_NAMES.join(', ')}.`);

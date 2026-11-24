@@ -287,3 +287,33 @@ describeDialects('Q-11 the result of a job on the database driver', ({ open, dia
     expect(JSON.stringify(rows).toLowerCase()).toContain('mediumtext');
   });
 });
+
+describeDialects('Q-02 a large input on the database driver', ({ open, dialect }) => {
+  it('Q-02 keeps an input of 200 KB, which MySQL could not hold in a TEXT column, and runs it', async () => {
+    const db = await open([]);
+    const seen: number[] = [];
+    const job = defineJob<{ rows: string }>({
+      name: 'big.input',
+      input: z.object({ rows: z.string() }),
+      handler: async (input) => void seen.push(input.rows.length),
+    });
+    const queue = await createQueue({ driver: 'database', jobs: [job], db });
+    const worker = queue.createWorker({ pollMs: 20 });
+    worker.start();
+    await queue.dispatch(job, { rows: 'Việt'.repeat(50_000) });
+    await waitFor(() => seen.length === 1);
+    expect(seen).toEqual([200_000]);
+    await worker.stop();
+    await queue.close();
+  });
+
+  it.skipIf(dialect !== 'mysql')('Q-02 the column of the input is a medium text on MySQL', async () => {
+    const db = await open([]);
+    const rows = await db.orm.em
+      .getConnection()
+      .execute(
+        "select data_type as t from information_schema.columns where table_name = 'bk_jobs' and column_name = 'input' and table_schema = database()",
+      );
+    expect(JSON.stringify(rows).toLowerCase()).toContain('mediumtext');
+  });
+});

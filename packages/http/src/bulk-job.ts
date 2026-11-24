@@ -30,7 +30,7 @@ import type { JobDef, JobResult, Queue } from '@bieberkit/queue';
 import { authorizationFor } from './authorization.ts';
 import type { BulkInput, BulkQueue } from './bulk.ts';
 import { entityRoutes, pathOf } from './entity-routes.ts';
-import type { Authorizer, RequestInfo } from './ports.ts';
+import type { Authorizer, Principal, RequestInfo } from './ports.ts';
 import { HttpError } from './problem.ts';
 import type { RouteContext } from './route.ts';
 import type { HttpServer } from './server.ts';
@@ -39,11 +39,10 @@ export const BULK_JOB = 'http.bulk';
 /** Where the owner of a job reads it. */
 export const JOBS_PATH = '/api/v1/_jobs';
 
+/** What the authorizer reads of a principal. The session and the way of signing in (`sessionId`, `via`) are not kept: a job needs neither. */
 const principal = z.object({
   id: z.string(),
   kind: z.enum(['user', 'apiKey', 'service']),
-  via: z.optional(z.enum(['cookie', 'token'])),
-  sessionId: z.optional(z.string()),
   mfa: z.optional(z.boolean()),
   grants: z.optional(z.array(z.string())),
   tenantId: z.optional(z.string()),
@@ -112,10 +111,23 @@ export function createBulkJob(options: BulkJobOptions): BulkJob {
     job,
     over: (queue) => ({
       async enqueue(call) {
-        const dispatched = await queue.dispatch(job, call);
+        const dispatched = await queue.dispatch(job, { ...call, principal: lean(call.principal) });
         return { id: dispatched.id, location: `${JOBS_PATH}/${encodeURIComponent(dispatched.id)}` };
       },
     }),
+  };
+}
+
+/** The principal as the job keeps it: only what the authorizer reads. A session id is a credential in spirit, and a job table is read by more people than a session store. */
+function lean(principalOf: Principal | undefined): Principal | undefined {
+  if (principalOf === undefined) return undefined;
+  const { id, kind, mfa, grants, tenantId } = principalOf;
+  return {
+    id,
+    kind,
+    ...(mfa === undefined ? {} : { mfa }),
+    ...(grants === undefined ? {} : { grants }),
+    ...(tenantId === undefined ? {} : { tenantId }),
   };
 }
 

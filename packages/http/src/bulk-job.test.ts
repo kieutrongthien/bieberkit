@@ -229,6 +229,32 @@ describe('API-14 a bulk call above 100 rows is a job', () => {
   });
 });
 
+describe('SEC-09 what the job keeps of the principal', () => {
+  it('SEC-09 keeps the id, the kind, the second factor, the grants and the tenant, and never the session', async () => {
+    const authorizer: Authorizer = { can: async () => true };
+    const app = await setup({ authorizer });
+    app.who.principal = {
+      id: ALICE.id,
+      kind: 'user',
+      via: 'token',
+      sessionId: 'session-secret-123',
+      mfa: true,
+      grants: ['crm.account.update'],
+      tenantId: TENANT,
+    };
+    const accepted = await app.bulk({ operation: 'delete', items: ghosts(101) });
+    expect(accepted.statusCode).toBe(202);
+    const rows = await app.db.orm.em.getConnection().execute('select input from bk_jobs');
+    const stored = JSON.stringify(rows);
+    expect(stored).not.toContain('session-secret-123');
+    expect(stored).not.toContain('sessionId');
+    expect(stored).not.toContain('via');
+    expect(stored).toContain(ALICE.id);
+    expect(stored).toContain('crm.account.update');
+    expect(stored).toContain('mfa');
+  });
+});
+
 describe('Q-10 the job asks the authorizer again, as the principal that sent it', () => {
   it('Q-10 a permission that is taken away while the job waits makes the job fail, and nothing is changed', async () => {
     let allowed = true;
