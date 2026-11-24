@@ -117,6 +117,8 @@ export { BieberEntityManager } from './entity-manager.ts';
 export type { ReferenceVisibility } from './references.ts';
 export { restore, softDelete } from './softdelete.ts';
 export { currentTenantId, runAsTenant } from './tenant.ts';
+export { createMemoryReadYourWrites, READ_YOUR_WRITES_MS, useReadYourWrites } from './read-your-writes.ts';
+export type { MemoryReadYourWritesOptions, ReadYourWrites } from './read-your-writes.ts';
 export type { AuditSink, SystemScopeEntry } from './tenant.ts';
 export { expectVersion } from './version.ts';
 export { listPage, queryableFields } from './query.ts';

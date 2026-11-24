@@ -22,6 +22,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { readConnection } from './read-your-writes.ts';
 import type { EntityManager } from '@mikro-orm/core';
 import { QueryOrder, ReferenceKind, wrap } from '@mikro-orm/core';
 import { dataError } from '../errors.ts';
@@ -389,6 +390,7 @@ export async function listPage(em: EntityManager, schema: OrmSchema, options: Li
     options.select === undefined
       ? undefined
       : [...new Set([...options.select, 'id', ...order.map((item) => item.field.lookup)])];
+  const connectionType = await readConnection(em);
   const entities = await em.find<Row>(schema, conditions.length === 0 ? {} : { $and: conditions }, {
     orderBy: order.map((item) => ({
       [item.field.lookup]: item.direction === 'asc' ? QueryOrder.ASC : QueryOrder.DESC,
@@ -396,7 +398,8 @@ export async function listPage(em: EntityManager, schema: OrmSchema, options: Li
     limit: limit + 1,
     ...(options.offset === undefined || options.offset === 0 ? {} : { offset: options.offset }),
     disableIdentityMap: true,
-    connectionType: 'read',
+    // A replica, unless the user wrote a moment ago and the replica may not have it yet (DATA-13).
+    connectionType,
     // One query per relation (DATA-10), whatever the default of the ORM is, so a page never joins a collection into its own rows.
     strategy: 'select-in',
     // The names were checked against the metadata above, and MikroORM types them as paths of a class that does not exist here.
@@ -419,6 +422,6 @@ export async function listPage(em: EntityManager, schema: OrmSchema, options: Li
   });
   if (options.locale !== undefined) await applyTranslations(em, schema, rows, options.locale);
 
-  const total = options.withTotal === true ? await em.count(schema, base, { connectionType: 'read' }) : undefined;
+  const total = options.withTotal === true ? await em.count(schema, base, { connectionType }) : undefined;
   return { rows, limit, nextCursor, ...(total === undefined ? {} : { total }) };
 }

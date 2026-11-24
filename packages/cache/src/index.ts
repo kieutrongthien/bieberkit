@@ -28,6 +28,8 @@ export { CacheError } from './contract.ts';
 export type { Atomic, CacheEngine, CacheValue } from './contract.ts';
 export { createCacheIdempotencyStore } from './idempotency.ts';
 export type { CacheIdempotencyOptions } from './idempotency.ts';
+export { createCacheReadYourWrites } from './read-your-writes.ts';
+export type { CacheReadYourWritesOptions } from './read-your-writes.ts';
 export { createLayeredEngine } from './layered-engine.ts';
 export type { LayeredEngineOptions } from './layered-engine.ts';
 export { createMemoryEngine } from './memory-engine.ts';

@@ -237,7 +237,7 @@ export async function createDatabase(env: DatabaseEnv, options: DatabaseOptions)
     ...(options.queryLog === undefined
       ? {}
       : { debug: ['query'] as ['query'], colors: false, logger: queryLogger(options.queryLog) }),
-    subscribers: [new DataSubscriber(options.references)],
+    subscribers: [new DataSubscriber(options.references, resolved.readLocations.length > 0)],
   } as const;
   const orm = await initOrm(resolved, common, env.DB_POOL_MAX);
   if (!hasEncryptionKeys() && encryptedProperties(orm).length > 0) {

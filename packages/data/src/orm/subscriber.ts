@@ -22,6 +22,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { recordWrite } from './read-your-writes.ts';
 import { ChangeSetType } from '@mikro-orm/core';
 import type { EventArgs, EventSubscriber, FlushEventArgs } from '@mikro-orm/core';
 import { dataError } from '../errors.ts';
@@ -38,9 +39,16 @@ type Row = Record<string, unknown>;
 /** Hooks of the data layer, registered by `createDatabase`. */
 export class DataSubscriber implements EventSubscriber {
   readonly #references: ReferenceVisibility | undefined;
+  readonly #trackWrites: boolean;
 
-  constructor(references?: ReferenceVisibility) {
+  constructor(references?: ReferenceVisibility, trackWrites = false) {
     this.#references = references;
+    this.#trackWrites = trackWrites;
+  }
+
+  /** After a commit: the user of the request has written, so its reads go to the primary for a while (DATA-13). Only with replicas. */
+  async afterTransactionCommit(): Promise<void> {
+    if (this.#trackWrites) await recordWrite();
   }
 
   /** Before the changes are computed: gives a new tenant row its tenant, and refuses one that names another tenant. */
