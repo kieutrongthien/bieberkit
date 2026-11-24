@@ -23,7 +23,13 @@
  */
 
 import { join } from 'node:path';
-import { authEntities, createAuthorizer } from '@bieberkit/auth';
+import {
+  authEntities,
+  createAuthenticator,
+  createAuthorizer,
+  createTenantResolver,
+  registerAuthRoutes,
+} from '@bieberkit/auth';
 import type { ScopedPermission } from '@bieberkit/auth';
 import { createContainer, createLifecycle, exitCode, loadEnv, parseRole, registerModule } from '@bieberkit/core';
 import type { EnvSource, Role } from '@bieberkit/core';
@@ -37,6 +43,7 @@ import type { JobDef, Queue } from '@bieberkit/queue';
 import { createQueueFromConfig } from '@bieberkit/queue/redis';
 import { ServerError } from './errors.ts';
 import { migrate } from './migrate.ts';
+import { permissionCatalog, registerRuntimeServices } from './services.ts';
 import { runMigrations } from './migrations.ts';
 import { allModules, contributed, contributedRecord } from './modules.ts';
 import { observe } from './observe.ts';
@@ -106,10 +113,6 @@ export async function boot(options: BootOptions): Promise<Running> {
   });
   const { logger, tracer, metrics, reporter } = seen;
 
-  const container = createContainer();
-  for (const module of modules) registerModule(container, module);
-  await container.boot();
-
   const db = await createDatabase(env, {
     entities: [...schemas, ...authEntities],
     audit: 'table',
@@ -117,6 +120,10 @@ export async function boot(options: BootOptions): Promise<Running> {
     tracer,
     metrics,
   });
+  const container = createContainer();
+  registerRuntimeServices(container, { env, extra, db, permissions: permissionCatalog(project, modules) });
+  for (const module of modules) registerModule(container, module);
+  await container.boot();
   const lifecycle = createLifecycle();
   lifecycle.onShutdown('database', () => db.close());
   lifecycle.onShutdown('observability', () => seen.close());
@@ -153,8 +160,20 @@ export async function boot(options: BootOptions): Promise<Running> {
   if (roles.includes('web')) {
     const scoped = contributedRecord<ScopedPermission>(modules, 'scopedPermissions');
     const authorizer = createAuthorizer({ db, entities, schemas, scoped });
-    server = createHttpServer(env, { logger, tracer, metrics, errorReporter: reporter, authorizer });
+    // Sign in with Better Auth under /api/auth, and the session cookie that gives a request its principal (AUTH-01, AUTH-09).
+    const { auth } = container.services;
+    server = createHttpServer(env, {
+      logger,
+      tracer,
+      metrics,
+      errorReporter: reporter,
+      authorizer,
+      services: container.services,
+      authenticator: createAuthenticator(auth),
+      tenantResolver: createTenantResolver({ db }),
+    });
     authorizer.install(server);
+    registerAuthRoutes(server, { auth, db });
     registerEntityRoutes(server, schemas, { db });
     for (const route of contributed<RouteDef>(modules, 'routes')) server.route(route);
     registerOpenApi(server, { title: project.config.name, version: '0.0.0' });

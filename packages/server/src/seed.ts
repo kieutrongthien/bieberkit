@@ -30,6 +30,7 @@ import { createDatabase, compileEntities } from '@bieberkit/data/orm';
 import type { EntityDef } from '@bieberkit/data';
 import { authEntities } from '@bieberkit/auth';
 import { allModules, contributed } from './modules.ts';
+import { permissionCatalog, registerRuntimeServices } from './services.ts';
 import { envOwnersOf, importFile, loadProject } from './project.ts';
 import { ServerError } from './errors.ts';
 
@@ -53,7 +54,7 @@ const PROJECT_SEED = 'apps/server/src/seed.ts';
 export async function seed(options: SeedOptions = {}): Promise<Seeded> {
   const project = await loadProject(options.cwd ?? process.cwd());
   const modules = await allModules(project);
-  const { env } = loadEnv({
+  const { env, extra } = loadEnv({
     ...(options.env === undefined ? {} : { source: options.env }),
     envFile: join(project.root, '.env'),
     extra: envOwnersOf(project),
@@ -62,6 +63,7 @@ export async function seed(options: SeedOptions = {}): Promise<Seeded> {
   const db = await createDatabase(env, { entities: [...compileEntities(entities), ...authEntities], audit: 'table' });
   try {
     const container = createContainer();
+    registerRuntimeServices(container, { env, extra, db, permissions: permissionCatalog(project, modules) });
     for (const module of modules) registerModule(container, module);
     await container.boot();
     const services: ServiceRegistry = container.services;

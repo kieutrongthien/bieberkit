@@ -1,0 +1,49 @@
+{
+  "name": "@bieberkit/plugin-settings",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Settings stored in the database: a key and a value, read and changed through the API and the admin.",
+  "keywords": [
+    "bieberkit",
+    "bieberkit-plugin"
+  ],
+  "license": "Apache-2.0",
+  "author": "Bieber Kieu <kieutrongthien@gmail.com>",
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "@bieberkit/source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "./package.json": "./package.json"
+    },
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@bieberkit/core": "workspace:*",
+    "@bieberkit/data": "workspace:*"
+  },
+  "devDependencies": {
+    "@bieberkit/testing": "workspace:*"
+  },
+  "engines": {
+    "node": ">=24.12"
+  }
+}

@@ -30,3 +30,12 @@ export { createMemoryDisk } from './memory-disk.ts';
 export type { MemoryDisk, MemoryDiskOptions } from './memory-disk.ts';
 export { createStorage } from './storage.ts';
 export type { Storage, StorageOptions, StoreBody } from './storage.ts';
+
+import type { Storage as ServiceStorage } from './storage.ts';
+
+declare module '@bieberkit/core' {
+  interface ServiceRegistry {
+    /** The files of the application: the disk of `STORAGE_DISK` behind the policy of the types, the sizes and the visibility. The server registers it for every role. */
+    storage: ServiceStorage;
+  }
+}

@@ -50,6 +50,7 @@ interface Template {
 interface PluginIndexEntry {
   readonly version: string;
   readonly manifest: Manifest;
+  readonly envRows?: readonly EnvDescription[];
 }
 type PluginIndex = Readonly<Record<string, PluginIndexEntry>>;
 export declare const BUILTIN_TEMPLATES: Readonly<Record<string, Template>>;
@@ -84,6 +85,7 @@ interface Plan {
     readonly name: string;
     readonly version: string;
     readonly env: readonly string[];
+    readonly envRows?: readonly EnvDescription[];
   }[];
   readonly year: number;
   readonly framework: string;

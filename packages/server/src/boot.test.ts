@@ -119,6 +119,38 @@ describe('section 7.1 the roles', () => {
       expect(names).toContain(table);
   });
 
+  it('AUTH-01 the web role serves the sign up and the sign in of Better Auth, and a signed in user is a principal: 403 where it was 401', async () => {
+    const { one, env } = await start('dev');
+    const base = `http://127.0.0.1:${String(one.port)}`;
+    const headers = {
+      'content-type': 'application/json',
+      origin: env['APP_URL'] ?? `http://localhost:${String(one.port)}`,
+      'sec-fetch-site': 'same-origin',
+    };
+    const email = 'admin@example.com';
+    const password = 'correct horse battery staple';
+    const up = await fetch(`${base}/api/auth/sign-up/email`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ email, password, name: 'Admin' }),
+    });
+    expect(up.status).toBe(200);
+    const inn = await fetch(`${base}/api/auth/sign-in/email`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ email, password }),
+    });
+    expect(inn.status).toBe(200);
+    const cookie = inn.headers
+      .getSetCookie()
+      .find((line) => line.startsWith('__Host-bk_session='))
+      ?.split(';')[0];
+    expect(cookie).toBeDefined();
+    expect((await get(one.port, '/api/v1/crm/people')).status).toBe(401);
+    const signedIn = await fetch(`${base}/api/v1/crm/people`, { headers: { cookie: cookie ?? '' } });
+    expect(signedIn.status).toBe(403);
+  });
+
   it('7.1 the worker role starts the queue and the outbox dispatcher, and stops them', async () => {
     const { one } = await start('worker');
     expect(one.roles).toEqual(['worker']);

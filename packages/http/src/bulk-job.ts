@@ -23,6 +23,7 @@
  */
 
 import * as z from 'zod/mini';
+import { createContainer } from '@bieberkit/core';
 import { entityOfSchema } from '@bieberkit/data/orm';
 import type { Database, OrmSchema } from '@bieberkit/data/orm';
 import { defineJob } from '@bieberkit/queue';
@@ -99,6 +100,7 @@ export function createBulkJob(options: BulkJobOptions): BulkJob {
         requestId: context.requestId,
         traceId: '0'.repeat(32),
         log: context.log,
+        services: createContainer().services,
         status: () => undefined,
         header: () => undefined,
         ...authorizationFor(options.authorizer, data.principal, info),

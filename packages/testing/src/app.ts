@@ -22,9 +22,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { createAuthorizer, assignRole, buildPermissionRegistry, createRole } from '@bieberkit/auth';
+import { createAuth, createAuthorizer, assignRole, buildPermissionRegistry, createRole } from '@bieberkit/auth';
 import type { AccessAuthorizer, ScopedPermission } from '@bieberkit/auth';
-import type { ModuleDef } from '@bieberkit/core';
+import { createContainer, loadEnv, registerModule } from '@bieberkit/core';
+import type { ModuleDef, ServiceRegistry } from '@bieberkit/core';
 import { uuid7 } from '@bieberkit/data';
 import type { EntityDef } from '@bieberkit/data';
 import { compileEntities } from '@bieberkit/data/orm';
@@ -32,6 +33,8 @@ import type { Database, OrmSchema } from '@bieberkit/data/orm';
 import { createHttpServer, registerEntityRoutes } from '@bieberkit/http';
 import type { HttpServer, Principal, RouteDef } from '@bieberkit/http';
 import { createQueue } from '@bieberkit/queue';
+import { createMemoryDisk, createStorage } from '@bieberkit/storage';
+import type { MemoryDisk } from '@bieberkit/storage';
 import type { JobDef, Queue } from '@bieberkit/queue';
 import { createClient, TENANT_HEADER, USER_HEADER } from './client.ts';
 import type { Client } from './client.ts';
@@ -62,6 +65,8 @@ export interface TestAppOptions {
   readonly open?: OpenDatabase;
   /** The tenant of callers and factories until `withTenant` says another. A new one by default. */
   readonly tenant?: string;
+  /** The values of the env keys that plugins declare, for the services of the app. */
+  readonly pluginEnv?: Readonly<Record<string, unknown>>;
 }
 
 export interface TestApp {
@@ -72,6 +77,10 @@ export interface TestApp {
   readonly schemas: readonly OrmSchema[];
   readonly entities: readonly EntityDef<string>[];
   readonly authorizer: AccessAuthorizer;
+  /** The services of the app: `config`, `pluginEnv`, `database`, `auth`, and what the modules registered. The seeds of plugins take them. */
+  readonly services: ServiceRegistry;
+  /** The disk behind the `storage` service. A test sends the bytes of a signed upload to it. */
+  readonly disk: MemoryDisk;
   /** What the app logged, so a test can read it and the run stays quiet. */
   readonly logger: MemoryLogger;
   /** The tenant that this view of the app acts in. */
@@ -120,6 +129,29 @@ export async function createTestApp(options: TestAppOptions = {}): Promise<TestA
   }
   const authorizer = createAuthorizer({ db, entities, schemas, scoped });
   const logger = createMemoryLogger();
+  const registry = buildPermissionRegistry(entities);
+  const everything = [
+    ...new Set([
+      ...registry.entries.map((entry) => entry.permission),
+      ...contributed<RouteDef>(modules, 'routes').flatMap((route) =>
+        route.permission === undefined ? [] : [route.permission],
+      ),
+    ]),
+  ];
+  const { env } = loadEnv({ source: { APP_ENV: 'test' } });
+  const container = createContainer();
+  container.register('config', { scope: 'singleton', create: () => env });
+  container.register('pluginEnv', { scope: 'singleton', create: () => options.pluginEnv ?? {} });
+  const disk = createMemoryDisk({ signing: true });
+  container.register('storage', { scope: 'singleton', create: () => createStorage({ disk }) });
+  container.register('permissions', { scope: 'singleton', create: () => everything });
+  container.register('database', { scope: 'singleton', create: () => db });
+  container.register('auth', {
+    scope: 'singleton',
+    create: () => createAuth({ db, dialect: db.dialect, secret: env.AUTH_SECRET, baseUrl: env.APP_URL }),
+  });
+  for (const module of modules) registerModule(container, module);
+  await container.boot();
   const server = createHttpServer(
     { APP_ENV: 'test', APP_PORT: 0, TRUST_PROXY: false, API_DOCS_PUBLIC: false },
     {
@@ -137,6 +169,7 @@ export async function createTestApp(options: TestAppOptions = {}): Promise<TestA
       },
       authorizer,
       logger,
+      services: container.services,
     },
   );
   authorizer.install(server);
@@ -144,8 +177,6 @@ export async function createTestApp(options: TestAppOptions = {}): Promise<TestA
   for (const route of contributed<RouteDef>(modules, 'routes')) server.route(route);
   const queue = await createQueue({ driver: 'sync', jobs: contributed<JobDef>(modules, 'jobs'), logger });
 
-  const registry = buildPermissionRegistry(entities);
-  const everything = [...new Set(registry.entries.map((entry) => entry.permission))];
   const catalog = new Map<string, readonly string[]>(Object.entries(options.roles ?? {}));
   catalog.set('admin', everything);
   // One role row for each tenant and name, shared by the views of the app.
@@ -194,6 +225,8 @@ export async function createTestApp(options: TestAppOptions = {}): Promise<TestA
       schemas,
       entities,
       authorizer,
+      services: container.services,
+      disk,
       logger,
       tenant,
       newUser: () => ({ id: uuid7() }),

@@ -35,7 +35,7 @@ import { dbSeedCommand, devCommand, doctorCommand, startCommand, testCommand } f
 import type { RuntimeDeps } from './commands/runtime.ts';
 import type { Child, Spawn } from './processes.ts';
 import { runCli } from './run.ts';
-import { CRM_MODULE, makeProject } from './testing/project.ts';
+import { CRM_MODULE, linkBasePlugins, makeProject } from './testing/project.ts';
 import type { Fixture } from './testing/project.ts';
 
 const fixtures: Fixture[] = [];
@@ -256,6 +256,7 @@ describe('section 6 a project that was made starts', () => {
     for (const name of ['core', 'data', 'http', 'queue', 'server', 'auth', 'log', 'cache', 'mail', 'storage'])
       symlinkSync(join(packages, name), join(root, 'node_modules/@bieberkit', name), 'dir');
     symlinkSync(join(packages, 'data', 'node_modules', 'zod'), join(root, 'node_modules/zod'), 'dir');
+    linkBasePlugins(root);
     const port = await freePort();
     const metrics = await freePort();
     const child = nodeSpawn(process.execPath, [join(root, 'apps/server/src/main.ts'), 'web'], {

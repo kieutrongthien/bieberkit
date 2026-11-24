@@ -28,7 +28,7 @@
 Generated from the built declaration files by `pnpm api:update`. Do not edit by hand. A change here is a change to the public API and needs a changeset (spec section 22.3).
 
 ```ts
-import { BkError, ErrorReporter, Lifecycle, Logger, Metrics, Tracer } from "@bieberkit/core";
+import { BkError, ErrorReporter, Lifecycle, Logger, Metrics, ServiceRegistry, Tracer } from "@bieberkit/core";
 import { Database, OrmSchema } from "@bieberkit/data/orm";
 import { EntityDef, JsonSchema } from "@bieberkit/data/schema";
 import { JobDef, Queue } from "@bieberkit/queue";
@@ -121,6 +121,7 @@ interface RouteContext {
   readonly requestId: string;
   readonly traceId: string;
   readonly log: Logger;
+  readonly services: ServiceRegistry;
   status(code: number): void;
   header(name: string, value: string): void;
   can(permission: string): Promise<boolean>;
@@ -190,6 +191,7 @@ interface HttpServerOptions {
   readonly errorReporter?: ErrorReporter;
   readonly tracer?: Tracer;
   readonly metrics?: Metrics;
+  readonly services?: ServiceRegistry;
 }
 interface InjectOptions {
   readonly method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "HEAD" | "OPTIONS";

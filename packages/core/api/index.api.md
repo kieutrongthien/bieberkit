@@ -468,7 +468,10 @@ export declare const requestContext: {
   get(): RequestContext | undefined;
   update(patch: Partial<RequestContext>): void;
 };
-interface ServiceRegistry {}
+interface ServiceRegistry {
+  config: CoreEnv;
+  pluginEnv: Readonly<Record<string, unknown>>;
+}
 type ServiceName = Extract<keyof ServiceRegistry, string>;
 type ServiceScope = "singleton" | "request" | "transient";
 interface RegistrationBase {

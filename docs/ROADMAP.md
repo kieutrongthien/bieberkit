@@ -274,8 +274,8 @@ State on 2026-11-24: a project made by `create` starts through its `main.ts` (a 
 Depends on: M1.7. Built and hardened first, as every other template relies on them (§12).
 
 - [x] CLI commands `migrate:make` and `migrate` (`--status`, `--rollback`, `--allow-destructive`, as the spec has them) over `openMigrator`, `bieberkit build` over `writeStandalone` (regenerate, `tsc --noEmit`, the standalone files; the bundle of the server comes with the image of M1.9), a lock so that one migrate run is guaranteed (`bieberkit_migration_lock`, on the three dialects), and the `bieberkit check` rules from `detectDestructive` (`migrations`) and `findStepRisks` (`plugin-steps`) (DATA-08, DATA-25, DATA-27). The migrate role runs the same in production
-- [ ] Plugins: `users`, `roles`, `auth-ui`, `settings`, `audit-log`, `notifications`, `media`
-- [ ] `templates/blank/template.ts` with plugin list, seeders and menu order; administrator account and base roles seeded (§12)
+- [x] Plugins: `users`, `roles`, `settings`, `audit-log`, `notifications`, `media` (`docs/modules/plugins.md`). `auth-ui` is a set of screens, so it comes with the admin slice below
+- [ ] `templates/blank/template.ts` with plugin list, seeders and menu order; administrator account and base roles seeded (§12). Done: the blank template lists the base plugins in the scaffolder (`BUILTIN_TEMPLATES`, with the bundled manifests), `create` writes the password of the administrator, and `blank.test.ts` migrates, seeds, boots and signs the administrator in. Open: the menu order, which comes with the admin, and `auth-ui` in the list
 - [ ] Thin admin slice: `@bieberkit/admin-core` metadata loading, routing, permissions; `@bieberkit/admin-antd` login, generic list and form, no more (UI-01, UI-02, UI-10)
 - [ ] Admin served under `/admin/` with its own CSP (UI-14, SEC-01)
 - [ ] Playwright flow: login and CRUD in the admin (§21)

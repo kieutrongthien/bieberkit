@@ -70,6 +70,7 @@ export type {
 } from './schema/fields.ts';
 export type { CreateInput, EntityRegistry, Row, UpdateInput } from './schema/registry.ts';
 
+import type { Database } from './orm/connect.ts';
 import type { PluginMigrationStep as ModuleMigrationStep } from './migrations/steps.ts';
 import type { EntityDef as ModuleEntityDef } from './schema/define-entity.ts';
 
@@ -79,5 +80,12 @@ declare module '@bieberkit/core' {
     entities?: readonly ModuleEntityDef<string>[];
     /** The migration steps of a plugin, in the order of its versions. The migrate role runs them in the boot order of the plugins (DATA-24). */
     migrations?: readonly ModuleMigrationStep[];
+  }
+}
+
+declare module '@bieberkit/core' {
+  interface ServiceRegistry {
+    /** The connection of the application, with its tenant filter, its audit and its outbox. The server registers it for every role. */
+    database: Database;
   }
 }

@@ -171,7 +171,21 @@ describe('section 6 the files of a new project', () => {
     expect(config).toContain("name: 'demo'");
     expect(config).toContain("database: { dialect: 'postgres' }");
     expect(config).toContain("tenancy: { mode: 'single' }");
-    expect(config).toContain('plugins: []');
+    // Each plugin after the ones that it requires: `roles` before `users`.
+    expect(config.indexOf("'@bieberkit/plugin-roles'")).toBeGreaterThan(0);
+    expect(config.indexOf("'@bieberkit/plugin-roles'")).toBeLessThan(config.indexOf("'@bieberkit/plugin-users'"));
+    expect(config).toContain("'@bieberkit/plugin-media'");
+  });
+
+  it('12 .env gives the administrator of the blank template a password of its own, and .env.example never shows it', async () => {
+    const cwd = workdir();
+    await create(cwd, ['demo', '--yes', '--no-install', '--no-git']);
+    const dotenv = read(cwd, 'demo/.env');
+    const password = /^USERS_ADMIN_PASSWORD=(.+)$/m.exec(dotenv)?.[1] ?? '';
+    expect(password).not.toBe('');
+    expect([`APP_KEY=${password}`, `AUTH_SECRET=${password}`].some((line) => dotenv.includes(line))).toBe(false);
+    expect(read(cwd, 'demo/.env.example')).not.toContain(password);
+    expect(() => readCoreEnv(parseEnvFile(dotenv))).not.toThrow();
   });
 
   it('6 .env has fresh secrets and the development defaults, and passes the validation of core', async () => {

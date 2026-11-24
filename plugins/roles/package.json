@@ -1,0 +1,51 @@
+{
+  "name": "@bieberkit/plugin-roles",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Roles and their permissions: the list, the permission catalogue, create, change, assign, and the base roles of the seed.",
+  "keywords": [
+    "bieberkit",
+    "bieberkit-plugin"
+  ],
+  "license": "Apache-2.0",
+  "author": "Bieber Kieu <kieutrongthien@gmail.com>",
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "@bieberkit/source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "./package.json": "./package.json"
+    },
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@bieberkit/auth": "workspace:*",
+    "@bieberkit/core": "workspace:*",
+    "@bieberkit/data": "workspace:*",
+    "@bieberkit/http": "workspace:*"
+  },
+  "devDependencies": {
+    "@bieberkit/testing": "workspace:*"
+  },
+  "engines": {
+    "node": ">=24.12"
+  }
+}

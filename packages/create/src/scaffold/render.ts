@@ -23,7 +23,7 @@
  */
 
 import { coreEnv, describeEnv } from '@bieberkit/core';
-import type { Dialect } from '@bieberkit/core';
+import type { Dialect, EnvDescription } from '@bieberkit/core';
 import type { Choices } from './choices.ts';
 import { renderEnvExample } from './env-example.ts';
 import { LICENSES } from './licenses.ts';
@@ -37,7 +37,12 @@ export interface ProjectFile {
 /** What the plan decided and the render needs. */
 export interface Plan {
   /** The plugins in boot order, with the version that the index has. */
-  readonly plugins: readonly { readonly name: string; readonly version: string; readonly env: readonly string[] }[];
+  readonly plugins: readonly {
+    readonly name: string;
+    readonly version: string;
+    readonly env: readonly string[];
+    readonly envRows?: readonly EnvDescription[];
+  }[];
   readonly year: number;
   /** The version of the framework packages: they share one (section 24.2). */
   readonly framework: string;
@@ -102,7 +107,12 @@ export function renderDotenv(choices: Choices, plan: Plan): string {
       ['SITE_SERVICE_TOKEN', plan.random()],
       ['SITE_REVALIDATE_SECRET', plan.random()],
     );
-  const plugins = plan.plugins.flatMap((plugin) => plugin.env.map((key) => `${key}=`));
+  // A key that holds a password, a secret, a token or a key gets a random value, so that the project works after `create` and no plugin
+  // ships a default password. The person reads it in this file, which is not committed.
+  const secretLike = /_(?:PASSWORD|SECRET|TOKEN|KEY)$/;
+  const plugins = plan.plugins.flatMap((plugin) =>
+    plugin.env.map((key) => `${key}=${secretLike.test(key) ? plan.random() : ''}`),
+  );
   void name;
   return [
     '# Development settings and the secrets made when the project was created. This file is not committed.',
@@ -233,14 +243,16 @@ export function renderProject(choices: Choices, plan: Plan): ProjectFile[] {
   const rows = describeEnv(coreEnv);
   const example = renderEnvExample([
     ...rows,
-    ...plan.plugins.flatMap((plugin) =>
-      plugin.env.map((key) => ({
-        key,
-        type: 'string' as const,
-        required: true,
-        secret: false,
-        description: `Setting of ${plugin.name}`,
-      })),
+    ...plan.plugins.flatMap(
+      (plugin) =>
+        plugin.envRows ??
+        plugin.env.map((key) => ({
+          key,
+          type: 'string' as const,
+          required: true,
+          secret: false,
+          description: `Setting of ${plugin.name}`,
+        })),
     ),
   ]);
   const files: ProjectFile[] = [

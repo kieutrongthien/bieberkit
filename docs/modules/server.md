@@ -42,6 +42,7 @@ boot({ role, cwd?, env?, process? }): Promise<Running>   // role: web | worker |
 main(argv?): Promise<number>                             // what main.ts calls: boots, waits for SIGTERM or SIGINT, answers the exit code
 migrate(db, env); seed({ cwd?, env? }); diagnose({ cwd?, env? })
 makeMigration({ cwd?, env?, name? }); runMigrations({ cwd?, env?, allowDestructive?, deployId? }); rollbackMigration(); migrationStatus()
+permissionCatalog(project, modules); registerRuntimeServices(container, { env, extra, db, permissions }); COLLECTORS
 contributedRecord<T>(modules, key)                        // what each module gives as an object by name, merged (scopedPermissions)
 ```
 

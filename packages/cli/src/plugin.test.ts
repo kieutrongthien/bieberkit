@@ -55,7 +55,7 @@ function install(root: string, name: string, extra = ''): void {
     join(folder, 'index.mjs'),
     `import { defineModule, definePlugin, env } from '@bieberkit/core';
 import { defineEntity, f } from '@bieberkit/data';
-const Page = defineEntity({ name: 'pages.Page', table: 'pages_pages', fields: { id: f.id(), title: f.string({ max: 100 }) }, api: { list: true } });
+const Page = defineEntity({ name: 'pages.Page', table: '${prefix.toLowerCase()}_pages', fields: { id: f.id(), title: f.string({ max: 100 }) }, api: { list: true } });
 export default definePlugin({ name: ${JSON.stringify(name)}, version: '1.0.0', core: '*', dialects: ['sqlite', 'postgres', 'mysql'], env: { ${prefix}_ROOT: env.string().describe('Folder of the pages'), ${prefix}_DEPTH: env.int().default(3).describe('Depth') }, entities: [Page]${extra} });
 `,
   );

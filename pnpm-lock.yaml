@@ -525,6 +525,9 @@ importers:
       '@bieberkit/queue':
         specifier: workspace:*
         version: link:../queue
+      '@bieberkit/storage':
+        specifier: workspace:*
+        version: link:../storage
       vitest:
         specifier: ^4.1.0
         version: 4.1.12(@types/node@24.19.2)(@vitest/coverage-v8@4.1.12)(vite@8.3.8(@types/node@24.19.2)(yaml@2.9.1))
@@ -534,6 +537,111 @@ importers:
         version: 4.6.7
 
   packages/tokens: {}
+
+  plugins/audit-log:
+    dependencies:
+      '@bieberkit/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@bieberkit/data':
+        specifier: workspace:*
+        version: link:../../packages/data
+      '@bieberkit/http':
+        specifier: workspace:*
+        version: link:../../packages/http
+    devDependencies:
+      '@bieberkit/testing':
+        specifier: workspace:*
+        version: link:../../packages/testing
+
+  plugins/media:
+    dependencies:
+      '@bieberkit/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@bieberkit/data':
+        specifier: workspace:*
+        version: link:../../packages/data
+      '@bieberkit/http':
+        specifier: workspace:*
+        version: link:../../packages/http
+      '@bieberkit/storage':
+        specifier: workspace:*
+        version: link:../../packages/storage
+    devDependencies:
+      '@bieberkit/testing':
+        specifier: workspace:*
+        version: link:../../packages/testing
+
+  plugins/notifications:
+    dependencies:
+      '@bieberkit/auth':
+        specifier: workspace:*
+        version: link:../../packages/auth
+      '@bieberkit/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@bieberkit/data':
+        specifier: workspace:*
+        version: link:../../packages/data
+    devDependencies:
+      '@bieberkit/testing':
+        specifier: workspace:*
+        version: link:../../packages/testing
+
+  plugins/roles:
+    dependencies:
+      '@bieberkit/auth':
+        specifier: workspace:*
+        version: link:../../packages/auth
+      '@bieberkit/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@bieberkit/data':
+        specifier: workspace:*
+        version: link:../../packages/data
+      '@bieberkit/http':
+        specifier: workspace:*
+        version: link:../../packages/http
+    devDependencies:
+      '@bieberkit/testing':
+        specifier: workspace:*
+        version: link:../../packages/testing
+
+  plugins/settings:
+    dependencies:
+      '@bieberkit/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@bieberkit/data':
+        specifier: workspace:*
+        version: link:../../packages/data
+    devDependencies:
+      '@bieberkit/testing':
+        specifier: workspace:*
+        version: link:../../packages/testing
+
+  plugins/users:
+    dependencies:
+      '@bieberkit/auth':
+        specifier: workspace:*
+        version: link:../../packages/auth
+      '@bieberkit/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@bieberkit/data':
+        specifier: workspace:*
+        version: link:../../packages/data
+      '@bieberkit/http':
+        specifier: workspace:*
+        version: link:../../packages/http
+    devDependencies:
+      '@bieberkit/plugin-roles':
+        specifier: workspace:*
+        version: link:../roles
+      '@bieberkit/testing':
+        specifier: workspace:*
+        version: link:../../packages/testing
 
 packages:
 

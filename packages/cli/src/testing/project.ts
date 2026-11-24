@@ -149,3 +149,15 @@ const route = {
 
 export default defineModule({ name: 'crm', entities: [Person], routes: [route] });
 `;
+
+const PLUGIN_FOLDER = join(PACKAGES, '..', 'plugins');
+
+/** The base plugins of the blank template, by short name. */
+export const BASE_PLUGINS: readonly string[] = ['users', 'roles', 'settings', 'audit-log', 'notifications', 'media'];
+
+/** Installs the base plugins of this repository into a project, as `pnpm install` would, so that a project made by `create` loads. */
+export function linkBasePlugins(root: string): void {
+  mkdirSync(join(root, 'node_modules/@bieberkit'), { recursive: true });
+  for (const name of BASE_PLUGINS)
+    symlinkSync(join(PLUGIN_FOLDER, name), join(root, 'node_modules/@bieberkit', `plugin-${name}`), 'dir');
+}

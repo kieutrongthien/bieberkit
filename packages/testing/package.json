@@ -40,7 +40,8 @@
     "@bieberkit/core": "workspace:*",
     "@bieberkit/data": "workspace:*",
     "@bieberkit/http": "workspace:*",
-    "@bieberkit/queue": "workspace:*"
+    "@bieberkit/queue": "workspace:*",
+    "@bieberkit/storage": "workspace:*"
   },
   "devDependencies": {
     "zod": "4.6.7"

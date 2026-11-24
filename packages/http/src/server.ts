@@ -25,8 +25,15 @@
 import { createHash } from 'node:crypto';
 import Fastify, { LogController } from 'fastify';
 import type { FastifyReply, FastifyRequest } from 'fastify';
-import { createLogger, createNoopMetrics, createNoopTracer, reportError, requestContext } from '@bieberkit/core';
-import type { ErrorReporter, Logger, Metrics, OpenSpan, Tracer } from '@bieberkit/core';
+import {
+  createContainer,
+  createLogger,
+  createNoopMetrics,
+  createNoopTracer,
+  reportError,
+  requestContext,
+} from '@bieberkit/core';
+import type { ErrorReporter, Logger, Metrics, OpenSpan, ServiceRegistry, Tracer } from '@bieberkit/core';
 import { createAjv, issuesOf } from '@bieberkit/data/build';
 import { normalizeInput } from '@bieberkit/data/schema';
 import type { AjvError, AjvInstance } from '@bieberkit/data/build';
@@ -106,6 +113,8 @@ export interface HttpServerOptions {
   readonly tracer?: Tracer;
   /** Receives the duration of each request by method, route and status (OBS-03). Defaults to a registry that keeps nothing. */
   readonly metrics?: Metrics;
+  /** The services that a route handler reads from its context. Without them, reading one is an error. */
+  readonly services?: ServiceRegistry;
 }
 
 export interface InjectOptions {
@@ -829,6 +838,7 @@ export function createHttpServer(env: HttpEnv, options: HttpServerOptions = {}):
           requestId: request.id,
           traceId: traceIdNow(),
           log: logger,
+          services: options.services ?? createContainer().services,
           status: (code) => {
             current.status = code;
           },

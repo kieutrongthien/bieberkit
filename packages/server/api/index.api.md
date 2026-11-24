@@ -28,7 +28,7 @@
 Generated from the built declaration files by `pnpm api:update`. Do not edit by hand. A change here is a change to the public API and needs a changeset (spec section 22.3).
 
 ```ts
-import { BkError, CoreEnv, EnvOwner, EnvSource, ModuleDef, PluginDef, ProjectConfigInput, Role } from "@bieberkit/core";
+import { BkError, CoreEnv, EnvOwner, EnvSource, KeyCollector, ModuleDef, PluginDef, ProjectConfigInput, Role } from "@bieberkit/core";
 import { Database, MadeMigration, PluginRun } from "@bieberkit/data/orm";
 import { PluginMigrationStep } from "@bieberkit/data";
 type BootRole = Role | "dev";
@@ -104,6 +104,7 @@ interface Seeded {
 }
 export declare function seed(options?: SeedOptions): Promise<Seeded>;
 export declare class ServerError extends BkError {}
+export declare const COLLECTORS: readonly KeyCollector[];
 export declare const CONFIG_FILE = "bieberkit.config.ts";
 interface LoadedPlugin {
   readonly def: PluginDef<unknown>;

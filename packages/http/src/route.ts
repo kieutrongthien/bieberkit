@@ -22,7 +22,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Logger } from '@bieberkit/core';
+import type { Logger, ServiceRegistry } from '@bieberkit/core';
 import type { JsonSchema } from '@bieberkit/data/schema';
 import type { AccessAnswer, Principal } from './ports.ts';
 
@@ -50,6 +50,8 @@ export interface RouteContext {
   readonly requestId: string;
   readonly traceId: string;
   readonly log: Logger;
+  /** The services of the process: the database, the validated config, and what the modules registered. */
+  readonly services: ServiceRegistry;
   /** Sets the status of the answer. It must be one that `schema.response` has a schema for. Defaults to 200. */
   status(code: number): void;
   /** Sets a header of the answer. */

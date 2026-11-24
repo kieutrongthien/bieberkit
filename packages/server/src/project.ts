@@ -29,6 +29,7 @@ import { pathToFileURL } from 'node:url';
 import { resolvePlugins, toManifest, validateConfig } from '@bieberkit/core';
 import type { EnvOwner, PluginDef, ProjectConfigInput } from '@bieberkit/core';
 import { ServerError } from './errors.ts';
+import { COLLECTORS } from './manifest.ts';
 
 export const CONFIG_FILE = 'bieberkit.config.ts';
 
@@ -155,7 +156,11 @@ export async function loadProject(cwd: string): Promise<Project> {
   }
   const version = coreVersion();
   const { order } = resolvePlugins(
-    [...loaded.values()].map(({ def }) => ({ name: def.name, version: def.version, manifest: toManifest(def) })),
+    [...loaded.values()].map(({ def }) => ({
+      name: def.name,
+      version: def.version,
+      manifest: toManifest(def, COLLECTORS),
+    })),
     { core: version, dialect: config.database.dialect },
   );
   const plugins = order.flatMap((name) => loaded.get(name) ?? []);

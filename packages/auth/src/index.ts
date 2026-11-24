@@ -100,10 +100,20 @@ export {
 export type { AuthRolePermissionRow, AuthRoleRow, AuthUserRoleRow, GrantLoader, Grants } from './roles.ts';
 
 import type { ScopedPermission } from './ability.ts';
+import type { AuthInstance as ServiceAuth } from './better-auth.ts';
 
 declare module '@bieberkit/core' {
   interface ModuleContributions {
     /** The permissions of the module that carry a condition, by permission string (AUTHZ-02). */
     scopedPermissions?: Readonly<Record<string, ScopedPermission>>;
+  }
+}
+
+declare module '@bieberkit/core' {
+  interface ServiceRegistry {
+    /** Better Auth over the database of the process: sign up, sign in and the session API. The server registers it for every role. */
+    auth: ServiceAuth;
+    /** Every permission string that the project knows: those of its entities, its routes and its plugins, sorted. The administrator role gets all of them. */
+    permissions: readonly string[];
   }
 }

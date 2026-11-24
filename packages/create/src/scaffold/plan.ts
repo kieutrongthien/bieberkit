@@ -86,7 +86,16 @@ export function planProject(choices: Choices, cwd: string, deps: PlanDeps): Plan
   const plan: Plan = {
     plugins: order.flatMap((name) => {
       const entry = deps.index[name];
-      return entry === undefined ? [] : [{ name, version: entry.version, env: entry.manifest.env }];
+      return entry === undefined
+        ? []
+        : [
+            {
+              name,
+              version: entry.version,
+              env: entry.manifest.env,
+              ...(entry.envRows === undefined ? {} : { envRows: entry.envRows }),
+            },
+          ];
     }),
     year: deps.year,
     framework: deps.framework,

@@ -22,14 +22,19 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type { CoreEnv } from '../config/core-env.ts';
 import { BkError, ContainerError } from '../errors/errors.ts';
 
 /**
  * Names and types of the services. Packages and modules add theirs by declaration merging:
  * `declare module '@bieberkit/core' { interface ServiceRegistry { pipeline: PipelineService } }`.
  */
-// oxlint-disable-next-line typescript/no-empty-interface
-export interface ServiceRegistry {}
+export interface ServiceRegistry {
+  /** The validated environment of the process. The server registers it, so that a service reads configuration and never `process.env` (P8). */
+  config: CoreEnv;
+  /** The validated values of the env keys that plugins declare, by key (`USERS_ADMIN_EMAIL`). */
+  pluginEnv: Readonly<Record<string, unknown>>;
+}
 
 export type ServiceName = Extract<keyof ServiceRegistry, string>;
 

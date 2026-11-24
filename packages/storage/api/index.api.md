@@ -43,5 +43,10 @@ interface MemoryDisk extends Disk {
   }>;
 }
 export declare function createMemoryDisk(options?: MemoryDiskOptions): MemoryDisk;
+declare module "@bieberkit/core" {
+  interface ServiceRegistry {
+    storage: Storage;
+  }
+}
 export { DEFAULT_MAX_BYTES, DEFAULT_TYPES, type Disk, type DiskBody, type DiskObject, type MemoryDisk, type MemoryDiskOptions, type SignedUpload, type Storage, StorageError, type StorageOptions, type StoragePolicy, type StoreBody, type StoredFile, type TypeRule, type Visibility, createStorage };
 ```

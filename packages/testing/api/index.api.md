@@ -30,10 +30,11 @@ Generated from the built declaration files by `pnpm api:update`. Do not edit by 
 ```ts
 import { AccessAuthorizer } from "@bieberkit/auth";
 import { ApiField } from "@bieberkit/data/schema";
-import { BkError, Dialect, LogFields, Logger, ModuleDef } from "@bieberkit/core";
+import { BkError, Dialect, LogFields, Logger, ModuleDef, ServiceRegistry } from "@bieberkit/core";
 import { Database, DatabaseOptions, OrmSchema } from "@bieberkit/data/orm";
 import { EntityDef } from "@bieberkit/data";
 import { HttpServer } from "@bieberkit/http";
+import { MemoryDisk } from "@bieberkit/storage";
 import { Queue } from "@bieberkit/queue";
 interface Reply {
   readonly status: number;
@@ -97,6 +98,7 @@ interface TestAppOptions {
   readonly roles?: Readonly<Record<string, readonly string[]>>;
   readonly open?: OpenDatabase;
   readonly tenant?: string;
+  readonly pluginEnv?: Readonly<Record<string, unknown>>;
 }
 interface TestApp {
   readonly db: Database;
@@ -105,6 +107,8 @@ interface TestApp {
   readonly schemas: readonly OrmSchema[];
   readonly entities: readonly EntityDef<string>[];
   readonly authorizer: AccessAuthorizer;
+  readonly services: ServiceRegistry;
+  readonly disk: MemoryDisk;
   readonly logger: MemoryLogger;
   readonly tenant: string;
   newUser(): TestUser;

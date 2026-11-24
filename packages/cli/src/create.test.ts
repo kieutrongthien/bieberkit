@@ -28,6 +28,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 import { runCli } from './run.ts';
+import { linkBasePlugins } from './testing/project.ts';
 
 const roots: string[] = [];
 afterEach(() => {
@@ -66,6 +67,7 @@ async function made(...flags: string[]): Promise<string> {
   for (const name of ['core', 'data', 'http', 'queue', 'auth', 'log'])
     symlinkSync(join(PACKAGES, name), join(root, 'node_modules/@bieberkit', name), 'dir');
   symlinkSync(join(PACKAGES, 'data', 'node_modules', 'zod'), join(root, 'node_modules/zod'), 'dir');
+  linkBasePlugins(root);
   return root;
 }
 
@@ -97,7 +99,8 @@ describe('section 5.1 bieberkit create', () => {
 describe('section 6 a new project is a project that the CLI understands', () => {
   it('6 the config loads, the plugin graph resolves, and the environment that was written is valid', async () => {
     const root = await made();
-    expect((await run(root, ['plugins', '--json'])).data).toMatchObject({ order: [] });
+    const order: unknown = (await run(root, ['plugins', '--json'])).data['order'];
+    expect(Array.isArray(order) ? order.length : 0).toBe(6);
     const env = await run(root, ['env:check', '--json']);
     expect(env.code).toBe(0);
     expect(env.data).toMatchObject({ valid: true });

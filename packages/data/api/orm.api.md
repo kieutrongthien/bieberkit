@@ -29,11 +29,12 @@ Generated from the built declaration files by `pnpm api:update`. Do not edit by 
 
 ```ts
 import { C as ResetEvery, E as TransitionDef, a as EntityDef } from "./define-entity-CMoIdUz2.js";
-import { Dialect, Logger, Metrics, Tracer } from "@bieberkit/core";
-import { EntityData, EntityManager, EntityName, EntityProperty, EntitySchema, FilterOptions, FilterQuery, FindOneOptions, FindOptions, IDatabaseDriver, MikroORM, NativeInsertUpdateOptions, Platform, Primary, RequiredEntityData, Type, UpdateOptions } from "@mikro-orm/core";
+import { D as DestructiveFinding, _ as EncryptionKeys, a as ResolvedConnection, c as currentEntityManager, d as runInUnitOfWork, f as AuditSink, g as ReferenceVisibility, h as runAsTenant, i as Orm, l as resolveConnection, m as currentTenantId, n as DatabaseEnv, o as afterCommit, p as SystemScopeEntry, r as DatabaseOptions, s as createDatabase, t as Database, u as runInTransaction, v as PluginMigrationStep, y as StepDatabase } from "./connect-q_meNF6W.js";
+import { Dialect, Logger } from "@bieberkit/core";
+import { EntityData, EntityManager, EntityName, EntityProperty, EntitySchema, FilterOptions, FilterQuery, FindOneOptions, FindOptions, NativeInsertUpdateOptions, Platform, Primary, RequiredEntityData, Type, UpdateOptions } from "@mikro-orm/core";
 import { Kysely, RawBuilder, SqliteDialect, Transaction } from "kysely";
 import { SqlEntityManager } from "@mikro-orm/sql";
-import { n as StepDatabase, t as PluginMigrationStep, u as DestructiveFinding } from "./steps-BowZpLj1.js";
+export declare function useEncryptionKeys(keys: EncryptionKeys | undefined): void;
 type OrmSchema = EntitySchema<Record<string, unknown>>;
 interface CompileOptions {
   readonly tenancy?: "single" | "shared-schema";
@@ -59,62 +60,6 @@ interface AggregateResult {
   readonly rows: AggregateRow[];
 }
 export declare function aggregate(em: EntityManager, schema: OrmSchema, options?: AggregateOptions): Promise<AggregateResult>;
-interface EncryptionKeys {
-  readonly current: string;
-  readonly previous?: readonly string[];
-}
-export declare function useEncryptionKeys(keys: EncryptionKeys | undefined): void;
-interface ReferenceVisibility {
-  visible(entity: string, ids: readonly string[]): Promise<readonly string[]>;
-}
-interface SystemScopeEntry {
-  readonly reason: string;
-  readonly userId?: string;
-  readonly requestId?: string;
-  readonly tenantId?: string;
-  readonly at: Date;
-}
-interface AuditSink {
-  record(entry: SystemScopeEntry): void | Promise<void>;
-}
-export declare function currentTenantId(): string | undefined;
-export declare function runAsTenant<T>(tenantId: string, fn: () => T): T;
-interface DatabaseEnv {
-  readonly DB_CONNECTION: Dialect | undefined;
-  readonly DATABASE_URL: string | undefined;
-  readonly DATABASE_READ_URLS: readonly string[];
-  readonly DB_POOL_MAX: number;
-}
-interface DatabaseOptions {
-  readonly entities: readonly EntitySchema[];
-  readonly audit?: AuditSink | "table";
-  readonly encryption?: EncryptionKeys;
-  readonly references?: ReferenceVisibility;
-  readonly logger?: Logger;
-  readonly queryLog?: (sql: string) => void;
-  readonly tracer?: Tracer;
-  readonly metrics?: Metrics;
-}
-type Orm = MikroORM<IDatabaseDriver, EntityManager, readonly EntitySchema[]>;
-interface Database {
-  readonly dialect: Dialect;
-  readonly orm: Orm;
-  fork(): EntityManager;
-  asSystem<T>(reason: string, fn: () => Promise<T>): Promise<T>;
-  close(): Promise<void>;
-}
-interface ResolvedConnection {
-  readonly dialect: Dialect;
-  readonly location: string;
-  readonly readLocations: readonly string[];
-}
-export declare function resolveConnection(env: DatabaseEnv, variable?: string): ResolvedConnection;
-export declare function createDatabase(env: DatabaseEnv, options: DatabaseOptions): Promise<Database>;
-export declare function currentEntityManager(): EntityManager | undefined;
-export declare function runInTransaction<T>(db: Database, fn: (em: EntityManager) => Promise<T>): Promise<T>;
-type CommitHook = () => Promise<void> | void;
-export declare function afterCommit(callback: CommitHook): void;
-export declare function runInUnitOfWork<T>(db: Database, fn: (em: EntityManager) => Promise<T>): Promise<T>;
 interface AuditEntry {
   readonly action: string;
   readonly entity?: string;
@@ -517,5 +462,5 @@ export declare function setTranslation(em: EntityManager, schema: OrmSchema, rec
 type Row = Record<string, unknown>;
 export declare function toApiRow(schema: OrmSchema, row: Row): Row;
 export declare function toOrmData(schema: OrmSchema, input: Row, _mode: "create" | "update"): Row;
-export type { AggregateOptions, AggregateResult, AggregateRow, AttachmentInput, AttachmentRow, AuditEntry, AuditLogRow, AuditSink, AvailableTransition, CommentRow, CompileOptions, Database, DatabaseEnv, DatabaseOptions, DispatchResult, EncryptionKeys, FeaturePage, ListOptions, MadeMigration, MemoryReadYourWritesOptions, MigrationEnv, MigrationLockOptions, MigrationStatus, Migrator, MigratorOptions, Orm, OrmSchema, OutboxDispatcher, OutboxDispatcherOptions, OutboxEntryRow, OutboxEvent, OutboxLag, OutboxMessage, OutboxProcessedRow, OutboxPublisher, Page, PageRequest, PluginRefusal, PluginRun, PluginRunOptions, PluginStatus, PurgeOptions, ReadYourWrites, ReencryptOptions, ReencryptResult, ReferenceVisibility, RequestKysely, ResolvedConnection, SequenceKey, SequenceOptions, SequenceRow, SortOption, SqliteOptions, SystemScopeEntry, TagRow, TimelineInput, TimelineRow, TransitionResult, UpOptions };
+export { type AggregateOptions, type AggregateResult, type AggregateRow, type AttachmentInput, type AttachmentRow, type AuditEntry, type AuditLogRow, type AuditSink, type AvailableTransition, type CommentRow, type CompileOptions, type Database, type DatabaseEnv, type DatabaseOptions, type DispatchResult, type EncryptionKeys, type FeaturePage, type ListOptions, type MadeMigration, type MemoryReadYourWritesOptions, type MigrationEnv, type MigrationLockOptions, type MigrationStatus, type Migrator, type MigratorOptions, type Orm, type OrmSchema, type OutboxDispatcher, type OutboxDispatcherOptions, type OutboxEntryRow, type OutboxEvent, type OutboxLag, type OutboxMessage, type OutboxProcessedRow, type OutboxPublisher, type Page, type PageRequest, type PluginRefusal, type PluginRun, type PluginRunOptions, type PluginStatus, type PurgeOptions, type ReadYourWrites, type ReencryptOptions, type ReencryptResult, type ReferenceVisibility, type RequestKysely, type ResolvedConnection, type SequenceKey, type SequenceOptions, type SequenceRow, type SortOption, type SqliteOptions, type SystemScopeEntry, type TagRow, type TimelineInput, type TimelineRow, type TransitionResult, type UpOptions, afterCommit, createDatabase, currentEntityManager, currentTenantId, resolveConnection, runAsTenant, runInTransaction, runInUnitOfWork };
 ```
