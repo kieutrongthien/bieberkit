@@ -187,3 +187,28 @@ export async function applyPluginMigrations(
 ): Promise<PluginRun> {
   return runPluginMigrations(await kyselyOf(db.orm.em), db.dialect, steps, options);
 }
+
+export interface PluginStatus {
+  /** `plugin/id` of the steps in the ledger, in run order. */
+  readonly applied: string[];
+  /** `plugin/id` of the steps that a run would apply, in run order. */
+  readonly pending: string[];
+}
+
+/** What the ledger says about `steps`, without running anything. A database that never ran a step has no ledger yet, and every step is pending. */
+export async function pluginMigrationStatus(
+  db: Kysely<StepDatabase>,
+  steps: readonly PluginMigrationStep[],
+  pluginOrder: readonly string[],
+): Promise<PluginStatus> {
+  validateSteps(steps, pluginOrder);
+  let ledger = new Set<string>();
+  try {
+    const rows = await db.selectFrom(LEDGER).select(['plugin', 'step_id']).execute();
+    ledger = new Set(rows.map((row) => `${String(row['plugin'])}/${String(row['step_id'])}`));
+  } catch {
+    // No ledger yet.
+  }
+  const names = orderSteps(steps, pluginOrder).map((step) => stepName(step));
+  return { applied: names.filter((name) => ledger.has(name)), pending: names.filter((name) => !ledger.has(name)) };
+}

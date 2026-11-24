@@ -69,3 +69,15 @@ export function contributed<T>(modules: readonly ModuleDef[], key: string): T[] 
     return Array.isArray(value) ? (value as T[]) : [];
   });
 }
+
+/** What the modules contribute under `key` when each gives an object by name, merged into one. A later module wins a name. */
+export function contributedRecord<T>(modules: readonly ModuleDef[], key: string): Record<string, T> {
+  const merged: Record<string, T> = {};
+  for (const module of modules) {
+    const value: unknown = module.contributions[key];
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) continue;
+    // The package that owns the key declared its type, a record of `T` by name.
+    for (const [name, item] of Object.entries(value)) merged[name] = item;
+  }
+  return merged;
+}

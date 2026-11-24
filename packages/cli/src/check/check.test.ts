@@ -363,3 +363,78 @@ describe('DATA-08 the migrations rule', () => {
     expect([code, violations.map((entry) => entry.severity)]).toEqual([0, ['warning']]);
   });
 });
+
+const PLUGIN = '@bieberkit/plugin-p';
+const pluginWith = (kind: string, up: string): Record<string, string> => ({
+  [`node_modules/${PLUGIN}/index.mjs`]: `import { definePlugin } from '@bieberkit/core';
+export default definePlugin({ name: '${PLUGIN}', version: '1.0.0', core: '*', dialects: ['sqlite', 'mysql'],
+  migrations: [{ plugin: '${PLUGIN}', version: '1.0.0', id: 'one', kind: '${kind}', up: async (trx) => { ${up} } }] });
+`,
+});
+
+describe('DATA-08 and DATA-27 the plugin-steps rule', () => {
+  it('DATA-08 a drop or a rename in a step that is not a contract step is an error that names the step', async () => {
+    const { code, violations } = await check(
+      pluginWith('expand', "await trx.schema.alterTable('t').dropColumn('a').execute();"),
+      ['plugin-steps'],
+      { plugins: [{ name: PLUGIN }] },
+    );
+    expect(code).toBe(3);
+    expect(violations).toMatchObject([{ code: 'BK_STEP_DESTRUCTIVE', file: PLUGIN, severity: 'error' }]);
+  });
+
+  it('DATA-08 the same drop in a contract step passes', async () => {
+    const { code, codes } = await check(
+      pluginWith('contract', "await trx.schema.alterTable('t').dropColumn('a').execute();"),
+      ['plugin-steps'],
+      { plugins: [{ name: PLUGIN }] },
+    );
+    expect([code, codes]).toEqual([0, []]);
+  });
+
+  it('DATA-27 on MySQL a step with two DDL statements and one without a guard is a warning, and on SQLite it is not reported', async () => {
+    const up =
+      "await trx.schema.createTable('a').ifNotExists().addColumn('id', 'integer').execute(); await trx.schema.createTable('b').addColumn('id', 'integer').execute();";
+    const mysql = await check(pluginWith('expand', up), ['plugin-steps'], {
+      plugins: [{ name: PLUGIN }],
+      dialect: 'mysql',
+    });
+    expect([mysql.code, mysql.violations]).toMatchObject([
+      0,
+      [{ code: 'BK_STEP_MYSQL_UNGUARDED', severity: 'warning' }],
+    ]);
+    const sqlite = await check(pluginWith('expand', up), ['plugin-steps'], { plugins: [{ name: PLUGIN }] });
+    expect(sqlite.codes).toEqual([]);
+  });
+});
+
+const SCOPED_MODULE = (when: string, subject = 'crm.Person'): string => `import { defineModule } from '@bieberkit/core';
+import { defineEntity, f } from '@bieberkit/data';
+const Person = defineEntity({ name: 'crm.Person', table: 'crm_people', fields: { id: f.id(), name: f.string({ max: 50 }) } });
+export default defineModule({ name: 'crm', entities: [Person],
+  scopedPermissions: { 'crm.person.read.own': { subject: '${subject}', action: 'read', when: ${when} } } });
+`;
+
+describe('AUTHZ-06 the scoped-permissions rule', () => {
+  it('AUTHZ-06 a condition inside the language of the translator passes', async () => {
+    const { code, codes } = await check(
+      { 'apps/server/src/modules/crm/module.ts': SCOPED_MODULE('(user) => ({ name: user.id })') },
+      ['scoped-permissions'],
+    );
+    expect([code, codes]).toEqual([0, []]);
+  });
+
+  it('AUTHZ-06 a dotted path, an unknown entity and a condition that throws are errors that name the permission', async () => {
+    const dotted = await check(
+      { 'apps/server/src/modules/crm/module.ts': SCOPED_MODULE("() => ({ 'owner.id': 1 })") },
+      ['scoped-permissions'],
+    );
+    expect([dotted.code, dotted.codes]).toEqual([3, ['BK_AUTHZ_CONDITION_NOT_ALLOWED']]);
+    expect(dotted.violations[0]?.file).toBe('apps/server/src/modules/crm/module.ts');
+    const unknown = await check(
+      { 'apps/server/src/modules/crm/module.ts': SCOPED_MODULE('() => ({})', 'crm.Nothing') },
+      ['scoped-permissions'],
+    );
+    expect(unknown.codes).toEqual(['BK_AUTHZ_SUBJECT_UNKNOWN']);
+  });
+});

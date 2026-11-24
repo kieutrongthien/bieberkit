@@ -70,11 +70,14 @@ export type {
 } from './schema/fields.ts';
 export type { CreateInput, EntityRegistry, Row, UpdateInput } from './schema/registry.ts';
 
+import type { PluginMigrationStep as ModuleMigrationStep } from './migrations/steps.ts';
 import type { EntityDef as ModuleEntityDef } from './schema/define-entity.ts';
 
 declare module '@bieberkit/core' {
   interface ModuleContributions {
     /** The entities of the module. The project compiles them to tables and, with `@bieberkit/http`, to routes (MOD-02). */
     entities?: readonly ModuleEntityDef<string>[];
+    /** The migration steps of a plugin, in the order of its versions. The migrate role runs them in the boot order of the plugins (DATA-24). */
+    migrations?: readonly ModuleMigrationStep[];
   }
 }

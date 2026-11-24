@@ -22,7 +22,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { sql } from 'kysely';
@@ -126,6 +126,14 @@ describeDialects('DATA-08 project migrations', ({ dialect, emptyDatabase }) => {
     expect(made?.destructive).toEqual([]);
     expect(existsSync(made?.path ?? '')).toBe(true);
     expect(readdirSync(p.directory).toSorted()).toEqual([`.snapshot-${dialect}.json`, `${made?.name}.ts`]);
+  });
+
+  it('DATA-08 writes a migration that imports its base class from @bieberkit/data, so a project needs no dependency on the ORM', async () => {
+    const p = await project();
+    const made = await (await p.use(NoteV1)).make();
+    const source = readFileSync(made?.path ?? '', 'utf8');
+    expect(source).toContain("import { Migration } from '@bieberkit/data/migration';");
+    expect(source).not.toContain('@mikro-orm');
   });
 
   it('DATA-08 creates nothing when the entities and the snapshot agree', async () => {

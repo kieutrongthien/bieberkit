@@ -146,7 +146,7 @@ Depends on: M1.1.
 - [x] Unicode NFC normalization at the validation boundary; code point length semantics; shared fixtures through Ajv and Zod Mini fail CI on disagreement (SCH-03, SCH-05)
 - [ ] Write helpers that add shadow column values for bulk writes (done: `bulkInsert`, `bulkUpdate`, and a runtime guard `DATA_SHADOW_STALE`), and a `bieberkit check` rule that flags direct `nativeUpdate` or `insert` on entities with compared fields (waits for the CLI of M1.8) (DATA-21, ADR 0009)
 - [x] `f.custom` takes schema values only, with a bundle size test that fails when a whole validator library is pulled into the client (SCH-07, ADR 0009)
-- [x] Standalone Ajv and fast-json-stringify modules emitted at build (SCH-06, PERF-06). The command `bieberkit build` that writes them waits for the CLI of M1.8
+- [x] Standalone Ajv and fast-json-stringify modules emitted at build (SCH-06, PERF-06). `bieberkit build` writes them to `apps/server/dist/standalone/`; the web role loads them from M1.9
 - [x] Standard columns and entity options: `version`, `created_by`, `updated_by`, `deleted_at`, `deleted_token` (DATA-18)
 - [x] UUIDv7 keys, native storage per dialect (DATA-03, DATA-14)
 - [x] UTC timestamps (DATA-04); request context per request and per job (DATA-05)
@@ -157,7 +157,7 @@ Depends on: M1.1.
 - [x] **[D]** Tenant model: `tenant: true`, global filter, `asSystem()` audited, unique constraints include `tenant_id`, tenant resolution per request (DATA-09, DATA-15, DATA-19, CFG-11)
 - [x] **[D]** Cross-tenant reference checks on writes (spec 0.8 review fix)
 - [x] Optimistic concurrency by `version` and `If-Match` (API-13)
-- [x] Migrations: snapshot diff per dialect, `make`, `up`, `down` and `status` of `openMigrator`, destructive statement detection, expand then contract (DATA-08, §9.3). The `migrate:*` commands wait for the CLI of M1.8
+- [x] Migrations: snapshot diff per dialect, `make`, `up`, `down` and `status` of `openMigrator`, destructive statement detection, expand then contract (DATA-08, §9.3). The `migrate` commands are in the CLI of M1.8
 - [x] Plugin migration runner with `bieberkit_plugin_migrations` and portable schema builder (DATA-24): step format, `deploy_id` guard, `uuidType` and `setNotNull` helpers, SQLite rebuilds with foreign keys off (DATA-08, DATA-27, ADR 0011). The `bieberkit check` rules are the functions `findStepRisks` and `detectDestructive`, and wait for the CLI of M1.8
 - [x] `MIGRATE_DATABASE_URL` used only by the migrate role (DATA-25)
 - [x] Outbox table, same-transaction write, dispatcher with SKIP LOCKED batches of 100, versioned events, per-subscriber processed ids, 7 day cleanup, lag numbers (MOD-18, §7.5). `LISTEN/NOTIFY` and the metric export wait for M1.5 and the observability package
@@ -209,7 +209,7 @@ Depends on: M1.3.
 - [x] Per-IP and per-account limits on login, OTP, magic link and reset (AUTH-06, SEC-10)
 - [x] **[D]** CASL ability per request from role data; permissions in code, roles in database (AUTHZ-01, §14.2). Roles are per tenant, a condition is code attached to a permission string (`scopedPermissions`), and the ability lives for one request
 - [x] **[D]** CASL to ORM condition translator; lists return only permitted rows (AUTHZ-02): own translator with a small operator set that fails closed with `AUTHZ_UNSUPPORTED_CONDITION` (ADR 0013)
-- [ ] `bieberkit check` rule: condition operators outside the supported set, dotted paths and unknown fields (AUTHZ-06, ADR 0013). Done: `checkScopedPermissions` (and `explainCondition`) in `@bieberkit/auth`, which is the rule. Open: the command `bieberkit check` that calls it, in M1.8
+- [x] `bieberkit check` rule: condition operators outside the supported set, dotted paths and unknown fields (AUTHZ-06, ADR 0013). Done: `checkScopedPermissions` (and `explainCondition`) in `@bieberkit/auth`, which is the rule. The rule is `bieberkit check scoped-permissions` (M1.8)
 - [x] **[D]** Field masks on read and write, default deny (AUTHZ-03, AUTHZ-04)
 - [x] Audit of role changes, `asSystem()`, impersonation, failed authorization (AUTHZ-05). `asSystem()`, failed authorization (a denial, an unsupported condition, a write of a masked field) and role changes (the service of roles) are done. Impersonation waits for its design. There is no impersonation feature yet: `recordImpersonationStart` and `recordImpersonationEnd` are what one must call, and they are tested
 - [x] API keys primitive: shown once, hashed, scoped, expiring (AUTH-07)
@@ -273,7 +273,7 @@ State on 2026-11-24: a project made by `create` starts through its `main.ts` (a 
 
 Depends on: M1.7. Built and hardened first, as every other template relies on them (§12).
 
-- [ ] CLI commands `migrate:make`, `migrate`, `migrate:status` and `migrate:rollback` over `openMigrator`, `bieberkit build` over `writeStandalone`, a lock so that one migrate run is guaranteed, and the `bieberkit check` rules from `detectDestructive` and `findStepRisks` (DATA-08, DATA-25, DATA-27)
+- [x] CLI commands `migrate:make` and `migrate` (`--status`, `--rollback`, `--allow-destructive`, as the spec has them) over `openMigrator`, `bieberkit build` over `writeStandalone` (regenerate, `tsc --noEmit`, the standalone files; the bundle of the server comes with the image of M1.9), a lock so that one migrate run is guaranteed (`bieberkit_migration_lock`, on the three dialects), and the `bieberkit check` rules from `detectDestructive` (`migrations`) and `findStepRisks` (`plugin-steps`) (DATA-08, DATA-25, DATA-27). The migrate role runs the same in production
 - [ ] Plugins: `users`, `roles`, `auth-ui`, `settings`, `audit-log`, `notifications`, `media`
 - [ ] `templates/blank/template.ts` with plugin list, seeders and menu order; administrator account and base roles seeded (§12)
 - [ ] Thin admin slice: `@bieberkit/admin-core` metadata loading, routing, permissions; `@bieberkit/admin-antd` login, generic list and form, no more (UI-01, UI-02, UI-10)

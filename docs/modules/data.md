@@ -393,6 +393,12 @@ Designed on 2026-11-22. None of it is maintainer-designed (ADR 0008 and ADR 0011
 
 Plugin steps run first and project migrations second, because a project entity may point at a table of a plugin. The command that orchestrates both is the CLI of M1.8. This slice delivers the two parts.
 
+### The lock of the migrate role (M1.8)
+
+`up`, `down` and `runPluginSteps` of the migrator run inside `withMigrationLock`, so that one run is guaranteed on every dialect (DATA-25). The lock is a row `migrate` in `bieberkit_migration_lock` (`name`, `owner`, `until`) with a lease, taken with an insert that ignores a conflict, then an update that wins only over an expired lease, then a read of the owner. A lock by session (`pg_advisory_lock`, `get_lock`) would need one connection that is held for the whole run, which breaks a pool of size 1, and SQLite has none. The run renews the lease every third of its length (5 minutes) while it works, and a run that crashes leaves a lease that ends by itself. A second run waits up to 10 minutes and then finds nothing to do; after that it fails with `DATA_MIGRATE_LOCKED` (409). `openMigrator` takes `lock: { ttlMs, waitMs, pollMs, owner }` for a test.
+
+The files that `make` writes import `Migration` from `@bieberkit/data/migration` (a subpath that only re-exports the base class), so a project depends on `@bieberkit/data` and on nothing of the ORM. A plugin gives its steps through the module key `migrations` (`ModuleContributions`), and `pluginStatus(steps, order)` reads the ledger without running anything.
+
 ### Public API
 
 `@bieberkit/data` (root, no ORM, so `bieberkit check` can use it):
@@ -468,9 +474,8 @@ All of it about MikroORM 7.2.9.
 
 ### Left out
 
-- **A migration lock.** Two `migrate` runs at once are stopped by the primary key of the ledger and by the table of MikroORM on PostgreSQL and SQLite. MySQL has no transactional DDL, so a lock (`get_lock`) belongs to the deploy of M1.8 where one run is guaranteed (DATA-25 says once per deploy).
 - **Row level security policies and the append-only grants of `audit_log`** (DATA-25) come with the audit table of slice 6.
-- **The `migrate:*` commands** are the CLI of M1.8. This slice is the library they call.
+- **The `migrate:*` commands** are the CLI of M1.8 (`docs/modules/cli.md`). This slice is the library they call.
 
 ## Slice 6: outbox and audit log
 

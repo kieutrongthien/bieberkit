@@ -48,6 +48,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
+    "@bieberkit/auth": "workspace:*",
     "@bieberkit/core": "workspace:*",
     "@bieberkit/data": "workspace:*",
     "@bieberkit/http": "workspace:*",

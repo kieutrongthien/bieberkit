@@ -268,8 +268,8 @@ Every prompt MUST have an equivalent flag, so CI and AI agents can run the scaff
 | `bieberkit dev` | Start local services from `compose.yaml`, then the server in watch mode with web, worker and scheduler in one process, plus the admin and site dev servers |
 | `bieberkit build` | Type check, build server, admin and site, generate OpenAPI and the client |
 | `bieberkit start <role>` | Start `web`, `worker`, `scheduler` or `migrate` from the built output |
-| `bieberkit migrate:make <name>` | Generate a migration from entity changes for the project dialect |
-| `bieberkit migrate` | Apply pending migrations (`--status`, `--rollback`) |
+| `bieberkit migrate:make [name]` | Generate a migration from entity changes for the project dialect |
+| `bieberkit migrate` | Apply pending plugin steps and migrations under a lock (`--status`, `--rollback`, `--allow-destructive`) |
 | `bieberkit db:seed` | Run seeders |
 | `bieberkit make:entity`, `make:module`, `make:plugin`, `make:job` | Generate code from the official recipes |
 | `bieberkit add <plugin>` / `remove <plugin>` | Install or uninstall a plugin and update config, env schema and migrations |
@@ -563,7 +563,7 @@ MariaDB is best effort and not in CI (ADR 0005). The only MySQL-family dialect v
 - **DATA-21** Every text field declares its comparison semantics: `exact` (default), `ci` (case-insensitive) or `ci_ai` (case- and accent-insensitive). `ci` and `ci_ai` use shadow columns that the application folds (Unicode NFC, lowercase, and for `ci_ai` also strip combining marks and map `đ` to `d`), compared with plain equality and a normal index. Native collations are not used, because they disagree across dialects (ADR 0008). So "Lê" and "Le", "đường" and "duong", or "LE01" and "le01" behave the same on every dialect. Contract tests run Vietnamese fixtures on all dialects. Bulk writes (`nativeUpdate`, `insert`) skip entity hooks, so they go through data-layer helpers that add the shadow values, and `bieberkit check` flags direct calls on entities that have compared fields (ADR 0009).
 - **DATA-22** Money and decimals are stored as scaled integers (MOD-11), never as floating point and never as `DECIMAL`. This matters on SQLite, which stores DECIMAL values with fractions as REAL. Validation limits every money value to the safe integer range (±9,007,199,254,740,991) on all dialects, because SQLite returns integers to JavaScript as numbers.
 - **DATA-23** SQLite runs in WAL mode with a busy timeout and starts write transactions with `BEGIN IMMEDIATE`, so web, worker and scheduler processes can share one file. MikroORM issues a plain `begin`, so `@bieberkit/data` provides the `BEGIN IMMEDIATE` through its own Kysely driver override (ADR 0008).
-- **DATA-25** Two database roles: `MIGRATE_DATABASE_URL` owns the schema and runs DDL, `DATABASE_URL` is the application role with no DDL rights. On PostgreSQL and MySQL the application role has only INSERT and SELECT on `audit_log`, which makes the audit log append-only in fact. On SQLite, triggers enforce the same rule.
+- **DATA-25** Two database roles: `MIGRATE_DATABASE_URL` owns the schema and runs DDL, `DATABASE_URL` is the application role with no DDL rights. On PostgreSQL and MySQL the application role has only INSERT and SELECT on `audit_log`, which makes the audit log append-only in fact. On SQLite, triggers enforce the same rule. One migrate run is guaranteed by a lock row with a lease in `bieberkit_migration_lock`: a second run waits, then finds nothing to do, and a crashed run frees the lock when its lease ends.
 - **DATA-26** Standard options expand into constraints automatically. Every unique constraint on a tenant-scoped entity includes `tenant_id`, on a soft-deleted entity it also includes `deleted_token`, and a tenant-scoped entity gets `UNIQUE (tenant_id, id)` as the target of composite foreign keys (DATA-15, DATA-16, DATA-20, ADR 0009).
 
 - **DATA-27** A SQLite table rebuild in a plugin step runs with foreign keys switched off (the runner sets the pragma, because it cannot change inside a transaction), since dropping the old table with foreign keys on silently cascades deletes into dependent tables. On MySQL and MariaDB DDL is not transactional, so a step has one DDL statement or guards every statement with `if not exists` or `if exists`, and `bieberkit check` flags steps that do not (ADR 0011).
@@ -1596,6 +1596,7 @@ Open questions:
 
 | Version | Date | Changes |
 | --- | --- | --- |
+| 0.8.8 | 2026-11-24 | M1.8 (migrations): the lock of the migrate role (DATA-25), `migrate --allow-destructive` in section 5.2 |
 | 0.8.7 | 2026-11-24 | M1.6 and M1.7 (the defaults of `--yes` and the missing flags in section 5.1): traces and metrics without an SDK (OBS-02 to OBS-04, ADR 0023), the log package (ADR 0022), and in section 5.2 the command `bieberkit generate`, the names of the rules of `bieberkit check` and the ignore directive |
 | 0.8.6 | 2026-11-22 | Section 11.2: the codes raised by `definePlugin` and by the manifest check (`PLG_NAME`, `PLG_MANIFEST_NAME`, and the existing ones), and how the short name of a plugin is derived. Found while implementing M1.1 |
 | 0.8.5 | 2026-11-22 | Section 23.5: changeset files are exempt from the header, because their text becomes the changelog. Found while adding the first changeset of M1.1 |

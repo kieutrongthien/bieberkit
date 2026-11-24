@@ -26,10 +26,12 @@ import { createRequire } from 'node:module';
 import { createCommand } from 'create-bieberkit';
 import { createRunner } from 'create-bieberkit/kit';
 import type { Command } from 'create-bieberkit/kit';
+import { buildCommand } from './commands/build.ts';
 import { checkCommand } from './commands/check.ts';
 import { envCheckCommand } from './commands/env-check.ts';
 import { envExampleCommand } from './commands/env-example.ts';
 import { clientGenerateCommand, generateCommand } from './commands/generate.ts';
+import { migrateCommand, migrateMakeCommand } from './commands/migrate.ts';
 import { makeEntityCommand, makeJobCommand, makeModuleCommand } from './commands/make.ts';
 import { addCommand, removeCommand } from './commands/plugin.ts';
 import { openapiCommand } from './commands/openapi.ts';
@@ -43,6 +45,7 @@ export const COMMANDS: readonly Command[] = [
   createCommand(),
   devCommand(),
   startCommand(),
+  buildCommand(),
   dbSeedCommand,
   doctorCommand,
   testCommand(),
@@ -54,6 +57,8 @@ export const COMMANDS: readonly Command[] = [
   makeModuleCommand,
   makeEntityCommand,
   makeJobCommand,
+  migrateMakeCommand,
+  migrateCommand,
   pluginsCommand,
   addCommand(),
   removeCommand(),

@@ -29,7 +29,8 @@ Generated from the built declaration files by `pnpm api:update`. Do not edit by 
 
 ```ts
 import { BkError, CoreEnv, EnvOwner, EnvSource, ModuleDef, PluginDef, ProjectConfigInput, Role } from "@bieberkit/core";
-import { Database } from "@bieberkit/data/orm";
+import { Database, MadeMigration, PluginRun } from "@bieberkit/data/orm";
+import { PluginMigrationStep } from "@bieberkit/data";
 type BootRole = Role | "dev";
 interface BootOptions {
   readonly role: BootRole;
@@ -63,6 +64,37 @@ interface Migrated {
   readonly statements: number;
 }
 export declare function migrate(db: Database, env: Pick<CoreEnv, "APP_ENV" | "QUEUE_DRIVER">): Promise<Migrated>;
+export declare const MIGRATIONS_DIR = "migrations";
+interface MigrationsOptions {
+  readonly cwd?: string;
+  readonly env?: EnvSource;
+  readonly deployId?: string;
+}
+export declare function stepsOf(env: Pick<CoreEnv, "QUEUE_DRIVER">, pluginSteps: readonly PluginMigrationStep[], plugins: readonly string[]): {
+  steps: PluginMigrationStep[];
+  order: string[];
+};
+export declare function makeMigration(options: MigrationsOptions & {
+  readonly name?: string;
+}): Promise<MadeMigration | null>;
+interface RunMigrationsOptions extends MigrationsOptions {
+  readonly allowDestructive?: boolean;
+}
+interface MigrationsRun {
+  readonly steps: PluginRun;
+  readonly migrations: readonly string[];
+}
+export declare function runMigrations(options?: RunMigrationsOptions): Promise<MigrationsRun>;
+export declare function rollbackMigration(options?: MigrationsOptions): Promise<string[]>;
+interface MigrationsStatus {
+  readonly executed: readonly string[];
+  readonly pending: readonly string[];
+  readonly steps: {
+    readonly applied: readonly string[];
+    readonly pending: readonly string[];
+  };
+}
+export declare function migrationStatus(options?: MigrationsOptions): Promise<MigrationsStatus>;
 interface SeedOptions {
   readonly cwd?: string;
   readonly env?: EnvSource;
@@ -98,6 +130,7 @@ export declare const MODULES_DIR = "apps/server/src/modules";
 export declare function projectModules(root: string): Promise<ModuleDef[]>;
 export declare function allModules(project: Project): Promise<ModuleDef[]>;
 export declare function contributed<T>(modules: readonly ModuleDef[], key: string): T[];
+export declare function contributedRecord<T>(modules: readonly ModuleDef[], key: string): Record<string, T>;
 export declare const packageName = "@bieberkit/server";
-export type { BootOptions, BootRole, DoctorOptions, Finding, LoadedPlugin, Migrated, Project, ProjectConfig, Running, SeedOptions, Seeded };
+export type { BootOptions, BootRole, DoctorOptions, Finding, LoadedPlugin, Migrated, MigrationsOptions, MigrationsRun, MigrationsStatus, Project, ProjectConfig, RunMigrationsOptions, Running, SeedOptions, Seeded };
 ```

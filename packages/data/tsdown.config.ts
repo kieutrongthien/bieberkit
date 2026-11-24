@@ -30,6 +30,7 @@ export default defineConfig({
     orm: 'src/orm/index.ts',
     schema: 'src/schema/index.ts',
     build: 'src/build/index.ts',
+    migration: 'src/migration.ts',
     runtime: 'src/runtime.ts',
   },
   format: 'esm',

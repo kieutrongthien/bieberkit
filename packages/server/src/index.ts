@@ -31,10 +31,19 @@ export { diagnose } from './doctor.ts';
 export type { DoctorOptions, Finding } from './doctor.ts';
 export { main } from './main.ts';
 export { migrate } from './migrate.ts';
+export {
+  makeMigration,
+  MIGRATIONS_DIR,
+  migrationStatus,
+  rollbackMigration,
+  runMigrations,
+  stepsOf,
+} from './migrations.ts';
+export type { MigrationsOptions, MigrationsRun, MigrationsStatus, RunMigrationsOptions } from './migrations.ts';
 export type { Migrated } from './migrate.ts';
 export { seed } from './seed.ts';
 export type { SeedOptions, Seeded } from './seed.ts';
 export { ServerError } from './errors.ts';
-export { allModules, contributed, MODULES_DIR, projectModules } from './modules.ts';
+export { allModules, contributed, contributedRecord, MODULES_DIR, projectModules } from './modules.ts';
 export { CONFIG_FILE, envOwnersOf, findProjectRoot, importFile, loadConfig, loadProject } from './project.ts';
 export type { LoadedPlugin, Project, ProjectConfig } from './project.ts';

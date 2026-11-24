@@ -34,6 +34,11 @@
       "types": "./dist/build.d.ts",
       "default": "./dist/build.js"
     },
+    "./migration": {
+      "@bieberkit/source": "./src/migration.ts",
+      "types": "./dist/migration.d.ts",
+      "default": "./dist/migration.js"
+    },
     "./runtime": {
       "@bieberkit/source": "./src/runtime.ts",
       "types": "./dist/runtime.d.ts",
@@ -58,6 +63,10 @@
       "./build": {
         "types": "./dist/build.d.ts",
         "default": "./dist/build.js"
+      },
+      "./migration": {
+        "types": "./dist/migration.d.ts",
+        "default": "./dist/migration.js"
       },
       "./runtime": {
         "types": "./dist/runtime.d.ts",

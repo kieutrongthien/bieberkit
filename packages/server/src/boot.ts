@@ -37,7 +37,8 @@ import type { JobDef, Queue } from '@bieberkit/queue';
 import { createQueueFromConfig } from '@bieberkit/queue/redis';
 import { ServerError } from './errors.ts';
 import { migrate } from './migrate.ts';
-import { allModules, contributed } from './modules.ts';
+import { runMigrations } from './migrations.ts';
+import { allModules, contributed, contributedRecord } from './modules.ts';
 import { observe } from './observe.ts';
 import { envOwnersOf, loadProject } from './project.ts';
 
@@ -120,7 +121,14 @@ export async function boot(options: BootOptions): Promise<Running> {
   lifecycle.onShutdown('database', () => db.close());
   lifecycle.onShutdown('observability', () => seen.close());
 
-  if (options.role === 'dev' || roles.includes('migrate')) {
+  if (roles.includes('migrate') && env.APP_ENV === 'production') {
+    // Production: the steps, then the files of the project, under the lock, on the connection of the migrate role (DATA-25).
+    const done = await runMigrations({
+      cwd: project.root,
+      ...(options.env === undefined ? {} : { env: options.env }),
+    });
+    logger.info('the database is ready', { steps: done.steps.applied.length, migrations: done.migrations.length });
+  } else if (options.role === 'dev' || roles.includes('migrate')) {
     const done = await migrate(db, env);
     logger.info('the database is ready', { steps: done.applied.length, statements: done.statements });
   }
@@ -143,9 +151,7 @@ export async function boot(options: BootOptions): Promise<Running> {
   }
 
   if (roles.includes('web')) {
-    const scoped: Record<string, ScopedPermission> = {};
-    for (const found of contributed<Record<string, ScopedPermission>>(modules, 'scopedPermissions'))
-      Object.assign(scoped, found);
+    const scoped = contributedRecord<ScopedPermission>(modules, 'scopedPermissions');
     const authorizer = createAuthorizer({ db, entities, schemas, scoped });
     server = createHttpServer(env, { logger, tracer, metrics, errorReporter: reporter, authorizer });
     authorizer.install(server);

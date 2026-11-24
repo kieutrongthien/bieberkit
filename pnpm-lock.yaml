@@ -283,6 +283,9 @@ importers:
 
   packages/cli:
     dependencies:
+      '@bieberkit/auth':
+        specifier: workspace:*
+        version: link:../auth
       '@bieberkit/core':
         specifier: workspace:*
         version: link:../core

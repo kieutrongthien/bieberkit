@@ -28,7 +28,9 @@ import { headersRule } from './rules/headers.ts';
 import { generatedRule } from './rules/generated.ts';
 import { migrationsRule } from './rules/migrations.ts';
 import { ormRule } from './rules/orm.ts';
+import { pluginStepsRule } from './rules/plugin-steps.ts';
 import { routesRule } from './rules/routes.ts';
+import { scopedPermissionsRule } from './rules/scoped-permissions.ts';
 import { sqlRule } from './rules/sql.ts';
 import { transactionsRule } from './rules/transactions.ts';
 import type { Rule } from './rule.ts';
@@ -43,4 +45,6 @@ export const RULES: readonly Rule[] = [
   migrationsRule,
   routesRule,
   generatedRule,
+  pluginStepsRule,
+  scopedPermissionsRule,
 ];

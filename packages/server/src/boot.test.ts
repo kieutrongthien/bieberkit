@@ -22,9 +22,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { boot, roleOf } from './boot.ts';
 import type { Running } from './boot.ts';
+import { makeMigration } from './migrations.ts';
 import { makeProject, testEnv } from './testing/project.ts';
 import type { Fixture } from './testing/project.ts';
 
@@ -95,6 +97,26 @@ describe('section 7.1 the roles', () => {
       .execute("select name from sqlite_master where type = 'table'");
     const names = rows.map((row: unknown) => String(Object(row).name));
     for (const table of ['crm_people', 'bieberkit_outbox', 'audit_log', 'auth_roles']) expect(names).toContain(table);
+  });
+
+  it('DATA-25 the migrate role in production runs the files of the project on MIGRATE_DATABASE_URL, and makes no table from the entities', async () => {
+    const fixture = makeProject();
+    fixtures.push(fixture);
+    const env = await testEnv(fixture.root, {
+      APP_ENV: 'production',
+      APP_SINGLE_NODE: 'true',
+      QUEUE_DRIVER: 'database',
+      MIGRATE_DATABASE_URL: join(fixture.root, 'test.db'),
+    });
+    await makeMigration({ cwd: fixture.root, env });
+    const one = await boot({ role: 'migrate', cwd: fixture.root, env });
+    running.push(one);
+    const rows = await one.database.orm.em
+      .getConnection()
+      .execute("select name from sqlite_master where type = 'table'");
+    const names = rows.map((row: unknown) => String(Object(row).name));
+    for (const table of ['crm_people', 'bieberkit_migrations', 'bieberkit_plugin_migrations', 'bk_jobs'])
+      expect(names).toContain(table);
   });
 
   it('7.1 the worker role starts the queue and the outbox dispatcher, and stops them', async () => {

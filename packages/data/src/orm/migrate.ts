@@ -34,8 +34,10 @@ import { migrationFileName } from '../migrations/names.ts';
 import type { PluginMigrationStep } from '../migrations/steps.ts';
 import { initOrm, resolveConnection } from './connect.ts';
 import { kyselyOf } from './internals.ts';
-import { runPluginMigrations } from './plugin-migrate.ts';
-import type { PluginRun, PluginRunOptions } from './plugin-migrate.ts';
+import { withMigrationLock } from './migration-lock.ts';
+import type { MigrationLockOptions } from './migration-lock.ts';
+import { pluginMigrationStatus, runPluginMigrations } from './plugin-migrate.ts';
+import type { PluginRun, PluginRunOptions, PluginStatus } from './plugin-migrate.ts';
 
 /** The keys of `CoreEnv` that the migrate role reads. Only this role reads `MIGRATE_DATABASE_URL` (DATA-25). */
 export interface MigrationEnv {
@@ -50,6 +52,8 @@ export interface MigratorOptions {
   /** The folder of the migration files and of the snapshots. Keep it in version control. */
   readonly directory: string;
   readonly logger?: Logger;
+  /** How the lock of the migrate role behaves. The defaults suit a deploy. A test shortens them. */
+  readonly lock?: MigrationLockOptions;
 }
 
 export interface MadeMigration {
@@ -82,6 +86,8 @@ export interface Migrator {
   status(): Promise<MigrationStatus>;
   /** Runs the pending steps of the plugins over the connection of the migrate role (DATA-24). */
   runPluginSteps(steps: readonly PluginMigrationStep[], options: PluginRunOptions): Promise<PluginRun>;
+  /** What the ledger of the plugin steps says, without running anything. */
+  pluginStatus(steps: readonly PluginMigrationStep[], pluginOrder: readonly string[]): Promise<PluginStatus>;
   close(): Promise<void>;
 }
 
@@ -116,7 +122,15 @@ export async function openMigrator(env: MigrationEnv, options: MigratorOptions):
   const { directory } = options;
   const logger = options.logger ?? createLogger({ level: 'info', role: 'migrate' });
   const snapshot = `.snapshot-${resolved.dialect}`;
-  const { Migrator: MikroMigrator } = await import('@mikro-orm/migrations');
+  const { Migrator: MikroMigrator, TSMigrationGenerator } = await import('@mikro-orm/migrations');
+  /** The file imports its base class from this package, so that a project needs no dependency on the ORM of its own. */
+  class FileGenerator extends TSMigrationGenerator {
+    override generateMigrationFile(className: string, diff: { up: string[]; down: string[] }): string {
+      return super
+        .generateMigrationFile(className, diff)
+        .replace("'@mikro-orm/migrations'", "'@bieberkit/data/migration'");
+    }
+  }
   const orm = await initOrm(
     resolved,
     {
@@ -131,6 +145,7 @@ export async function openMigrator(env: MigrationEnv, options: MigratorOptions):
         pathTs: directory,
         glob: '!(*.d).{js,ts}',
         emit: 'ts',
+        generator: FileGenerator,
         tableName: 'bieberkit_migrations',
         snapshot: true,
         snapshotName: snapshot,
@@ -147,6 +162,10 @@ export async function openMigrator(env: MigrationEnv, options: MigratorOptions):
   );
   const migrator = orm.migrator;
 
+  /** One run at a time on the database, whichever process it is (DATA-25). */
+  const locked = async <T>(run: () => Promise<T>): Promise<T> =>
+    withMigrationLock(await kyselyOf(orm.em), resolved.dialect, run, options.lock);
+
   const files = (): string[] =>
     existsSync(directory)
       ? readdirSync(directory).filter((file) => EXTENSION.test(file) && !file.endsWith('.d.ts'))
@@ -156,6 +175,35 @@ export async function openMigrator(env: MigrationEnv, options: MigratorOptions):
     executed: (await migrator.getExecuted()).map((row) => row.name).toSorted(),
     pending: (await migrator.getPending()).map((info) => info.name).toSorted(),
   });
+
+  const runUp = async (upOptions: UpOptions): Promise<string[]> => {
+    const pending = await migrator.getPending();
+    if (upOptions.allowDestructive !== true) {
+      const found: string[] = [];
+      for (const info of pending.toSorted((a, b) => a.name.localeCompare(b.name))) {
+        if (info.path === undefined) continue;
+        const findings = detectDestructive(upStatementsOfMigration(readFileSync(info.path, 'utf8')));
+        for (const finding of findings) found.push(`${info.name}: ${finding.kind}: ${finding.statement}`);
+      }
+      if (found.length > 0) {
+        throw dataError(
+          'DATA_MIGRATION_DESTRUCTIVE',
+          409,
+          `No migration ran, because these statements drop, rename or narrow something:\n${found.join('\n')}`,
+          'Split the change: add and fill in this release, remove in a later one (DATA-08). Pass allowDestructive in the contract release.',
+        );
+      }
+    }
+    const applied = (await migrator.up()).map((info) => info.name);
+    for (const name of applied) logger.info('migration applied', { migration: name });
+    return applied;
+  };
+
+  const runDown = async (): Promise<string[]> => {
+    const reverted = (await migrator.down()).map((info) => info.name);
+    for (const name of reverted) logger.warn('migration rolled back', { migration: name });
+    return reverted;
+  };
 
   return {
     dialect: resolved.dialect,
@@ -183,36 +231,12 @@ export async function openMigrator(env: MigrationEnv, options: MigratorOptions):
         destructive: detectDestructive(result.diff.up),
       };
     },
-    async up(upOptions = {}) {
-      const pending = await migrator.getPending();
-      if (upOptions.allowDestructive !== true) {
-        const found: string[] = [];
-        for (const info of pending.toSorted((a, b) => a.name.localeCompare(b.name))) {
-          if (info.path === undefined) continue;
-          const findings = detectDestructive(upStatementsOfMigration(readFileSync(info.path, 'utf8')));
-          for (const finding of findings) found.push(`${info.name}: ${finding.kind}: ${finding.statement}`);
-        }
-        if (found.length > 0) {
-          throw dataError(
-            'DATA_MIGRATION_DESTRUCTIVE',
-            409,
-            `No migration ran, because these statements drop, rename or narrow something:\n${found.join('\n')}`,
-            'Split the change: add and fill in this release, remove in a later one (DATA-08). Pass allowDestructive in the contract release.',
-          );
-        }
-      }
-      const applied = (await migrator.up()).map((info) => info.name);
-      for (const name of applied) logger.info('migration applied', { migration: name });
-      return applied;
-    },
-    async down() {
-      const reverted = (await migrator.down()).map((info) => info.name);
-      for (const name of reverted) logger.warn('migration rolled back', { migration: name });
-      return reverted;
-    },
+    up: (upOptions = {}) => locked(() => runUp(upOptions)),
+    down: () => locked(runDown),
     status,
-    runPluginSteps: async (steps, runOptions) =>
-      runPluginMigrations(await kyselyOf(orm.em), resolved.dialect, steps, runOptions),
+    runPluginSteps: (steps, runOptions) =>
+      locked(async () => runPluginMigrations(await kyselyOf(orm.em), resolved.dialect, steps, runOptions)),
+    pluginStatus: async (steps, pluginOrder) => pluginMigrationStatus(await kyselyOf(orm.em), steps, pluginOrder),
     close: () => orm.close(),
   };
 }

@@ -373,6 +373,14 @@ export declare function rawKysely(db: {
     readonly em: EntityManager;
   };
 }): Promise<Kysely<StepDatabase>>;
+export declare const MIGRATION_LOCK_TABLE = "bieberkit_migration_lock";
+interface MigrationLockOptions {
+  readonly owner?: string;
+  readonly ttlMs?: number;
+  readonly waitMs?: number;
+  readonly pollMs?: number;
+}
+export declare function withMigrationLock<T>(kysely: Kysely<StepDatabase>, dialect: Dialect, run: () => Promise<T>, options?: MigrationLockOptions): Promise<T>;
 interface PluginRefusal {
   readonly step: string;
   readonly code: string;
@@ -390,6 +398,11 @@ interface PluginRunOptions {
 }
 export declare function runPluginMigrations(db: Kysely<StepDatabase>, dialect: Dialect, steps: readonly PluginMigrationStep[], options: PluginRunOptions): Promise<PluginRun>;
 export declare function applyPluginMigrations(db: Database, steps: readonly PluginMigrationStep[], options: PluginRunOptions): Promise<PluginRun>;
+interface PluginStatus {
+  readonly applied: string[];
+  readonly pending: string[];
+}
+export declare function pluginMigrationStatus(db: Kysely<StepDatabase>, steps: readonly PluginMigrationStep[], pluginOrder: readonly string[]): Promise<PluginStatus>;
 interface MigrationEnv {
   readonly DB_CONNECTION: Dialect | undefined;
   readonly MIGRATE_DATABASE_URL: string | undefined;
@@ -399,6 +412,7 @@ interface MigratorOptions {
   readonly entities: readonly EntitySchema[];
   readonly directory: string;
   readonly logger?: Logger;
+  readonly lock?: MigrationLockOptions;
 }
 interface MadeMigration {
   readonly name: string;
@@ -421,6 +435,7 @@ interface Migrator {
   down(): Promise<string[]>;
   status(): Promise<MigrationStatus>;
   runPluginSteps(steps: readonly PluginMigrationStep[], options: PluginRunOptions): Promise<PluginRun>;
+  pluginStatus(steps: readonly PluginMigrationStep[], pluginOrder: readonly string[]): Promise<PluginStatus>;
   close(): Promise<void>;
 }
 export declare function openMigrator(env: MigrationEnv, options: MigratorOptions): Promise<Migrator>;
@@ -502,5 +517,5 @@ export declare function setTranslation(em: EntityManager, schema: OrmSchema, rec
 type Row = Record<string, unknown>;
 export declare function toApiRow(schema: OrmSchema, row: Row): Row;
 export declare function toOrmData(schema: OrmSchema, input: Row, _mode: "create" | "update"): Row;
-export type { AggregateOptions, AggregateResult, AggregateRow, AttachmentInput, AttachmentRow, AuditEntry, AuditLogRow, AuditSink, AvailableTransition, CommentRow, CompileOptions, Database, DatabaseEnv, DatabaseOptions, DispatchResult, EncryptionKeys, FeaturePage, ListOptions, MadeMigration, MemoryReadYourWritesOptions, MigrationEnv, MigrationStatus, Migrator, MigratorOptions, Orm, OrmSchema, OutboxDispatcher, OutboxDispatcherOptions, OutboxEntryRow, OutboxEvent, OutboxLag, OutboxMessage, OutboxProcessedRow, OutboxPublisher, Page, PageRequest, PluginRefusal, PluginRun, PluginRunOptions, PurgeOptions, ReadYourWrites, ReencryptOptions, ReencryptResult, ReferenceVisibility, RequestKysely, ResolvedConnection, SequenceKey, SequenceOptions, SequenceRow, SortOption, SqliteOptions, SystemScopeEntry, TagRow, TimelineInput, TimelineRow, TransitionResult, UpOptions };
+export type { AggregateOptions, AggregateResult, AggregateRow, AttachmentInput, AttachmentRow, AuditEntry, AuditLogRow, AuditSink, AvailableTransition, CommentRow, CompileOptions, Database, DatabaseEnv, DatabaseOptions, DispatchResult, EncryptionKeys, FeaturePage, ListOptions, MadeMigration, MemoryReadYourWritesOptions, MigrationEnv, MigrationLockOptions, MigrationStatus, Migrator, MigratorOptions, Orm, OrmSchema, OutboxDispatcher, OutboxDispatcherOptions, OutboxEntryRow, OutboxEvent, OutboxLag, OutboxMessage, OutboxProcessedRow, OutboxPublisher, Page, PageRequest, PluginRefusal, PluginRun, PluginRunOptions, PluginStatus, PurgeOptions, ReadYourWrites, ReencryptOptions, ReencryptResult, ReferenceVisibility, RequestKysely, ResolvedConnection, SequenceKey, SequenceOptions, SequenceRow, SortOption, SqliteOptions, SystemScopeEntry, TagRow, TimelineInput, TimelineRow, TransitionResult, UpOptions };
 ```

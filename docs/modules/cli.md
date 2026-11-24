@@ -36,7 +36,8 @@
 | C2    | `bieberkit check` and its rules (boundaries, headers, env access, route permissions, destructive migrations, WP-01, string SQL, stale generated files, ORM in entity files) |             |
 | C3    | Deterministic generators (`.bieberkit/*`, `packages/client`, `openapi`, `client:generate`, `routes`) and `make:entity`, `make:module`, `make:job`                           |             |
 | C4    | `create-bieberkit`: every flag and prompt, the plugin graph before any write, the files of section 6                                                                        |             |
-| C5    | The runtime commands: `start <role>` (the boot that wires the tracer, the metrics server and `redactKeys`), `dev`, `build`, `migrate`, `db:seed`, `doctor`, `test`          |             |
+| C5    | The runtime commands: `start <role>` (the boot that wires the tracer, the metrics server and `redactKeys`), `dev`, `db:seed`, `doctor`, `test`                              |             |
+| C7    | `migrate:make`, `migrate` (`--status`, `--rollback`, `--allow-destructive`), `build`, and the rules `plugin-steps` and `scoped-permissions` of `check` (M1.8)               | this change |
 | C6    | `add` and `remove` with the data ownership prompt, and the Oxlint plugin                                                                                                    |             |
 
 ## Behavior of C1
@@ -97,7 +98,7 @@
 4. **`db:seed`** runs the seeders and says which ran. **`doctor`** prints one line for each check (`ok`, `warning` or `error`, with the fix), and an error is `BK_DOCTOR_FAILED` with the fixes, exit code 1.
 5. **`test [filter] [--watch] [--coverage]`** writes `.bieberkit/vitest.config.ts` and `.bieberkit/vitest.setup.ts` (part of `generate`, not committed) and runs `pnpm exec vitest` with them. The preset includes `apps/**` and `packages/**` tests, provides the URLs of the test databases from the environment the way CI gives them, and installs the guard on the network of `@bieberkit/testing` (TST-03).
 6. **A new project starts.** The test of this slice makes a project with `create`, links the packages of the repository where `pnpm install` would, starts its `main.ts web` in a real process on free ports, waits for `/health/ready` and the metrics, and stops it with SIGTERM: exit code 0.
-7. **Left for M1.8.** `build` (`writeStandalone`), `migrate:make`, `migrate`, `--status` and `--rollback` (`openMigrator`, with the lock of one run), and the first migration and the administrator seed that need the base plugins.
+7. **Left for M1.8.** The first migration and the administrator seed need the base plugins; the commands `migrate:make`, `migrate` and `build` are C7.
 
 ## Behavior of C6
 
@@ -106,6 +107,13 @@
 3. **The package manager is not bypassed.** A `pnpm` that fails is `BK_PNPM_FAILED`, and its fix says that the settings of the supply chain are never relaxed to make an install pass (SEC-11).
 4. **The Oxlint plugin** is `bieberkit/oxlint`, a plugin in the shape that Oxlint loads (`jsPlugins`; it is a default export, the one in the framework, because Oxlint requires it). Each rule is a rule of `bieberkit check` that reads one file (`headers`, `env-access`, `boundaries`, `orm`, `sql`, `transactions`), run by the same function, so the editor, `oxlint` and `bieberkit check` cannot disagree, and a test compares them. `generate` writes `.bieberkit/oxlintrc.json` with the plugin, the six rules, and the root, the author and the license of the project: `oxlint -c .bieberkit/oxlintrc.json`. A diagnostic carries the code (`BK_ENV_ACCESS`), the message, the fix and the line. The rules that need the application (`routes`, `generated`) and the files of the project (`migrations`) are not in the plugin. JS plugins of Oxlint are in alpha and not subject to semver, so the version of Oxlint is pinned by the project and a test runs the real binary.
 5. **A copy of core of its own.** A plugin may bring its own copy of `@bieberkit/core`, whose errors are not `instanceof` ours, so a failure is read by its stable code and not by its class.
+
+## Behavior of C7
+
+1. **`migrate:make [name]`** writes `migrations/Migration<timestamp>[_name].ts` for what the entities changed since `migrations/.snapshot-<dialect>.json`, and says its path. It never reads the live database (ADR 0008). A change that drops, renames or narrows something is written and reported as a warning, and the file is checked in `check`. Nothing to make is a success.
+2. **`migrate`** opens the migrator on `MIGRATE_DATABASE_URL` (DATA-25), under the lock, and runs the steps of the framework and of the plugins in boot order, then the files of the project. A refused step (`PLG_CONTRACT_SAME_DEPLOY`) is `BK_MIGRATE_REFUSED` and stops the run before the files. A file with a destructive statement stops the run with `DATA_MIGRATION_DESTRUCTIVE` until `--allow-destructive` is given in the contract release (DATA-08). `--status` lists the files and the steps that ran and that wait, and runs nothing. `--rollback` reverts the last file and never a plugin step (steps only go forward, DATA-24). The two flags together are `BK_USAGE_FLAGS_CONFLICT`. The migrate role of `bieberkit start migrate` does the same in production, and in development it keeps making the tables of the entities from the metadata, so the loop is fast.
+3. **`build`** regenerates everything (GEN-02), runs `pnpm exec tsc --noEmit` when the project has a `tsconfig.json` (`--no-typecheck` skips it; a failure is `BK_BUILD_TYPECHECK`), and writes the standalone Ajv validators and fast-json-stringify serializers to `apps/server/dist/standalone/` (SCH-06). The bundle of the server and the builds of the admin and of the site wait for M1.8's admin and for the image of M1.9.
+4. **`check plugin-steps`** reads the steps that plugins contribute: a drop or a rename in a step that is not a `contract` step is `BK_STEP_DESTRUCTIVE` (an error), and on MySQL a step with two or more DDL statements and one without `ifNotExists()` or `ifExists()` is `BK_STEP_MYSQL_UNGUARDED` (a warning, DATA-27). **`check scoped-permissions`** runs `checkScopedPermissions` of `@bieberkit/auth` on the conditions of every module (`BK_AUTHZ_SUBJECT_UNKNOWN`, `BK_AUTHZ_ACTION_INVALID`, `BK_AUTHZ_CONDITION_THROWS`, `BK_AUTHZ_CONDITION_NOT_ALLOWED`, AUTHZ-06). Both load the application, so the Oxlint plugin does not offer them.
 
 ## Tests
 
@@ -120,3 +128,5 @@
 `runtime.test.ts` (each command with a fake process: the arguments, the entry, the exit codes, the watch and the services; `db:seed` and `doctor` through the CLI; a project that `create` made, started in a real process).
 
 `plugin-config.test.ts` (the list is read, added to and removed from in each style, and add then remove gives the file back), `plugin.test.ts` (add and remove with a pnpm that leaves what the real one does: the install, the config, the environment, the undone attempt, the confirmation, the migration and that check accepts it), `oxlint.test.ts` (the real Oxlint loads the plugin and agrees with check).
+
+`migrate.test.ts` (make, run, status, rollback and the usage error over a project and SQLite), `build.test.ts` (regeneration from scratch, the standalone files, the type check and its failure), and in `check.test.ts` the rules `plugin-steps` and `scoped-permissions`. The migrator, its lock and its files are tested on the three dialects in `packages/data` (`migration-lock.dialects.test.ts`).
