@@ -25,6 +25,7 @@
 import type { Authenticator } from '@bieberkit/http';
 import { keyOf, principalOfKey } from './api-keys.ts';
 import type { AuthInstance } from './better-auth.ts';
+import { requireEnabledUser } from './user-status.ts';
 
 const COOKIE = '__Host-bk_session';
 
@@ -43,7 +44,7 @@ export function createAuthenticator(auth: AuthInstance): Authenticator {
       const cookie = Array.isArray(header) ? header.join('; ') : header;
       if (cookie === undefined || !cookie.includes(`${COOKIE}=`)) return undefined;
       const session = await auth.api.getSession({ headers: new Headers({ cookie }) });
-      if (session === null) return undefined;
+      if (session === null || !(await requireEnabledUser(auth, session.user.id))) return undefined;
       // The user has a second factor when he turned it on. A session of such a user is made only after the code (AUTH-05).
       const mfa = 'twoFactorEnabled' in session.user && session.user.twoFactorEnabled === true;
       return { id: session.user.id, kind: 'user', via: 'cookie', sessionId: session.session.id, mfa };

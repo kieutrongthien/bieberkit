@@ -163,23 +163,23 @@ git commit -s -m "feat(auth): add the disabled and identity columns to the users
 Run: `BK_REQUIRE_DIALECTS=all pnpm test packages/auth/src/user-service.dialects.test.ts`
 Expected: FAIL (`disableUser` is not exported).
 
-**Execution record (2026-11-25):** The 13 test cases ran on PostgreSQL, MySQL and SQLite: **39 expected failures, no skips**. Service cases fail because `disableUser`/`enableUser` are not exported. Authentication cases seed disabled status directly so they reach the real HTTP path even before those services exist: password, magic link, passkey, TOTP, cookie and API key still succeed instead of returning 403 `AUTH_USER_DISABLED`. Extra cases prove audit-failure rollback, passkey refusal and no-op enabling. The secondary-store test retains the original enabled-user snapshot after session revocation; satisfying it requires reading current status rather than trusting the cached user. The namespace-export guards keep the RED phase typecheckable and will be replaced by direct imports when the public services exist. The maintainer approved Gate 2 ("Duyệt test Task 2, tiếp tục triển khai"); production implementation is in progress.
+**Execution record (2026-11-25):** The 13 test cases ran on PostgreSQL, MySQL and SQLite: **39 expected failures, no skips**. Service cases fail because `disableUser`/`enableUser` are not exported. Authentication cases seed disabled status directly so they reach the real HTTP path even before those services exist: password, magic link, passkey, TOTP, cookie and API key still succeed instead of returning 403 `AUTH_USER_DISABLED`. Extra cases prove audit-failure rollback, passkey refusal and no-op enabling. The secondary-store test retains the original enabled-user snapshot after session revocation; satisfying it requires reading current status rather than trusting the cached user. The namespace-export guards keep the RED phase typecheckable and will be replaced by direct imports when the public services exist. The maintainer approved Gate 2 ("Duyệt test Task 2, tiếp tục triển khai"); implementation is complete. The 39 cases are now green, and `BK_REQUIRE_DIALECTS=all pnpm test packages/auth packages/http --maxWorkers=2 --testTimeout=15000` passed **1239 tests across 48 files, no skips**. `pnpm check`, `pnpm typecheck` and `pnpm lint` passed. HTTP already maps the domain error to 403; no HTTP source change is needed. `user-status.ts` shares the status predicate and fresh owner read between cookie and API-key authentication; trusting the cached `session.user` would fail the retained-snapshot test. Better Auth 1.7.25 exposes `$context.internalAdapter.findUserById`, so no new authenticator option is needed. Services use conditional updates to preserve no-op behavior and keep the audit with explicit actor, status change and session deletion in one transaction. Direct public imports replaced the temporary RED guards. The auth build, generated API report and changeset were updated.
 
 - [x] **Step 3: GATE.** Show the maintainer the tests and wait.
 
-- [ ] **Step 4: Implement `disableUser` and `enableUser`** in `user-service.ts` with `runInTransaction` and `recordAudit` from `@bieberkit/data/orm`, and export both with their types from `index.ts`.
+- [x] **Step 4: Implement `disableUser` and `enableUser`** in `user-service.ts` with `runInTransaction` and `recordAudit` from `@bieberkit/data/orm`, and export both with their types from `index.ts`.
 
-- [ ] **Step 5: Implement the three refusals.**
+- [x] **Step 5: Implement the three refusals.**
   - One choke point for sign in: `databaseHooks.session.create.before` in `createAuth` throws the Better Auth API error carrying `code: 'AUTH_USER_DISABLED'` and status 403 when the user is disabled. Every method (password, magic link, passkey, second factor) creates its session there.
   - `createAuthenticator`: after `getSession`, a user with `disabledAt` set throws `authError('AUTH_USER_DISABLED', ...)`. This covers a session that came from the secondary storage.
   - `principalOfKey`: after a valid key, read the owner through `auth.$context` (`internalAdapter.findUserById`) and refuse a disabled one. If `$context` is not available in Better Auth 1.7.25, give `createAuthenticator` a required `db` option and update its callers (`boot.ts`, `testing/auth-server.ts` and the tests of this package); the test decides.
 
-- [ ] **Step 6: Run to verify it passes, and that the HTTP pipeline maps the thrown error.**
+- [x] **Step 6: Run to verify it passes, and that the HTTP pipeline maps the thrown error.**
 
 Run: `BK_REQUIRE_DIALECTS=all pnpm test packages/auth packages/http`
 Expected: PASS. If a thrown `AuthError` from `authenticate` becomes a 500, fix the mapping in `@bieberkit/http` (an `AuthError` is a `BkError` and carries its status) and add `it('BPL-01 the pipeline answers with the status of a BkError thrown by the authenticator')` there.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add packages/auth packages/http

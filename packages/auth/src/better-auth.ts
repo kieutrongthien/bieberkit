@@ -37,6 +37,7 @@ import type { Database } from '@bieberkit/data/orm';
 import { authError } from './errors.ts';
 import { accountKey, createRateLimiter, rulesOf } from './limits.ts';
 import type { AuthLimits, RateLimiter } from './limits.ts';
+import { isDisabledUser, userDisabledError } from './user-status.ts';
 
 export type { AuthLimits, Limit, Limit2 } from './limits.ts';
 export type { BetterAuthOptions };
@@ -267,6 +268,20 @@ export function createAuth(options: CreateAuthOptions): AuthInstance {
       modelName: 'authRateLimit',
       customStorage: limiter.storage,
       customRules: rules.perIp,
+    },
+    databaseHooks: {
+      session: {
+        create: {
+          before: async (session) => {
+            const user = await requestKysely(options.db)
+              .selectFrom('authUser')
+              .select('disabledAt')
+              .where('id', '=', session.userId)
+              .executeTakeFirst();
+            if (isDisabledUser(user)) throw new APIError('FORBIDDEN', userDisabledError().toJSON());
+          },
+        },
+      },
     },
     hooks: {
       // The limit of an account. The address of the request is hashed, so the table never holds it in clear text.

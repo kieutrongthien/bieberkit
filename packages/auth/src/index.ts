@@ -59,6 +59,8 @@ export type { ConditionFinding } from './check-conditions.ts';
 export { createAuthorizer } from './authorizer.ts';
 export { assignRole, createRole, deleteRole, revokeRole, setRolePermissions, updateRole } from './role-service.ts';
 export type { Assignment, NewRole } from './role-service.ts';
+export { disableUser, enableUser } from './user-service.ts';
+export type { DisableUserInput, EnableUserInput } from './user-service.ts';
 export { registerAuthRoutes } from './routes.ts';
 export type { AuthRoutesOptions } from './routes.ts';
 export {

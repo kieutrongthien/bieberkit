@@ -179,6 +179,17 @@ export declare function updateRole(db: Database, roleId: string, changes: {
 export declare function deleteRole(db: Database, roleId: string): Promise<void>;
 export declare function assignRole(db: Database, input: Assignment): Promise<boolean>;
 export declare function revokeRole(db: Database, input: Assignment): Promise<boolean>;
+interface DisableUserInput {
+  readonly userId: string;
+  readonly reason: string;
+  readonly actorId: string | null;
+}
+interface EnableUserInput {
+  readonly userId: string;
+  readonly actorId: string | null;
+}
+export declare function disableUser(db: Database, input: DisableUserInput): Promise<boolean>;
+export declare function enableUser(db: Database, input: EnableUserInput): Promise<boolean>;
 interface AuthRoutesOptions {
   readonly auth: AuthInstance;
   readonly db: Database;
@@ -314,5 +325,5 @@ declare module "@bieberkit/core" {
     permissions: readonly string[];
   }
 }
-export { AUTH_PLUGIN, type Ability, type AbilityInput, type AbilityUser, type AccessAnswer, type AccessAuthorizer, type Action, type ApiKeyInput, type Assignment, type AuthAccountRow, type AuthApiKeyRow, type AuthApiKeys, type AuthInstance, type AuthLimits, type AuthMail, type AuthPasskeyRow, type AuthRateLimitRow, AuthRole, AuthRolePermission, type AuthRolePermissionRow, type AuthRoleRow, type AuthRoutesOptions, type AuthSecondaryStorage, type AuthSessionRow, type AuthTwoFactorRow, AuthUserRole, type AuthUserRoleRow, type AuthUserRow, type AuthVerificationRow, type AuthorizerOptions, type BetterAuthOptions, type Condition, type ConditionFinding, type CreateAuthOptions, type CreatedApiKey, type DriftEntity, type DriftProperty, type EntityShape, type GrantLoader, type Grants, type ImpersonationEntry, type Limit, type Limit2, type MaskedField, NIL_TENANT, type NewRole, type PermissionEntry, type PermissionRegistry, type ScopedPermission, type TenantResolverOptions, authEntities, authMigrationSteps, buildAbility, buildPermissionRegistry, createAuthorizer, explainCondition, loadGrants };
+export { AUTH_PLUGIN, type Ability, type AbilityInput, type AbilityUser, type AccessAnswer, type AccessAuthorizer, type Action, type ApiKeyInput, type Assignment, type AuthAccountRow, type AuthApiKeyRow, type AuthApiKeys, type AuthInstance, type AuthLimits, type AuthMail, type AuthPasskeyRow, type AuthRateLimitRow, AuthRole, AuthRolePermission, type AuthRolePermissionRow, type AuthRoleRow, type AuthRoutesOptions, type AuthSecondaryStorage, type AuthSessionRow, type AuthTwoFactorRow, AuthUserRole, type AuthUserRoleRow, type AuthUserRow, type AuthVerificationRow, type AuthorizerOptions, type BetterAuthOptions, type Condition, type ConditionFinding, type CreateAuthOptions, type CreatedApiKey, type DisableUserInput, type DriftEntity, type DriftProperty, type EnableUserInput, type EntityShape, type GrantLoader, type Grants, type ImpersonationEntry, type Limit, type Limit2, type MaskedField, NIL_TENANT, type NewRole, type PermissionEntry, type PermissionRegistry, type ScopedPermission, type TenantResolverOptions, authEntities, authMigrationSteps, buildAbility, buildPermissionRegistry, createAuthorizer, explainCondition, loadGrants };
 ```
