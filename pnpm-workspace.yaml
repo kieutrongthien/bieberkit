@@ -45,7 +45,10 @@ blockExoticSubdeps: true
 # Dependency build scripts run only when listed here with true. Anything unlisted fails the
 # install (strictDepBuilds). Each entry needs a reason in the pull request that adds it.
 strictDepBuilds: true
-allowBuilds: {}
+allowBuilds:
+  # BullMQ -> msgpackr -> msgpackr-extract has an install script that looks for a prebuilt binary and falls back to plain JavaScript.
+  # It is reviewed and denied: no script runs, and the redis queue driver works on the JavaScript path (ADR 0020, option A).
+  msgpackr-extract: false
 
 # Exact versions in package.json. The lockfile is the record of what runs.
 saveExact: true
