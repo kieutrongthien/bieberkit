@@ -69,3 +69,12 @@ export type {
   TransitionDef,
 } from './schema/fields.ts';
 export type { CreateInput, EntityRegistry, Row, UpdateInput } from './schema/registry.ts';
+
+import type { EntityDef as ModuleEntityDef } from './schema/define-entity.ts';
+
+declare module '@bieberkit/core' {
+  interface ModuleContributions {
+    /** The entities of the module. The project compiles them to tables and, with `@bieberkit/http`, to routes (MOD-02). */
+    entities?: readonly ModuleEntityDef<string>[];
+  }
+}

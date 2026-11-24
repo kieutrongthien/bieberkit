@@ -62,11 +62,12 @@ describe('OBS-02 the span of a request', () => {
     server.route(okRoute('/api/v1/deals/:id'));
     await server.inject({
       method: 'GET',
-      url: '/api/v1/deals/42?token=secret',
-      headers: { authorization: 'Bearer abc', cookie: 'session=xyz' },
+      url: '/api/v1/deals/row-9731?token=querysecret',
+      headers: { authorization: 'Bearer headersecret', cookie: 'session=cookiesecret' },
     });
     const text = JSON.stringify(spans, (_key, value: unknown) => (typeof value === 'bigint' ? String(value) : value));
-    for (const secret of ['42', 'secret', 'Bearer', 'abc', 'session', 'xyz']) expect(text).not.toContain(secret);
+    for (const secret of ['row-9731', 'querysecret', 'Bearer', 'headersecret', 'session', 'cookiesecret'])
+      expect(text).not.toContain(secret);
   });
 
   it('OBS-02 without a traceparent the span starts a trace, and the log lines of the request carry its ids', async () => {

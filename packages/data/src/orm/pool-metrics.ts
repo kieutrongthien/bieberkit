@@ -32,10 +32,16 @@ interface PoolOwner {
 /** A number that the pool says about itself, under the first of `names` that it has, or the length of the list that is under it. */
 function figure(pool: unknown, names: readonly string[]): number | undefined {
   if (typeof pool !== 'object' || pool === null) return undefined;
-  for (const name of names) {
-    const value: unknown = Reflect.get(pool, name);
-    if (typeof value === 'number') return value;
-    if (Array.isArray(value)) return value.length;
+  // `mysql2` wraps its core pool, which holds the lists, in the object that the driver gives out.
+  for (const owner of [pool, Reflect.get(pool, 'pool')]) {
+    if (typeof owner !== 'object' || owner === null) continue;
+    for (const name of names) {
+      const value: unknown = Reflect.get(owner, name);
+      if (typeof value === 'number') return value;
+      // A list, or a queue with a `length` (`mysql2` keeps its free connections in one).
+      const length: unknown = typeof value === 'object' && value !== null ? Reflect.get(value, 'length') : undefined;
+      if (typeof length === 'number') return length;
+    }
   }
   return undefined;
 }

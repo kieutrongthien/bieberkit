@@ -32,6 +32,8 @@ export default defineConfig({
   test: {
     include: ['packages/*/src/**/*.test.{ts,tsx}', 'plugins/*/src/**/*.test.{ts,tsx}', 'tools/**/*.test.ts'],
     passWithNoTests: true,
+    // TST-03: a test that opens a connection outside this machine fails.
+    setupFiles: ['./tools/vitest-setup.ts'],
     // Database URLs for the dialect suites of @bieberkit/data (packages/data/src/testing). The `services` job of ci.yml sets
     // them, and locally they point at throwaway containers. With BK_REQUIRE_DIALECTS=all a missing URL fails the run.
     // This file is the one place where tests read the environment, as a config file (P8 covers application code).
@@ -47,22 +49,29 @@ export default defineConfig({
       // The Valkey of the queue suites of @bieberkit/queue (packages/queue/src/adapters/redis). Its policy must be `noeviction` (Q-08).
       queueRedisUrl: process.env['QUEUE_TEST_REDIS_URL'] ?? '',
       storageS3Endpoint: process.env['STORAGE_TEST_S3_ENDPOINT'] ?? '',
+      // Hosts besides this machine that a test may call, separated by commas. For the services of a CI network. Empty by default.
+      networkAllow: (process.env['TEST_NETWORK_ALLOW'] ?? '')
+        .split(',')
+        .map((host) => host.trim())
+        .filter((host) => host !== ''),
     },
-    // `pnpm test:coverage`. TST-01: 90 percent of lines for core, data, http and auth, 80 percent for the rest.
-    // Each package gets its threshold when it reaches Phase 1.
+    // `pnpm test:coverage`. TST-01: 90 percent of lines for core, data, http and auth, and 80 percent for every other package.
+    // The packages that are already above 90 keep it. `lines` at the top is the 80 percent of the rest, and a file that a
+    // threshold of a glob covers is counted there and not in the top one.
     coverage: {
       provider: 'v8',
       include: ['packages/*/src/**/*.ts'],
-      exclude: ['**/*.test.ts', '**/*.d.ts', 'packages/*/src/testing/**'],
+      exclude: ['**/*.test.ts', '**/*.d.ts', 'packages/*/src/testing/**', 'packages/testing/src/fixtures.ts'],
       reporter: ['text-summary', 'text'],
       thresholds: {
+        lines: 80,
         'packages/core/src/**': { lines: 90 },
         'packages/data/src/**': { lines: 90 },
+        'packages/http/src/**': { lines: 90 },
         'packages/auth/src/**': { lines: 90 },
         'packages/cache/src/**': { lines: 90 },
         'packages/storage/src/**': { lines: 90 },
         'packages/mail/src/**': { lines: 90 },
-        'packages/log/src/**': { lines: 80 },
       },
     },
   },

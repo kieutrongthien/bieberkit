@@ -38,7 +38,7 @@ export { BULK_JOB, createBulkJob, JOBS_PATH, registerJobRoutes } from './bulk-jo
 export type { BulkJob, BulkJobOptions } from './bulk-job.ts';
 export { MAX_BULK, MAX_BULK_INLINE } from './bulk.ts';
 export type { BulkInput, BulkQueue } from './bulk.ts';
-export { entityRoutes, registerEntityRoutes } from './entity-routes.ts';
+export { entityRoutes, pathOf as entityPath, registerEntityRoutes } from './entity-routes.ts';
 export type { EntityRoutesContext } from './entity-routes.ts';
 export { META_SCHEMA, registerMeta } from './meta.ts';
 export { openApiDocument, registerOpenApi } from './openapi.ts';
@@ -71,3 +71,12 @@ export type {
   StageHook,
   StageName,
 } from './server.ts';
+
+import type { RouteDef as ModuleRouteDef } from './route.ts';
+
+declare module '@bieberkit/core' {
+  interface ModuleContributions {
+    /** The routes of the module that no entity makes. They are added to the server with the routes of the entities (MOD-02). */
+    routes?: readonly ModuleRouteDef[];
+  }
+}

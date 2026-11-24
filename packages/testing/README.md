@@ -24,7 +24,7 @@
 
 # @bieberkit/testing
 
-Test app, factories and actingAs helpers.
+Test app, entity factories, callers with roles and tenants, and the helpers that run a suite on every dialect.
 
 - Product layer. Imports contracts and foundation, never tools.
 - Workspace dependencies: `@bieberkit/core`, `@bieberkit/http`, `@bieberkit/data`, `@bieberkit/auth`.

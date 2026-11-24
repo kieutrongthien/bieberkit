@@ -2,7 +2,7 @@
  * BieberKit
  *
  * @file        packages/testing/src/index.ts
- * @description Public entry point of @bieberkit/testing.
+ * @description Public API of @bieberkit/testing: the test app, factories, callers and the helpers that run a suite on every dialect (TST-02, TST-03).
  * @author      Bieber Kieu <kieutrongthien@gmail.com>
  * @copyright   Copyright (c) 2026 Bieber Kieu
  * @license     Apache-2.0
@@ -22,7 +22,22 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-// Public API of @bieberkit/testing. Implementation starts after the Phase 0 ADRs (docs/adr/README.md).
-
 /** npm name of this package. */
 export const packageName = '@bieberkit/testing';
+
+export { createTestApp } from './app.ts';
+export type { TestApp, TestAppOptions, TestUser } from './app.ts';
+export { invalidCasesOf, REFUSED_PAGES } from './cases.ts';
+export type { InvalidCase, PageCase } from './cases.ts';
+export { createClient, TENANT_HEADER, USER_HEADER } from './client.ts';
+export type { Client, Reply } from './client.ts';
+export { describeEntityContracts } from './contract.ts';
+export type { EntityContractOptions } from './contract.ts';
+export { describeDialects, openMemoryDatabase } from './database.ts';
+export type { DialectContext, OpenDatabase } from './database.ts';
+export { TestingError } from './errors.ts';
+export { createMemoryLogger } from './logger.ts';
+export type { LoggedLine, MemoryLogger } from './logger.ts';
+export { createFactory } from './factory.ts';
+export type { Factory, FactoryContext, Overrides } from './factory.ts';
+export { sampleOf } from './sample.ts';
