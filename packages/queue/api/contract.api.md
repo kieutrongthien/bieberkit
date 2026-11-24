@@ -120,7 +120,7 @@ interface Worker {
   crash(): void;
 }
 interface Queue {
-  readonly driver: "sync" | "database";
+  readonly driver: "sync" | "database" | "redis";
   dispatch<Input>(job: JobDef<Input>, input: Input, options?: DispatchOptions): Promise<Dispatched>;
   subscribe<Input>(event: string, job: JobDef<Input>, map?: (message: OutboxMessage) => Input): void;
   readonly publisher: OutboxPublisher;

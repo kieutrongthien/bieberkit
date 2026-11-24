@@ -31,7 +31,7 @@ Generated from the built declaration files by `pnpm api:update`. Do not edit by 
 import { Database, OutboxDispatcher, OutboxDispatcherOptions } from "@bieberkit/data/orm";
 import { ErrorReporter, Logger } from "@bieberkit/core";
 import { PluginMigrationStep } from "@bieberkit/data";
-import { _ as WorkerOptions, a as JobContext, b as queueError, c as JobResult, d as Queue, f as QueueError, g as Worker, i as Dispatched, l as JobStatus, m as QueueStats, n as DeadLetterPage, o as JobDef, p as QueueName, r as DispatchOptions, s as JobInput, t as DeadJob, u as QUEUE_NAMES, v as defaultBackoffMs, y as defineJob } from "./contract-DcepRID4.js";
+import { _ as defineJob, a as JobContext, c as QUEUE_NAMES, d as QueueName, f as QueueStats, g as defaultBackoffMs, h as WorkerOptions, i as Dispatched, l as Queue, m as Worker, n as DeadLetterPage, o as JobDef, r as DispatchOptions, s as JobInput, t as DeadJob, u as QueueError, v as queueError } from "./contract-BCjOZFtL.js";
 interface Cron {
   matches(date: Date): boolean;
 }
@@ -101,5 +101,5 @@ declare module "@bieberkit/core" {
     jobs?: readonly JobDef[];
   }
 }
-export { type CreateQueueOptions, type Cron, type DeadJob, type DeadLetterPage, type DispatchOptions, type Dispatched, type JobContext, type JobDef, type JobInput, type JobResult, type JobStatus, type PoolStats, QUEUE_NAMES, type Queue, QueueError, type QueueName, type QueueStats, type RunOptions, type Schedule, type Scheduler, type SchedulerOptions, type Worker, type WorkerOptions, type WorkerPool, type WorkerPoolOptions, defaultBackoffMs, defineJob, queueError };
+export { type CreateQueueOptions, type Cron, type DeadJob, type DeadLetterPage, type DispatchOptions, type Dispatched, type JobContext, type JobDef, type JobInput, type PoolStats, QUEUE_NAMES, type Queue, QueueError, type QueueName, type QueueStats, type RunOptions, type Schedule, type Scheduler, type SchedulerOptions, type Worker, type WorkerOptions, type WorkerPool, type WorkerPoolOptions, defaultBackoffMs, defineJob, queueError };
 ```

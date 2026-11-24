@@ -965,6 +965,7 @@ await queue.dispatch(sendInvoice, { invoiceId })
 
 - **Q-11** Every queue driver passes the shared contract suite of nine tests: context restored (Q-10), `jobId` deduplication, retries with backoff, dead letters, delay, queue isolation, redelivery after a crash, exactly one run per job with two workers, and throughput (ADR 0010).
 - **Q-13** A worker on PostgreSQL MAY be woken by a notification that is sent in the transaction of the insert and delivered at the commit, so a job that another process adds starts at once. The poll stays as the fallback, and a source that cannot connect never stops the worker (ADR 0019).
+- **Q-14** The `redis` driver is BullMQ on Valkey, imported only in `@bieberkit/queue/redis`. It passes the same contract suite as the other drivers, keeps the job ids that callers choose (Q-01), and gives a job of a worker that died to another worker. Its instance needs `maxmemory-policy noeviction` (Q-08).
 - **Q-15** A handler may return JSON, which the queue keeps with the job (at most 1 MiB, for 7 days), and `queue.status(jobId)` answers where a job is, its result and its error, with the tenant and the user that dispatched it.
 
 ### 15.2 Cache
