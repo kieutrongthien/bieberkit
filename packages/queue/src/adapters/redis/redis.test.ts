@@ -45,7 +45,18 @@ const waitFor = async (done: () => boolean | Promise<boolean>, timeoutMs = 15_00
 
 describe('Q-01 the ids of BullMQ', () => {
   it('Q-01 an id that is a whole number or has a colon or a percent is made valid, and comes back as it was', () => {
-    for (const id of ['1', '123456', 'a:b', 'a%3Ab', '100%', 'sched:daily:2026-11-24T00:00', 'ob-0190f6b2', 'tên-việt', '::', '%%']) {
+    for (const id of [
+      '1',
+      '123456',
+      'a:b',
+      'a%3Ab',
+      '100%',
+      'sched:daily:2026-11-24T00:00',
+      'ob-0190f6b2',
+      'tên-việt',
+      '::',
+      '%%',
+    ]) {
       const stored = encodeId(id);
       expect(stored).not.toMatch(/^\d+$/);
       expect(stored).not.toContain(':');
@@ -67,8 +78,10 @@ describeQueueRedis('Q-11 the redis driver', ({ url, prefix, clean }) => {
     return { queue, close: () => queue.close() };
   });
 
-  const make = async (jobs: Parameters<typeof createRedisQueue>[0]['jobs'], extra: Partial<Parameters<typeof createRedisQueue>[0]> = {}) =>
-    createRedisQueue({ url, jobs, prefix: prefix(), ...extra });
+  const make = async (
+    jobs: Parameters<typeof createRedisQueue>[0]['jobs'],
+    extra: Partial<Parameters<typeof createRedisQueue>[0]> = {},
+  ) => createRedisQueue({ url, jobs, prefix: prefix(), ...extra });
 
   describe('Q-04 dead letters', () => {
     const failing = defineJob<{ n: number }>({
@@ -167,7 +180,11 @@ describeQueueRedis('Q-11 the redis driver', ({ url, prefix, clean }) => {
 
   describe('Q-02 input and ids', () => {
     it('Q-02 refuses an input that does not fit before anything is stored, and an id that is not allowed', async () => {
-      const job = defineJob<{ id: string }>({ name: 'r.input', input: z.object({ id: z.string() }), handler: async () => undefined });
+      const job = defineJob<{ id: string }>({
+        name: 'r.input',
+        input: z.object({ id: z.string() }),
+        handler: async () => undefined,
+      });
       const queue = await make([job]);
       // The test gives an input that the types forbid, on purpose.
       // oxlint-disable-next-line typescript/no-unsafe-type-assertion
@@ -179,11 +196,16 @@ describeQueueRedis('Q-11 the redis driver', ({ url, prefix, clean }) => {
 
     it('Q-01 ids that are numbers, or have colons or percent signs, work and come back as given', async () => {
       const seen: string[] = [];
-      const job = defineJob({ name: 'r.ids', input: empty, handler: async (_input, context) => void seen.push(context.jobId) });
+      const job = defineJob({
+        name: 'r.ids',
+        input: empty,
+        handler: async (_input, context) => void seen.push(context.jobId),
+      });
       const queue = await make([job]);
       const worker = queue.createWorker({ pollMs: 20 });
       worker.start();
-      for (const id of ['12345', 'sched:daily:2026-11-24', '100%', 'a%3Ab']) await queue.dispatch(job, {}, { jobId: id });
+      for (const id of ['12345', 'sched:daily:2026-11-24', '100%', 'a%3Ab'])
+        await queue.dispatch(job, {}, { jobId: id });
       await waitFor(() => seen.length === 4);
       expect(seen.toSorted()).toEqual(['100%', '12345', 'a%3Ab', 'sched:daily:2026-11-24']);
       await worker.stop();
@@ -192,8 +214,18 @@ describeQueueRedis('Q-11 the redis driver', ({ url, prefix, clean }) => {
 
     it('Q-02 a job whose stored input no longer fits its schema is not tried again, and is dead at once, reported', async () => {
       const reporter = createMemoryReporter();
-      const loose = defineJob({ name: 'r.drift', input: z.object({ n: z.number() }), attempts: 5, handler: async () => undefined });
-      const strict = defineJob({ name: 'r.drift', input: z.object({ n: z.string() }), attempts: 5, handler: async () => undefined });
+      const loose = defineJob({
+        name: 'r.drift',
+        input: z.object({ n: z.number() }),
+        attempts: 5,
+        handler: async () => undefined,
+      });
+      const strict = defineJob({
+        name: 'r.drift',
+        input: z.object({ n: z.string() }),
+        attempts: 5,
+        handler: async () => undefined,
+      });
       const name = prefix();
       const producer = await createRedisQueue({ url, jobs: [loose], prefix: name });
       const consumer = await createRedisQueue({ url, jobs: [strict], prefix: name, errorReporter: reporter });
@@ -259,7 +291,16 @@ describeQueueRedis('Q-11 the redis driver', ({ url, prefix, clean }) => {
       worker.start();
       const tenantId = randomUUID();
       const userId = randomUUID();
-      const message = { id: 'm1', jobId: 'ob-aaaa', name: 'crm.deal.won', version: 1, tenantId, userId, payload: { id: 'd1' }, createdAt: new Date() };
+      const message = {
+        id: 'm1',
+        jobId: 'ob-aaaa',
+        name: 'crm.deal.won',
+        version: 1,
+        tenantId,
+        userId,
+        payload: { id: 'd1' },
+        createdAt: new Date(),
+      };
       // The transaction of the dispatcher is not used by this driver.
       // oxlint-disable-next-line typescript/no-unsafe-type-assertion
       const claiming = {} as never;
@@ -316,11 +357,18 @@ describeQueueRedis('Q-11 the redis driver', ({ url, prefix, clean }) => {
       const job = defineJob({ name: 'r.config', input: empty, handler: async () => undefined });
       const sync = await createQueueFromConfig({ QUEUE_DRIVER: 'sync', REDIS_URL: undefined }, { jobs: [job] });
       expect(sync.driver).toBe('sync');
-      const redis = await createQueueFromConfig({ QUEUE_DRIVER: 'redis', REDIS_URL: url }, { jobs: [job], prefix: prefix() });
+      const redis = await createQueueFromConfig(
+        { QUEUE_DRIVER: 'redis', REDIS_URL: url },
+        { jobs: [job], prefix: prefix() },
+      );
       expect(redis.driver).toBe('redis');
       await redis.close();
-      await expect(createQueueFromConfig({ QUEUE_DRIVER: 'redis', REDIS_URL: undefined }, { jobs: [job] })).rejects.toThrow(/REDIS_URL/);
-      await expect(createQueueFromConfig({ QUEUE_DRIVER: 'database', REDIS_URL: undefined }, { jobs: [job] })).rejects.toThrow(/database/);
+      await expect(
+        createQueueFromConfig({ QUEUE_DRIVER: 'redis', REDIS_URL: undefined }, { jobs: [job] }),
+      ).rejects.toThrow(/REDIS_URL/);
+      await expect(
+        createQueueFromConfig({ QUEUE_DRIVER: 'database', REDIS_URL: undefined }, { jobs: [job] }),
+      ).rejects.toThrow(/database/);
     });
 
     it('createQueue says where the redis driver is, and a job that is registered twice is refused', async () => {
@@ -330,7 +378,9 @@ describeQueueRedis('Q-11 the redis driver', ({ url, prefix, clean }) => {
         code: 'QUEUE_DRIVER_UNSUPPORTED',
         fix: expect.stringContaining('createRedisQueue'),
       });
-      await expect(createRedisQueue({ url, jobs: [job, job], prefix: prefix() })).rejects.toMatchObject({ code: 'QUEUE_JOB_INVALID' });
+      await expect(createRedisQueue({ url, jobs: [job, job], prefix: prefix() })).rejects.toMatchObject({
+        code: 'QUEUE_JOB_INVALID',
+      });
     });
   });
 });

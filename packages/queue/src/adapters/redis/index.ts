@@ -70,5 +70,9 @@ export async function createQueueFromConfig(config: QueueConfig, options: QueueF
       ...(options.prefix === undefined ? {} : { prefix: options.prefix }),
     });
   }
-  return createQueue({ ...common, driver: config.QUEUE_DRIVER, ...(options.db === undefined ? {} : { db: options.db }) });
+  return createQueue({
+    ...common,
+    driver: config.QUEUE_DRIVER,
+    ...(options.db === undefined ? {} : { db: options.db }),
+  });
 }

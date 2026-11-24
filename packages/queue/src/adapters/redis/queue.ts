@@ -105,7 +105,12 @@ const isOurs = (job: Job, token: string): boolean => isJobData(job.data) && job.
 const refusal = (job: Job | undefined): QueueError =>
   job === undefined
     ? queueError('QUEUE_JOB_NOT_FOUND', 404, 'The job does not exist.', 'Check the id of the job.')
-    : queueError('QUEUE_JOB_NOT_DEAD', 409, 'Only a dead job can be retried or discarded.', 'Look in the dead letters.');
+    : queueError(
+        'QUEUE_JOB_NOT_DEAD',
+        409,
+        'Only a dead job can be retried or discarded.',
+        'Look in the dead letters.',
+      );
 
 /** The queue on Valkey. One BullMQ queue for each of the three names, so that each has its own workers and its own slots. */
 export async function createRedisQueue(options: RedisQueueOptions): Promise<Queue> {
@@ -161,8 +166,11 @@ export async function createRedisQueue(options: RedisQueueOptions): Promise<Queu
     return undefined;
   }
 
-
-  async function dispatch<Input>(job: JobDef<Input>, input: Input, dispatchOptions?: DispatchOptions): Promise<Dispatched> {
+  async function dispatch<Input>(
+    job: JobDef<Input>,
+    input: Input,
+    dispatchOptions?: DispatchOptions,
+  ): Promise<Dispatched> {
     return add(await prepare(shared, job, input, dispatchOptions));
   }
 
@@ -173,11 +181,17 @@ export async function createRedisQueue(options: RedisQueueOptions): Promise<Queu
       // The transaction of the dispatcher is not used: Redis has no part in it. If the row is not deleted after this, it is published
       // again, and the id of the message makes the second add a no-op (Q-01).
       await add(
-        await prepare(shared, subscription.job, subscription.map(message), { jobId: message.jobId }, {
-          ...(message.tenantId === undefined ? {} : { tenantId: message.tenantId }),
-          ...(message.userId === undefined ? {} : { userId: message.userId }),
-          ...(message.requestId === undefined ? {} : { requestId: message.requestId }),
-        }),
+        await prepare(
+          shared,
+          subscription.job,
+          subscription.map(message),
+          { jobId: message.jobId },
+          {
+            ...(message.tenantId === undefined ? {} : { tenantId: message.tenantId }),
+            ...(message.userId === undefined ? {} : { userId: message.userId }),
+            ...(message.requestId === undefined ? {} : { requestId: message.requestId }),
+          },
+        ),
       );
     },
   };
@@ -205,25 +219,25 @@ export async function createRedisQueue(options: RedisQueueOptions): Promise<Queu
     let started = false;
 
     const processor: Processor = async (job) => {
-        if (!isJobData(job.data)) throw new UnrecoverableError('The job has no data of ours.');
-        const data = job.data;
-        const outcome = await runDelivery(shared, {
-          jobId: data.id,
-          name: data.name,
-          input: data.input,
-          attempt: job.attemptsStarted,
-          context: {
-            ...(data.tenantId === undefined ? {} : { tenantId: data.tenantId }),
-            ...(data.userId === undefined ? {} : { userId: data.userId }),
-            ...(data.requestId === undefined ? {} : { requestId: data.requestId }),
-          },
-        });
-        if (outcome.ok) return outcome.result === undefined ? undefined : JSON.parse(outcome.result);
-        if (job.id !== undefined) causes.set(job.id, outcome.cause);
-        // A job that cannot start to pass (an input that no longer fits) is not given another attempt.
-        if (!outcome.retry) throw new UnrecoverableError(outcome.error);
-        throw new Error(outcome.error);
-      };
+      if (!isJobData(job.data)) throw new UnrecoverableError('The job has no data of ours.');
+      const data = job.data;
+      const outcome = await runDelivery(shared, {
+        jobId: data.id,
+        name: data.name,
+        input: data.input,
+        attempt: job.attemptsStarted,
+        context: {
+          ...(data.tenantId === undefined ? {} : { tenantId: data.tenantId }),
+          ...(data.userId === undefined ? {} : { userId: data.userId }),
+          ...(data.requestId === undefined ? {} : { requestId: data.requestId }),
+        },
+      });
+      if (outcome.ok) return outcome.result === undefined ? undefined : JSON.parse(outcome.result);
+      if (job.id !== undefined) causes.set(job.id, outcome.cause);
+      // A job that cannot start to pass (an input that no longer fits) is not given another attempt.
+      if (!outcome.retry) throw new UnrecoverableError(outcome.error);
+      throw new Error(outcome.error);
+    };
 
     const settled = (queue: QueueName) => (job: Job | undefined, error: Error) => {
       if (job === undefined || !isJobData(job.data)) return;
@@ -306,7 +320,14 @@ export async function createRedisQueue(options: RedisQueueOptions): Promise<Queu
       reports: { waiting: 0, active: 0, done: 0, dead: 0 },
     };
     for (const name of QUEUE_NAMES) {
-      const found = await queueOf(name).getJobCounts('waiting', 'prioritized', 'delayed', 'active', 'completed', 'failed');
+      const found = await queueOf(name).getJobCounts(
+        'waiting',
+        'prioritized',
+        'delayed',
+        'active',
+        'completed',
+        'failed',
+      );
       out[name] = {
         waiting: (found['waiting'] ?? 0) + (found['prioritized'] ?? 0) + (found['delayed'] ?? 0),
         active: found['active'] ?? 0,
@@ -355,7 +376,8 @@ export async function createRedisQueue(options: RedisQueueOptions): Promise<Queu
         id: job.data.id,
         name: job.data.name,
         queue,
-        status: state === 'completed' ? 'done' : state === 'failed' ? 'dead' : state === 'active' ? 'active' : 'waiting',
+        status:
+          state === 'completed' ? 'done' : state === 'failed' ? 'dead' : state === 'active' ? 'active' : 'waiting',
         attempts: job.attemptsMade,
         ...(state === 'completed' && returned !== undefined && returned !== null ? { result: asResult(returned) } : {}),
         ...(job.failedReason === undefined || job.failedReason === '' ? {} : { error: job.failedReason }),

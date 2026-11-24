@@ -42,12 +42,12 @@ The file that decides this is `pnpm-workspace.yaml`, which an agent may not chan
 
 ## Options
 
-| Option                                                | For                                                                                         | Against                                                                                          |
-| ----------------------------------------------------- | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| A. `allowBuilds: { msgpackr-extract: false }`         | Says "reviewed, and denied" in the file that records it. No script runs. The decision of ADR 0010 is kept | msgpackr encodes with its JavaScript path: a little slower, which a job payload does not notice  |
-| B. `allowBuilds: { msgpackr-extract: true }`          | Native speed of the encoder                                                                 | Runs a script from a dependency on every install, and on CI. Against ADR 0010 and the policy     |
-| C. Remove `msgpackr-extract` with an override         | Same result as A                                                                            | The override is a second place to keep in step, and it hides the choice                          |
-| D. No BullMQ: our own Redis driver                    | No dependency                                                                               | Our own queue on Redis is a project of its own. It contradicts ADR 0010, which measured BullMQ   |
+| Option                                        | For                                                                                                       | Against                                                                                         |
+| --------------------------------------------- | --------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| A. `allowBuilds: { msgpackr-extract: false }` | Says "reviewed, and denied" in the file that records it. No script runs. The decision of ADR 0010 is kept | msgpackr encodes with its JavaScript path: a little slower, which a job payload does not notice |
+| B. `allowBuilds: { msgpackr-extract: true }`  | Native speed of the encoder                                                                               | Runs a script from a dependency on every install, and on CI. Against ADR 0010 and the policy    |
+| C. Remove `msgpackr-extract` with an override | Same result as A                                                                                          | The override is a second place to keep in step, and it hides the choice                         |
+| D. No BullMQ: our own Redis driver            | No dependency                                                                                             | Our own queue on Redis is a project of its own. It contradicts ADR 0010, which measured BullMQ  |
 
 ## Decision proposed
 
@@ -62,10 +62,10 @@ Then `feat/queue-redis` installs and builds, and its tests run against a Valkey 
 
 Runtime dependencies that the branch adds (P9):
 
-| Package   | Version | Used by                      | License | Maintainers (npm)                         | Reason                                          |
-| --------- | ------- | ---------------------------- | ------- | ----------------------------------------- | ----------------------------------------------- |
-| `bullmq`  | 6.7.6   | queue (`/redis` subpath)     | MIT     | taskforce.sh (manast, and the team)       | The queue on Valkey of ADR 0010                 |
-| `ioredis` | 5.11.1  | queue (`/redis` subpath)     | MIT     | ioredis-robot, dmaier-redislabs           | The client of BullMQ. The version of ADR 0016   |
+| Package   | Version | Used by                  | License | Maintainers (npm)                   | Reason                                        |
+| --------- | ------- | ------------------------ | ------- | ----------------------------------- | --------------------------------------------- |
+| `bullmq`  | 6.7.6   | queue (`/redis` subpath) | MIT     | taskforce.sh (manast, and the team) | The queue on Valkey of ADR 0010               |
+| `ioredis` | 5.11.1  | queue (`/redis` subpath) | MIT     | ioredis-robot, dmaier-redislabs     | The client of BullMQ. The version of ADR 0016 |
 
 `bullmq` 6.7.7 and later are held back by `minimumReleaseAge` until 2026-11-24 and 2026-11-26. Its own dependencies are `tslib`, `semver`, `msgpackr`, `cron-parser` and `node-abort-controller` (all MIT, except `tslib`: 0BSD).
 
