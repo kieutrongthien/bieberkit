@@ -24,7 +24,8 @@
 
 # 0015. Runtime dependencies of Phase 1
 
-- Status: Proposed
+- Status: Accepted
+- Accepted: 2026-11-24, by delegation: the maintainer asked the engineer to settle every open decision, and this one follows the requirements and the evidence above.
 - Date: 2026-11-23
 - Deciders: Bieber Kieu
 - Requirements: P9, SEC-11, PKG-04, AUTH-11, spec section 3
@@ -67,7 +68,7 @@ Rules that go with it:
 1. `better-auth` and `@better-auth/kysely-adapter` have the same version, and a test checks it (AUTH-11).
 2. `kysely` has the version that MikroORM uses, so that there is one copy in the tree.
 3. A library that is a development dependency (`rolldown`, the type packages) is not in this list: P9 is about what ships to users.
-4. A new row needs a new ADR, or an addendum row here while this ADR is still `Proposed`.
+4. A new row needs a new ADR, or an addendum row here while this ADR is still open to rows.
 
 ## Evidence
 

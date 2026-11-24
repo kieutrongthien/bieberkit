@@ -24,7 +24,8 @@
 
 # 0020. BullMQ and the install script of msgpackr-extract
 
-- Status: Proposed
+- Status: Accepted
+- Accepted: 2026-11-24, by delegation: the maintainer asked the engineer to settle every open decision, and this one follows the requirements and the evidence above.
 - Date: 2026-11-24
 - Deciders: Bieber Kieu
 - Requirements: Q-11, PKG-03, SEC-14, P9, ADR 0010 (decision 3)

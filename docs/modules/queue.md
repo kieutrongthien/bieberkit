@@ -27,7 +27,7 @@
 - Package: `@bieberkit/queue`
 - Layer: contracts (it may import `@bieberkit/core` and `@bieberkit/data`)
 - Spec sections: 15.1, 7.5, ADR 0010
-- Status: **Slice Q1 is prepared on 2026-11-23.** The roadmap item is **[M]**: it is the maintainer's call, so it is not ticked and the branch is not merged. Slice Q2 (the `redis` driver on BullMQ) is next.
+- Status: **Done on 2026-11-24.** Slice Q1 (the contract, `sync` and `database`) and slice Q2 (the `redis` driver on BullMQ) are merged, and the maintainer, who owns this item, asked the engineer to settle it and tick it.
 
 ## Purpose
 
@@ -92,7 +92,7 @@ queueContractSuite(name, make, { skip? })            // the nine cases of ADR 00
 - **`worker_threads` pool** (Q-09), **bulk requests of 101 to 500 rows as a job** (API-14, PERF-05) and **`bieberkit doctor`** reading `maxmemory-policy`.
 - **MariaDB.** ADR 0010 measured it, and it is not in the dialects of this repository, so the suite does not run on it.
 - **Time zones for cron.** Schedules are in UTC.
-- **Mail, cache, storage and the error reporter**, the other items of M1.5, each with its own slice and its own `Proposed` ADR for its library.
+- **Mail, cache, storage and the error reporter**, the other items of M1.5, each with its own slice and its own ADR for its library (0016 to 0018, accepted).
 
 ## Found while implementing
 

@@ -24,7 +24,8 @@
 
 # 0016. Cache engines: BentoCache drivers and ioredis behind one engine contract
 
-- Status: Proposed
+- Status: Accepted
+- Accepted: 2026-11-24, by delegation: the maintainer asked the engineer to settle every open decision, and this one follows the requirements and the evidence above.
 - Date: 2026-11-23
 - Deciders: Bieber Kieu
 - Requirements: C-01 to C-03, DATA-13, Q-08, CFG-07, PKG-03, P9, 13.1

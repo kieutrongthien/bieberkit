@@ -24,7 +24,8 @@
 
 # 0017. Storage disks: FlyDrive drivers, visibility as a prefix, content by sniffing
 
-- Status: Proposed
+- Status: Accepted
+- Accepted: 2026-11-24, by delegation: the maintainer asked the engineer to settle every open decision, and this one follows the requirements and the evidence above.
 - Date: 2026-11-23
 - Deciders: Bieber Kieu
 - Requirements: S-01 to S-04, CFG-07, PKG-03, SEC-04, P9

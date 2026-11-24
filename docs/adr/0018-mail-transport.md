@@ -24,7 +24,8 @@
 
 # 0018. Mail: nodemailer behind a transport port, a message checked before it is queued
 
-- Status: Proposed
+- Status: Accepted
+- Accepted: 2026-11-24, by delegation: the maintainer asked the engineer to settle every open decision, and this one follows the requirements and the evidence above.
 - Date: 2026-11-23
 - Deciders: Bieber Kieu
 - Requirements: M-01, CFG-07, SEC-04, SEC-09, PKG-03, P9

@@ -27,7 +27,7 @@
 - Package: `@bieberkit/cache`
 - Layer: contracts (it may import `@bieberkit/core`, `@bieberkit/data` and `@bieberkit/http`)
 - Spec sections: 15.2 (C-01 to C-03), DATA-13, Q-08, 13.1, CFG-07
-- Status: **Prepared on 2026-11-23.** ADR 0016 (Proposed) lists the two libraries (P9).
+- Status: **Prepared on 2026-11-23.** ADR 0016 (Accepted) lists the two libraries (P9).
 
 ## Purpose
 

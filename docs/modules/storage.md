@@ -27,7 +27,7 @@
 - Package: `@bieberkit/storage`
 - Layer: contracts (it may import `@bieberkit/core` and `@bieberkit/data`)
 - Spec sections: 15.3 (S-01 to S-04), CFG-07, PKG-03, SEC-04
-- Status: **Prepared on 2026-11-23.** ADR 0017 (Proposed) lists the libraries (P9).
+- Status: **Prepared on 2026-11-23.** ADR 0017 (Accepted) lists the libraries (P9).
 
 ## Purpose
 

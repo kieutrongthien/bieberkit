@@ -46,12 +46,12 @@ Status values: `Proposed`, `Accepted`, `Rejected`, `Superseded by NNNN`. Only th
 | [0012](0012-authentication.md)                  | Authentication: Better Auth on MikroORM's Kysely        | Accepted |
 | [0013](0013-authorization.md)                   | Authorization: an own CASL to MikroORM translator       | Accepted |
 | [0014](0014-release-pipeline.md)                | Release pipeline: trusted publishing from tarballs      | Accepted |
-| [0015](0015-runtime-dependencies-of-phase-1.md) | Runtime dependencies of Phase 1                         | Proposed |
-| [0016](0016-cache-engines.md)                   | Cache engines: BentoCache drivers and ioredis           | Proposed |
-| [0017](0017-storage-disks.md)                   | Storage disks: FlyDrive, visibility as a prefix         | Proposed |
-| [0018](0018-mail-transport.md)                  | Mail: nodemailer behind a transport port                | Proposed |
-| [0019](0019-queue-wake-listen-notify.md)        | Queue wake: LISTEN/NOTIFY on PostgreSQL                 | Proposed |
-| [0020](0020-bullmq-install-script.md)           | BullMQ and the install script of msgpackr-extract       | Proposed |
+| [0015](0015-runtime-dependencies-of-phase-1.md) | Runtime dependencies of Phase 1                         | Accepted |
+| [0016](0016-cache-engines.md)                   | Cache engines: BentoCache drivers and ioredis           | Accepted |
+| [0017](0017-storage-disks.md)                   | Storage disks: FlyDrive, visibility as a prefix         | Accepted |
+| [0018](0018-mail-transport.md)                  | Mail: nodemailer behind a transport port                | Accepted |
+| [0019](0019-queue-wake-listen-notify.md)        | Queue wake: LISTEN/NOTIFY on PostgreSQL                 | Accepted |
+| [0020](0020-bullmq-install-script.md)           | BullMQ and the install script of msgpackr-extract       | Accepted |
 
 ## Needed for the Phase 0 gate
 

@@ -27,7 +27,7 @@
 - Package: `@bieberkit/mail`
 - Layer: contracts (it may import `@bieberkit/core` and `@bieberkit/queue`)
 - Spec sections: 15.4 (M-01), CFG-07, SEC-04, SEC-09, OBS-06, PKG-03
-- Status: **Prepared on 2026-11-23.** ADR 0018 (Proposed) lists the library (P9). Templates (M-02, React Email) come with the admin and the site, and use this package to send.
+- Status: **Prepared on 2026-11-23.** ADR 0018 (Accepted) lists the library (P9). Templates (M-02, React Email) come with the admin and the site, and use this package to send.
 
 ## Purpose
 

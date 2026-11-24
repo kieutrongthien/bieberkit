@@ -24,7 +24,8 @@
 
 # 0019. Queue wake: LISTEN/NOTIFY on PostgreSQL
 
-- Status: Proposed
+- Status: Accepted
+- Accepted: 2026-11-24, by delegation: the maintainer asked the engineer to settle every open decision, and this one follows the requirements and the evidence above.
 - Date: 2026-11-24
 - Deciders: Bieber Kieu
 - Requirements: Q-06, Q-03, PKG-03, P9
