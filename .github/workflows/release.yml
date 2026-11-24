@@ -84,8 +84,9 @@ jobs:
       - run: pnpm check
       - run: pnpm typecheck
       - run: pnpm lint
-      - run: pnpm test
+      # Build before the tests, as ci.yml does: the tests of the CLI start real processes that load the built packages.
       - run: pnpm build
+      - run: pnpm test
       - run: pnpm check:api
       - run: pnpm check:packages
       - name: Pack every package, record the publish order and the checksums

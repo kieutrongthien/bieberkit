@@ -29,6 +29,12 @@ export default defineConfig({
     // Resolve workspace packages to their TypeScript sources, so tests need no build.
     conditions: ['@bieberkit/source'],
   },
+  ssr: {
+    resolve: {
+      // Node tests resolve through SSR; client conditions alone fall back to missing dist entries on a clean checkout.
+      conditions: ['@bieberkit/source', 'node', 'development|production'],
+    },
+  },
   test: {
     include: ['packages/*/src/**/*.test.{ts,tsx}', 'plugins/*/src/**/*.test.{ts,tsx}', 'tools/**/*.test.ts'],
     // Artifact checks require built output and run explicitly through pnpm test:artifacts.
