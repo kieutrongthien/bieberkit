@@ -35,13 +35,32 @@ export default defineConfig({
     baseURL: 'http://127.0.0.1:4310',
     trace: 'retain-on-failure',
   },
-  projects: [{ name: 'chromium', use: { browserName: 'chromium' } }],
-  webServer: {
-    command: 'node serve.mjs',
-    url: 'http://127.0.0.1:4310/health/ready',
-    reuseExistingServer: false,
-    timeout: 120_000,
-    stdout: 'pipe',
-    stderr: 'pipe',
-  },
+  projects: [
+    { name: 'chromium', testMatch: 'admin.spec.ts', use: { browserName: 'chromium' } },
+    // The admin at the root of a host of its own. Chromium resolves `*.localhost` to this machine.
+    {
+      name: 'subdomain',
+      testMatch: 'admin-subdomain.spec.ts',
+      use: { browserName: 'chromium', baseURL: 'http://admin.localhost:4312' },
+    },
+  ],
+  webServer: [
+    {
+      command: 'node serve.mjs',
+      url: 'http://127.0.0.1:4310/health/ready',
+      reuseExistingServer: false,
+      timeout: 120_000,
+      stdout: 'pipe',
+      stderr: 'pipe',
+    },
+    {
+      command: 'node serve.mjs',
+      env: { E2E_PORT: '4312', E2E_ADMIN_URL: 'http://admin.localhost:4312' },
+      url: 'http://127.0.0.1:4312/health/ready',
+      reuseExistingServer: false,
+      timeout: 120_000,
+      stdout: 'pipe',
+      stderr: 'pipe',
+    },
+  ],
 });

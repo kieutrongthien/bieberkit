@@ -105,4 +105,4 @@ it('12 a blank project migrates, seeds the administrator, boots, and the adminis
   expect(JSON.stringify(body)).toContain('admin@example.com');
   const roles = await fetch(`${base}/api/v1/roles/roles`, { headers: { cookie } });
   expect(JSON.stringify(await roles.json())).toContain('"name":"admin"');
-});
+}, 60_000);

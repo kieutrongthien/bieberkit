@@ -26,12 +26,55 @@ import { existsSync, realpathSync } from 'node:fs';
 import { join } from 'node:path';
 import { serveStatic } from '@bieberkit/http';
 import type { HttpServer } from '@bieberkit/http';
+import { ServerError } from './errors.ts';
 
 /** The adapter that the framework maintains (UI-10). A project that installs another one sets its name in `admin.adapter` later. */
 export const ADMIN_PACKAGE = '@bieberkit/admin-antd';
 
-/** Where the admin is served (UI-14). */
+/** Where the admin is served when `ADMIN_URL` says nothing (UI-14). */
 export const ADMIN_PREFIX = '/admin';
+
+/** The first segments of a path that belong to the server: the API, the probes and the metrics. */
+const RESERVED = new Set(['api', 'health', 'metrics']);
+
+/** Where the admin is: on which host, and under which path. */
+export interface AdminLocation {
+  /** `https://admin.example.com`: the origin that a browser opens it from. It is trusted by the sign in (a cookie is host only). */
+  readonly origin: string;
+  /** Set when the admin has a host of its own: only the requests for it are the admin's. Includes the port. */
+  readonly host: string | undefined;
+  /** `/admin`, `/panel`, or `''` for the root of the host. Never ends with a slash. */
+  readonly prefix: string;
+}
+
+const refused = (address: string, why: string): ServerError =>
+  new ServerError(`ADMIN_URL "${address}" is not a place for the admin: ${why}.`, {
+    code: 'BK_ADMIN_URL_INVALID',
+    fix: 'Give an address of the form https://example.com/panel (a path of the application), https://admin.example.com (a host of its own), or leave ADMIN_URL out for /admin.',
+  });
+
+/**
+ * Reads `ADMIN_URL` against `APP_URL`. A path of the host of the application is a prefix, a host that is not the application's is a
+ * host of its own, and a path of nothing is the root. The admin is always on the same server as the API, so a browser calls the API
+ * with the origin that it opened the page from, and there is no CORS to configure (UI-14).
+ */
+export function adminLocation(appUrl: string, adminUrl: string | undefined): AdminLocation {
+  const app = new URL(appUrl);
+  if (adminUrl === undefined) return { origin: app.origin, host: undefined, prefix: ADMIN_PREFIX };
+  let url: URL;
+  try {
+    url = new URL(adminUrl);
+  } catch {
+    throw refused(adminUrl, 'it is not an address');
+  }
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') throw refused(adminUrl, 'the scheme is http or https');
+  if (url.search !== '' || url.hash !== '') throw refused(adminUrl, 'it has a query or a fragment');
+  if (url.username !== '' || url.password !== '') throw refused(adminUrl, 'it has a login');
+  const prefix = url.pathname.replace(/\/+$/, '');
+  const first = prefix.split('/')[1];
+  if (first !== undefined && RESERVED.has(first)) throw refused(adminUrl, `/${first} is the path of the server`);
+  return { origin: url.origin, host: url.host === app.host ? undefined : url.host, prefix };
+}
 
 /**
  * The policy of the admin (UI-14, SEC-01). Its files are static, so the policy is fixed: scripts only from the same origin, no frame,
@@ -67,10 +110,25 @@ export function adminDirectory(root: string): string | undefined {
   return undefined;
 }
 
-/** Serves the admin under `/admin/` when it is installed. It answers whether it did. */
-export function registerAdmin(server: HttpServer, root: string): boolean {
+/** The page of the application, told where it lives: its files from the prefix, and the prefix for the router. */
+function pageAt(prefix: string): (html: string) => string {
+  return (html) =>
+    html
+      // The build writes the files as `./assets/...`, which is right at the root of a folder and wrong at a route under it.
+      .replaceAll(/(["'(])\.\//g, `$1${prefix}/`)
+      .replace('</head>', `<meta name="bk-admin-base" content="${prefix}" /></head>`);
+}
+
+/** Serves the admin where `location` says, when an adapter is installed. It answers whether it did. */
+export function registerAdmin(server: HttpServer, root: string, location: AdminLocation): boolean {
   const directory = adminDirectory(root);
   if (directory === undefined) return false;
-  serveStatic(server, { prefix: ADMIN_PREFIX, directory, policy: ADMIN_POLICY });
+  serveStatic(server, {
+    prefix: location.prefix,
+    directory,
+    policy: ADMIN_POLICY,
+    transformPage: pageAt(location.prefix),
+    ...(location.host === undefined ? {} : { host: location.host }),
+  });
   return true;
 }

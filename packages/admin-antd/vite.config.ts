@@ -2,7 +2,7 @@
  * BieberKit
  *
  * @file        packages/admin-antd/vite.config.ts
- * @description Builds the admin application into dist/app: static files with content hashes, to be served under /admin/ by the web role (UI-08, UI-14).
+ * @description Builds the admin application into dist/app: static files with content hashes, to be served by the web role at any address (UI-08, UI-14).
  * @author      Bieber Kieu <kieutrongthien@gmail.com>
  * @copyright   Copyright (c) 2026 Bieber Kieu
  * @license     Apache-2.0
@@ -27,7 +27,8 @@ import { defineConfig } from 'vite';
 
 export default defineConfig({
   root: 'src/app',
-  base: '/admin/',
+  // Relative, so that the server decides where the application is: it writes the address of each file when it sends the page (UI-14).
+  base: './',
   plugins: [react()],
   build: {
     outDir: '../../dist/app',

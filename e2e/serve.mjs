@@ -28,9 +28,10 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-export const PORT = 4310;
-export const ADMIN_EMAIL = 'admin@example.com';
-export const ADMIN_PASSWORD = 'Playwright-Admin-Passw0rd!';
+// Two servers run in one test: the admin at /admin of the application, and the admin at the root of a host of its own.
+const PORT = Number(process.env.E2E_PORT ?? 4310);
+const ADMIN_EMAIL = 'admin@example.com';
+const ADMIN_PASSWORD = 'Playwright-Admin-Passw0rd!';
 
 const REPOSITORY = join(dirname(fileURLToPath(import.meta.url)), '..');
 const CLI = join(REPOSITORY, 'packages', 'cli', 'dist', 'bin.js');
@@ -41,6 +42,7 @@ const env = {
   ...process.env,
   APP_ENV: 'development',
   APP_URL: `http://127.0.0.1:${PORT}`,
+  ...(process.env.E2E_ADMIN_URL === undefined ? {} : { ADMIN_URL: process.env.E2E_ADMIN_URL }),
   APP_PORT: String(PORT),
   METRICS_PORT: String(PORT + 1),
   LOG_LEVEL: 'warn',

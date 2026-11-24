@@ -97,7 +97,8 @@ compose.prod.yaml
 }
 
 export function renderCaddyfile(head: Head): string {
-  return `${head('deploy/Caddyfile', 'The proxy of the single server setup: TLS, compression, and everything to the web role. The metrics port is never routed (OBS-04).')}{$SITE_ADDRESS:localhost} {
+  return `${head('deploy/Caddyfile', 'The proxy of the single server setup: TLS, compression, and everything to the web role. The metrics port is never routed (OBS-04). The admin may have a host of its own, which is routed to the same web role.')}# SITE_ADDRESS is the host of the application. ADMIN_ADDRESS is the host of the admin when it has one of its own (ADMIN_URL), and localhost when it has not.
+{$SITE_ADDRESS:localhost}, {$ADMIN_ADDRESS:localhost} {
 	encode zstd gzip
 	reverse_proxy web:3000 {
 		health_uri /health/ready
@@ -125,6 +126,12 @@ export function renderProductionEnv(dialect: Dialect, folder: string, head: Head
   return `${head('.env.production.example', 'What production reads: copy it to .env.production and give every change-me a value. The file with the values is never committed.')}APP_ENV=production
 APP_URL=https://${folder}.example.com
 SITE_ADDRESS=${folder}.example.com
+
+# Where the admin is (UI-14). Leave ADMIN_URL out for /admin of APP_URL. A path of the application: APP_URL/panel. A host of its own:
+# https://admin.${folder}.example.com, and then ADMIN_ADDRESS is that host, so that the proxy answers for it and gets its certificate.
+# ADMIN_URL=https://admin.${folder}.example.com
+# ADMIN_ADDRESS=admin.${folder}.example.com
+
 APP_KEY=change-me
 AUTH_SECRET=change-me
 DB_CONNECTION=${dialect}
@@ -273,6 +280,7 @@ services:
     ports: ['80:80', '443:443']
     environment:
       SITE_ADDRESS: \${SITE_ADDRESS:-localhost}
+      ADMIN_ADDRESS: \${ADMIN_ADDRESS:-localhost}
     volumes:
       - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data

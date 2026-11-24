@@ -29,6 +29,7 @@ import type { Database } from '@bieberkit/data/orm';
 import type { RouteDef } from '@bieberkit/http';
 import type { Storage } from '@bieberkit/storage';
 import { createStorageFromConfig } from '@bieberkit/storage/flydrive';
+import { adminLocation } from './admin.ts';
 import { contributed, contributedRecord } from './modules.ts';
 import type { Project } from './project.ts';
 
@@ -69,6 +70,8 @@ export function registerRuntimeServices(
         dialect: db.dialect,
         secret: env.AUTH_SECRET,
         baseUrl: env.APP_URL,
+        // The admin may have a host of its own, and a sign in from there is not a cross site request (UI-14).
+        trustedOrigins: [adminLocation(env.APP_URL, env.ADMIN_URL).origin],
         ...(env.APP_KEY_PREVIOUS === undefined ? {} : { previousSecrets: [env.APP_KEY_PREVIOUS] }),
       }),
   });

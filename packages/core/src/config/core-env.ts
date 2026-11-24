@@ -39,6 +39,7 @@ export interface CoreEnvValues {
   APP_NAME: string;
   APP_ENV: AppEnv;
   APP_URL: string;
+  ADMIN_URL: string | undefined;
   APP_PORT: number;
   APP_KEY: string | undefined;
   APP_KEY_PREVIOUS: string | undefined;
@@ -104,6 +105,12 @@ export const coreEnv: EnvSchema<CoreEnvValues> = defineEnv({
   APP_NAME: env.string().default('bieberkit-app').describe('Name of the application'),
   APP_ENV: env.enum(['development', 'test', 'production']).default('development').describe('Run mode'),
   APP_URL: env.url().default('http://localhost:3000').describe('Public address, used for links, CORS and cookies'),
+  ADMIN_URL: env
+    .url()
+    .optional()
+    .describe(
+      'Public address of the admin: a path of this address (https://example.com/panel) or a host of its own (https://admin.example.com). Defaults to APP_URL and /admin',
+    ),
   APP_PORT: env.int({ min: 1, max: 65535 }).default(3000).describe('Port of the web role'),
   APP_KEY: env.base64().secret().optional().describe('Encryption and signing key, 32 or more random bytes in base64'),
   APP_KEY_PREVIOUS: env

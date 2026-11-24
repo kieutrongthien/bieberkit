@@ -207,6 +207,7 @@ interface InjectResponse {
 interface HttpServer {
   route(route: RouteDef): void;
   mount(mount: MountDef): void;
+  fallback(handler: (request: Request) => Promise<Response | undefined>): void;
   stage(name: StageName, hook: StageHook): void;
   inject(request: InjectOptions): Promise<InjectResponse>;
   listen(options?: {
@@ -361,9 +362,11 @@ interface Problem {
 }
 interface StaticOptions {
   readonly prefix: string;
+  readonly host?: string;
   readonly directory: string;
   readonly policy: string;
   readonly fallback?: string;
+  readonly transformPage?: (html: string) => string;
 }
 export declare function serveStatic(server: HttpServer, options: StaticOptions): void;
 export declare const packageName = "@bieberkit/http";

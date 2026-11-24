@@ -23,12 +23,13 @@
  */
 
 import { mkdirSync, writeFileSync } from 'node:fs';
+import { request as httpRequest } from 'node:http';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { boot, roleOf } from './boot.ts';
 import type { Running } from './boot.ts';
 import { makeMigration } from './migrations.ts';
-import { makeProject, testEnv } from './testing/project.ts';
+import { freePort, makeProject, testEnv } from './testing/project.ts';
 import type { Fixture } from './testing/project.ts';
 
 const fixtures: Fixture[] = [];
@@ -55,6 +56,54 @@ const get = async (port: number | undefined, path: string): Promise<{ status: nu
   const response = await fetch(`http://127.0.0.1:${String(port)}${path}`);
   return { status: response.status, body: await response.text() };
 };
+
+/** An adapter whose page has one file, installed in the project, and the env of a booted process with the given addresses. */
+async function adminProject(urls: (port: number) => Record<string, string>) {
+  const fixture = makeProject();
+  fixtures.push(fixture);
+  const folder = join(fixture.root, 'node_modules/@bieberkit/admin-antd');
+  mkdirSync(join(folder, 'dist/app/assets'), { recursive: true });
+  writeFileSync(join(folder, 'package.json'), JSON.stringify({ name: '@bieberkit/admin-antd', version: '0.0.0' }));
+  writeFileSync(
+    join(folder, 'dist/app/index.html'),
+    '<!doctype html><head><title>admin</title></head><script src="./assets/main.js"></script>',
+  );
+  writeFileSync(join(folder, 'dist/app/assets/main.js'), 'console.log(1)');
+  const port = await freePort();
+  const env = await testEnv(fixture.root, { APP_PORT: String(port), ...urls(port) });
+  const one = await boot({ role: 'dev', cwd: fixture.root, env });
+  running.push(one);
+  return { port, one };
+}
+
+/** A request with the host that a proxy would send: the name that a browser typed, whatever it connected to. */
+function request(
+  port: number,
+  host: string,
+  path: string,
+  init: { method?: string; headers?: Record<string, string>; body?: string } = {},
+) {
+  return new Promise<{ status: number; body: string; headers: Record<string, string | string[] | undefined> }>(
+    (resolve, reject) => {
+      const call = httpRequest(
+        { host: '127.0.0.1', port, path, method: init.method ?? 'GET', headers: { host, ...init.headers } },
+        (response) => {
+          const chunks: Buffer[] = [];
+          response.on('data', (chunk: Buffer) => chunks.push(chunk));
+          response.on('end', () =>
+            resolve({
+              status: response.statusCode ?? 0,
+              body: Buffer.concat(chunks).toString('utf8'),
+              headers: response.headers,
+            }),
+          );
+        },
+      );
+      call.on('error', reject);
+      call.end(init.body);
+    },
+  );
+}
 
 describe('section 7.1 the roles', () => {
   it('7.1 reads the role from the arguments, and dev is web, worker and scheduler in one process', () => {
@@ -173,6 +222,70 @@ describe('section 7.1 the roles', () => {
     expect((await fetch(`${base}/api/v1/crm/ping`)).headers.get('content-security-policy')).toContain(
       "default-src 'none'",
     );
+  });
+
+  it('UI-14 ADMIN_URL puts the admin under any path of the application, and /admin is not served then', async () => {
+    const { port } = await adminProject((p) => ({
+      APP_URL: `http://127.0.0.1:${String(p)}`,
+      ADMIN_URL: `http://127.0.0.1:${String(p)}/back/office`,
+    }));
+    const page = await request(port, `127.0.0.1:${String(port)}`, '/back/office/settings/settings/new');
+    expect(page.status).toBe(200);
+    expect(page.body).toContain('src="/back/office/assets/main.js"');
+    expect(page.body).toContain('<meta name="bk-admin-base" content="/back/office" />');
+    expect(page.headers['content-security-policy']).toContain("script-src 'self'");
+    expect((await request(port, `127.0.0.1:${String(port)}`, '/back/office/assets/main.js')).status).toBe(200);
+    expect((await request(port, `127.0.0.1:${String(port)}`, '/admin/')).status).toBe(404);
+  });
+
+  it('UI-14 ADMIN_URL puts the admin at the root of a host of its own, for that host only, and the API stays what it is on both', async () => {
+    const { port } = await adminProject((p) => ({
+      APP_URL: `http://127.0.0.1:${String(p)}`,
+      ADMIN_URL: `http://admin.localhost:${String(p)}`,
+    }));
+    const admin = `admin.localhost:${String(port)}`;
+    const main = `127.0.0.1:${String(port)}`;
+    const page = await request(port, admin, '/settings/settings');
+    expect(page.status).toBe(200);
+    expect(page.body).toContain('src="/assets/main.js"');
+    expect(page.body).toContain('<meta name="bk-admin-base" content="" />');
+    expect((await request(port, main, '/')).status).toBe(404);
+    expect((await request(port, main, '/admin/')).status).toBe(404);
+    // The API is the API on the host of the admin too, and a missing route is its problem and not the page.
+    const missing = await request(port, admin, '/api/v1/nothing');
+    expect([missing.status, JSON.parse(missing.body).code]).toEqual([404, 'HTTP_NOT_FOUND']);
+    expect((await request(port, admin, '/health/live')).status).toBe(200);
+  });
+
+  it('UI-14 a person signs in from the host of the admin: its origin is trusted, and the session works there', async () => {
+    const { port } = await adminProject((p) => ({
+      APP_URL: `http://127.0.0.1:${String(p)}`,
+      ADMIN_URL: `http://admin.localhost:${String(p)}`,
+    }));
+    const admin = `admin.localhost:${String(port)}`;
+    const headers = { 'content-type': 'application/json', origin: `http://${admin}`, 'sec-fetch-site': 'same-origin' };
+    const body = JSON.stringify({ email: 'ann@example.com', password: 'correct horse battery staple', name: 'Ann' });
+    const up = await request(port, admin, '/api/auth/sign-up/email', { method: 'POST', headers, body });
+    expect(up.status).toBe(200);
+    const inn = await request(port, admin, '/api/auth/sign-in/email', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ email: 'ann@example.com', password: 'correct horse battery staple' }),
+    });
+    expect(inn.status).toBe(200);
+    const cookie =
+      [inn.headers['set-cookie']]
+        .flat()
+        .find((line) => line?.startsWith('__Host-bk_session='))
+        ?.split(';')[0] ?? '';
+    expect((await request(port, admin, '/api/v1/_meta', { headers: { cookie } })).status).toBe(200);
+  });
+
+  it('UI-14 an ADMIN_URL that is not a place stops the boot with its own code', async () => {
+    const fixture = makeProject();
+    fixtures.push(fixture);
+    const env = await testEnv(fixture.root, { ADMIN_URL: 'http://localhost:3000/api' });
+    await expect(boot({ role: 'web', cwd: fixture.root, env })).rejects.toMatchObject({ code: 'BK_ADMIN_URL_INVALID' });
   });
 
   it('UI-14 without an adapter, /admin/ is not served', async () => {

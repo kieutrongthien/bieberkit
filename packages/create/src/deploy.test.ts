@@ -132,6 +132,17 @@ describe.each(['postgres', 'mysql', 'sqlite'] as const)(
   },
 );
 
+describe('UI-14 the admin on a host of its own, behind the proxy', () => {
+  it('routes the host of the admin to the same web role, and says in the environment how to turn it on', () => {
+    const caddy = renderCaddyfile(head);
+    expect(caddy).toContain('{$SITE_ADDRESS:localhost}, {$ADMIN_ADDRESS:localhost} {');
+    expect(renderComposeProduction('postgres', 'shop', head)).toContain('ADMIN_ADDRESS: ${ADMIN_ADDRESS:-localhost}');
+    const env = renderProductionEnv('postgres', 'shop', head);
+    expect(env).toContain('# ADMIN_URL=https://admin.shop.example.com');
+    expect(env).toContain('# ADMIN_ADDRESS=admin.shop.example.com');
+  });
+});
+
 describe('OBS-04 the proxy', () => {
   it('sends everything to the web role and has no route for the metrics port', () => {
     const caddy = renderCaddyfile(head);

@@ -140,6 +140,12 @@ export interface HttpServer {
    * A mounted prefix has no schema and no permission, so it is not in `routes()` nor in the OpenAPI document.
    */
   mount(mount: MountDef): void;
+  /**
+   * Answers a GET or a HEAD that no route matched, before the 404: a page that lives at the root of a host, such as an admin on its own
+   * subdomain, and has no prefix to mount. The handler answers `undefined` for a request that is not its own, and the 404 follows.
+   * One handler only, and before the server starts.
+   */
+  fallback(handler: (request: Request) => Promise<Response | undefined>): void;
   /** Adds a hook at one of the four stages that a plugin may use (REQ-01). */
   stage(name: StageName, hook: StageHook): void;
   inject(request: InjectOptions): Promise<InjectResponse>;
@@ -357,6 +363,41 @@ function stateOf(map: WeakMap<FastifyRequest, RequestState>, request: FastifyReq
   }
   return state;
 }
+
+/** A request of Fastify as a web `Request`, which is what a mounted handler and the fallback take. */
+const toWebRequest = (request: FastifyRequest): Request => {
+  const headers = new Headers();
+  for (const [name, value] of Object.entries(request.headers)) {
+    if (value === undefined || ['content-length', 'transfer-encoding', 'x-bk-client-ip'].includes(name)) continue;
+    for (const item of Array.isArray(value) ? value : [value]) headers.append(name, item);
+  }
+  // The address that TRUST_PROXY resolved is the only one that the handler may use (AUTH-10).
+  headers.set('x-bk-client-ip', request.ip);
+  const body =
+    request.method === 'GET' || request.method === 'HEAD' || request.body === undefined || request.body === null
+      ? undefined
+      : typeof request.body === 'string'
+        ? request.body
+        : JSON.stringify(request.body);
+  return new Request(`${request.protocol}://${request.host}${request.url}`, {
+    method: request.method,
+    headers,
+    ...(body === undefined ? {} : { body }),
+  });
+};
+
+/** A web `Response` as the answer of Fastify: its cookies, its headers, its status and its body as bytes. */
+const sendWeb = async (reply: FastifyReply, response: Response): Promise<void> => {
+  for (const cookie of response.headers.getSetCookie()) void reply.header('set-cookie', cookie);
+  response.headers.forEach((value, name) => {
+    if (name !== 'set-cookie') void reply.header(name, value);
+  });
+  const retry = response.headers.get('x-retry-after');
+  if (response.status === 429 && retry !== null && response.headers.get('retry-after') === null)
+    void reply.header('retry-after', retry);
+  // The body goes out as bytes, so that a file that is not text (an image, a font) arrives as it was.
+  void reply.code(response.status).send(Buffer.from(await response.arrayBuffer()));
+};
 
 /**
  * The HTTP server of a project. Fastify stays behind this facade: a plugin adds routes and the four named stage hooks, and
@@ -772,13 +813,21 @@ export function createHttpServer(env: HttpEnv, options: HttpServerOptions = {}):
       .send(described.problem);
   };
   app.setErrorHandler((error, request, reply) => answer(error, request, reply));
-  app.setNotFoundHandler((request, reply) =>
-    answer(
+  let fallbackHandler: ((request: Request) => Promise<Response | undefined>) | undefined;
+  app.setNotFoundHandler(async (request, reply) => {
+    if (fallbackHandler !== undefined && (request.method === 'GET' || request.method === 'HEAD')) {
+      const response = await fallbackHandler(toWebRequest(request));
+      if (response !== undefined) {
+        await sendWeb(reply, response);
+        return reply;
+      }
+    }
+    return answer(
       new HttpError('HTTP_NOT_FOUND', 404, 'There is no such route.', 'Check the path and the method.'),
       request,
       reply,
-    ),
-  );
+    );
+  });
 
   const register = (route: RouteDef, internal: boolean): void => {
     const key = `${route.method} ${route.url}`;
@@ -884,35 +933,7 @@ export function createHttpServer(env: HttpEnv, options: HttpServerOptions = {}):
       url: `${mount.prefix}/*`,
       config: { bk: state },
       handler: async (request, reply) => {
-        const headers = new Headers();
-        for (const [name, value] of Object.entries(request.headers)) {
-          if (value === undefined || ['content-length', 'transfer-encoding', 'x-bk-client-ip'].includes(name)) continue;
-          for (const item of Array.isArray(value) ? value : [value]) headers.append(name, item);
-        }
-        // The address that TRUST_PROXY resolved is the only one that the handler may use (AUTH-10).
-        headers.set('x-bk-client-ip', request.ip);
-        const body =
-          request.method === 'GET' || request.body === undefined || request.body === null
-            ? undefined
-            : typeof request.body === 'string'
-              ? request.body
-              : JSON.stringify(request.body);
-        const response = await mount.handler(
-          new Request(`${request.protocol}://${request.host}${request.url}`, {
-            method: request.method,
-            headers,
-            ...(body === undefined ? {} : { body }),
-          }),
-        );
-        for (const cookie of response.headers.getSetCookie()) void reply.header('set-cookie', cookie);
-        response.headers.forEach((value, name) => {
-          if (name !== 'set-cookie') void reply.header(name, value);
-        });
-        const retry = response.headers.get('x-retry-after');
-        if (response.status === 429 && retry !== null && response.headers.get('retry-after') === null)
-          void reply.header('retry-after', retry);
-        // The body goes out as bytes, so that a file that is not text (an image, a font) arrives as it was.
-        void reply.code(response.status).send(Buffer.from(await response.arrayBuffer()));
+        await sendWeb(reply, await mount.handler(toWebRequest(request)));
         return reply;
       },
     });
@@ -934,6 +955,11 @@ export function createHttpServer(env: HttpEnv, options: HttpServerOptions = {}):
   return {
     route: (route) => register(route, false),
     mount: mountPrefix,
+    fallback: (handler) => {
+      if (started) invalidRoute({ method: 'GET', url: '/*' }, 'the fallback was set after the server started.');
+      if (fallbackHandler !== undefined) invalidRoute({ method: 'GET', url: '/*' }, 'a fallback is set already.');
+      fallbackHandler = handler;
+    },
     stage(name, hook) {
       if (!STAGE_NAMES.includes(name)) {
         throw new HttpError(

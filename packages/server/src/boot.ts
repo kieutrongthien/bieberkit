@@ -42,7 +42,7 @@ import { createScheduler } from '@bieberkit/queue';
 import type { JobDef, Queue } from '@bieberkit/queue';
 import { createQueueFromConfig } from '@bieberkit/queue/redis';
 import { ServerError } from './errors.ts';
-import { registerAdmin } from './admin.ts';
+import { adminLocation, registerAdmin } from './admin.ts';
 import { migrate } from './migrate.ts';
 import { permissionCatalog, registerRuntimeServices } from './services.ts';
 import { runMigrations } from './migrations.ts';
@@ -180,7 +180,7 @@ export async function boot(options: BootOptions): Promise<Running> {
     registerMeta(server, entities);
     for (const route of contributed<RouteDef>(modules, 'routes')) server.route(route);
     registerOpenApi(server, { title: project.config.name, version: '0.0.0' });
-    registerAdmin(server, project.root);
+    registerAdmin(server, project.root, adminLocation(env.APP_URL, env.ADMIN_URL));
     const web = server;
     lifecycle.onBoot('http', async () => {
       port = (await web.listen({ port: env.APP_PORT })).port;

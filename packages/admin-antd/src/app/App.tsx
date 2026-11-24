@@ -42,9 +42,15 @@ const list = createRoute({ getParentRoute: () => root, path: '$module/$resource'
 const create = createRoute({ getParentRoute: () => root, path: '$module/$resource/new', component: FormScreen });
 const edit = createRoute({ getParentRoute: () => root, path: '$module/$resource/$id', component: FormScreen });
 
+/**
+ * Where the server serves the application: it writes the path in a meta element of the page (`/admin`, `/panel`, or empty for the root
+ * of a host), so that one build runs at any address (UI-14).
+ */
+const served = document.querySelector('meta[name="bk-admin-base"]')?.getAttribute('content') ?? '';
+
 const router = createRouter({
   routeTree: root.addChildren([index, list, create, edit]),
-  basepath: '/admin',
+  basepath: served === '' ? '/' : served,
   defaultPreload: 'intent',
 });
 

@@ -117,3 +117,67 @@ describe('UI-14 static files under a prefix', () => {
     expect((await server.inject({ method: 'GET', url: '/health/live' })).statusCode).toBe(200);
   });
 });
+
+function adminServer(options: { prefix: string; host?: string; transformPage?: (html: string) => string }) {
+  const root = mkdtempSync(join(tmpdir(), 'bk-static-'));
+  folders.push(root);
+  writeFileSync(join(root, 'index.html'), '<!doctype html><script src="./assets/main.js"></script>');
+  mkdirSync(join(root, 'assets'));
+  writeFileSync(join(root, 'assets', 'main.js'), 'console.log(1)');
+  const instance = createHttpServer({ APP_ENV: 'test', APP_PORT: 0, TRUST_PROXY: false, API_DOCS_PUBLIC: false });
+  instance.route({
+    method: 'GET',
+    url: '/api/v1/ping',
+    public: true,
+    schema: { response: { 200: { type: 'object', properties: { pong: { type: 'boolean' } }, required: ['pong'] } } },
+    handler: () => ({ pong: true }),
+  });
+  serveStatic(instance, { directory: root, policy: POLICY, ...options });
+  return instance;
+}
+
+describe('UI-14 the admin at any address', () => {
+  it('serves a page that the application gives its own address, through a transform of the page', async () => {
+    const instance = adminServer({ prefix: '/panel', transformPage: (html) => html.replaceAll('./', '/panel/') });
+    const page = await instance.inject({ method: 'GET', url: '/panel/settings/new' });
+    expect(page.statusCode).toBe(200);
+    expect(page.body).toContain('src="/panel/assets/main.js"');
+    expect((await instance.inject({ method: 'GET', url: '/admin/' })).statusCode).toBe(404);
+  });
+
+  it('serves only the requests for its own host, and the other hosts get a 404', async () => {
+    const instance = adminServer({ prefix: '/panel', host: 'admin.example.com' });
+    const own = await instance.inject({ method: 'GET', url: '/panel/', headers: { host: 'admin.example.com' } });
+    expect(own.statusCode).toBe(200);
+    const other = await instance.inject({ method: 'GET', url: '/panel/', headers: { host: 'example.com' } });
+    expect(other.statusCode).toBe(404);
+  });
+
+  it('serves the root of a host as a fallback: the page for a route of the application, and the files', async () => {
+    const instance = adminServer({ prefix: '', host: 'admin.example.com' });
+    const headers = { host: 'admin.example.com' };
+    expect((await instance.inject({ method: 'GET', url: '/', headers })).statusCode).toBe(200);
+    expect((await instance.inject({ method: 'GET', url: '/settings/settings/new', headers })).body).toContain(
+      '<script',
+    );
+    const asset = await instance.inject({ method: 'GET', url: '/assets/main.js', headers });
+    expect([asset.statusCode, asset.headers['cache-control']]).toEqual([200, 'public, max-age=31536000, immutable']);
+    expect((await instance.inject({ method: 'GET', url: '/', headers: { host: 'example.com' } })).statusCode).toBe(404);
+  });
+
+  it('keeps the API, the probes and the metrics out of the root: they answer as they do, and a missing one is the problem of the API', async () => {
+    const instance = adminServer({ prefix: '' });
+    expect((await instance.inject({ method: 'GET', url: '/api/v1/ping' })).statusCode).toBe(200);
+    expect((await instance.inject({ method: 'GET', url: '/health/live' })).statusCode).toBe(200);
+    const missing = await instance.inject({ method: 'GET', url: '/api/v1/nope' });
+    expect(missing.statusCode).toBe(404);
+    expect(JSON.parse(missing.body)).toMatchObject({ code: 'HTTP_NOT_FOUND' });
+    expect((await instance.inject({ method: 'GET', url: '/metrics' })).body).not.toContain('<script');
+  });
+
+  it('answers a method that writes at the root with a 404 problem, since it is no page of ours, and a second fallback is refused', async () => {
+    const instance = adminServer({ prefix: '' });
+    expect((await instance.inject({ method: 'POST', url: '/', payload: {} })).statusCode).toBe(404);
+    expect(() => serveStatic(instance, { prefix: '', directory: '/tmp', policy: POLICY })).toThrow(/fallback/);
+  });
+});

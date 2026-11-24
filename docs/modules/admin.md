@@ -2,7 +2,7 @@
   BieberKit
 
   @file        docs/modules/admin.md
-  @description Module spec of the thin admin of M1.8: @bieberkit/admin-core (the headless client and the screens from metadata), @bieberkit/admin-antd (login, list, form) and how the web role serves it under /admin/.
+  @description Module spec of the thin admin of M1.8: @bieberkit/admin-core (the headless client and the screens from metadata), @bieberkit/admin-antd (login, list, form) and how the web role serves it, at the address that `ADMIN_URL` gives.
   @author      Bieber Kieu <kieutrongthien@gmail.com>
   @copyright   Copyright (c) 2026 Bieber Kieu
   @license     Apache-2.0
@@ -30,7 +30,7 @@
 
 ## What it does
 
-A person opens `/admin/`, signs in with the account of the seed, sees the entities that the roles let them read, and lists, makes, changes and deletes rows from screens that are drawn from the metadata of `/api/v1/_meta`. There is no screen to write for an entity: a plugin or a module that declares an entity with `api` and `admin` settings has its screens.
+A person opens the admin (`/admin/` unless `ADMIN_URL` says another address), signs in with the account of the seed, sees the entities that the roles let them read, and lists, makes, changes and deletes rows from screens that are drawn from the metadata of `/api/v1/_meta`. There is no screen to write for an entity: a plugin or a module that declares an entity with `api` and `admin` settings has its screens.
 
 ## Parts
 
@@ -40,7 +40,20 @@ A person opens `/admin/`, signs in with the account of the seed, sees the entiti
 | `columnsOf`, `formFieldsOf`, `listFields`, `initialValues`, `bodyOf`, `labelOf`, `allows` | The pure functions that turn the metadata of an entity into the columns, the fields of the form, the keys that the list asks for (`fields=`, UI-15), the body of a save, and whether the user may create, change or delete                                                                                                                                                                                                                                                     |
 | `@bieberkit/admin-antd`                                                                   | The application: the gate (nobody sees anything before the session says who signed in), the frame (the menu of the entities that the user may read, the user, sign out), the login, the list (page and sort of the API, a link to each row, delete after a question), the form (a control for each widget, the refusals of the API at the field, a 412 shown as "someone else changed this row"). Routes under `/admin` with TanStack Router, server state with TanStack Query |
 | `serveStatic(server, { prefix, directory, policy })`                                      | Files of a folder under a prefix with their types, `no-cache` for the page, one year for the hashed files of `assets/`, the page for a path with no file and no extension (so a reload on a route works), 404 for a missing file with an extension, 405 for a method that writes, and no path that leaves the folder                                                                                                                                                           |
-| `registerAdmin(server, root)`                                                             | Serves `dist/app` of `@bieberkit/admin-antd` under `/admin/` when the package is in the `node_modules` of `apps/server` or of the root. A project made by `create` has it (`--no-admin` leaves it out)                                                                                                                                                                                                                                                                         |
+| `registerAdmin(server, root, location)`                                                   | Serves `dist/app` of `@bieberkit/admin-antd` at `location` when the package is in the `node_modules` of `apps/server` or of the root. A project made by `create` has it (`--no-admin` leaves it out)                                                                                                                                                                                                                                                                           |
+| `adminLocation(APP_URL, ADMIN_URL)`                                                       | Reads where the admin is: its origin, its host when it has one of its own, and its path. See the next section                                                                                                                                                                                                                                                                                                                                                                  |
+
+## Where the admin is (`ADMIN_URL`)
+
+| `ADMIN_URL`                     | The admin is at                                                 |
+| ------------------------------- | --------------------------------------------------------------- |
+| not set                         | `APP_URL` and `/admin`                                          |
+| `https://example.com/panel`     | any path of the application, such as `/panel` or `/back/office` |
+| `https://example.com`           | the root of the application itself                              |
+| `https://admin.example.com`     | the root of a host of its own, answered for that host only      |
+| `https://admin.example.com/ops` | a path of a host of its own                                     |
+
+The build knows none of this. Vite writes every file with a relative address, and the server, when it sends the page, writes the address of each file and a `<meta name="bk-admin-base">` that the router reads for its base path. A path is a mount of the server, and the root of a host is a fallback that answers a GET or a HEAD that no route matched, and never for `/api/`, `/health/` and `/metrics`. A host of its own is the same server under another name: a proxy (the generated Caddyfile does it with `ADMIN_ADDRESS`) sends both names to the web role. The session cookie belongs to one host (`__Host-`), so the admin signs in on its own host, calls the API on that host without CORS, and its origin is a trusted origin of Better Auth. An address that is not a place (a query, a fragment, a login, a scheme that is not http, a path of the server) stops the boot with `BK_ADMIN_URL_INVALID`.
 
 ## The policy of the admin (UI-14, SEC-01)
 
@@ -59,4 +72,4 @@ Saved views, filters, bulk actions, export (UI-03), detail tabs and activity, Ta
 
 ## Tests
 
-`admin-core`: `client.test.ts` (the session, the sign in and out, the list with its paging, sort and fields, the writes with `If-Match`, the problems as one error), `screens.test.ts` (columns, form, defaults, the body of a save, permission). `http`: `static.test.ts` (types, cache, binary files, the page and its policy, the fallback, traversal, methods). `server`: `boot.test.ts` (the admin is served with its policy when the adapter is installed, and not otherwise; Better Auth and the metadata in the web role). The browser test is `e2e/admin.spec.ts` (`pnpm build`, then `pnpm test:e2e`; `pnpm exec playwright install chromium` once): a wrong password, the sign in, the menu, a setting made, refused for a repeated key, changed and deleted, a reload on a route, and sign out, with no policy violation.
+`admin-core`: `client.test.ts` (the session, the sign in and out, the list with its paging, sort and fields, the writes with `If-Match`, the problems as one error), `screens.test.ts` (columns, form, defaults, the body of a save, permission). `http`: `static.test.ts` (types, cache, binary files, the page and its policy, the fallback, traversal, methods). `server`: `admin.test.ts` (the location of the admin), `boot.test.ts` (the admin is served with its policy when the adapter is installed, and not otherwise; at any path, on a host of its own and for that host only; a sign in from that host; Better Auth and the metadata in the web role). The browser tests are `e2e/admin.spec.ts` and `e2e/admin-subdomain.spec.ts`, which signs in at the root of `admin.localhost` on a second server (`pnpm build`, then `pnpm test:e2e`; `pnpm exec playwright install chromium` once): a wrong password, the sign in, the menu, a setting made, refused for a repeated key, changed and deleted, a reload on a route, and sign out, with no policy violation.

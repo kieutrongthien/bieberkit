@@ -34,9 +34,15 @@ import { HttpServer } from "@bieberkit/http";
 import { PluginMigrationStep } from "@bieberkit/data";
 export declare const ADMIN_PACKAGE = "@bieberkit/admin-antd";
 export declare const ADMIN_PREFIX = "/admin";
+interface AdminLocation {
+  readonly origin: string;
+  readonly host: string | undefined;
+  readonly prefix: string;
+}
+export declare function adminLocation(appUrl: string, adminUrl: string | undefined): AdminLocation;
 export declare const ADMIN_POLICY: string;
 export declare function adminDirectory(root: string): string | undefined;
-export declare function registerAdmin(server: HttpServer, root: string): boolean;
+export declare function registerAdmin(server: HttpServer, root: string, location: AdminLocation): boolean;
 type BootRole = Role | "dev";
 interface BootOptions {
   readonly role: BootRole;
@@ -139,5 +145,5 @@ export declare function allModules(project: Project): Promise<ModuleDef[]>;
 export declare function contributed<T>(modules: readonly ModuleDef[], key: string): T[];
 export declare function contributedRecord<T>(modules: readonly ModuleDef[], key: string): Record<string, T>;
 export declare const packageName = "@bieberkit/server";
-export type { BootOptions, BootRole, DoctorOptions, Finding, LoadedPlugin, Migrated, MigrationsOptions, MigrationsRun, MigrationsStatus, Project, ProjectConfig, RunMigrationsOptions, Running, SeedOptions, Seeded };
+export type { AdminLocation, BootOptions, BootRole, DoctorOptions, Finding, LoadedPlugin, Migrated, MigrationsOptions, MigrationsRun, MigrationsStatus, Project, ProjectConfig, RunMigrationsOptions, Running, SeedOptions, Seeded };
 ```

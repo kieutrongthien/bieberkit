@@ -433,6 +433,7 @@ All runtime configuration comes from environment variables, validated once at bo
 | `APP_NAME` | string | project name |  |
 | `APP_ENV` | `development`, `test`, `production` | `development` |  |
 | `APP_URL` | URL | `http://localhost:3000` | Used for links, CORS and cookies |
+| `ADMIN_URL` | URL | `APP_URL` and `/admin` | Where the admin is: a path of the application (`https://example.com/panel`), a host of its own (`https://admin.example.com`), or a path of that host. Never a path of the API (`/api`, `/health`, `/metrics`) |
 | `APP_PORT` | integer | `3000` |  |
 | `APP_KEY` | 32+ random bytes, base64 | generated | Secret. Encryption and signing. Rotation supported through `APP_KEY_PREVIOUS` |
 | `AUTH_SECRET` | 32+ random bytes | generated | Secret. Session signing |
@@ -1055,7 +1056,7 @@ Admin architecture, forms and performance:
 - **UI-11** Form metadata supports repeatable groups and inline child tables, fields shown or required by condition (`visibleWhen`, `requiredWhen`), computed read-only fields, file and image fields with direct upload, relation pickers with server search, and the block content editor (section 16.5).
 - **UI-12** Every route and every screen of a plugin is a lazy chunk. Translations load per language and per module. Lists over 200 rows render with TanStack Virtual.
 - **UI-13** Data hooks prefetch on link hover, update optimistically for state transitions and inline edits, and invalidate caches from realtime events (RT-03).
-- **UI-14** The admin is served under `/admin/` on the same origin as the API, as static files from the web role or a CDN, with its own strict Content-Security-Policy.
+- **UI-14** The admin is served at the address of `ADMIN_URL` (`/admin` of the application by default) on the same origin as the API, as static files from the web role or a CDN, with its own strict Content-Security-Policy. Its address is not in the build: the server writes it in the page, so one build runs at `/admin`, at any other path, or at the root of a host of its own such as `admin.example.com`. A host of its own is the same server answering for another name (a proxy routes both names to the web role), so the session cookie, which belongs to one host, is the one of the admin and the API calls need no CORS, and the origin of the admin is trusted by the sign in.
 - **UI-15** Generic screens never fetch more than the listed fields (`fields=` from metadata), so wide entities stay fast in lists.
 
 * **UI-16** Generic list, detail and form screens work down to a 360 px wide screen, so staff can use the admin on phones and tablets in the field. Wide tables switch to a card layout on small screens.
@@ -1599,6 +1600,7 @@ Open questions:
 
 | Version | Date | Changes |
 | --- | --- | --- |
+| 0.8.11 | 2026-11-24 | UI-14: the address of the admin is `ADMIN_URL`, a path or a host of its own, and the build does not know it |
 | 0.8.10 | 2026-11-24 | DATA-28: every table of the framework and of first-party plugins starts with `bk_` (ADR 0027) |
 | 0.8.9 | 2026-11-24 | M1.9: the base image of the generated Dockerfile is `node:26-slim` by digest until the hardened image can be pulled (ADR 0026), the files of section 19.2 (`.dockerignore`, `.env.production.example`, `deploy/`), and the first k6 results against section 18.1 |
 | 0.8.8 | 2026-11-24 | M1.8: the lock of the migrate role (DATA-25), `migrate --allow-destructive` in section 5.2, the base plugins and their services, the first admin slice without TanStack Table, Form and Virtual (ADR 0025), and the policy of the admin (UI-14) |
