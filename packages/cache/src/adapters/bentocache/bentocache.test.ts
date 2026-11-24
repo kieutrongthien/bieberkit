@@ -28,6 +28,7 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
 import { createCache } from '../../cache.ts';
 import { createCacheIdempotencyStore } from '../../idempotency.ts';
+import { createCacheReadYourWrites } from '../../read-your-writes.ts';
 import { createLayeredEngine } from '../../layered-engine.ts';
 import { createMemoryEngine } from '../../memory-engine.ts';
 import { cacheEngineContractSuite } from '../../testing/contract-suite.ts';
@@ -104,6 +105,16 @@ describeRedis('bentocache redis', (url) => {
     const two = createCacheIdempotencyStore(b);
     const begun = await Promise.all([one.begin('k', 'fp'), two.begin('k', 'fp')]);
     expect(begun.map((r) => r.state).toSorted()).toEqual(['busy', 'new']);
+    await Promise.all([a.close(), b.close()]);
+  });
+
+  it('DATA-13 a write remembered on one node is seen at once by another, through Valkey and past the memory level', async () => {
+    const [a, b] = nodes(`ryw${Date.now()}`);
+    const first = createCacheReadYourWrites(a);
+    const second = createCacheReadYourWrites(b);
+    expect(await second.recently('user-1')).toBe(false);
+    await first.record('user-1');
+    expect(await second.recently('user-1')).toBe(true);
     await Promise.all([a.close(), b.close()]);
   });
 

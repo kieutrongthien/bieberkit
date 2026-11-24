@@ -812,3 +812,21 @@ recordAudit(em, { ..., piiOf: Customer })           // the values of its pii fie
 - **`ensureComparable` must be off.** Otherwise the ORM compares what would be written, which has a new nonce each time, and every flush would update every encrypted column.
 - **An email is `ci` by default.** `.encrypted()` on an email switches it to exact, because the shadow column of a folded compare would keep the clear text.
 - **`getAll()` of the metadata is a `Map`.** The boot check, which looks for the flag `bkEncrypted` on the properties, iterates its values.
+
+## Read your own writes (DATA-13)
+
+Prepared on 2026-11-24. With read replicas (`DATABASE_READ_URLS`), a list is read from a replica, and a replica may be a moment behind. A user who has just written must not see the old data, so for 5 seconds after a user's write the reads of that user go to the primary.
+
+```ts
+interface ReadYourWrites { record(userId): Promise<void>; recently(userId): Promise<boolean> }
+createMemoryReadYourWrites({ windowMs?, now? }): ReadYourWrites    // the default: a map of this process
+useReadYourWrites(port)                                            // at boot; createCacheReadYourWrites(cache) of @bieberkit/cache for several processes
+```
+
+1. **What is remembered.** After every commit of the database (a transaction of `runInTransaction`, or the transaction of a flush of `runInUnitOfWork`), the user of the request is recorded for the window. A commit that is rolled back records nothing, and a write with no user (a job of the system, a migration) records nobody. Only a database that has replicas does this: with one database the store is never called.
+2. **What is routed.** A list (`listPage`) and its count read from a replica, unless `recently(userId)` is true, and then from the primary. A read with no user (anonymous, public) always goes to a replica. Reads of one record (`findScoped`) already go to the primary.
+3. **Failures are safe.** If the store cannot record (a cache that is down) the write is not failed: it is committed, and a warning is logged once a minute. If it cannot answer, the read goes to the primary, which is always right and only a little slower.
+4. **Several processes.** A user's next request may be served by another process, so a map is not enough on the web role: `createCacheReadYourWrites` of `@bieberkit/cache` keeps it in `cache.atomic`, which never comes from the memory level.
+5. **Not done here.** A write by one user does not make the reads of other users go to the primary: they see it when the replica has it, which is what a replica means.
+
+Tests: `read-your-writes.test.ts` (the memory store), `read-your-writes.dialects.test.ts` on PostgreSQL and MySQL against a real replica that is another database, so it is behind for good: the author reads the write, another user and an anonymous reader do not, the window and its end, a unit of work that flushes, a rolled back write, a system write, a store that is down, the count of a page; and on SQLite, that a database with no replica never asks the store.
