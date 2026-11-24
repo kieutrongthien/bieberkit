@@ -45,8 +45,19 @@ A route handler and a seed read what they need from the container, never from th
 | `auth`        | `AuthInstance`            | Better Auth over that database (`signUpEmail`, sessions)                                     |
 | `permissions` | `readonly string[]`       | Every permission of the entities, the routes, the plugins and the scoped permissions, sorted |
 | `storage`     | `Storage`                 | The disk of `STORAGE_DISK` behind the policy of S-01 and S-02                                |
+| `mail`        | `Mail`                    | Queued mail through the configured transport; memory transport in the test app               |
+| `queue`       | `Queue`                   | Job dispatch for every role; only worker/dev starts a worker and outbox loop                 |
+| `cache`       | `Cache`                   | The configured cache; memory engine in the test app                                          |
 
 `RouteContext.services` is the same registry, so a route handler writes `ctx.services.database`. A plugin contributes its own through `services`, as any module does. The steps of a plugin go through the module key `migrations` (DATA-24), and `check plugin-steps` reads them.
+
+## Platform services and contributions (S0)
+
+`definePlugin({ services })` already uses the module container. A plugin declares its service type by augmenting `ServiceRegistry` from `@bieberkit/core`, registers a singleton with `services: { greeter: { scope: 'singleton', create: () => value } }`, and a consumer reads `ctx.services.greeter`. No new `definePlugin` API is needed. Two owners of the same service name fail at boot with `CORE_SERVICE_DUPLICATE` (BPL-03).
+
+A module contributes both `jobs` and `subscriptions` from `@bieberkit/queue`. Each subscription names an event and its job, with an optional `map(message)`; duplicate event mappings fail rather than overwrite one another. Only worker/dev starts the dispatcher, while web can enqueue without running work. Seeders get the same services. `createTestApp` uses a sync queue, `mailbox` and explicit `runOutbox()` calls for deterministic tests (BPL-02, BPL-04).
+
+The complete plugin behavior is tracked separately in [base-plugins-complete.md](base-plugins-complete.md) and M1.11; this platform slice does not mark those later slices complete.
 
 ## The plugins
 

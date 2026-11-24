@@ -27,7 +27,7 @@
 - Packages: `@bieberkit/plugin-users`, `-roles`, `-settings`, `-audit-log`, `-notifications`, `-media`, and the changes they need in `@bieberkit/auth`, `@bieberkit/server` and `bieberkit` (CLI).
 - Layer: plugins, with the platform changes in the product and tools layers. Imports keep pointing downward (PKG-01).
 - Spec sections: 11, 12, 14, 15, OBS-05, AUTH-01 to AUTH-06, AUTHZ-01, AUTHZ-05, S-01 to S-06, DATA-13, DATA-25, IO-04.
-- Status: **Approved in outline by the maintainer on 2026-11-25** (approach 2, and the recommendations of the open questions, which are now decisions below). The maintainer asked for a result that serves a single person and an enterprise equally. Section "Who it is for" and section "Enterprise controls" carry that. The requirement IDs are proposals until they enter `docs/spec/SPEC.md` in the same pull request as the first slice, and the roadmap gets milestone M1.11 then.
+- Status: **Approved in outline by the maintainer on 2026-11-25** (approach 2, and the recommendations of the open questions, which are now decisions below). The maintainer asked for a result that serves a single person and an enterprise equally. Section "Who it is for" and section "Enterprise controls" carry that. S0 implements BPL-01 to BPL-04 and IDN-01 in this slice, with the normative requirements in `docs/spec/SPEC.md` and milestone M1.11 in the roadmap. The remaining IDs are proposals for S1 to S6; the full milestone remains open.
 - Builds on: `docs/modules/plugins.md` (the thin slice of M1.8). This file replaces its "what a plugin does" tables slice by slice; `plugins.md` is updated as each slice lands.
 
 ## Purpose
@@ -90,10 +90,12 @@ These come first, because the plugins below depend on them.
 
 - **BPL-01** A user can be disabled. `bk_auth_users` gains `disabled_at`, `disabled_reason` and `disabled_by`, as a versioned step of `@bieberkit/auth`. A disabled user cannot sign in, and a request that carries a session of a disabled user is refused with `AUTH_USER_DISABLED` (403). Disabling revokes every session of the user in the same transaction.
 - **BPL-02** The service registry of plugins (`RouteContext.services`, the seed services, the test app) gains `mail`, `queue` and `cache`, with the types of the contracts. `createTestApp` registers the in-memory versions.
-- **BPL-03** A plugin can contribute a named service of its own (`settings`, `notifier`) that other plugins read from the registry with an inferred type. A service name taken twice fails at boot (the rule of the container, §7.3).
-- **BPL-04** A file in storage is deleted after commit: the service writes an outbox record `media.file.deleted` in the transaction, and a worker subscriber removes the object and retries on failure. A failure that survives its retries goes to the error reporter.
-- **BPL-05** Every mutation of the six plugins writes its audit entry in the same transaction (AUTHZ-05) with a stable action name `<plugin>.<noun>.<verb>`.
-- **BPL-06** Every list route of the six plugins uses a keyset cursor and a limit of at most 100, and takes `withTotal` where the entity routes do (DATA-06, DATA-11).
+- **BPL-03** The existing `definePlugin({ services })` and module container already let a plugin contribute a named service of its own (`settings`, `notifier`) that other plugins read from the registry with an inferred type. A service name taken twice fails at boot (the rule of the container, §7.3).
+- **BPL-04** S0 provides `subscriptions` contributions and `applySubscriptions` to map committed outbox events to jobs, optionally mapping the message to job input. Boot, seed and test-app wiring apply them; each queue driver rejects a second mapping for an event with `QUEUE_SUBSCRIPTION_DUPLICATE`. The media slice S4 applies this mechanism to `media.file.deleted`: the worker removes the object after commit, retries failures and reports a final failure (MED-03).
+- **BPL-05** Acceptance rule for each of S1 to S5, not new S0 code: every mutation of the six plugins writes its audit entry in the same transaction (AUTHZ-05) with a stable action name `<plugin>.<noun>.<verb>`.
+- **BPL-06** Acceptance rule for each of S1 to S5, not new S0 code: every list route of the six plugins uses a keyset cursor and a limit of at most 100, and takes `withTotal` where the entity routes do (DATA-06, DATA-11).
+
+Auth reset and verification mail is now wired to the queued mail service in real boots and seeders. The test app captures those links in its memory mailbox; unknown-address reset returns the same answer and sends no additional message (AUTH-06). The type additions to `ServiceRegistry` reuse the mail, queue and cache contracts; ADR 0028 records the internal dependency edges of the test app.
 
 ## `users` (slice S1, `[D]`)
 
@@ -222,7 +224,7 @@ New keys, declared by the plugins and validated at boot (CFG-01): `NOTIFICATIONS
 
 | Slice | Content                          | Gate                                |
 | ----- | -------------------------------- | ----------------------------------- |
-| S0    | BPL-01 to BPL-06                 | `[D]`: plan mode, tests shown first |
+| S0    | BPL-01 to BPL-04, IDN-01         | `[D]`: plan mode, tests shown first |
 | S1    | `users`, `roles`, `user-service` | `[D]`: plan mode, tests shown first |
 | S2    | `settings`                       | `[D]` only for the declaration      |
 | S3    | `notifications`                  | none                                |
@@ -248,7 +250,7 @@ One test per requirement ID, named after it (`it('USR-07 refuses to disable the 
 
 Taken on 2026-11-25 by accepting the recommendations of the first draft. Each is a decision of this design, and the two marked ADR need one before their code.
 
-1. **BPL-01 and IDN-01 columns:** added to `bk_auth_users` through Better Auth's `additionalFields`, after a short spike on the three dialects that proves the drift test covers them. If the spike fails, a side table `bk_auth_user_status` is the fallback and this file is updated first.
+1. **BPL-01 and IDN-01 columns:** added to `bk_auth_users` through Better Auth's `additionalFields`. The S0 spike passed all 69 profile/table/drift cases and all 788 auth cases on three dialects, proving both the fields and drift checks work. The side-table fallback was not needed.
 2. **SET-01 declaration:** a new manifest key on `definePlugin` (`settings`). It changes a public API, so it needs an **ADR** (`[D]`) before S2.
 3. **Users and tenants:** in a tenant the list shows only the holders of a role in that tenant. A system administrator without a tenant sees all users.
 4. **USR-06:** deleting a user **anonymizes** the row (`deleted-<id>@invalid`, name removed, `source` cleared) and removes the sessions, memberships and second factors, so foreign keys stay valid and the email is free again.

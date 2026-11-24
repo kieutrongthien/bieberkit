@@ -300,6 +300,23 @@ Deferred by the maintainer until Phase 2 and a verified pre-1.0 npm release. The
 - [ ] Pilot runs web, worker and scheduler behind a load balancer
 - [ ] Pilot survives a rolling deploy and a restore from backup
 
+### M1.11 Complete base plugins
+
+Depends on the M1.8 baseline. This milestone hardens the shared base for domain-independent projects; it does not complete M1.10 Pilot or either phase gate. The design is [base-plugins-complete.md](modules/base-plugins-complete.md), with the S0 plan in `docs/superpowers/plans/2026-11-25-base-plugins-s0-platform.md`.
+
+- [x] **S0 / BPL-01** Disabled-user schema and atomic disable/enable services; reject password, magic-link, passkey, TOTP, cookie and API-key access, including cached sessions. Evidence: `auth/src/profile.dialects.test.ts`, `user-service.dialects.test.ts` (including audit-failure rollback)
+- [x] **S0 / IDN-01** Provider identity columns with a local default and per-provider uniqueness, auth migration 0.5.0. Evidence: `IDN-01 a new user has source "local" and no external id`, the uniqueness case and `AUTH-10 the drift check passes with the profile fields`
+- [x] **S0 / BPL-02** Typed mail/queue/cache in process roles, seeders and the memory test app; auth mail, `mailbox`, `runOutbox()`. Evidence: the `BPL-02` boot, seed, auth-mail and test-app cases; the `AUTH-06` unknown-address reset case
+- [x] **S0 / BPL-03** Prove existing plugin service contribution and duplicate-name rejection. Evidence: the two `BPL-03` cases in `testing/src/app.test.ts`
+- [x] **S0 / BPL-04 mechanism** Contributed outbox-to-job mappings, commit/rollback behavior and duplicate-event rejection across drivers. Evidence: `queue/src/subscriptions.test.ts`, the shared contract case and `BPL-04` boot/test-app cases. Media deletion remains S4
+- [ ] **S1 [D]** Complete users and roles
+- [ ] **S2** Complete settings, with maintainer review of its declaration
+- [ ] **S3** Complete notifications
+- [ ] **S4** Complete media, including deletion after commit
+- [ ] **S5** Complete audit-log and pruning
+- [ ] **S6 [D]** Enterprise policies, managed identities, retention and operational controls
+- [ ] Cross-slice acceptance BPL-05/BPL-06: each mutation audits atomically and each list proves cursor/limit rules in its own slice
+
 ### Phase 1 gate **[M]**
 
 - [ ] **[M]** Pilot live in production

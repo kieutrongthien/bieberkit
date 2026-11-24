@@ -329,9 +329,9 @@ git commit -s -m "test(testing): prove that a plugin contributes a named service
 - Modify: `docs/spec/SPEC.md` (add BPL-01 to BPL-06 and IDN-01 to IDN-03 as in the design document, bump the version history), `docs/ROADMAP.md` (milestone M1.11 with S0 to S6 as items, S0 ticked only for what landed), `docs/modules/base-plugins-complete.md` (the three deviations above, BPL-04 split), `docs/modules/auth.md`, `docs/modules/plugins.md` (the services table gains `mail`, `queue`, `cache`), `docs/modules/queue.md` (`subscriptions`)
 - Create: changesets by `pnpm changeset` for `@bieberkit/auth`, `@bieberkit/queue`, `@bieberkit/mail`, `@bieberkit/cache`, `@bieberkit/server`, `@bieberkit/testing`
 
-- [ ] **Step 1: Edit the documents.** The spec gains only the requirements of S0 now (the other slices add theirs). The roadmap item for each S0 requirement is ticked with its evidence (a test name), and the milestone stays open.
-- [ ] **Step 2: Add the changesets** (`pnpm changeset`, minor, one line each) and run `pnpm api:update` for the packages whose public API changed, then `pnpm check:api`.
-- [ ] **Step 3: Commit**
+- [x] **Step 1: Edit the documents.** The spec gains only the requirements of S0 now (the other slices add theirs). The roadmap item for each S0 requirement is ticked with its evidence (a test name), and the milestone stays open.
+- [x] **Step 2: Add the changesets** (`pnpm changeset`, minor, one line each) and run `pnpm api:update` for the packages whose public API changed, then `pnpm check:api`.
+- [x] **Step 3: Commit**
 
 ```bash
 git add docs .changeset packages/*/api
@@ -339,6 +339,8 @@ git commit -s -m "docs: add the platform requirements of the base plugins to the
 ```
 
 ---
+
+**Task 6 record:** Spec revision 0.8.12 adds only BPL-01 to BPL-04 and IDN-01 for S0, plus the TST-02 mailbox/outbox helpers. BPL-05/BPL-06 and IDN-02/IDN-03 remain design proposals for their implementing slices. M1.11 ticks each implemented S0 requirement with its test evidence; S1 to S6, cross-slice acceptance, Pilot and the phase gates remain open. The auth/plugin/queue module docs describe current behavior, and the design records the BPL-03 reuse, BPL-04 media split and per-slice acceptance rules. Auth and platform changesets/API reports were brought forward into their implementation commits. Changesets CLI could not create entries while the packages are private (Task 1); the entries use the existing repository format without changing visibility. ADR 0028 remains Proposed for the maintainer. `pnpm check:api`, changeset coverage and `pnpm check` passed.
 
 ### Task 7: Verify and hand over
 
