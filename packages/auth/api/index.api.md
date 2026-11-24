@@ -29,12 +29,13 @@ Generated from the built declaration files by `pnpm api:update`. Do not edit by 
 
 ```ts
 import "@bieberkit/data";
+import { A as buildPermissionRegistry, C as ScopedPermission, D as MaskedField, E as Action, O as PermissionEntry, S as EntityShape, T as explainCondition, _ as Ability, a as AuthRolePermission, b as AccessAnswer, c as AuthUserRole, d as Grants, f as NIL_TENANT, g as AUTH_PLUGIN, h as loadGrants, i as AuthRole, k as PermissionRegistry, l as AuthUserRoleRow, m as authMigrationSteps, n as AuthorizerOptions, o as AuthRolePermissionRow, p as authEntities, r as createAuthorizer, s as AuthRoleRow, t as AccessAuthorizer, u as GrantLoader, v as AbilityInput, w as buildAbility, x as Condition, y as AbilityUser } from "./authorizer-B3QFV22q.js";
 import { Auth, BetterAuthOptions, BetterAuthOptions as BetterAuthOptions$1 } from "better-auth";
 import { Authenticator, HttpServer, TenantResolver } from "@bieberkit/http";
 import { BkError, Dialect } from "@bieberkit/core";
-import { C as ScopedPermission, D as PermissionEntry, E as MaskedField, O as PermissionRegistry, S as EntityShape, T as Action, _ as Ability, a as AuthRolePermission, b as AccessAnswer, c as AuthUserRole, d as Grants, f as NIL_TENANT, g as AUTH_PLUGIN, h as loadGrants, i as AuthRole, k as buildPermissionRegistry, l as AuthUserRoleRow, m as authMigrationSteps, n as AuthorizerOptions, o as AuthRolePermissionRow, p as authEntities, r as createAuthorizer, s as AuthRoleRow, t as AccessAuthorizer, u as GrantLoader, v as AbilityInput, w as buildAbility, x as Condition, y as AbilityUser } from "./authorizer-CqvOMK08.js";
 import { Database } from "@bieberkit/data/orm";
-import { EntitySchema } from "@mikro-orm/core";
+import { EntityDef as EntityDef$1 } from "@bieberkit/data/schema";
+import { EntityManager, EntitySchema } from "@mikro-orm/core";
 interface Limit {
   readonly window: number;
   readonly max: number;
@@ -103,6 +104,7 @@ interface CreateAuthOptions {
   readonly trustedOrigins?: readonly string[];
   readonly previousSecrets?: readonly string[];
   readonly limits?: AuthLimits;
+  readonly secondaryStorage?: AuthSecondaryStorage;
   readonly apiKeys?: AuthApiKeys;
   readonly methods?: AuthMethods;
   readonly mail?: {
@@ -111,6 +113,7 @@ interface CreateAuthOptions {
   };
 }
 type AuthInstance = Auth;
+type AuthSecondaryStorage = NonNullable<BetterAuthOptions["secondaryStorage"]>;
 export declare function limiterOf(auth: AuthInstance): RateLimiter | undefined;
 export declare function createAuth(options: CreateAuthOptions): AuthInstance;
 export declare const API_KEY_PREFIX = "bk_";
@@ -140,6 +143,21 @@ interface DriftEntity {
 }
 export declare function driftEntities(db: Database): Record<string, DriftEntity>;
 export declare function checkAuthDrift(options: BetterAuthOptions$1, entities: Record<string, DriftEntity>): string[];
+interface ImpersonationEntry {
+  readonly actorId: string;
+  readonly targetId: string;
+  readonly tenantId?: string;
+  readonly reason?: string;
+}
+export declare function recordImpersonationStart(em: EntityManager, entry: ImpersonationEntry): void;
+export declare function recordImpersonationEnd(em: EntityManager, entry: ImpersonationEntry): void;
+interface ConditionFinding {
+  readonly permission: string;
+  readonly code: "SUBJECT_UNKNOWN" | "ACTION_INVALID" | "CONDITION_THROWS" | "CONDITION_NOT_ALLOWED";
+  readonly message: string;
+  readonly fix: string;
+}
+export declare function checkScopedPermissions(scoped: Readonly<Record<string, ScopedPermission>>, entities: readonly EntityDef$1<string>[]): ConditionFinding[];
 interface NewRole {
   readonly tenantId?: string;
   readonly name: string;
@@ -284,5 +302,5 @@ declare module "@bieberkit/core" {
     scopedPermissions?: Readonly<Record<string, ScopedPermission>>;
   }
 }
-export { AUTH_PLUGIN, type Ability, type AbilityInput, type AbilityUser, type AccessAnswer, type AccessAuthorizer, type Action, type ApiKeyInput, type Assignment, type AuthAccountRow, type AuthApiKeyRow, type AuthApiKeys, type AuthInstance, type AuthLimits, type AuthMail, type AuthPasskeyRow, type AuthRateLimitRow, AuthRole, AuthRolePermission, type AuthRolePermissionRow, type AuthRoleRow, type AuthRoutesOptions, type AuthSessionRow, type AuthTwoFactorRow, AuthUserRole, type AuthUserRoleRow, type AuthUserRow, type AuthVerificationRow, type AuthorizerOptions, type BetterAuthOptions, type Condition, type CreateAuthOptions, type CreatedApiKey, type DriftEntity, type DriftProperty, type EntityShape, type GrantLoader, type Grants, type Limit, type Limit2, type MaskedField, NIL_TENANT, type NewRole, type PermissionEntry, type PermissionRegistry, type ScopedPermission, type TenantResolverOptions, authEntities, authMigrationSteps, buildAbility, buildPermissionRegistry, createAuthorizer, loadGrants };
+export { AUTH_PLUGIN, type Ability, type AbilityInput, type AbilityUser, type AccessAnswer, type AccessAuthorizer, type Action, type ApiKeyInput, type Assignment, type AuthAccountRow, type AuthApiKeyRow, type AuthApiKeys, type AuthInstance, type AuthLimits, type AuthMail, type AuthPasskeyRow, type AuthRateLimitRow, AuthRole, AuthRolePermission, type AuthRolePermissionRow, type AuthRoleRow, type AuthRoutesOptions, type AuthSecondaryStorage, type AuthSessionRow, type AuthTwoFactorRow, AuthUserRole, type AuthUserRoleRow, type AuthUserRow, type AuthVerificationRow, type AuthorizerOptions, type BetterAuthOptions, type Condition, type ConditionFinding, type CreateAuthOptions, type CreatedApiKey, type DriftEntity, type DriftProperty, type EntityShape, type GrantLoader, type Grants, type ImpersonationEntry, type Limit, type Limit2, type MaskedField, NIL_TENANT, type NewRole, type PermissionEntry, type PermissionRegistry, type ScopedPermission, type TenantResolverOptions, authEntities, authMigrationSteps, buildAbility, buildPermissionRegistry, createAuthorizer, explainCondition, loadGrants };
 ```

@@ -258,6 +258,10 @@ importers:
       kysely:
         specifier: 0.29.8
         version: 0.29.8
+    devDependencies:
+      '@bieberkit/cache':
+        specifier: workspace:*
+        version: link:../cache
 
   packages/cache:
     dependencies:

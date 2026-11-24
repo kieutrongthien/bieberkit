@@ -78,6 +78,11 @@ export interface CreateAuthOptions {
   /** The secrets that were current before, newest first (`APP_KEY_PREVIOUS`). They only decrypt, so a rotation loses nothing. */
   readonly previousSecrets?: readonly string[];
   readonly limits?: AuthLimits;
+  /**
+   * Valkey for the sessions, so that every web replica finds a session in one hop (AUTH-02). The database still holds each session, so a
+   * Valkey that loses its data signs nobody out. Without it, sessions are in the database only.
+   */
+  readonly secondaryStorage?: AuthSecondaryStorage;
   /** API keys for machine clients (AUTH-07). Without it there is no key plugin, and no table. */
   readonly apiKeys?: AuthApiKeys;
   /** The sign in methods besides email and password. A method that is not here is not loaded, and needs no table. */
@@ -90,6 +95,9 @@ export interface CreateAuthOptions {
 }
 
 export type AuthInstance = Auth;
+
+/** Where sessions are kept besides the database: Valkey, through `redisSecondaryStorage` of `@bieberkit/cache/bentocache` (AUTH-02). */
+export type AuthSecondaryStorage = NonNullable<BetterAuthOptions['secondaryStorage']>;
 
 const limiters = new WeakMap<object, RateLimiter>();
 
@@ -153,7 +161,11 @@ export function createAuth(options: CreateAuthOptions): AuthInstance {
     trustedOrigins: [base.origin, ...(options.trustedOrigins ?? [])],
     telemetry: { enabled: false },
     user: { modelName: 'authUser' },
-    session: { modelName: 'authSession' },
+    session: {
+      modelName: 'authSession',
+      ...(options.secondaryStorage === undefined ? {} : { storeSessionInDatabase: true }),
+    },
+    ...(options.secondaryStorage === undefined ? {} : { secondaryStorage: options.secondaryStorage }),
     account: { modelName: 'authAccount', fields: { accountId: 'externalId' } },
     verification: { modelName: 'authVerification' },
     emailAndPassword: {

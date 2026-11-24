@@ -34,6 +34,8 @@ import { bentocacheEngine } from './engine.ts';
 export { checkRedisInstances, describeInstance, readInstance, sameInstance } from './doctor.ts';
 export type { DoctorFinding, InstanceInfo, RedisInstanceChecks, RedisInstanceConfig } from './doctor.ts';
 export { bentocacheEngine, checkEvictionPolicy } from './engine.ts';
+export { redisSecondaryStorage } from './secondary-storage.ts';
+export type { RedisSecondaryStorage, RedisSecondaryStorageOptions } from './secondary-storage.ts';
 export type { BentocacheEngineOptions } from './engine.ts';
 
 /** The part of the validated config (`CoreEnv`) that decides the cache. */

@@ -80,6 +80,9 @@ interface AbilityInput {
   readonly scoped?: Readonly<Record<string, ScopedPermission>>;
   readonly user: AbilityUser;
 }
+declare function explainCondition(condition: unknown, properties: ReadonlySet<string>, options?: {
+  readonly oneOperator?: boolean;
+}): string | undefined;
 declare function buildAbility(input: AbilityInput): Ability;
 declare const AUTH_PLUGIN = "@bieberkit/auth";
 declare const NIL_TENANT = "00000000-0000-0000-0000-000000000000";
@@ -124,5 +127,5 @@ interface AccessAuthorizer extends Authorizer {
   install(server: HttpServer): void;
 }
 declare function createAuthorizer(options: AuthorizerOptions): AccessAuthorizer;
-export { ScopedPermission as C, PermissionEntry as D, MaskedField as E, PermissionRegistry as O, EntityShape as S, Action as T, Ability as _, AuthRolePermission as a, AccessAnswer as b, AuthUserRole as c, Grants as d, NIL_TENANT as f, AUTH_PLUGIN as g, loadGrants as h, AuthRole as i, buildPermissionRegistry as k, AuthUserRoleRow as l, authMigrationSteps as m, AuthorizerOptions as n, AuthRolePermissionRow as o, authEntities as p, createAuthorizer as r, AuthRoleRow as s, AccessAuthorizer as t, GrantLoader as u, AbilityInput as v, buildAbility as w, Condition as x, AbilityUser as y };
+export { buildPermissionRegistry as A, ScopedPermission as C, MaskedField as D, Action as E, PermissionEntry as O, EntityShape as S, explainCondition as T, Ability as _, AuthRolePermission as a, AccessAnswer as b, AuthUserRole as c, Grants as d, NIL_TENANT as f, AUTH_PLUGIN as g, loadGrants as h, AuthRole as i, PermissionRegistry as k, AuthUserRoleRow as l, authMigrationSteps as m, AuthorizerOptions as n, AuthRolePermissionRow as o, authEntities as p, createAuthorizer as r, AuthRoleRow as s, AccessAuthorizer as t, GrantLoader as u, AbilityInput as v, buildAbility as w, Condition as x, AbilityUser as y };
 ```

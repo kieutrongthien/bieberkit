@@ -32,7 +32,7 @@ import { createAuthenticator } from '../authenticator.ts';
 import { createApiKey, revokeApiKey } from '../api-keys.ts';
 import type { ApiKeyInput, CreatedApiKey } from '../api-keys.ts';
 import { createAuth } from '../better-auth.ts';
-import type { AuthInstance, AuthLimits, AuthMail } from '../better-auth.ts';
+import type { AuthInstance, AuthLimits, AuthMail, AuthSecondaryStorage } from '../better-auth.ts';
 import { AuthRole, AuthRolePermission, AuthUserRole } from '../roles.ts';
 import { registerAuthRoutes } from '../routes.ts';
 import { createTenantResolver } from '../tenant.ts';
@@ -119,6 +119,8 @@ export interface AuthServerOptions {
   readonly previousSecrets?: readonly string[];
   readonly limits?: AuthLimits;
   readonly trustProxy?: boolean;
+  /** Valkey for the sessions (AUTH-02). */
+  readonly secondaryStorage?: AuthSecondaryStorage;
 }
 
 const asBody = (text: string): Record<string, unknown> => {
@@ -178,6 +180,7 @@ export async function authServer(
         : {}),
     },
     ...(options.limits === undefined ? {} : { limits: options.limits }),
+    ...(options.secondaryStorage === undefined ? {} : { secondaryStorage: options.secondaryStorage }),
     mail: {
       sendVerification: async (mail) => void mails.push({ kind: 'verify', ...mail }),
       sendResetPassword: async (mail) => void mails.push({ kind: 'reset', ...mail }),

@@ -52,6 +52,7 @@ Status values: `Proposed`, `Accepted`, `Rejected`, `Superseded by NNNN`. Only th
 | [0018](0018-mail-transport.md)                  | Mail: nodemailer behind a transport port                | Accepted |
 | [0019](0019-queue-wake-listen-notify.md)        | Queue wake: LISTEN/NOTIFY on PostgreSQL                 | Accepted |
 | [0020](0020-bullmq-install-script.md)           | BullMQ and the install script of msgpackr-extract       | Accepted |
+| [0021](0021-tenants-are-ours.md)                | Tenants are ours: no organization plugin                | Accepted |
 
 ## Needed for the Phase 0 gate
 

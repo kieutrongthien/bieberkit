@@ -89,24 +89,52 @@ const isOperand = (value: unknown): boolean =>
   typeof value === 'boolean' ||
   value instanceof Date;
 
-/** Whether a condition is in the language: properties of the entity, no path, no logic, only the operators above. */
-function inLanguage(condition: unknown, properties: ReadonlySet<string>): condition is Condition {
-  if (!isPlain(condition)) return false;
+/**
+ * Why a condition is not in the language of ADR 0013, or `undefined` when it is: properties of the entity, no path, no logic, only the
+ * operators above. With `oneOperator` it also refuses two operators on one field, which is what AUTHZ-06 asks of a declared condition at
+ * build time; the ability at run time accepts a range, so that a stored condition that worked keeps working.
+ */
+export function explainCondition(
+  condition: unknown,
+  properties: ReadonlySet<string>,
+  options: { readonly oneOperator?: boolean } = {},
+): string | undefined {
+  if (!isPlain(condition)) return 'A condition is an object like { field: value }.';
   const entries = Object.entries(condition);
-  if (entries.length === 0) return false;
-  return entries.every(([field, value]) => {
-    if (field.startsWith('$') || !properties.has(field)) return false;
-    if (!isPlain(value)) return isOperand(value);
+  if (entries.length === 0)
+    return 'The condition is empty, so it would allow every row. Use the plain permission for that.';
+  for (const [field, value] of entries) {
+    if (field.startsWith('$')) {
+      return `${field} is not allowed: "or" is several rules and "not" is an inverted rule (AUTHZ-06).`;
+    }
+    if (field.includes('.')) return `${field} is a path. A condition names a property of the entity, with no path.`;
+    if (!properties.has(field)) return `${field} is not a property of the entity.`;
+    if (!isPlain(value)) {
+      if (!isOperand(value)) return `The value of ${field} is not a string, a number, a boolean, a date or null.`;
+      continue;
+    }
     const operators = Object.entries(value);
-    return (
-      operators.length > 0 &&
-      operators.every(([operator, operand]) =>
-        operator === '$in' || operator === '$nin'
-          ? Array.isArray(operand) && operand.every(isOperand)
-          : OPERATORS.includes(operator) && isOperand(operand),
-      )
-    );
-  });
+    if (operators.length === 0) return `${field} has no operator.`;
+    if (options.oneOperator === true && operators.length > 1) {
+      return `${field} has ${String(operators.length)} operators. A declared condition has one for each field (AUTHZ-06).`;
+    }
+    for (const [operator, operand] of operators) {
+      if (operator === '$in' || operator === '$nin') {
+        if (!Array.isArray(operand) || !operand.every(isOperand))
+          return `${operator} of ${field} needs a list of plain values.`;
+      } else if (!OPERATORS.includes(operator)) {
+        return `${operator} is not an operator of the language (${OPERATORS.join(', ')}).`;
+      } else if (!isOperand(operand)) {
+        return `The operand of ${operator} on ${field} is not a plain value.`;
+      }
+    }
+  }
+  return undefined;
+}
+
+/** Whether a condition is in the language. */
+function inLanguage(condition: unknown, properties: ReadonlySet<string>): condition is Condition {
+  return explainCondition(condition, properties) === undefined;
 }
 
 const isNodes = (value: unknown): value is AstNode[] =>

@@ -67,6 +67,19 @@ export declare function checkEvictionPolicy(url: string): Promise<{
   readonly ok: boolean;
   readonly policy: string;
 }>;
+interface RedisSecondaryStorage {
+  get(key: string): Promise<string | null>;
+  getAndDelete(key: string): Promise<string | null>;
+  increment(key: string, ttlSeconds: number): Promise<number>;
+  set(key: string, value: string, ttlSeconds?: number): Promise<void>;
+  delete(key: string): Promise<void>;
+  close(): Promise<void>;
+}
+interface RedisSecondaryStorageOptions {
+  readonly url: string;
+  readonly prefix?: string;
+}
+export declare function redisSecondaryStorage(options: RedisSecondaryStorageOptions): RedisSecondaryStorage;
 export interface CacheConfig {
   readonly CACHE_DRIVER: "memory" | "file" | "database" | "redis";
   readonly CACHE_PREFIX: string;
@@ -79,5 +92,5 @@ export interface CacheFromConfigOptions {
 }
 export declare function engineFromConfig(config: CacheConfig, options?: CacheFromConfigOptions): CacheEngine;
 export declare function createCacheFromConfig(config: CacheConfig, options?: CacheFromConfigOptions): Cache;
-export type { BentocacheEngineOptions, DoctorFinding, InstanceInfo, RedisInstanceChecks, RedisInstanceConfig };
+export type { BentocacheEngineOptions, DoctorFinding, InstanceInfo, RedisInstanceChecks, RedisInstanceConfig, RedisSecondaryStorage, RedisSecondaryStorageOptions };
 ```

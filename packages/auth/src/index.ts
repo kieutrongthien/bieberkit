@@ -25,7 +25,7 @@
 /** npm name of this package. */
 export const packageName = '@bieberkit/auth';
 
-export { buildAbility } from './ability.ts';
+export { buildAbility, explainCondition } from './ability.ts';
 export type {
   Ability,
   AbilityInput,
@@ -44,6 +44,7 @@ export type {
   AuthInstance,
   AuthLimits,
   AuthMail,
+  AuthSecondaryStorage,
   BetterAuthOptions,
   CreateAuthOptions,
   Limit,
@@ -51,6 +52,10 @@ export type {
 } from './better-auth.ts';
 export { checkAuthDrift, driftEntities } from './drift.ts';
 export type { DriftEntity, DriftProperty } from './drift.ts';
+export { recordImpersonationEnd, recordImpersonationStart } from './impersonation.ts';
+export type { ImpersonationEntry } from './impersonation.ts';
+export { checkScopedPermissions } from './check-conditions.ts';
+export type { ConditionFinding } from './check-conditions.ts';
 export { createAuthorizer } from './authorizer.ts';
 export { assignRole, createRole, deleteRole, revokeRole, setRolePermissions, updateRole } from './role-service.ts';
 export type { Assignment, NewRole } from './role-service.ts';
