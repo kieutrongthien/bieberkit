@@ -267,6 +267,8 @@ Depends on: M1.1 to M1.6 (can start the resolver and flags earlier).
 
 Done when: `pnpm create bieberkit@latest demo --yes` boots, migrates, seeds an admin and `bieberkit dev` serves the API.
 
+State on 2026-11-24: a project made by `create` starts through its `main.ts` (a test runs it in a real process), `dev` makes the framework tables and serves the API, and `db:seed` runs the seeders. The administrator is seeded by the base plugins, and the `pnpm create bieberkit@latest` form needs the first release, so this line closes with M1.8.
+
 ### M1.8 Blank template and base plugins
 
 Depends on: M1.7. Built and hardened first, as every other template relies on them (§12).

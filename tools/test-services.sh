@@ -27,6 +27,8 @@ set -eu
 #   sh tools/test-services.sh start    starts them and waits until each answers
 #   sh tools/test-services.sh env      prints the variables that the tests read, one KEY=value a line
 #   sh tools/test-services.sh stop     removes them
+# The ports are below 32768, the start of the range that Linux gives to outgoing connections: a port inside it can be held by a
+# connection that some other program opened, and then the container cannot bind it.
 # Locally:  sh tools/test-services.sh start && export $(sh tools/test-services.sh env | xargs) && pnpm test
 #
 # The data of PostgreSQL and MySQL is in memory and their durability is off: the tests make and drop databases all the time, and a server
@@ -47,15 +49,15 @@ stop() {
 
 start() {
   stop
-  docker run -d --rm --name bk-test-pg --tmpfs /var/lib/postgresql/data -e POSTGRES_PASSWORD=bk -p 55415:5432 "$POSTGRES" \
+  docker run -d --rm --name bk-test-pg --tmpfs /var/lib/postgresql/data -e POSTGRES_PASSWORD=bk -p 25415:5432 "$POSTGRES" \
     -c fsync=off -c synchronous_commit=off -c full_page_writes=off -c max_connections=400 >/dev/null
-  docker run -d --rm --name bk-test-mysql --tmpfs /var/lib/mysql -e MYSQL_ROOT_PASSWORD=bk -p 53384:3306 "$MYSQL" \
+  docker run -d --rm --name bk-test-mysql --tmpfs /var/lib/mysql -e MYSQL_ROOT_PASSWORD=bk -p 23384:3306 "$MYSQL" \
     --innodb-flush-log-at-trx-commit=0 --sync-binlog=0 --skip-log-bin --max-connections=500 --innodb-doublewrite=0 >/dev/null
-  docker run -d --rm --name bk-test-valkey -p 56379:6379 "$VALKEY" \
+  docker run -d --rm --name bk-test-valkey -p 26379:6379 "$VALKEY" \
     valkey-server --maxmemory-policy allkeys-lru --maxmemory 128mb >/dev/null
-  docker run -d --rm --name bk-test-queue-valkey -p 56380:6379 "$VALKEY" \
+  docker run -d --rm --name bk-test-queue-valkey -p 26380:6379 "$VALKEY" \
     valkey-server --maxmemory-policy noeviction >/dev/null
-  docker run -d --rm --name bk-test-s3 -p 59000:9000 -e MINIO_ROOT_USER=minioadmin -e MINIO_ROOT_PASSWORD=minioadmin "$MINIO" >/dev/null
+  docker run -d --rm --name bk-test-s3 -p 29000:9000 -e MINIO_ROOT_USER=minioadmin -e MINIO_ROOT_PASSWORD=minioadmin "$MINIO" >/dev/null
 
   tries=0
   # Over TCP, because both servers first run a temporary one that listens on a socket only, and then restart.
@@ -63,7 +65,7 @@ start() {
     && docker exec bk-test-mysql mysql -h 127.0.0.1 -P 3306 -uroot -pbk -e 'select 1' >/dev/null 2>&1 \
     && docker exec bk-test-valkey valkey-cli ping >/dev/null 2>&1 \
     && docker exec bk-test-queue-valkey valkey-cli ping >/dev/null 2>&1 \
-    && curl -sf http://127.0.0.1:59000/minio/health/live >/dev/null 2>&1; do
+    && curl -sf http://127.0.0.1:29000/minio/health/live >/dev/null 2>&1; do
     tries=$((tries + 1))
     if [ "$tries" -gt 90 ]; then
       echo 'The test services did not answer in 3 minutes.' >&2
@@ -77,11 +79,11 @@ start() {
 
 env_lines() {
   cat <<'ENV'
-DATABASE_URL_POSTGRES=postgres://postgres:bk@127.0.0.1:55415/postgres
-DATABASE_URL_MYSQL=mysql://root:bk@127.0.0.1:53384/mysql
-CACHE_TEST_REDIS_URL=redis://127.0.0.1:56379
-QUEUE_TEST_REDIS_URL=redis://127.0.0.1:56380
-STORAGE_TEST_S3_ENDPOINT=http://127.0.0.1:59000
+DATABASE_URL_POSTGRES=postgres://postgres:bk@127.0.0.1:25415/postgres
+DATABASE_URL_MYSQL=mysql://root:bk@127.0.0.1:23384/mysql
+CACHE_TEST_REDIS_URL=redis://127.0.0.1:26379
+QUEUE_TEST_REDIS_URL=redis://127.0.0.1:26380
+STORAGE_TEST_S3_ENDPOINT=http://127.0.0.1:29000
 BK_REQUIRE_DIALECTS=all
 ENV
 }
