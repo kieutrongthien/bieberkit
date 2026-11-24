@@ -28,6 +28,7 @@
 Generated from the built declaration files by `pnpm api:update`. Do not edit by hand. A change here is a change to the public API and needs a changeset (spec section 22.3).
 
 ```ts
+import { a as MailTransport } from "./contract-BFl6GzOT.js";
 interface FakeSmtpOptions {
   readonly auth?: {
     readonly user: string;
@@ -46,5 +47,11 @@ interface FakeSmtp {
   close(): Promise<void>;
 }
 export declare function startFakeSmtp(options?: FakeSmtpOptions): Promise<FakeSmtp>;
-export type { FakeSmtp, FakeSmtpOptions, ReceivedMail };
+interface TransportSubject {
+  readonly make: () => Promise<MailTransport>;
+  readonly cleanup?: () => Promise<void>;
+  readonly refusedAddress?: string;
+}
+export declare function mailTransportContractSuite(name: string, subject: TransportSubject): void;
+export type { FakeSmtp, FakeSmtpOptions, ReceivedMail, TransportSubject };
 ```

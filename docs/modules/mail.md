@@ -73,6 +73,7 @@ startFakeSmtp({ auth? }): FakeSmtp                                        // a s
 
 ## Tests
 
+- `mailTransportContractSuite` (`@bieberkit/mail/testing`), run on `log`, `log` verbose, `memory` and `smtp`: a receipt with an id, ids that differ, cc, bcc, reply-to, html, Vietnamese, a body of 1 MiB, 20 sends at once, `verify`, `close` twice, and an address that is refused for good is a permanent `MailError`.
 - `contract.test.ts`: every rule of 2, with the injection cases.
 - `mailer.test.ts` on the sync queue and the memory transport: a message is sent by a job with the sender filled, `jobId`, the restored context, a retry that works, a dead job, a refusal for good, a partial refusal, `verify`, `close`.
 - `transports.test.ts`: the log never prints an address or a body in production.

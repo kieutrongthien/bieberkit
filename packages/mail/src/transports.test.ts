@@ -24,6 +24,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { createLogger } from '@bieberkit/core';
+import { mailTransportContractSuite } from './testing/transport-suite.ts';
 import { createLogTransport, createMemoryTransport } from './transports.ts';
 import { MailError } from './contract.ts';
 import type { PreparedMessage } from './contract.ts';
@@ -84,3 +85,9 @@ describe('M-01 the memory transport', () => {
     await transport.close();
   });
 });
+
+mailTransportContractSuite('log', { make: async () => createLogTransport({ logger: logs().logger }) });
+mailTransportContractSuite('log (verbose)', {
+  make: async () => createLogTransport({ logger: logs().logger, verbose: true }),
+});
+mailTransportContractSuite('memory', { make: async () => createMemoryTransport() });

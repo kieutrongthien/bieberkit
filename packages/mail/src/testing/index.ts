@@ -24,3 +24,5 @@
 
 export { startFakeSmtp } from './fake-smtp.ts';
 export type { FakeSmtp, FakeSmtpOptions, ReceivedMail } from './fake-smtp.ts';
+export { mailTransportContractSuite } from './transport-suite.ts';
+export type { TransportSubject } from './transport-suite.ts';

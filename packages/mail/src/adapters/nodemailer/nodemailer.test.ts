@@ -27,6 +27,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createLogger, createMemoryReporter } from '@bieberkit/core';
 import { createQueue } from '@bieberkit/queue';
 import { startFakeSmtp } from '../../testing/fake-smtp.ts';
+import { mailTransportContractSuite } from '../../testing/transport-suite.ts';
 import type { FakeSmtp } from '../../testing/fake-smtp.ts';
 import type { PreparedMessage } from '../../contract.ts';
 import { classify, createMailerFromConfig, nodemailerTransport, transportFromConfig } from './index.ts';
@@ -294,4 +295,18 @@ describe('M-01 the config', () => {
     expect(() => createMailerFromConfig({ ...base, MAIL_FROM: 'not an address' }, { logger })).toThrow(/not valid/);
     expect(createMailerFromConfig({ ...base, MAIL_FROM: undefined }, { logger }).job.name).toBe('mail.send');
   });
+});
+
+mailTransportContractSuite('smtp', {
+  make: async () => {
+    const server = await startFakeSmtp();
+    const transport = nodemailerTransport({ url: server.url });
+    const close = transport.close.bind(transport);
+    transport.close = async () => {
+      await close();
+      await server.close();
+    };
+    return transport;
+  },
+  refusedAddress: 'reject-me@example.com',
 });

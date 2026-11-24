@@ -28,55 +28,9 @@
 Generated from the built declaration files by `pnpm api:update`. Do not edit by hand. A change here is a change to the public API and needs a changeset (spec section 22.3).
 
 ```ts
-import { BkError, ErrorReporter, Logger } from "@bieberkit/core";
 import { DispatchOptions, Dispatched, JobDef, Queue } from "@bieberkit/queue";
-type Address = string | {
-  readonly name?: string;
-  readonly address: string;
-};
-interface Message {
-  readonly to: Address | readonly Address[];
-  readonly cc?: Address | readonly Address[];
-  readonly bcc?: Address | readonly Address[];
-  readonly from?: Address;
-  readonly replyTo?: Address;
-  readonly subject: string;
-  readonly text?: string;
-  readonly html?: string;
-}
-interface Mailbox {
-  readonly name?: string;
-  readonly address: string;
-}
-interface PreparedMessage {
-  readonly from: Mailbox;
-  readonly to: readonly Mailbox[];
-  readonly cc: readonly Mailbox[];
-  readonly bcc: readonly Mailbox[];
-  readonly replyTo?: Mailbox;
-  readonly subject: string;
-  readonly text?: string;
-  readonly html?: string;
-}
-interface MailReceipt {
-  readonly id: string;
-  readonly rejected: readonly string[];
-}
-interface MailTransport {
-  readonly name: string;
-  send(message: PreparedMessage): Promise<MailReceipt>;
-  verify(): Promise<void>;
-  close(): Promise<void>;
-}
-declare class MailError extends BkError {
-  readonly permanent: boolean;
-  constructor(message: string, options: ConstructorParameters<typeof BkError>[1] & {
-    readonly permanent?: boolean;
-  });
-}
-declare const MAX_RECIPIENTS: number;
-declare function prepareMessage(message: Message, defaultFrom: Mailbox | undefined): PreparedMessage;
-declare function parseSender(value: string | undefined): Mailbox | undefined;
+import { ErrorReporter, Logger } from "@bieberkit/core";
+import { a as MailTransport, c as PreparedMessage, i as MailReceipt, o as Mailbox, s as Message } from "./contract-BFl6GzOT.js";
 interface MailerOptions {
   readonly transport: MailTransport;
   readonly from?: Mailbox;
@@ -97,5 +51,5 @@ interface Mailer {
 }
 declare const MAIL_JOB = "mail.send";
 declare function createMailer(options: MailerOptions): Mailer;
-export { createMailer as a, MailError as c, Mailbox as d, Message as f, prepareMessage as h, MailerOptions as i, MailReceipt as l, parseSender as m, Mail as n, Address as o, PreparedMessage as p, Mailer as r, MAX_RECIPIENTS as s, MAIL_JOB as t, MailTransport as u };
+export { createMailer as a, MailerOptions as i, Mail as n, Mailer as r, MAIL_JOB as t };
 ```

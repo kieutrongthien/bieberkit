@@ -29,7 +29,8 @@ Generated from the built declaration files by `pnpm api:update`. Do not edit by 
 
 ```ts
 import { Logger } from "@bieberkit/core";
-import { a as createMailer, c as MailError, d as Mailbox, f as Message, h as prepareMessage, i as MailerOptions, l as MailReceipt, m as parseSender, n as Mail, o as Address, p as PreparedMessage, r as Mailer, s as MAX_RECIPIENTS, t as MAIL_JOB, u as MailTransport } from "./mailer-8U5QtmVF.js";
+import { a as MailTransport, c as PreparedMessage, i as MailReceipt, l as parseSender, n as MAX_RECIPIENTS, o as Mailbox, r as MailError, s as Message, t as Address, u as prepareMessage } from "./contract-BFl6GzOT.js";
+import { a as createMailer, i as MailerOptions, n as Mail, r as Mailer, t as MAIL_JOB } from "./mailer-DUUP24mj.js";
 interface LogTransportOptions {
   readonly logger: Logger;
   readonly verbose?: boolean;
