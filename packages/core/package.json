@@ -1,6 +1,6 @@
 {
   "name": "@bieberkit/core",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Kernel, container, config, lifecycle and events.",
   "keywords": [
     "bieberkit"

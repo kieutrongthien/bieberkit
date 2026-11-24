@@ -1,6 +1,6 @@
 {
   "name": "@bieberkit/plugin-users",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "The users of the application: a list, an invitation with a password, and the administrator account of the seed.",
   "keywords": [
     "bieberkit",

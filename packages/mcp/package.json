@@ -1,6 +1,6 @@
 {
   "name": "@bieberkit/mcp",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Development-only MCP server for AI agents.",
   "keywords": [
     "bieberkit"

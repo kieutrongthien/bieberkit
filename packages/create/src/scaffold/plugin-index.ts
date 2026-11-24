@@ -27,7 +27,7 @@ import type { PluginIndex } from './templates.ts';
 
 export const BUILTIN_PLUGIN_INDEX: PluginIndex = {
   '@bieberkit/plugin-audit-log': {
-    version: '0.0.0',
+    version: '0.1.0',
     manifest: {
       core: '*',
       dialects: ['mysql', 'postgres', 'sqlite'],
@@ -41,7 +41,7 @@ export const BUILTIN_PLUGIN_INDEX: PluginIndex = {
     },
   },
   '@bieberkit/plugin-media': {
-    version: '0.0.0',
+    version: '0.1.0',
     manifest: {
       core: '*',
       dialects: ['mysql', 'postgres', 'sqlite'],
@@ -55,7 +55,7 @@ export const BUILTIN_PLUGIN_INDEX: PluginIndex = {
     },
   },
   '@bieberkit/plugin-notifications': {
-    version: '0.0.0',
+    version: '0.1.0',
     manifest: {
       core: '*',
       dialects: ['mysql', 'postgres', 'sqlite'],
@@ -69,7 +69,7 @@ export const BUILTIN_PLUGIN_INDEX: PluginIndex = {
     },
   },
   '@bieberkit/plugin-roles': {
-    version: '0.0.0',
+    version: '0.1.0',
     manifest: {
       core: '*',
       dialects: ['mysql', 'postgres', 'sqlite'],
@@ -91,7 +91,7 @@ export const BUILTIN_PLUGIN_INDEX: PluginIndex = {
     },
   },
   '@bieberkit/plugin-settings': {
-    version: '0.0.0',
+    version: '0.1.0',
     manifest: {
       core: '*',
       dialects: ['mysql', 'postgres', 'sqlite'],
@@ -105,7 +105,7 @@ export const BUILTIN_PLUGIN_INDEX: PluginIndex = {
     },
   },
   '@bieberkit/plugin-users': {
-    version: '0.0.0',
+    version: '0.1.0',
     manifest: {
       core: '*',
       dialects: ['mysql', 'postgres', 'sqlite'],

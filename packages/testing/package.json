@@ -1,6 +1,6 @@
 {
   "name": "@bieberkit/testing",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Test app, entity factories, callers with roles and tenants, and the helpers that run a suite on every dialect.",
   "keywords": [
     "bieberkit"
