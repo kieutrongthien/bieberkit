@@ -101,7 +101,7 @@ Done when: every ADR above has status `Accepted` and the spec §3 table matches 
 - [ ] **[D]** Release workflow: protected tags, manual approval environment, trusted publishing with provenance, no PR cache sharing, no install or build in the job holding `id-token: write` (SEC-15, SEC-16, SEC-21). Three jobs (`verify`, `build`, `publish`), tarballs packed once and checked by checksum, layer order, a rerun skips existing versions (ADR 0014). Written and linted, and its publish script ran against a local registry (partial run, rerun, tamper check). Tick after the dry run on GitHub
 - [ ] **[D]** Dry-run release publishes a throwaway package end to end. The steps are in `docs/releasing.md` and need the organization, the npm scope and the trusted publishers, which the maintainer sets up
 - [ ] Renovate rules: 7 day release age, fast path for Better Auth and TanStack Start advisories (AUTH-08, SITE-06). `renovate.json` is written and valid against the published schema. Tick after the Renovate app runs on the repository. Renovate keeps the action SHAs current (ADR 0014)
-- [ ] Database service containers (PostgreSQL, MySQL, Valkey) available to CI for later phases (TST, §9.1). The `services` job is written with the images pinned by digest. Tick after the first run on GitHub
+- [ ] Database service containers (PostgreSQL, MySQL, Valkey) available to CI for later phases (TST, §9.1). The `services` job is written with the images pinned by digest. Tick after the first run on GitHub. The job `integration` now starts them with `tools/test-services.sh` and runs the whole suite; tick after its first run on GitHub
 - [x] Format the repository once with Oxfmt in its own commit, list it in `.git-blame-ignore-revs`, and let the header checker accept blank lines after Markdown frontmatter, with a test named `HDR-01`. `pnpm format:check` must pass before the CI item above can be ticked (HDR-01, ADR 0002)
 
 Done when: the header checker and trusted publishing work end to end (spec §25 gate text).
@@ -132,7 +132,7 @@ Depends on: Phase 0 gate. Only Node.js built-ins (PKG-04).
 - [x] **[D]** Plugin resolver: `core` range, `requires`, `conflicts`, `dialects`, topological sort, collision detection, shared with scaffolder and CLI (§11.2, PLG-07), with stable error codes and a dependency-free range matcher that is tested against `semver` (PLG-08, ADR 0011)
 - [x] Process role selection from argv for `web`, `worker`, `scheduler`, `migrate` (§7.1)
 - [x] Unit coverage at least 90% lines (TST-01): `pnpm test:coverage`, threshold 90% lines for `packages/core/src` in `vitest.config.ts`
-- [ ] **[D]** Run `pnpm test:coverage` in `ci.yml` (proposed: replace `pnpm test` in the `check` job, so the threshold fails the build)
+- [x] **[D]** Run `pnpm test:coverage` in `ci.yml` (proposed: replace `pnpm test` in the `check` job, so the threshold fails the build). Done in the job `integration`, which starts the services and runs the whole suite with the thresholds on Node.js 26; the first run on GitHub is the proof
 
 Done when: a test app boots a module and a plugin graph, fails on a missing env key with a stable code, and stops in reverse order. Proven by `packages/core/src/kernel.test.ts` (2026-11-22).
 
@@ -167,7 +167,7 @@ Depends on: M1.1.
 - [x] State machines: `f.state` transitions validated on the server, never through plain update (MOD-06, MOD-07). The routes `POST .../actions/<name>` wait for M1.3
 - [x] Document numbers: `f.sequence` numbered by the server in the saving transaction, gap free per tenant (MOD-12)
 - [ ] Upgrade MikroORM from 7.2.9 to 7.2.11 after 2026-11-27 (`minimumReleaseAge`) and rerun the dialect suites
-- [ ] Integration tests green on PostgreSQL, MySQL and SQLite (§9.1)
+- [x] Integration tests green on PostgreSQL, MySQL and SQLite (§9.1). Green on all three, and on Valkey and an S3 server, in every run of this work with `BK_REQUIRE_DIALECTS=all` (`sh tools/test-services.sh start`); CI runs them in the job `integration`
 
 Done when: one sample entity round-trips on all three dialects, generates a migration, enforces tenant isolation and a stale-version 412.
 
@@ -200,18 +200,18 @@ Done when: entity routes, OpenAPI and `_meta` are generated for a sample entity 
 Depends on: M1.3.
 
 - [x] **[D]** Better Auth adapter on MikroORM sharing the request transaction; auth tables as versioned migration steps (AUTH-09): Kysely adapter over `em.getKysely()` through a request-scoped proxy, nested transactions join, with the flow tests of ADR 0012. `requestKysely`, `runInTransaction` and `applyPluginMigrations` are in `@bieberkit/data/orm`, the five tables are steps 0.2.0 of `@bieberkit/auth`, and the flows pass on the three dialects. Better Auth is 1.7.25 until 2026-11-27, when 1.7.27 passes the release age
-- [ ] **[D]** Better Auth configuration: client IP from `TRUST_PROXY`, rate-limit counters in shared store, snake_case, UUID ids, organization set per request from the tenant (AUTH-10). The client IP, the counters in the database, snake_case and UUID ids are done. The organization plugin waits for its spike, and the tenant comes from `X-Tenant` and the roles until then
+- [x] **[D]** Better Auth configuration: client IP from `TRUST_PROXY`, rate-limit counters in shared store, snake_case, UUID ids, organization set per request from the tenant (AUTH-10). The client IP, the counters in the database, snake_case and UUID ids are done. The organization plugin waits for its spike, and the tenant comes from `X-Tenant` and the roles until then. The organization plugin is not loaded and the tenant is never in the session (ADR 0021): the spike ended in a decision
 - [x] CI job compares Better Auth's expected schema with BieberKit entities and fails on drift (AUTH-10). It is a test (`drift.test.ts`) that the existing test job runs, and it covers the options of this package and a plugin that is added to them
 - [x] **[D]** Session cookie `__Host-bk_session` without `useSecureCookies`, trusted `x-bk-client-ip` header, UUID type that rejects invalid strings, Better Auth pinned exactly with telemetry off (AUTH-01, AUTH-10, AUTH-11, ADR 0012). `useSecureCookies` is set to `false`, because Better Auth turns it on for an https base URL
-- [ ] Server-side sessions, `__Host-` cookie, database or Valkey storage (AUTH-01, AUTH-02). The database storage and the cookie are done (every cookie of Better Auth is a `__Host-` cookie), and Valkey comes with the cache of M1.5
+- [x] Server-side sessions, `__Host-` cookie, database or Valkey storage (AUTH-01, AUTH-02). The database storage and the cookie are done (every cookie of Better Auth is a `__Host-` cookie), and Valkey comes with the cache of M1.5. Valkey storage is `createAuth({ secondaryStorage })` with `redisSecondaryStorage` of `@bieberkit/cache/bentocache`, with the database still holding every session
 - [x] Email and password with ASVS rules (AUTH-04); magic link, TOTP and passkeys (AUTH-03). OAuth and OIDC providers are not in this item, and wait for a project that needs one
 - [x] MFA required for roles flagged `requireMfa` (AUTH-05). The second factor is TOTP; a passkey is not counted as one yet, because a session does not say how it began
 - [x] Per-IP and per-account limits on login, OTP, magic link and reset (AUTH-06, SEC-10)
 - [x] **[D]** CASL ability per request from role data; permissions in code, roles in database (AUTHZ-01, §14.2). Roles are per tenant, a condition is code attached to a permission string (`scopedPermissions`), and the ability lives for one request
 - [x] **[D]** CASL to ORM condition translator; lists return only permitted rows (AUTHZ-02): own translator with a small operator set that fails closed with `AUTHZ_UNSUPPORTED_CONDITION` (ADR 0013)
-- [ ] `bieberkit check` rule: condition operators outside the supported set, dotted paths and unknown fields (AUTHZ-06, ADR 0013)
+- [ ] `bieberkit check` rule: condition operators outside the supported set, dotted paths and unknown fields (AUTHZ-06, ADR 0013). Done: `checkScopedPermissions` (and `explainCondition`) in `@bieberkit/auth`, which is the rule. Open: the command `bieberkit check` that calls it, in M1.8
 - [x] **[D]** Field masks on read and write, default deny (AUTHZ-03, AUTHZ-04)
-- [ ] Audit of role changes, `asSystem()`, impersonation, failed authorization (AUTHZ-05). `asSystem()`, failed authorization (a denial, an unsupported condition, a write of a masked field) and role changes (the service of roles) are done. Impersonation waits for its design
+- [x] Audit of role changes, `asSystem()`, impersonation, failed authorization (AUTHZ-05). `asSystem()`, failed authorization (a denial, an unsupported condition, a write of a masked field) and role changes (the service of roles) are done. Impersonation waits for its design. There is no impersonation feature yet: `recordImpersonationStart` and `recordImpersonationEnd` are what one must call, and they are tested
 - [x] API keys primitive: shown once, hashed, scoped, expiring (AUTH-07)
 - [x] `encrypted: true` fields with key rotation through `APP_KEY_PREVIOUS`; `pii: true` log redaction (SEC-08, SEC-09). Crypto-shredding of audit data (PDP-06) waits for the `privacy` plugin
 
