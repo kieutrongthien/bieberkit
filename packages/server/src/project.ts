@@ -73,8 +73,10 @@ function isPluginDef(value: unknown): value is PluginDef<unknown> {
 }
 
 export async function importFile(path: string): Promise<unknown> {
-  // The time of the file is part of the address, so a file that was edited since it was first read is read again.
-  const url = `${pathToFileURL(path).href}?v=${String(statSync(path).mtimeMs)}`;
+  // The time of the file is part of the address, so a file that was edited since it was first read is read again. Whole
+  // milliseconds only: a fraction puts a dot after the extension, and a tool that reads the extension of the address
+  // (Vite, in the tests) takes the digits for it, and reads a TypeScript file as plain JavaScript.
+  const url = `${pathToFileURL(path).href}?v=${String(Math.trunc(statSync(path).mtimeMs))}`;
   const loaded: unknown = await import(url);
   return typeof loaded === 'object' && loaded !== null ? Reflect.get(loaded, 'default') : undefined;
 }
