@@ -304,14 +304,14 @@ git commit -s -m "feat(queue): let a module map an outbox event to a job"
 
 - Consumes: `definePlugin({ services })`, `registerModule`, `createTestApp({ modules })`.
 
-- [ ] **Step 1: Write the test** `it('BPL-03 a plugin contributes a named service that another plugin reads from the registry')`: a fixture plugin declares `declare module '@bieberkit/core' { interface ServiceRegistry { fixtureGreeter: { hello(): string } } }` and registers `fixtureGreeter`; a second fixture plugin has a route that returns `ctx.services.fixtureGreeter.hello()`; the route answers it. And `it('BPL-03 a service name taken by two plugins fails at boot with CORE_SERVICE_DUPLICATE')`.
+- [x] **Step 1: Write the test** `it('BPL-03 a plugin contributes a named service that another plugin reads from the registry')`: a fixture plugin declares `declare module '@bieberkit/core' { interface ServiceRegistry { fixtureGreeter: { hello(): string } } }` and registers `fixtureGreeter`; a second fixture plugin has a route that returns `ctx.services.fixtureGreeter.hello()`; the route answers it. And `it('BPL-03 a service name taken by two plugins fails at boot with CORE_SERVICE_DUPLICATE')`.
 
-- [ ] **Step 2: Run it.**
+- [x] **Step 2: Run it.**
 
 Run: `pnpm test packages/testing/src/app.test.ts`
 Expected: PASS with no change to the source. If it fails, stop: the design assumed the mechanism exists, and the cause goes to the maintainer.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add packages/testing
@@ -319,6 +319,8 @@ git commit -s -m "test(testing): prove that a plugin contributes a named service
 ```
 
 ---
+
+**Task 5 record:** Both `BPL-03` cases passed immediately against the existing plugin/container implementation on all three dialects. The complete test-app file passed **49 tests, no skips**. No production source change was needed. `pnpm typecheck`, `pnpm lint`, `pnpm check` and `git diff --check` passed. The fixture service is declared only in its test file.
 
 ### Task 6: Spec, roadmap, docs and changeset
 

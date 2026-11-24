@@ -25,7 +25,7 @@
 import { expect, it, onTestFinished } from 'vitest';
 import { emitEvent, runInTransaction } from '@bieberkit/data/orm';
 import type { Database, OutboxMessage } from '@bieberkit/data/orm';
-import { BkError, defineModule } from '@bieberkit/core';
+import { BkError, defineModule, definePlugin } from '@bieberkit/core';
 import { defineJob } from '@bieberkit/queue';
 import type { RouteDef } from '@bieberkit/http';
 import { z } from 'zod';
@@ -166,6 +166,63 @@ describeDialects('BPL-04 contributed outbox jobs', ({ open }) => {
     expect(seen).toEqual([]);
     expect(await app.runOutbox()).toBe(0);
     expect(seen).toEqual([]);
+  });
+});
+declare module '@bieberkit/core' {
+  interface ServiceRegistry {
+    /** A test-only service contributed by a fixture plugin. */
+    fixtureGreeter: { hello(): string };
+  }
+}
+
+function greeterPlugin(name = '@fixture/plugin-greeter') {
+  return definePlugin({
+    name,
+    version: '0.1.0',
+    core: '>=0.0.0',
+    dialects: ['postgres', 'mysql', 'sqlite'],
+    services: {
+      fixtureGreeter: { scope: 'singleton', create: () => ({ hello: () => 'Hello from a plugin' }) },
+    },
+  });
+}
+
+describeDialects('BPL-03 plugin services', ({ open }) => {
+  it('BPL-03 a plugin contributes a named service that another plugin reads from the registry', async () => {
+    const provider = greeterPlugin();
+    const consumer = definePlugin({
+      name: '@fixture/plugin-consumer',
+      version: '0.1.0',
+      core: '>=0.0.0',
+      dialects: ['postgres', 'mysql', 'sqlite'],
+      requires: { '@fixture/plugin-greeter': '^0.1.0' },
+      routes: [
+        {
+          method: 'GET',
+          url: '/api/v1/fixture/hello',
+          public: true,
+          schema: {
+            response: { 200: { type: 'object', properties: { greeting: { type: 'string' } }, required: ['greeting'] } },
+          },
+          handler: async (context) => ({ greeting: context.services.fixtureGreeter.hello() }),
+        },
+      ],
+    });
+    const app = await createTestApp({ open, modules: [provider.module, consumer.module] });
+    onTestFinished(() => app.close());
+    const response = await app.anonymous().get('/api/v1/fixture/hello');
+    expect([response.status, response.body]).toEqual([200, { greeting: 'Hello from a plugin' }]);
+  });
+
+  it('BPL-03 a service name taken by two plugins fails at boot with CORE_SERVICE_DUPLICATE', async () => {
+    const db = await open([]);
+    onTestFinished(() => db.close());
+    await expect(
+      createTestApp({
+        open: async () => db,
+        modules: [greeterPlugin().module, greeterPlugin('@fixture/plugin-other').module],
+      }),
+    ).rejects.toMatchObject({ code: 'CORE_SERVICE_DUPLICATE' });
   });
 });
 const dataOf = (body: Readonly<Record<string, unknown>>): Record<string, unknown>[] => {
