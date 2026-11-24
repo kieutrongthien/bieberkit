@@ -28,10 +28,11 @@
 Generated from the built declaration files by `pnpm api:update`. Do not edit by hand. A change here is a change to the public API and needs a changeset (spec section 22.3).
 
 ```ts
-import { BkError, CoreEnv, EnvOwner, EnvSource, KeyCollector, ModuleDef, PluginDef, ProjectConfigInput, Role } from "@bieberkit/core";
+import { BkError, CoreEnv, EnvSource, ModuleDef, Role } from "@bieberkit/core";
 import { Database, MadeMigration, PluginRun } from "@bieberkit/data/orm";
 import { HttpServer } from "@bieberkit/http";
 import { PluginMigrationStep } from "@bieberkit/data";
+import { a as envOwnersOf, c as loadConfig, i as ProjectConfig, l as loadProject, n as LoadedPlugin, o as findProjectRoot, r as Project, s as importFile, t as CONFIG_FILE, u as COLLECTORS } from "./project-CSBZwAGD.js";
 export declare const ADMIN_PACKAGE = "@bieberkit/admin-antd";
 export declare const ADMIN_PREFIX = "/admin";
 interface AdminLocation {
@@ -116,34 +117,11 @@ interface Seeded {
 }
 export declare function seed(options?: SeedOptions): Promise<Seeded>;
 export declare class ServerError extends BkError {}
-export declare const COLLECTORS: readonly KeyCollector[];
-export declare const CONFIG_FILE = "bieberkit.config.ts";
-interface LoadedPlugin {
-  readonly def: PluginDef<unknown>;
-  readonly options: unknown;
-}
-interface Project {
-  readonly root: string;
-  readonly configPath: string;
-  readonly config: ProjectConfigInput;
-  readonly plugins: readonly LoadedPlugin[];
-  readonly coreVersion: string;
-}
-export declare function findProjectRoot(from: string): string | undefined;
-export declare function importFile(path: string): Promise<unknown>;
-export declare function envOwnersOf(project: Pick<Project, "plugins">): EnvOwner[];
-interface ProjectConfig {
-  readonly root: string;
-  readonly configPath: string;
-  readonly config: ProjectConfigInput;
-}
-export declare function loadConfig(cwd: string): Promise<ProjectConfig>;
-export declare function loadProject(cwd: string): Promise<Project>;
 export declare const MODULES_DIR = "apps/server/src/modules";
 export declare function projectModules(root: string): Promise<ModuleDef[]>;
 export declare function allModules(project: Project): Promise<ModuleDef[]>;
 export declare function contributed<T>(modules: readonly ModuleDef[], key: string): T[];
 export declare function contributedRecord<T>(modules: readonly ModuleDef[], key: string): Record<string, T>;
 export declare const packageName = "@bieberkit/server";
-export type { AdminLocation, BootOptions, BootRole, DoctorOptions, Finding, LoadedPlugin, Migrated, MigrationsOptions, MigrationsRun, MigrationsStatus, Project, ProjectConfig, RunMigrationsOptions, Running, SeedOptions, Seeded };
+export { type AdminLocation, type BootOptions, type BootRole, COLLECTORS, CONFIG_FILE, type DoctorOptions, type Finding, type LoadedPlugin, type Migrated, type MigrationsOptions, type MigrationsRun, type MigrationsStatus, type Project, type ProjectConfig, type RunMigrationsOptions, type Running, type SeedOptions, type Seeded, envOwnersOf, findProjectRoot, importFile, loadConfig, loadProject };
 ```

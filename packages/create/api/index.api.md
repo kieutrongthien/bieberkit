@@ -35,6 +35,7 @@ interface ProjectName {
   readonly folder: string;
 }
 export declare function checkProjectName(value: string): ProjectName;
+export declare const BUILTIN_PLUGIN_INDEX: PluginIndex;
 interface Template {
   readonly name: string;
   readonly description: string;
@@ -54,7 +55,6 @@ interface PluginIndexEntry {
 }
 type PluginIndex = Readonly<Record<string, PluginIndexEntry>>;
 export declare const BUILTIN_TEMPLATES: Readonly<Record<string, Template>>;
-export declare const BUILTIN_PLUGIN_INDEX: PluginIndex;
 interface Choices {
   readonly project: ProjectName;
   readonly dialect: Dialect;

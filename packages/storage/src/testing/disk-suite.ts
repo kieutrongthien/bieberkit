@@ -24,7 +24,7 @@
 
 import { createHash, randomBytes } from 'node:crypto';
 import { Readable } from 'node:stream';
-import { afterAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Disk } from '../contract.ts';
 
 export interface DiskSubject {
@@ -49,9 +49,13 @@ async function read(stream: Readable): Promise<Uint8Array> {
 export function diskContractSuite(name: string, subject: DiskSubject): void {
   describe(`${name} disk contract`, () => {
     let disk: Disk;
-    const opened = subject.make().then((made) => (disk = made));
+    let opened: Promise<Disk>;
+    beforeAll(() => {
+      opened = subject.make().then((made) => (disk = made));
+      return opened;
+    });
     afterAll(async () => {
-      await (await opened).close();
+      await disk?.close();
       await subject.cleanup?.();
     });
 

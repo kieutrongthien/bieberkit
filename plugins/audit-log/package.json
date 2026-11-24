@@ -33,7 +33,7 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsdown",
+    "build": "tsdown && node --conditions=@bieberkit/source ../../tools/plugin-manifests.ts --write --plugin .",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
@@ -46,5 +46,24 @@
   },
   "engines": {
     "node": ">=24.12"
+  },
+  "bieberkit": {
+    "core": "*",
+    "dialects": [
+      "mysql",
+      "postgres",
+      "sqlite"
+    ],
+    "requires": {},
+    "conflicts": [],
+    "env": [],
+    "tables": [],
+    "routes": [
+      "GET /api/v1/audit-log/entries"
+    ],
+    "permissions": [
+      "audit-log.read"
+    ],
+    "admin": []
   }
 }

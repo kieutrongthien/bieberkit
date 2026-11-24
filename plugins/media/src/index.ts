@@ -142,9 +142,11 @@ const confirm: RouteDef = defineRoute({
   },
 });
 
+import pkg from '../package.json' with { type: 'json' };
+
 const plugin: PluginDef = definePlugin({
   name: '@bieberkit/plugin-media',
-  version: '0.1.0',
+  version: pkg.version,
   core: '*',
   dialects: ['postgres', 'mysql', 'sqlite'],
   permissions: ['media.read', 'media.upload', 'media.manage'],

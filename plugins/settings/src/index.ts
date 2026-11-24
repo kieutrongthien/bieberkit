@@ -49,9 +49,11 @@ export const Setting: EntityDef<'settings.Setting'> = defineEntity({
   admin: { title: 'key', list: ['key', 'value', 'updatedAt'], icon: 'setting' },
 });
 
+import pkg from '../package.json' with { type: 'json' };
+
 const plugin: PluginDef = definePlugin({
   name: '@bieberkit/plugin-settings',
-  version: '0.1.0',
+  version: pkg.version,
   core: '*',
   dialects: ['postgres', 'mysql', 'sqlite'],
   permissions: ['settings.read', 'settings.manage'],

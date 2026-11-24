@@ -84,6 +84,16 @@ export function toManifest(def: PluginDef<unknown>, collectors: readonly KeyColl
   };
 }
 
+function normalizeManifestKeyLists(value: unknown): unknown {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return value;
+  const result: Record<string, unknown> = { ...value };
+  for (const key of ['dialects', 'conflicts', 'env', 'tables', 'routes', 'permissions', 'admin']) {
+    const list = result[key];
+    if (Array.isArray(list) && list.every((item: unknown) => typeof item === 'string')) result[key] = list.toSorted();
+  }
+  return result;
+}
+
 function canonical(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(canonical);
   if (typeof value === 'object' && value !== null) {
@@ -128,7 +138,7 @@ export function checkManifest(
       message: 'package.json has no "bieberkit" field. Run bieberkit build to write it.',
     };
   }
-  if (canonicalText(pkg.bieberkit) !== canonicalText(toManifest(def, collectors))) {
+  if (canonicalText(normalizeManifestKeyLists(pkg.bieberkit)) !== canonicalText(toManifest(def, collectors))) {
     return {
       ok: false,
       code: 'PLG_MANIFEST_STALE',

@@ -32,6 +32,8 @@ import { generateFiles, writeFiles } from '../generate/files.ts';
 import { realSpawn, supervise } from '../processes.ts';
 import type { Spawn } from '../processes.ts';
 
+import { buildPluginManifest } from '../plugin-manifest.ts';
+
 export interface BuildDeps {
   readonly spawn?: Spawn;
 }
@@ -45,6 +47,7 @@ export function buildCommand(deps: BuildDeps = {}): Command {
     name: 'build',
     summary: 'Regenerate everything, check the types, and emit the standalone validators and serializers.',
     flags: [
+      { name: 'check', type: 'boolean', description: 'Verify a plugin manifest without writing files.' },
       {
         name: 'typecheck',
         type: 'boolean',
@@ -52,6 +55,16 @@ export function buildCommand(deps: BuildDeps = {}): Command {
       },
     ],
     async run(context) {
+      const checking = context.args.flags['check'] === true;
+      const plugin = await buildPluginManifest(context.cwd, checking);
+      if (plugin !== undefined) return plugin;
+      if (checking) {
+        throw new CliError('build --check is for a plugin package.', {
+          code: 'BK_USAGE_PLUGIN_CHECK',
+          exit: 2,
+          fix: 'Run this command in a plugin package, or use bieberkit check in an application.',
+        });
+      }
       const app = await loadApp(context.cwd);
       const root = app.project.root;
       const steps: string[] = [];
