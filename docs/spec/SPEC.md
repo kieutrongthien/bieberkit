@@ -1352,9 +1352,9 @@ The orchestrator's grace period (for example `terminationGracePeriodSeconds`) MU
 Every process writes JSON logs to stdout, exports OpenTelemetry traces when an endpoint is configured, and exposes Prometheus metrics on a separate port.
 
 - **OBS-01** Logs use pino, bound as in ADR 0003: `@bieberkit/core` owns the `Logger` port, a dependency-free default logger and the request context, and only `@bieberkit/log/pino` imports pino. Each line carries `time`, `level`, `msg`, `role`, `requestId`, `traceId`, `spanId`, and `tenantId` and `userId` when known.
-- **OBS-02** Traces cover HTTP requests, database queries, cache calls, queue dispatch and job execution, with trace context carried from the request into the jobs it creates.
+- **OBS-02** Traces cover HTTP requests, database queries, cache calls, queue dispatch and job execution, with trace context carried from the request into the jobs it creates. Core writes them (OTLP over HTTP, no SDK, ADR 0023), and a span holds ids, names and counts, never a statement, a URL query, a header, a body or an error message.
 - **OBS-03** Metrics: HTTP duration histogram by route and status, event loop lag, heap usage, database pool usage, queue depth and job duration by queue, cache hit ratio.
-- **OBS-04** The metrics port is never exposed through the public load balancer.
+- **OBS-04** The metrics port is never exposed through the public load balancer. The server answers `GET /metrics` only, and refuses a request that carries a `Forwarded` or `X-Forwarded-*` header.
 - **OBS-05** The audit log is a database table separate from application logs, append-only for the application role, and viewable in the admin UI.
 - **OBS-06** Unhandled errors are reported with the request or job context through an error-reporter contract. A Sentry-compatible driver is optional. The reporter never throws and never waits, reports carry ids and the place of the error and never a body, a header or a query string, and a Sentry-compatible server is reached through `ERROR_REPORTER_DSN` with no SDK.
 
