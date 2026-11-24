@@ -271,6 +271,7 @@ Every prompt MUST have an equivalent flag, so CI and AI agents can run the scaff
 | `bieberkit migrate:make [name]` | Generate a migration from entity changes for the project dialect |
 | `bieberkit migrate` | Apply pending plugin steps and migrations under a lock (`--status`, `--rollback`, `--allow-destructive`) |
 | `bieberkit db:seed` | Run seeders |
+| `bieberkit backup:verify` | Restore the newest backup into a throwaway database and check that nothing is left to migrate (DEP-09) |
 | `bieberkit make:entity`, `make:module`, `make:plugin`, `make:job` | Generate code from the official recipes |
 | `bieberkit add <plugin>` / `remove <plugin>` | Install or uninstall a plugin and update config, env schema and migrations |
 | `bieberkit plugins` | List installed plugins, versions and dependency graph |
@@ -1285,7 +1286,7 @@ CMD ["web"]
 - **DEP-01** `pnpm fetch` runs before the source copy, so dependency layers stay cached until the lockfile changes.
 - **DEP-02** `pnpm deploy --prod` produces a self-contained folder without devDependencies or TypeScript sources. The server package lists dist in its files field, so a gitignored build output is still included.
 - **DEP-03** The entrypoint calls `node` directly, never `pnpm start` or `npm start`, so SIGTERM reaches the application.
-- **DEP-04** Build caches are shared only between trusted builds (SEC-16). Base images are pinned by digest (SEC-18).
+- **DEP-04** Build caches are shared only between trusted builds (SEC-16). Base images are pinned by digest (SEC-18). The generated Dockerfile uses `node:26-slim` by digest until the hardened `dhi.io/node:26` can be pulled without a login, and the layout of the image is `/app/apps/server` (the deployed server app) with `bieberkit.config.ts` and `migrations/` beside it (ADR 0026).
 - **DEP-05** The role is the container command: `web`, `worker --queues=critical,default`, `scheduler`, `migrate`.
 
 * **DEP-06** The admin build output (`apps/admin/dist`) is copied into the server image under `public/admin`, so the web role can serve it when no CDN is used.
@@ -1295,6 +1296,7 @@ CMD ["web"]
 | File | Purpose |
 | --- | --- |
 | `Dockerfile`, `.dockerignore` | Image above |
+| `.env.production.example`, `deploy/` | What production reads, the Caddyfile, the backup and the upload scripts (DEP-07) |
 | `compose.yaml` | Local services for development |
 | `compose.prod.yaml` | Single-server production: proxy, web, worker, scheduler, migrate, database, Valkey |
 | Helm chart (`bieberkit deploy:helm`) | Kubernetes deployments with probes, preStop hook, migrate job, autoscaling |
@@ -1596,6 +1598,7 @@ Open questions:
 
 | Version | Date | Changes |
 | --- | --- | --- |
+| 0.8.9 | 2026-11-24 | M1.9: the base image of the generated Dockerfile is `node:26-slim` by digest until the hardened image can be pulled (ADR 0026), the files of section 19.2 (`.dockerignore`, `.env.production.example`, `deploy/`), and the first k6 results against section 18.1 |
 | 0.8.8 | 2026-11-24 | M1.8: the lock of the migrate role (DATA-25), `migrate --allow-destructive` in section 5.2, the base plugins and their services, the first admin slice without TanStack Table, Form and Virtual (ADR 0025), and the policy of the admin (UI-14) |
 | 0.8.7 | 2026-11-24 | M1.6 and M1.7 (the defaults of `--yes` and the missing flags in section 5.1): traces and metrics without an SDK (OBS-02 to OBS-04, ADR 0023), the log package (ADR 0022), and in section 5.2 the command `bieberkit generate`, the names of the rules of `bieberkit check` and the ignore directive |
 | 0.8.6 | 2026-11-22 | Section 11.2: the codes raised by `definePlugin` and by the manifest check (`PLG_NAME`, `PLG_MANIFEST_NAME`, and the existing ones), and how the short name of a plugin is derived. Found while implementing M1.1 |

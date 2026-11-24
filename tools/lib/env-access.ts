@@ -34,6 +34,8 @@ export const PATTERN_FILES: readonly string[] = [
   'packages/cli/src/check/',
   'packages/cli/src/generate/',
   'packages/cli/src/oxlint.test.ts',
+  // The text of the backup script of a new project, which runs in its own container.
+  'packages/create/src/scaffold/deploy.ts',
 ];
 
 /** Top-level folders that hold framework or project code. `tools/` is covered by the lint rule `node/no-process-env`. */

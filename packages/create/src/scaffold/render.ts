@@ -25,6 +25,16 @@
 import { coreEnv, describeEnv } from '@bieberkit/core';
 import type { Dialect, EnvDescription } from '@bieberkit/core';
 import type { Choices } from './choices.ts';
+import {
+  renderBackupScript,
+  renderCaddyfile,
+  renderComposeProduction,
+  renderDockerfile,
+  renderDockerignore,
+  renderProductionEnv,
+  renderSqliteBackupScript,
+  renderUploadScript,
+} from './deploy.ts';
 import { renderEnvExample } from './env-example.ts';
 import { LICENSES } from './licenses.ts';
 
@@ -111,7 +121,10 @@ export function renderDotenv(choices: Choices, plan: Plan): string {
   // ships a default password. The person reads it in this file, which is not committed.
   const secretLike = /_(?:PASSWORD|SECRET|TOKEN|KEY)$/;
   const plugins = plan.plugins.flatMap((plugin) =>
-    plugin.env.map((key) => `${key}=${secretLike.test(key) ? plan.random() : ''}`),
+    plugin.env.map((key) => {
+      const given = plugin.envRows?.find((row) => row.key === key)?.default;
+      return `${key}=${secretLike.test(key) ? plan.random() : (given ?? '')}`;
+    }),
   );
   void name;
   return [
@@ -331,6 +344,20 @@ export function renderProject(choices: Choices, plan: Plan): ProjectFile[] {
       content: `${header('hash', choices, plan, '.gitignore', 'What git leaves out: installed packages, builds, the environment, and what is generated and not committed.')}node_modules\ndist\ncoverage\n.env\n.bieberkit\nstorage\ndata/*.db\n.turbo\n`,
     },
   ];
+  const head = (path: string, description: string): string => header('hash', choices, plan, path, description);
+  // A JavaScript file cannot begin with a `#` comment.
+  const blockHead = (path: string, description: string): string => header('block', choices, plan, path, description);
+  files.push(
+    { path: 'Dockerfile', content: renderDockerfile(folder, head) },
+    { path: '.dockerignore', content: renderDockerignore(head) },
+    { path: 'compose.prod.yaml', content: renderComposeProduction(choices.dialect, folder, head) },
+    { path: '.env.production.example', content: renderProductionEnv(choices.dialect, folder, head) },
+    { path: 'deploy/Caddyfile', content: renderCaddyfile(head) },
+    { path: 'deploy/upload.sh', content: renderUploadScript(head) },
+    choices.dialect === 'sqlite'
+      ? { path: 'deploy/backup.mjs', content: renderSqliteBackupScript(blockHead) }
+      : { path: 'deploy/backup.sh', content: renderBackupScript(choices.dialect, head) },
+  );
   if (choices.dialect === 'sqlite') files.push({ path: 'data/.gitkeep', content: '' });
   const text = LICENSES[choices.license];
   if (text !== undefined) {

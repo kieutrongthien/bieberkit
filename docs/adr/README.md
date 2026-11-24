@@ -57,6 +57,7 @@ Status values: `Proposed`, `Accepted`, `Rejected`, `Superseded by NNNN`. Only th
 | [0023](0023-observability-without-an-sdk.md)         | Traces and metrics without an SDK                                                                  | Accepted |
 | [0024](0024-the-server-package.md)                   | A package that boots the process roles: `@bieberkit/server`                                        | Accepted |
 | [0025](0025-the-admin-stack.md)                      | The admin stack of the first slice: React, Ant Design, TanStack Query and Router, Vite, Playwright | Accepted |
+| [0026](0026-deployment-files.md)                     | The deployment files: images, proxy, backup                                                        | Accepted |
 
 ## Needed for the Phase 0 gate
 

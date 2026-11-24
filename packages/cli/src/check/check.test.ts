@@ -171,6 +171,13 @@ describe('HDR-01 the headers rule', () => {
 });
 
 describe('P8 the env-access rule', () => {
+  it('19.2 a script of deploy/ runs in its own container, so it may read its environment', async () => {
+    const { violations } = await check(entries(source('deploy/backup.mjs', 'const a = process.env.A;')), [
+      'env-access',
+    ]);
+    expect(violations).toEqual([]);
+  });
+
   it('P8 finds every way to read the environment, and not a string or a comment that says so', async () => {
     const body = [
       'const a = process.env.A;',

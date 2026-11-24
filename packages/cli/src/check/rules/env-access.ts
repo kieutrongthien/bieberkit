@@ -39,12 +39,15 @@ const PATTERNS: readonly RegExp[] = [
 const isToolConfig = (path: string): boolean =>
   /(?:^|\/)[^/]+\.config\.[cm]?[jt]s$/.test(path) && !path.endsWith('bieberkit.config.ts');
 
+/** The scripts of `deploy/` run in their own container, beside the application and never inside it (section 19.2). */
+const isDeployScript = (path: string): boolean => path.startsWith('deploy/');
+
 export const envAccessRule: Rule = {
   name: 'env-access',
   summary: 'Nothing reads process.env: take validated config from core (P8).',
   run: ({ files }) =>
     files
-      .filter((file) => isCode(file) && !isToolConfig(file.path))
+      .filter((file) => isCode(file) && !isToolConfig(file.path) && !isDeployScript(file.path))
       .flatMap((file) => {
         // Strings are kept so that `process['env']` is found, and a match counts only when it starts in code.
         return PATTERNS.flatMap((pattern) =>

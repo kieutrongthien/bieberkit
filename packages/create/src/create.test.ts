@@ -113,15 +113,22 @@ describe('section 6 the files of a new project', () => {
     expect(code).toBe(0);
     expect(listing(join(cwd, 'demo'))).toEqual(
       [
+        '.dockerignore',
         '.env',
         '.env.example',
+        '.env.production.example',
         '.gitignore',
         'AGENTS.md',
         'CLAUDE.md',
+        'Dockerfile',
         'apps/server/package.json',
         'apps/server/src/main.ts',
         'bieberkit.config.ts',
+        'compose.prod.yaml',
         'compose.yaml',
+        'deploy/Caddyfile',
+        'deploy/backup.mjs',
+        'deploy/upload.sh',
         'data/.gitkeep',
         'package.json',
         'pnpm-workspace.yaml',
@@ -132,7 +139,7 @@ describe('section 6 the files of a new project', () => {
       name: 'demo',
       dialect: 'sqlite',
       template: 'blank',
-      files: 13,
+      files: 20,
       installed: false,
       git: 'skipped',
       next: ['cd demo', 'pnpm install', 'pnpm dev'],
@@ -183,6 +190,8 @@ describe('section 6 the files of a new project', () => {
     const dotenv = read(cwd, 'demo/.env');
     const password = /^USERS_ADMIN_PASSWORD=(.+)$/m.exec(dotenv)?.[1] ?? '';
     expect(password).not.toBe('');
+    // A key that has a default is written with it, and not left empty.
+    expect(dotenv).toContain('USERS_ADMIN_EMAIL=admin@example.com');
     expect([`APP_KEY=${password}`, `AUTH_SECRET=${password}`].some((line) => dotenv.includes(line))).toBe(false);
     expect(read(cwd, 'demo/.env.example')).not.toContain(password);
     expect(() => readCoreEnv(parseEnvFile(dotenv))).not.toThrow();

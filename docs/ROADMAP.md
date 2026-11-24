@@ -284,12 +284,12 @@ Depends on: M1.7. Built and hardened first, as every other template relies on th
 
 Depends on: M1.7, M1.8.
 
-- [ ] Generated `Dockerfile`, `.dockerignore`, `compose.yaml`, `compose.prod.yaml` with proxy, roles, database, Valkey (§19.1, §19.2, DEP-01 to DEP-06)
-- [ ] Hardened runtime image: non-root, read-only root, digest pinned, SBOM and provenance, Trivy gate (SEC-18, SEC-19)
-- [ ] Rollout order and `scheduler` stop-then-start documented in the generated files (§19.5)
-- [ ] Backup service and `backup:verify` (DEP-07, DEP-09)
-- [ ] `NODE_OPTIONS` heap sizing in compose (PERF-03)
-- [ ] k6 benchmarks for the reference endpoints; record results against §18.1 and update the targets in the spec (open question in §26)
+- [x] Generated `Dockerfile`, `.dockerignore`, `compose.yaml`, `compose.prod.yaml` with proxy, roles, database, Valkey (§19.1, §19.2, DEP-01 to DEP-06). The compose files and the Dockerfile are checked by Docker, and the image is not built to the end until `@bieberkit/*` can be installed from a registry (`docs/modules/deploy.md`)
+- [ ] Hardened runtime image: non-root, read-only root, digest pinned, SBOM and provenance, Trivy gate (SEC-18, SEC-19). Done: non-root, read only, no capability, digests pinned (ADR 0026). Open: the hardened base image (needs a login), the SBOM, the provenance and the Trivy gate, which are CI steps (`.github/workflows/`, the maintainer)
+- [x] Rollout order and `scheduler` stop-then-start documented in the generated files (§19.5)
+- [x] Backup service and `backup:verify` (DEP-07, DEP-09). Verified by hand against PostgreSQL 15
+- [x] `NODE_OPTIONS` heap sizing in compose (PERF-03)
+- [x] k6 benchmarks for the reference endpoints; record results against §18.1 and update the targets in the spec (open question in §26). `pnpm bench`; the first results are in `docs/modules/deploy.md`: two targets missed (get p95, memory at rest) on a laptop that is not the reference setup, and the targets are kept; the CI run on release candidates waits for the maintainer
 
 ### M1.10 Pilot
 

@@ -26,6 +26,7 @@ import { createRequire } from 'node:module';
 import { createCommand } from 'create-bieberkit';
 import { createRunner } from 'create-bieberkit/kit';
 import type { Command } from 'create-bieberkit/kit';
+import { backupVerifyCommand } from './commands/backup.ts';
 import { buildCommand } from './commands/build.ts';
 import { checkCommand } from './commands/check.ts';
 import { envCheckCommand } from './commands/env-check.ts';
@@ -58,6 +59,7 @@ export const COMMANDS: readonly Command[] = [
   makeEntityCommand,
   makeJobCommand,
   migrateMakeCommand,
+  backupVerifyCommand(),
   migrateCommand,
   pluginsCommand,
   addCommand(),

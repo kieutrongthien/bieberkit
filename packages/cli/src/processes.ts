@@ -22,7 +22,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { spawn } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
 
 export interface Child {
   /** The exit code of the program. A program that was killed by a signal is 1. */
@@ -60,3 +60,26 @@ export async function supervise(child: Child): Promise<number> {
     process.off('SIGTERM', terminate);
   }
 }
+
+/** What a program wrote and how it ended. */
+export interface ExecResult {
+  readonly code: number;
+  readonly stdout: string;
+  readonly stderr: string;
+}
+
+/** Runs a program to its end and collects its output. A test gives its own, so that nothing real runs. */
+export type Exec = (file: string, args: readonly string[], options?: { readonly cwd?: string }) => Promise<ExecResult>;
+
+export const realExec: Exec = (file, args, options = {}) =>
+  new Promise((resolve) => {
+    execFile(
+      file,
+      [...args],
+      { ...(options.cwd === undefined ? {} : { cwd: options.cwd }), maxBuffer: 64 * 1024 * 1024 },
+      (error, stdout, stderr) => {
+        const code = error === null ? 0 : typeof error.code === 'number' ? error.code : 1;
+        resolve({ code, stdout, stderr });
+      },
+    );
+  });
