@@ -1,7 +1,7 @@
 /**
  * BieberKit
  *
- * @file        packages/cli/src/errors.test.ts
+ * @file        packages/create/src/kit/errors.test.ts
  * @description Tests of the failures of the CLI: each kind of error gives a code, a fix, a link and an exit code (section 5.3, AI-02).
  * @author      Bieber Kieu <kieutrongthien@gmail.com>
  * @copyright   Copyright (c) 2026 Bieber Kieu

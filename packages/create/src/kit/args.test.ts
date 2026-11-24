@@ -1,7 +1,7 @@
 /**
  * BieberKit
  *
- * @file        packages/cli/src/args.test.ts
+ * @file        packages/create/src/kit/args.test.ts
  * @description Tests of the argument reader: the command, flags in both forms, negation, and every way to use a command wrongly (section 5.3).
  * @author      Bieber Kieu <kieutrongthien@gmail.com>
  * @copyright   Copyright (c) 2026 Bieber Kieu

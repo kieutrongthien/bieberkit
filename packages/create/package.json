@@ -22,6 +22,11 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
+    "./kit": {
+      "@bieberkit/source": "./src/kit/index.ts",
+      "types": "./dist/kit.d.ts",
+      "default": "./dist/kit.js"
+    },
     "./package.json": "./package.json"
   },
   "publishConfig": {
@@ -30,6 +35,10 @@
         "types": "./dist/index.d.ts",
         "default": "./dist/index.js"
       },
+      "./kit": {
+        "types": "./dist/kit.d.ts",
+        "default": "./dist/kit.js"
+      },
       "./package.json": "./package.json"
     },
     "access": "public"
@@ -37,6 +46,9 @@
   "scripts": {
     "build": "tsdown",
     "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@bieberkit/core": "workspace:*"
   },
   "engines": {
     "node": ">=24.12"

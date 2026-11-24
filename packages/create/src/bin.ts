@@ -3,7 +3,7 @@
  * BieberKit
  *
  * @file        packages/create/src/bin.ts
- * @description Executable entry point of the create-bieberkit command.
+ * @description The create-bieberkit executable: makes a project from its arguments and ends the process with the exit code.
  * @author      Bieber Kieu <kieutrongthien@gmail.com>
  * @copyright   Copyright (c) 2026 Bieber Kieu
  * @license     Apache-2.0
@@ -23,8 +23,32 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { createInterface } from 'node:readline/promises';
+import { createCommand } from './commands/create.ts';
+import { createRunner } from './kit/run.ts';
+import type { Ask } from './kit/command.ts';
 import { packageName } from './index.ts';
 
-// Placeholder until the create-bieberkit commands in spec section 5 are implemented.
-process.stdout.write(`${packageName} 0.0.0: not implemented yet. See docs/spec/SPEC.md section 5.\n`);
-process.exitCode = 1;
+/** Asks on the terminal. A choice is a number or the word, and an empty answer is the default. */
+const ask: Ask = async (question, choices, fallback) => {
+  const reader = createInterface({ input: process.stdin, output: process.stderr });
+  try {
+    const options =
+      choices === undefined
+        ? ''
+        : ` (${choices.map((choice) => (choice === fallback ? `${choice}*` : choice)).join(', ')})`;
+    const answer = (await reader.question(`${question}${options} `)).trim();
+    return answer === '' ? (fallback ?? '') : (choices?.[Number(answer) - 1] ?? answer);
+  } finally {
+    reader.close();
+  }
+};
+
+const run = createRunner({ name: packageName, version: '0.0.0', commands: [createCommand()], single: 'create' });
+
+process.exitCode = await run(process.argv.slice(2), {
+  stdout: (text) => void process.stdout.write(text),
+  stderr: (text) => void process.stderr.write(text),
+  cwd: process.cwd(),
+  ...(process.stdin.isTTY ? { ask } : {}),
+});

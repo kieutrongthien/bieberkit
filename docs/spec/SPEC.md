@@ -246,8 +246,8 @@ pnpm create bieberkit@latest example-project
 
 | Flag | Values | Default | Purpose |
 | --- | --- | --- | --- |
-| `--db` | `postgres`, `mysql`, `sqlite` | asked | Database dialect |
-| `--template` | `blank`, `cms`, `crm`, `saas` | asked | Starter template |
+| `--db` | `postgres`, `mysql`, `sqlite` | asked, `sqlite` with `--yes` | Database dialect |
+| `--template` | `blank`, `cms`, `crm`, `saas` | asked, `blank` with `--yes` | Starter template |
 | `--plugins` | comma-separated plugin names | none | Extra plugins on top of the template |
 | `--admin` / `--no-admin` | flag | `--admin` | Include the admin SPA |
 | `--author` | `"Name <email>"` | from git config | Author written into project file headers |
@@ -258,7 +258,7 @@ pnpm create bieberkit@latest example-project
 | --site / --no-site | flag | --site for cms, otherwise --no-site | Include the server-rendered public site app |
 | `--license` | an SPDX identifier or `UNLICENSED` | `UNLICENSED` | License written into `bieberkit.config.ts`, file headers and the `LICENSE` file (ADR 0007) |
 
-Every prompt MUST have an equivalent flag, so CI and AI agents can run the scaffolder without interaction.
+Every prompt MUST have an equivalent flag, so CI and AI agents can run the scaffolder without interaction. With nobody to ask and no `--yes`, the command lists every flag that is missing (`BK_CREATE_CHOICE_NEEDED`, exit code 2), so that an agent repairs its command in one go.
 
 ### 5.2 Project commands
 
@@ -1595,7 +1595,7 @@ Open questions:
 
 | Version | Date | Changes |
 | --- | --- | --- |
-| 0.8.7 | 2026-11-24 | M1.6 and M1.7: traces and metrics without an SDK (OBS-02 to OBS-04, ADR 0023), the log package (ADR 0022), and in section 5.2 the command `bieberkit generate`, the names of the rules of `bieberkit check` and the ignore directive |
+| 0.8.7 | 2026-11-24 | M1.6 and M1.7 (the defaults of `--yes` and the missing flags in section 5.1): traces and metrics without an SDK (OBS-02 to OBS-04, ADR 0023), the log package (ADR 0022), and in section 5.2 the command `bieberkit generate`, the names of the rules of `bieberkit check` and the ignore directive |
 | 0.8.6 | 2026-11-22 | Section 11.2: the codes raised by `definePlugin` and by the manifest check (`PLG_NAME`, `PLG_MANIFEST_NAME`, and the existing ones), and how the short name of a plugin is derived. Found while implementing M1.1 |
 | 0.8.5 | 2026-11-22 | Section 23.5: changeset files are exempt from the header, because their text becomes the changelog. Found while adding the first changeset of M1.1 |
 | 0.8.4 | 2026-11-22 | ADRs 0010 to 0014: queue drivers and outbox rules (Q-01, Q-05, Q-07, Q-11, MOD-18), plugin manifest, resolver and migration steps (PLG-07, PLG-08, DATA-08, DATA-24, DATA-27), Better Auth on MikroORM's Kysely (AUTH-01, AUTH-09 to AUTH-11), own authorization translator (AUTHZ-02, AUTHZ-05, AUTHZ-06), release pipeline (SEC-13, SEC-15, SEC-16, SEC-21, section 24.2) |

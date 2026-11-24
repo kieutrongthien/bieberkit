@@ -295,12 +295,19 @@ importers:
       '@bieberkit/queue':
         specifier: workspace:*
         version: link:../queue
+      create-bieberkit:
+        specifier: workspace:*
+        version: link:../create
 
   packages/content: {}
 
   packages/core: {}
 
-  packages/create: {}
+  packages/create:
+    dependencies:
+      '@bieberkit/core':
+        specifier: workspace:*
+        version: link:../core
 
   packages/data:
     dependencies:

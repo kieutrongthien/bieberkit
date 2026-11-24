@@ -42,7 +42,8 @@
     "@bieberkit/core": "workspace:*",
     "@bieberkit/data": "workspace:*",
     "@bieberkit/http": "workspace:*",
-    "@bieberkit/queue": "workspace:*"
+    "@bieberkit/queue": "workspace:*",
+    "create-bieberkit": "workspace:*"
   },
   "engines": {
     "node": ">=24.12"

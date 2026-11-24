@@ -255,8 +255,8 @@ Depends on: M1.3, M1.4, M1.5.
 Depends on: M1.1 to M1.6 (can start the resolver and flags earlier).
 
 - [x] Stable error codes, `--json` on every command, exit codes 0, 1, 2, 3 (§5.3, AI-02, AI-03). Done in the framework of commands (slice C1): each command that follows inherits them
-- [ ] `create-bieberkit` with every flag and prompt equivalent; resolves the plugin graph before writing anything (§5.1, §6 steps 1 to 5)
-- [ ] Scaffold writes `bieberkit.config.ts`, headers with the project author, `.env` with generated secrets, `.env.example`, `compose.yaml`, git commit (§6 steps 6 to 12, §23.7)
+- [x] `create-bieberkit` with every flag and prompt equivalent; resolves the plugin graph before writing anything (§5.1, §6 steps 1 to 5). Done (slice C4); `bieberkit create` is the alias
+- [x] Scaffold writes `bieberkit.config.ts`, headers with the project author, `.env` with generated secrets, `.env.example`, `compose.yaml`, git commit (§6 steps 6 to 12, §23.7). Done (slice C4); the admin and site apps and the seed come with the base plugins
 - [ ] Commands: `dev`, `build`, `start <role>`, `migrate:make`, `migrate`, `db:seed`, `env:check`, `env:example`, `routes`, `openapi`, `client:generate`, `doctor`, `test` (§5.2)
 - [ ] `make:entity`, `make:module`, `make:job` from official recipes (§5.2)
 - [x] `bieberkit check` rules: boundaries, headers, env access, route permissions, destructive migrations, `http.fetch` or queue calls inside transactions, string-built SQL, stale generated files (WP-01, SEC-05, GEN-01, DATA-07). Done (slices C2 and C3). DATA-07 needs no rule, because a filter or a sort on a field with no index is refused by the query

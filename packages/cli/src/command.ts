@@ -2,7 +2,7 @@
  * BieberKit
  *
  * @file        packages/cli/src/command.ts
- * @description The shape of a command: what it takes, and what it answers for the human and for the machine.
+ * @description The shape of a command: the same types as the kit of create-bieberkit.
  * @author      Bieber Kieu <kieutrongthien@gmail.com>
  * @copyright   Copyright (c) 2026 Bieber Kieu
  * @license     Apache-2.0
@@ -22,33 +22,4 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { EnvSource } from '@bieberkit/core';
-import type { ExitCode } from './errors.ts';
-import type { FlagDef, ParsedArgs, Positional } from './args.ts';
-
-/** What a command is given. */
-export interface CommandContext {
-  readonly cwd: string;
-  /** Set by a test. Without it, a command reads the real environment through core. */
-  readonly env?: EnvSource;
-  readonly args: ParsedArgs;
-  readonly json: boolean;
-  /** A line of progress. It goes to stderr, so that stdout stays the answer (section 5.3). */
-  log(line: string): void;
-}
-
-/** What a command answers. `data` is the document of `--json`, and `text` is what a person reads. */
-export interface Outcome {
-  readonly data: unknown;
-  readonly text: string;
-  /** `3` when a check found violations. Defaults to `0`. A command that fails throws. */
-  readonly exit?: ExitCode;
-}
-
-export interface Command {
-  readonly name: string;
-  readonly summary: string;
-  readonly flags?: readonly FlagDef[];
-  readonly positionals?: readonly Positional[];
-  run(context: CommandContext): Promise<Outcome>;
-}
+export type { Command, CommandContext, Outcome } from 'create-bieberkit/kit';

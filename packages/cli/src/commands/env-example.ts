@@ -25,25 +25,9 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { coreEnv, describeEnv, mergeEnv } from '@bieberkit/core';
-import type { EnvDescription } from '@bieberkit/core';
+import { renderEnvExample } from 'create-bieberkit';
 import type { Command } from '../command.ts';
 import { envOwnersOf, loadProject } from '../project.ts';
-
-/** One key as it is written in `.env.example`: its description, what it takes, and the key with the default or nothing. */
-function block(row: EnvDescription): string {
-  const takes = row.values === undefined ? (row.expected ?? row.type) : row.values.join(' | ');
-  const need = row.required ? 'required' : row.default === undefined ? 'optional' : `default ${row.default}`;
-  // A secret never shows its value or its default (CFG-06).
-  const value = row.secret ? '' : (row.default ?? '');
-  return [`# ${row.description}`, `# ${takes}, ${need}${row.secret ? ', secret' : ''}`, `${row.key}=${value}`].join(
-    '\n',
-  );
-}
-
-/** The text of `.env.example`. Core first and then the plugins in boot order, each key once, so the same schema gives the same bytes. */
-export function renderEnvExample(rows: readonly EnvDescription[]): string {
-  return `${rows.map(block).join('\n\n')}\n`;
-}
 
 export const envExampleCommand: Command = {
   name: 'env:example',
