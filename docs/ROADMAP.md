@@ -243,8 +243,8 @@ Done when: each contract passes its shared driver tests, and switching `QUEUE_DR
 Depends on: M1.3, M1.4, M1.5.
 
 - [x] `@bieberkit/log`: pino adapter under `@bieberkit/log/pino` with SEC-09 redaction, JSON logs with the fields of OBS-01, and a shared contract test run against it and the core default logger (OBS-01, SEC-09, PKG-02, PKG-03, ADR 0003). Done: `createPinoLogger` redacts with the sanitizer of core (ADR 0022), and `loggerContractSuite` passes on both loggers
-- [ ] OpenTelemetry traces over HTTP, database, cache, queue, jobs with context carried into jobs (OBS-02)
-- [ ] Prometheus metrics on `METRICS_PORT`, not routed publicly (OBS-03, OBS-04)
+- [x] OpenTelemetry traces over HTTP, database, cache, queue, jobs with context carried into jobs (OBS-02). Done without an SDK (ADR 0023): OTLP over HTTP from core, a span for each request, ORM query, cache call, dispatch and delivery, and the `traceparent` kept in the outbox row and the job row. The kernel builds the tracer from the config with the CLI (M1.7)
+- [x] Prometheus metrics on `METRICS_PORT`, not routed publicly (OBS-03, OBS-04). Done: the registry and the server in core (a request that a proxy touched is refused), and the figures of http, data, queue and cache. Starting the server at boot comes with the CLI (M1.7)
 - [ ] `@bieberkit/testing`: `createTestApp`, entity factories, `actingAs`, `withTenant` (TST-02)
 - [ ] Generated contract tests per entity: permissions, field masks, tenant isolation, validation, pagination limits (§21). Generated from the `permissions` block, with a mutation job that proves they catch six known faults (ADR 0013). The permission part is done in `@bieberkit/auth/testing` (M1.4); validation and pagination limits are left
 - [ ] Testcontainers setup for PostgreSQL, MySQL and Valkey; network calls outside containers fail tests (TST-03)

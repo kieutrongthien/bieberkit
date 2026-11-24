@@ -269,3 +269,31 @@ installProcessHandlers({ reporter, logger, flushMs? }): () => void      // uncau
 7. **Not done here.** Client errors and web vitals (UI-21) come with the admin. A driver for another vendor is a reporter that implements the port.
 
 Tests: `reporting/reporter.test.ts`, `sentry.test.ts` (the DSN, frames, the envelope, what is left out, sampling, the budget, 429, timeouts, flush), `process-handlers.test.ts`, `from-config.test.ts`; the 5xx cases in `packages/http/src/errors.test.ts`; the dead job cases in `packages/queue/src/sync.test.ts` and `worker.dialects.test.ts`.
+
+## Traces and metrics (OBS-02 to OBS-04)
+
+ADR 0023 (Accepted): core writes both on Node.js built-ins, with no SDK and no metrics library. A package that traces or measures takes a `tracer` and a `metrics` option, as one that reports takes an `errorReporter`, and both default to ones that record nothing.
+
+```ts
+// traces
+createTracer({ exporter, nowNs? }): Tracer         // span(name, options, fn), startSpan, within, record, current, flush
+createNoopTracer(); createMemorySpanExporter()     // the default, and the one for tests
+createOtlpExporter({ endpoint, resource, logger?, batchSize?, maxQueue?, intervalMs?, timeoutMs?, fetch? })
+createTracerFromConfig(config, { logger, role, serviceName?, release? })   // OTEL_EXPORTER_OTLP_ENDPOINT, APP_ENV
+parseTraceparent(header); formatTraceparent({ traceId, spanId })           // W3C Trace Context
+// metrics
+createMetrics(): Metrics                           // counter, gauge, histogram, collect, render
+createNoopMetrics(); registerProcessMetrics(metrics): () => void
+startMetricsServer({ metrics, port, host?, logger? }): Promise<MetricsServer>   // METRICS_PORT
+```
+
+1. **A span is ids, a name, a kind, times and a few attributes.** Never a statement, a parameter, a URL with its query string, a header, a body, a key of the cache or an error message. A failed span keeps the class of the error (`exception.type`) and its code (`bk.error.code`). Contract tests of each package look for a planted secret in the exported spans.
+2. **The current span is carried by async context.** A span started inside another is its child, also after an `await`, and spans that run at once are siblings. Inside a request, the context that log lines and error reports read names the current span, so a line, a report and a trace meet on `traceId` and `spanId` (OBS-01).
+3. **The trace crosses processes.** `@bieberkit/http` reads `traceparent`. The outbox row and the job row keep the `traceparent` of the code that wrote them (`traceparent` columns, steps `0.4.0` of data and `0.3.0` of queue), and the worker starts its span as a child of it, so a request, its event and the job that the event became are one trace.
+4. **Tracing is off when `OTEL_EXPORTER_OTLP_ENDPOINT` is empty.** The no-op tracer costs a call, and the trace of the caller still reaches the log lines.
+5. **The exporter never blocks and never throws.** It posts OTLP over HTTP in JSON (`/v1/traces`) in batches of 512 every 5 seconds, holds at most 2048 spans (the oldest are dropped and counted), gives a request 5 seconds, and logs a failure once a minute. `flush` waits for what was handed over, for a shutdown.
+6. **Metrics (OBS-03).** `bk_http_request_duration_seconds{method,route,status}` (http), `bk_event_loop_lag_seconds{stat}`, `bk_heap_used_bytes`, `bk_heap_total_bytes`, `bk_process_resident_bytes`, `bk_process_uptime_seconds` (`registerProcessMetrics`), `bk_db_pool_connections{state}` (data, PostgreSQL and MySQL), `bk_queue_jobs{queue,status}` and `bk_job_duration_seconds{queue,job,outcome}` (queue), `bk_cache_lookups_total{result}` (cache; the ratio is `rate(hit) / rate(hit + miss)`). A route label is the pattern of the route, and a path that no route has is `unmatched`, so a scan cannot make labels without end. A metric holds at most 1000 series.
+7. **The metrics server (OBS-04)** answers `GET` and `HEAD` on `/metrics` and nothing else (404 and 405), and refuses with 403 a request that has `Forwarded`, `X-Forwarded-*`, `X-Real-IP` or `Via`, because only a proxy sets them. The port is never published by the compose files and the charts. A port that is taken rejects with `OBS_METRICS_PORT_UNAVAILABLE`, and the caller decides whether that stops the process.
+8. **Not done here.** Wiring from the config at boot (the CLI of M1.7), `OTEL_EXPORTER_OTLP_HEADERS`, sampling by ratio, and spans for the raw Kysely queries of the outbox and the queue tables.
+
+Tests: `observability/traceparent.test.ts`, `tracing.test.ts`, `otlp.test.ts` (the OTLP JSON, batching, a collector that is down or slow, a real server), `metrics.test.ts` (the text format, escaping, limits), `metrics-server.test.ts` (the paths, the proxy headers, a taken port, process metrics).
