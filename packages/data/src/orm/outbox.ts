@@ -222,14 +222,34 @@ function toMessage(row: Row): OutboxMessage {
   return message as unknown as OutboxMessage;
 }
 
-const sleep = (ms: number, wake: { current: () => void }): Promise<void> =>
-  new Promise((resolve) => {
-    const timer = setTimeout(resolve, ms);
-    wake.current = () => {
-      clearTimeout(timer);
-      resolve();
-    };
-  });
+/**
+ * A sleep that a wake ends, and that does not forget a wake that came while nobody slept. A dispatcher that is in the middle of a batch
+ * when `wake` is called must not go to sleep for a whole poll afterwards: the rows that the caller just committed would wait for it.
+ */
+export function createWakeSignal(): { sleep(ms: number): Promise<void>; wake(): void } {
+  const state: { end: (() => void) | undefined; pending: boolean } = { end: undefined, pending: false };
+  return {
+    sleep: (ms) =>
+      new Promise((resolve) => {
+        if (state.pending) {
+          state.pending = false;
+          resolve();
+          return;
+        }
+        const timer = setTimeout(done, ms);
+        function done(): void {
+          clearTimeout(timer);
+          state.end = undefined;
+          resolve();
+        }
+        state.end = done;
+      }),
+    wake() {
+      if (state.end === undefined) state.pending = true;
+      else state.end();
+    },
+  };
+}
 
 /**
  * The dispatcher of the outbox (MOD-18). One call claims a batch with `FOR UPDATE SKIP LOCKED`, in the order of the index so that MySQL locks the batch and not every due row (SQLite has one writer, and its
@@ -247,7 +267,7 @@ export function createOutboxDispatcher(db: Database, options: OutboxDispatcherOp
   const logger = options.logger ?? createLogger({ level: 'info', role: 'worker' });
   const state = { running: false };
   let loop: Promise<void> | undefined;
-  const wake = { current: (): void => undefined };
+  const signal = createWakeSignal();
 
   async function dispatchOnce(): Promise<DispatchResult> {
     const kysely = await kyselyOf(db.orm.em);
@@ -311,7 +331,7 @@ export function createOutboxDispatcher(db: Database, options: OutboxDispatcherOp
       } catch (error) {
         logger.error('outbox dispatch failed', { reason: error instanceof Error ? error.message : String(error) });
       }
-      if (state.running && !busy) await sleep(pollMs, wake);
+      if (state.running && !busy) await signal.sleep(pollMs);
     }
   }
 
@@ -322,10 +342,10 @@ export function createOutboxDispatcher(db: Database, options: OutboxDispatcherOp
       state.running = true;
       loop = run();
     },
-    wake: () => wake.current(),
+    wake: () => signal.wake(),
     async stop() {
       state.running = false;
-      wake.current();
+      signal.wake();
       await loop;
       loop = undefined;
     },

@@ -177,3 +177,8 @@ createQueueFromConfig({ QUEUE_DRIVER, REDIS_URL }, { jobs, db?, prefix?, logger?
 10. **Not done.** The wake is BullMQ's own (blocking commands), so `wake` is ignored. A cursor by offset can skip or repeat a job when dead jobs are added or removed between two pages.
 
 Tests: `adapters/redis/redis.test.ts` against a Valkey with `noeviction` (`QUEUE_TEST_REDIS_URL`; `BK_REQUIRE_DIALECTS=all` makes a missing URL fail): the nine cases, the ids, dead letters (pages, retry, discard, refusals), an input that no longer fits, a poison job that stalls, the outbox, stats and purge, two prefixes on one server, the config.
+
+## Two fixes of the wake and the claim (2026-11-24)
+
+1. **A wake is kept (Q-06).** A hint that arrived while a loop of the worker was in the middle of a claim used to be lost, and the loop then slept a whole poll (30 seconds, with a wake source). Each loop now has a `createWakeSignal()` (exported from `@bieberkit/data/orm`, where the outbox dispatcher uses it for the same reason): a wake that finds nobody asleep is kept for the next sleep. Test: `wake.dialects.test.ts`, eight rounds in which the job is added and the hint comes at once, with a poll of 30 seconds; `wake-signal.test.ts` in the data package for the signal itself.
+2. **The claim is READ COMMITTED on MySQL.** The default isolation (REPEATABLE READ) keeps gap locks, so the claims of `critical`, `default` and `reports`, woken together, locked each other's rows, and `SKIP LOCKED` skipped a job that was due until the next poll. PostgreSQL is READ COMMITTED already, and SQLite has one writer.

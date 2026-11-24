@@ -65,6 +65,30 @@ const message = (jobId: string) => ({
 });
 
 describeDialects('Q-06 the wake of a worker', ({ dialect, open, urlOf }) => {
+  it('Q-06 a hint that arrives while the worker is busy with a claim is kept: the job is taken at once, not after the poll', async () => {
+    const db = await open([]);
+    let ran = 0;
+    const job = defineJob({ name: 'wake.race', input: empty, handler: async () => void (ran += 1) });
+    const queue = await createQueue({ driver: 'database', jobs: [job], db });
+    for (let round = 1; round <= 8; round += 1) {
+      let hint: (() => void) | undefined;
+      const source: WakeSource = {
+        listen: async (onWake) => {
+          hint = () => onWake('default');
+          return async () => undefined;
+        },
+      };
+      const worker = queue.createWorker({ pollMs: 30_000, wake: source });
+      worker.start();
+      // The first claim is on its way. The job is added and the hint comes at once, as another process would do.
+      await queue.dispatch(job, {}, { jobId: `race-${String(round)}` });
+      hint?.();
+      await waitFor(() => ran === round, 5_000);
+      await worker.stop();
+    }
+    expect(ran).toBe(8);
+  }, 30_000);
+
   it('Q-06 a worker that stops before its source has started stops the source as soon as it is ready', async () => {
     const db = await open([]);
     let stopped = 0;

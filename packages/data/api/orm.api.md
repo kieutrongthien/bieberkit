@@ -342,6 +342,10 @@ interface OutboxDispatcher {
   wake(): void;
   stop(): Promise<void>;
 }
+export declare function createWakeSignal(): {
+  sleep(ms: number): Promise<void>;
+  wake(): void;
+};
 export declare function createOutboxDispatcher(db: Database, options: OutboxDispatcherOptions): OutboxDispatcher;
 interface OutboxLag {
   readonly pending: number;

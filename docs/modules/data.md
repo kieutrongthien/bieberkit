@@ -830,3 +830,7 @@ useReadYourWrites(port)                                            // at boot; c
 5. **Not done here.** A write by one user does not make the reads of other users go to the primary: they see it when the replica has it, which is what a replica means.
 
 Tests: `read-your-writes.test.ts` (the memory store), `read-your-writes.dialects.test.ts` on PostgreSQL and MySQL against a real replica that is another database, so it is behind for good: the author reads the write, another user and an anonymous reader do not, the window and its end, a unit of work that flushes, a rolled back write, a system write, a store that is down, the count of a page; and on SQLite, that a database with no replica never asks the store.
+
+## The wake signal (MOD-18, 2026-11-24)
+
+`createWakeSignal(): { sleep(ms), wake() }` is the sleep of the outbox dispatcher and of the loops of the queue worker. A `wake` ends the sleep that is running, and a `wake` that finds nobody asleep is kept for the next `sleep`, so a dispatcher that is in the middle of a batch when `wake` is called does not sleep a whole poll afterwards. The outbox test `MOD-18 start delivers new rows by itself` failed once in a run of the whole suite because of this, and now cannot.

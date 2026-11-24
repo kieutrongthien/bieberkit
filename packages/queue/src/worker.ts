@@ -27,6 +27,7 @@ import { sql } from 'kysely';
 import type { Kysely } from 'kysely';
 import type { Dialect } from '@bieberkit/core';
 import type { StepDatabase } from '@bieberkit/data';
+import { createWakeSignal } from '@bieberkit/data/orm';
 import { QUEUE_NAMES } from './contract.ts';
 import type { QueueName, WakeSource, Worker, WorkerOptions } from './contract.ts';
 import { reportDead, runDelivery } from './shared.ts';
@@ -75,13 +76,16 @@ export function createDatabaseWorker(
   const state = { running: false, crashed: false };
   const loops: Promise<void>[] = [];
   const running = new Set<Promise<void>>();
-  const wakers = new Set<() => void>();
   const heartbeats = new Set<NodeJS.Timeout>();
   let unlisten: (() => Promise<void>) | undefined;
 
   async function claim(queue: QueueName, limit: number): Promise<Claimed[]> {
     const now = shared.now();
-    return kysely.transaction().execute(async (trx) => {
+    // On MySQL the default isolation (REPEATABLE READ) keeps gap locks, so claims of two queues that run together lock each other's rows,
+    // and SKIP LOCKED then skips a job that is due. READ COMMITTED locks only the rows that a claim takes.
+    const transaction =
+      dialect === 'mysql' ? kysely.transaction().setIsolationLevel('read committed') : kysely.transaction();
+    return transaction.execute(async (trx) => {
       let query = trx
         .selectFrom(JOBS_TABLE)
         .selectAll()
@@ -245,23 +249,16 @@ export function createDatabaseWorker(
     }
   }
 
+  /** One signal for each loop, so that a hint that arrives while a loop is busy is kept and the loop does not go to sleep for a whole poll. */
+  const signals = new Set<ReturnType<typeof createWakeSignal>>();
   const wakeAll = (): void => {
-    for (const wake of Array.from(wakers)) wake();
+    for (const signal of signals) signal.wake();
   };
-
-  const sleep = (ms: number): Promise<void> =>
-    new Promise((resolve) => {
-      const timer = setTimeout(done, ms);
-      function done(): void {
-        clearTimeout(timer);
-        wakers.delete(done);
-        resolve();
-      }
-      wakers.add(done);
-    });
 
   async function loop(queue: QueueName): Promise<void> {
     const slots = slotsOf(options, queue);
+    const signal = createWakeSignal();
+    signals.add(signal);
     let busy = 0;
     while (state.running && !state.crashed) {
       let claimed: Claimed[] = [];
@@ -281,7 +278,7 @@ export function createDatabaseWorker(
       }
       // With slots free and nothing to take, look again after the poll time. With every slot busy, wait for one to end.
       if (state.running && !state.crashed && (claimed.length === 0 || slots - busy <= 0))
-        await sleep(claimed.length === 0 ? pollMs : Math.max(pollMs, 20));
+        await signal.sleep(claimed.length === 0 ? pollMs : Math.max(pollMs, 20));
     }
   }
 

@@ -70,6 +70,7 @@ export { availableTransitions, entityEventName, transition, transitionOf } from 
 export type { AvailableTransition, TransitionResult } from './state.ts';
 export {
   createOutboxDispatcher,
+  createWakeSignal,
   emitEvent,
   outboxLag,
   processOnce,
