@@ -37,6 +37,8 @@ import type { Database } from '@bieberkit/data/orm';
 import { authError } from './errors.ts';
 import { accountKey, createRateLimiter, rulesOf } from './limits.ts';
 import type { AuthLimits, RateLimiter } from './limits.ts';
+import { isDisabledUser, userDisabledError } from './user-status.ts';
+import { withEnabledSession } from './user-service.ts';
 
 export type { AuthLimits, Limit, Limit2 } from './limits.ts';
 export type { BetterAuthOptions };
@@ -148,9 +150,22 @@ export function createAuth(options: CreateAuthOptions): AuthInstance {
   const limiter = createRateLimiter(options.db);
   const rules = rulesOf(options.limits);
   const { mail } = options;
+  const database = kyselyAdapter(requestKysely(options.db), { type: options.dialect, transaction: false });
   // The options are typed as `BetterAuthOptions`, so `AuthInstance` is one type for every project (the plugins of slice C add to it).
   const config: BetterAuthOptions = {
-    database: kyselyAdapter(requestKysely(options.db), { type: options.dialect, transaction: false }),
+    database: (authConfig: BetterAuthOptions) => {
+      const adapter = database(authConfig);
+      const create: typeof adapter.create = <T extends Record<string, unknown>, R = T>(
+        input: Parameters<typeof adapter.create<T, R>>[0],
+      ): Promise<R> => {
+        const userId: unknown = Reflect.get(input.data, 'userId');
+        if ((input.model === 'session' || input.model === 'authSession') && typeof userId === 'string') {
+          return withEnabledSession(options.db, userId, () => adapter.create<T, R>(input));
+        }
+        return adapter.create<T, R>(input);
+      };
+      return { ...adapter, create };
+    },
     secret: options.secret,
     // Always the envelope with a key id, so that a later rotation can still open what was written now (APP_KEY_PREVIOUS).
     secrets: [options.secret, ...(options.previousSecrets ?? [])].map((value) => ({
@@ -160,7 +175,16 @@ export function createAuth(options: CreateAuthOptions): AuthInstance {
     baseURL: base.origin,
     trustedOrigins: [base.origin, ...(options.trustedOrigins ?? [])],
     telemetry: { enabled: false },
-    user: { modelName: 'authUser' },
+    user: {
+      modelName: 'authUser',
+      additionalFields: {
+        disabledAt: { type: 'date', required: false, input: false },
+        disabledReason: { type: 'string', required: false, input: false },
+        disabledBy: { type: 'string', required: false, input: false },
+        source: { type: 'string', required: true, defaultValue: 'local', input: false },
+        externalId: { type: 'string', required: false, input: false },
+      },
+    },
     session: {
       modelName: 'authSession',
       ...(options.secondaryStorage === undefined ? {} : { storeSessionInDatabase: true }),
@@ -258,6 +282,20 @@ export function createAuth(options: CreateAuthOptions): AuthInstance {
       modelName: 'authRateLimit',
       customStorage: limiter.storage,
       customRules: rules.perIp,
+    },
+    databaseHooks: {
+      session: {
+        create: {
+          before: async (session) => {
+            const user = await requestKysely(options.db)
+              .selectFrom('authUser')
+              .select('disabledAt')
+              .where('id', '=', session.userId)
+              .executeTakeFirst();
+            if (isDisabledUser(user)) throw new APIError('FORBIDDEN', userDisabledError().toJSON());
+          },
+        },
+      },
     },
     hooks: {
       // The limit of an account. The address of the request is hashed, so the table never holds it in clear text.

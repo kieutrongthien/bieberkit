@@ -35,6 +35,32 @@ describeDialects('AUTH-10 the drift check on the real entities', ({ open }) => {
     return { auth, entities: driftEntities(db) };
   };
 
+  it('AUTH-10 the drift check passes with the profile fields', async () => {
+    const { auth, entities } = await setup();
+    expect(auth.options.user?.additionalFields).toMatchObject({
+      disabledAt: { type: 'date', required: false, input: false },
+      disabledReason: { type: 'string', required: false, input: false },
+      disabledBy: { type: 'string', required: false, input: false },
+      source: { type: 'string', required: true, defaultValue: 'local', input: false },
+      externalId: { type: 'string', required: false, input: false },
+    });
+    expect(checkAuthDrift(auth.options, entities)).toEqual([]);
+  });
+
+  it('AUTH-10 the drift check detects missing or nullable profile fields', async () => {
+    const { auth, entities } = await setup();
+    const broken = structuredClone(entities);
+    delete broken['authUser']?.properties['disabledAt'];
+    const source = broken['authUser']?.properties['source'];
+    if (source !== undefined) source.nullable = true;
+    expect(checkAuthDrift(auth.options, broken)).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('authUser.disabledAt'),
+        expect.stringContaining('authUser.source'),
+      ]),
+    );
+  });
+
   it('AUTH-10 finds no difference between the five entities and what Better Auth expects', async () => {
     const { auth, entities } = await setup();
     expect(checkAuthDrift(auth.options, entities)).toEqual([]);

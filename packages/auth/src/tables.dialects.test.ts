@@ -29,6 +29,20 @@ import { AUTH_PLUGIN, authEntities, authMigrationSteps } from './roles.ts';
 import { AuthAccount, AuthRateLimit, AuthSession, AuthUser, AuthVerification } from './tables.ts';
 import { describeDialects } from './testing/dialects.ts';
 
+describe('BPL-01 the profile migration contract', () => {
+  it('BPL-01 the six profile steps use version 0.5.0 and expand only', () => {
+    const steps = authMigrationSteps.filter((step) => step.version === '0.5.0');
+    expect(steps.map((step) => step.id).toSorted()).toEqual([
+      'users-disabled-at',
+      'users-disabled-by',
+      'users-disabled-reason',
+      'users-external-id',
+      'users-source',
+      'users-source-external-index',
+    ]);
+    expect(steps.every((step) => step.plugin === AUTH_PLUGIN && step.kind === 'expand')).toBe(true);
+  });
+});
 const NOW = new Date('2026-11-23T10:00:00.000Z');
 const LATER = new Date('2026-11-24T10:00:00.000Z');
 

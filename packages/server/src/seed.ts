@@ -24,13 +24,14 @@
 
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { createContainer, loadEnv, registerModule } from '@bieberkit/core';
+import { createContainer, createLogger, loadEnv, registerModule } from '@bieberkit/core';
+import type { JobDef, QueueSubscription } from '@bieberkit/queue';
 import type { EnvSource, ServiceRegistry } from '@bieberkit/core';
 import { createDatabase, compileEntities } from '@bieberkit/data/orm';
 import type { EntityDef } from '@bieberkit/data';
 import { authEntities } from '@bieberkit/auth';
 import { allModules, contributed } from './modules.ts';
-import { permissionCatalog, registerRuntimeServices } from './services.ts';
+import { createRuntimePlatform, permissionCatalog, registerRuntimeServices } from './services.ts';
 import { envOwnersOf, importFile, loadProject } from './project.ts';
 import { ServerError } from './errors.ts';
 
@@ -61,9 +62,23 @@ export async function seed(options: SeedOptions = {}): Promise<Seeded> {
   });
   const entities = contributed<EntityDef<string>>(modules, 'entities');
   const db = await createDatabase(env, { entities: [...compileEntities(entities), ...authEntities], audit: 'table' });
+  let platform: Awaited<ReturnType<typeof createRuntimePlatform>> | undefined;
+  let result: Seeded;
   try {
+    platform = await createRuntimePlatform(env, {
+      jobs: contributed<JobDef>(modules, 'jobs'),
+      subscriptions: contributed<QueueSubscription>(modules, 'subscriptions'),
+      db,
+      logger: createLogger({ level: env.LOG_LEVEL, role: 'migrate' }),
+    });
     const container = createContainer();
-    registerRuntimeServices(container, { env, extra, db, permissions: permissionCatalog(project, modules) });
+    registerRuntimeServices(container, {
+      env,
+      extra,
+      db,
+      ...platform,
+      permissions: permissionCatalog(project, modules),
+    });
     for (const module of modules) registerModule(container, module);
     await container.boot();
     const services: ServiceRegistry = container.services;
@@ -85,8 +100,15 @@ export async function seed(options: SeedOptions = {}): Promise<Seeded> {
       await exported(services);
       ran.push('project');
     }
-    return { ran };
+    result = { ran };
+  } catch (error) {
+    await Promise.allSettled([platform?.close(), db.close()]);
+    throw error;
+  }
+  try {
+    await platform.close();
   } finally {
     await db.close();
   }
+  return result;
 }

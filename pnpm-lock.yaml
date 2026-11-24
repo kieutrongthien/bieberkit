@@ -544,6 +544,9 @@ importers:
       '@bieberkit/auth':
         specifier: workspace:*
         version: link:../auth
+      '@bieberkit/cache':
+        specifier: workspace:*
+        version: link:../cache
       '@bieberkit/core':
         specifier: workspace:*
         version: link:../core
@@ -553,6 +556,9 @@ importers:
       '@bieberkit/http':
         specifier: workspace:*
         version: link:../http
+      '@bieberkit/mail':
+        specifier: workspace:*
+        version: link:../mail
       '@bieberkit/queue':
         specifier: workspace:*
         version: link:../queue

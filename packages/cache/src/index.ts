@@ -34,3 +34,11 @@ export { createLayeredEngine } from './layered-engine.ts';
 export type { LayeredEngineOptions } from './layered-engine.ts';
 export { createMemoryEngine } from './memory-engine.ts';
 export type { MemoryEngineOptions } from './memory-engine.ts';
+import type { Cache as ServiceCache } from './cache.ts';
+
+declare module '@bieberkit/core' {
+  interface ServiceRegistry {
+    /** Application cache backed by the configured engine. */
+    cache: ServiceCache;
+  }
+}

@@ -37,7 +37,7 @@ import type {
   JobStatus,
   Worker,
 } from '../contract.ts';
-import { dispatching, prepare, reportDead, runDelivery, sleep } from '../shared.ts';
+import { dispatching, prepare, registerSubscription, reportDead, runDelivery, sleep } from '../shared.ts';
 import type { Shared } from '../shared.ts';
 
 interface Entry {
@@ -160,10 +160,7 @@ export function createSyncQueue(shared: Shared): Queue {
     driver: 'sync',
     dispatch,
     subscribe(event, job, map) {
-      shared.subscriptions.set(event, {
-        job: job,
-        map: map === undefined ? (message) => message.payload : map,
-      });
+      registerSubscription(shared, event, job, map);
     },
     publisher,
     createWorker(): Worker {

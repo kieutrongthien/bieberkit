@@ -182,7 +182,7 @@ export interface Queue {
   readonly driver: 'sync' | 'database' | 'redis';
   /** Adds a job. The input is checked first (`QUEUE_INPUT_INVALID`). */
   dispatch<Input>(job: JobDef<Input>, input: Input, options?: DispatchOptions): Promise<Dispatched>;
-  /** Says that the event named `event` of the outbox is the job `job`. `map` makes the input of the job from the message, and defaults to its payload. */
+  /** Maps one outbox event to a job. `map` defaults to the payload; a second mapping for that event throws `QUEUE_SUBSCRIPTION_DUPLICATE`. */
   subscribe<Input>(event: string, job: JobDef<Input>, map?: (message: OutboxMessage) => Input): void;
   /** The publisher for the dispatcher of the outbox (MOD-18). */
   readonly publisher: OutboxPublisher;

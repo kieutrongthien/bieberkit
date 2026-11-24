@@ -30,6 +30,7 @@ import { HttpError } from '@bieberkit/http';
 import type { AuthInstance } from './better-auth.ts';
 import { authError } from './errors.ts';
 import { AuthApiKey, AuthUser } from './tables.ts';
+import { requireEnabledUser } from './user-status.ts';
 
 export const API_KEY_PREFIX = 'bk_';
 const DAY = 86_400;
@@ -176,6 +177,8 @@ export async function principalOfKey(auth: AuthInstance, key: string): Promise<P
   }
   if (verified['valid'] !== true) return undefined;
   const found = recordOf(verified['key']);
+  if (typeof found['referenceId'] !== 'string' || !(await requireEnabledUser(auth, found['referenceId'])))
+    return undefined;
   const metadata = recordOf(typeof found['metadata'] === 'string' ? safeParse(found['metadata']) : found['metadata']);
   const grants = Array.isArray(metadata['permissions'])
     ? metadata['permissions'].filter((item) => typeof item === 'string')

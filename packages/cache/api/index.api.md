@@ -52,5 +52,10 @@ interface MemoryEngineOptions {
   readonly now?: () => number;
 }
 export declare function createMemoryEngine(options?: MemoryEngineOptions): CacheEngine;
+declare module "@bieberkit/core" {
+  interface ServiceRegistry {
+    cache: Cache;
+  }
+}
 export { type Atomic, type AtomicCache, type Cache, type CacheEngine, CacheError, type CacheIdempotencyOptions, type CacheOptions, type CacheReadYourWritesOptions, type CacheReader, type CacheValue, type LayeredEngineOptions, type Lock, type LockOptions, type MemoryEngineOptions, type TaggedCache, createCache };
 ```

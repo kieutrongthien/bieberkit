@@ -45,6 +45,9 @@ export type {
 export { parseCron } from './cron.ts';
 export type { Cron } from './cron.ts';
 export { registerOutbox } from './outbox.ts';
+export { applySubscriptions } from './subscriptions.ts';
+export type { QueueSubscription } from './subscriptions.ts';
+import type { QueueSubscription } from './subscriptions.ts';
 export { createWorkerPool } from './pool.ts';
 export type { PoolStats, RunOptions, WorkerPool, WorkerPoolOptions } from './pool.ts';
 export { createQueue } from './queue.ts';
@@ -59,5 +62,15 @@ declare module '@bieberkit/core' {
   interface ModuleContributions {
     /** The jobs of the module (Q-02). They are given to `createQueue` with the jobs of the other modules. */
     jobs?: readonly JobDef[];
+    /** Outbox events mapped to the jobs contributed by the module (BPL-04). */
+    subscriptions?: readonly QueueSubscription[];
+  }
+}
+import type { Queue as ServiceQueue } from './contract.ts';
+
+declare module '@bieberkit/core' {
+  interface ServiceRegistry {
+    /** The configured queue; a worker runs only in its process role. */
+    queue: ServiceQueue;
   }
 }

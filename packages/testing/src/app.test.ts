@@ -22,7 +22,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { expect, it } from 'vitest';
+import { expect, it, onTestFinished } from 'vitest';
+import { emitEvent, runInTransaction } from '@bieberkit/data/orm';
+import type { Database, OutboxMessage } from '@bieberkit/data/orm';
+import { BkError, defineModule, definePlugin } from '@bieberkit/core';
+import { defineJob } from '@bieberkit/queue';
+import type { RouteDef } from '@bieberkit/http';
+import { z } from 'zod';
+import type { OpenDatabase } from './database.ts';
 import { createTestApp, describeDialects } from './index.ts';
 import { Account, crm, touchJob } from './fixtures.ts';
 
@@ -32,6 +39,213 @@ const roles = {
   writer: ['crm.account.read', 'crm.account.create', 'crm.account.update', 'crm.account.delete'],
 };
 
+describeDialects('BPL-02 the platform of the test app', ({ open }) => {
+  it('BPL-02 createTestApp registers mail, queue and cache in memory', async () => {
+    const app = await createTestApp({ open });
+    onTestFinished(() => app.close());
+    expect(app.services.mail).toMatchObject({
+      send: expect.any(Function),
+      sendNow: expect.any(Function),
+      verify: expect.any(Function),
+    });
+    expect(app.services.queue).toBe(app.queue);
+    expect(app.services.cache).toMatchObject({
+      get: expect.any(Function),
+      set: expect.any(Function),
+      remember: expect.any(Function),
+    });
+    expect(app.mailbox).toEqual([]);
+  });
+
+  it('BPL-02 runOutbox delivers committed events once and returns their count', async () => {
+    const app = await createTestApp({ open });
+    onTestFinished(() => app.close());
+    expect(await app.runOutbox()).toBe(0);
+    await runInTransaction(app.db, async (em) => {
+      emitEvent(em, { name: 'platform.probe', payload: { value: 42 } });
+      await em.flush();
+    });
+    expect(await app.runOutbox()).toBe(1);
+    expect(await app.runOutbox()).toBe(0);
+  });
+
+  it('BPL-02 a password reset request sends one message with the link', async () => {
+    const app = await createTestApp({ open });
+    onTestFinished(() => app.close());
+    const auth = app.services.auth;
+    const base = app.services.config.APP_URL;
+    const headers = new Headers({ origin: base });
+    await auth.api.signUpEmail({
+      body: { name: 'Reader', email: 'reader@example.test', password: 'correct-test-password' },
+      headers,
+    });
+    const response = await auth.api.requestPasswordReset({
+      body: { email: 'reader@example.test', redirectTo: base + '/reset-password' },
+      headers,
+      asResponse: true,
+    });
+    expect(response.status).toBe(200);
+    expect(app.mailbox).toEqual([
+      expect.objectContaining({
+        to: [{ address: 'reader@example.test' }],
+        subject: expect.stringMatching(/password|reset/i),
+        text: expect.stringMatching(/https?:\/\/\S+\/api\/auth\/reset-password\/[^/?\s]+\?callbackURL=/),
+      }),
+    ]);
+  });
+
+  it('BPL-02 transactional auth mail is delivered from the outbox after commit', async () => {
+    const app = await createTestApp({ open });
+    onTestFinished(() => app.close());
+    const auth = app.services.auth;
+    const headers = new Headers({ origin: app.services.config.APP_URL });
+    await auth.api.signUpEmail({
+      body: { name: 'Reader', email: 'outbox@example.test', password: 'correct-test-password' },
+      headers,
+    });
+    await runInTransaction(app.db, async () => {
+      await auth.api.requestPasswordReset({ body: { email: 'outbox@example.test' }, headers });
+      expect(app.mailbox).toEqual([]);
+    });
+    expect(app.mailbox).toEqual([]);
+    expect(await app.runOutbox()).toBe(1);
+    expect(app.mailbox).toEqual([expect.objectContaining({ to: [{ address: 'outbox@example.test' }] })]);
+    expect(await app.runOutbox()).toBe(0);
+    expect(app.mailbox).toHaveLength(1);
+  });
+
+  it('AUTH-06 a reset request for an unknown address sends no mail and answers the same', async () => {
+    const app = await createTestApp({ open });
+    onTestFinished(() => app.close());
+    const auth = app.services.auth;
+    const headers = new Headers({ origin: app.services.config.APP_URL });
+    await auth.api.signUpEmail({
+      body: { name: 'Reader', email: 'reader@example.test', password: 'correct-test-password' },
+      headers,
+    });
+    const known = await auth.api.requestPasswordReset({ body: { email: 'reader@example.test' }, headers });
+    const before: unknown = app.mailbox;
+    expect(before).toHaveLength(1);
+    const unknown = await auth.api.requestPasswordReset({ body: { email: 'nobody@example.test' }, headers });
+    expect(unknown).toEqual(known);
+    expect(app.mailbox).toHaveLength(1);
+  });
+});
+async function eventApp(open: OpenDatabase, rollback = false) {
+  const seen: number[] = [];
+  const job = defineJob({
+    name: 'fixture.receive',
+    input: z.object({ value: z.number() }),
+    handler: async ({ value }) => {
+      seen.push(value);
+    },
+  });
+  // The route calls this service; the service owns the transaction (MOD-16).
+  const writeEvent = async (db: Database): Promise<void> => {
+    await runInTransaction(db, async (em) => {
+      emitEvent(em, { name: 'fixture.thing.done', version: 3, payload: { value: 999 } });
+      await em.flush();
+      if (rollback) throw new BkError('Intentional rollback', { code: 'FIXTURE_ROLLBACK', status: 409 });
+    });
+  };
+  const route: RouteDef = {
+    method: 'POST',
+    url: '/api/v1/fixture/event',
+    public: true,
+    schema: {
+      response: { 200: { type: 'object', properties: { queued: { type: 'boolean' } }, required: ['queued'] } },
+    },
+    handler: async (context) => {
+      await writeEvent(context.services.database);
+      return { queued: true };
+    },
+  };
+  const subscriptions = [
+    { event: 'fixture.thing.done', job, map: (event: OutboxMessage) => ({ value: event.version }) },
+  ];
+  const module = defineModule({ name: 'fixture', jobs: [job], routes: [route], subscriptions });
+  const app = await createTestApp({ modules: [module], open });
+  onTestFinished(() => app.close());
+  return { app, seen };
+}
+
+describeDialects('BPL-04 contributed outbox jobs', ({ open }) => {
+  it('BPL-04 an event written in a transaction runs its job after the commit, once', async () => {
+    const { app, seen } = await eventApp(open);
+    expect((await app.anonymous().post('/api/v1/fixture/event', {})).status).toBe(200);
+    expect(seen).toEqual([]);
+    expect(await app.runOutbox()).toBe(1);
+    expect(seen).toEqual([3]);
+    expect(await app.runOutbox()).toBe(0);
+    expect(seen).toEqual([3]);
+  });
+
+  it('BPL-04 a failed transaction leaves no event, so the job never runs', async () => {
+    const { app, seen } = await eventApp(open, true);
+    expect((await app.anonymous().post('/api/v1/fixture/event', {})).status).toBe(409);
+    expect(seen).toEqual([]);
+    expect(await app.runOutbox()).toBe(0);
+    expect(seen).toEqual([]);
+  });
+});
+declare module '@bieberkit/core' {
+  interface ServiceRegistry {
+    /** A test-only service contributed by a fixture plugin. */
+    fixtureGreeter: { hello(): string };
+  }
+}
+
+function greeterPlugin(name = '@fixture/plugin-greeter') {
+  return definePlugin({
+    name,
+    version: '0.1.0',
+    core: '>=0.0.0',
+    dialects: ['postgres', 'mysql', 'sqlite'],
+    services: {
+      fixtureGreeter: { scope: 'singleton', create: () => ({ hello: () => 'Hello from a plugin' }) },
+    },
+  });
+}
+
+describeDialects('BPL-03 plugin services', ({ open }) => {
+  it('BPL-03 a plugin contributes a named service that another plugin reads from the registry', async () => {
+    const provider = greeterPlugin();
+    const consumer = definePlugin({
+      name: '@fixture/plugin-consumer',
+      version: '0.1.0',
+      core: '>=0.0.0',
+      dialects: ['postgres', 'mysql', 'sqlite'],
+      requires: { '@fixture/plugin-greeter': '^0.1.0' },
+      routes: [
+        {
+          method: 'GET',
+          url: '/api/v1/fixture/hello',
+          public: true,
+          schema: {
+            response: { 200: { type: 'object', properties: { greeting: { type: 'string' } }, required: ['greeting'] } },
+          },
+          handler: async (context) => ({ greeting: context.services.fixtureGreeter.hello() }),
+        },
+      ],
+    });
+    const app = await createTestApp({ open, modules: [provider.module, consumer.module] });
+    onTestFinished(() => app.close());
+    const response = await app.anonymous().get('/api/v1/fixture/hello');
+    expect([response.status, response.body]).toEqual([200, { greeting: 'Hello from a plugin' }]);
+  });
+
+  it('BPL-03 a service name taken by two plugins fails at boot with CORE_SERVICE_DUPLICATE', async () => {
+    const db = await open([]);
+    onTestFinished(() => db.close());
+    await expect(
+      createTestApp({
+        open: async () => db,
+        modules: [greeterPlugin().module, greeterPlugin('@fixture/plugin-other').module],
+      }),
+    ).rejects.toMatchObject({ code: 'CORE_SERVICE_DUPLICATE' });
+    expect(await db.orm.isConnected()).toBe(false);
+  });
+});
 const dataOf = (body: Readonly<Record<string, unknown>>): Record<string, unknown>[] => {
   const data = body['data'];
   return Array.isArray(data) ? data.map((row: unknown) => Object.fromEntries(Object.entries(Object(row)))) : [];

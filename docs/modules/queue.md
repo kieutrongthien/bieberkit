@@ -186,3 +186,24 @@ Tests: `adapters/redis/redis.test.ts` against a Valkey with `noeviction` (`QUEUE
 ## Traces and metrics (OBS-02, OBS-03, ADR 0023)
 
 `createQueue`, `createRedisQueue` and `createQueueFromConfig` take `tracer` and `metrics`. A dispatch is a `producer` span named `dispatch <job>` (`bk.job.name`, `bk.queue`), and each delivery is a `consumer` span named `job <job>` (`bk.job.attempt`) that is a child of the code that dispatched. The trace travels in the job: `traceparent` is a column of `bk_jobs` (step 0.3.0), a field of the BullMQ data, and a field of the outbox row (step 0.4.0 of `@bieberkit/data`), so a request, the event that it emitted and the job that the event became are one trace. A row from before the column has none, and its delivery starts a trace. The log lines of the handler carry the `traceId` and the `spanId` of the delivery, also when no tracer is set (the trace of the caller). A failed delivery fails its span with the class and the code of the error, never its message. `bk_job_duration_seconds{queue,job,outcome}` times each delivery, and `bk_queue_jobs{queue,status}` is read from `stats()` when the metrics are scraped.
+
+## Contributed outbox subscriptions (S0, BPL-04)
+
+A module or plugin contributes `jobs` and `subscriptions` through `ModuleContributions`. The public API is:
+
+```ts
+interface QueueSubscription<Input = unknown> {
+  readonly event: string;
+  readonly job: JobDef<Input>;
+  readonly map?: (message: OutboxMessage) => Input;
+}
+applySubscriptions(queue: Queue, subscriptions: readonly QueueSubscription[]): void;
+```
+
+Without `map`, job input is the event payload. Boot and seed install these mappings through their shared platform setup; the test app installs them on its sync queue. Only worker/dev starts the real outbox loop. Tests explicitly call `app.runOutbox()` after the service transaction has committed; a rollback leaves no row and runs no job. Delivery keeps the existing stable outbox job id and Q-01 guarantees; the helper does not promise exactly-once side effects beyond the queue's deduplication window.
+
+Every driver shares the registration check: a second subscription for one event throws `QUEUE_SUBSCRIPTION_DUPLICATE` (500), even if it names the same job. This replaces silent overwrites and preserves the original mapping. Register one job per event; that job can coordinate any subsequent work.
+
+Tests: `subscriptions.test.ts`, the `BPL-04` shared queue-contract case on sync/database/Redis, and boot/test-app integration cases. Media-object deletion is an application delivered in S4 rather than part of this generic mechanism.
+
+Subscription registration rejects a job absent from the queue registry with `QUEUE_JOB_UNKNOWN` (500), before an outbox batch can be claimed. The runtime owns the built-in `mail.send` subscription for transactional authentication mail. Boot, seed and test-app initialization release acquired resources if registration fails, preserving the original configuration error.

@@ -28,10 +28,10 @@
 Generated from the built declaration files by `pnpm api:update`. Do not edit by hand. A change here is a change to the public API and needs a changeset (spec section 22.3).
 
 ```ts
-import { Database, OutboxDispatcher, OutboxDispatcherOptions } from "@bieberkit/data/orm";
+import { Database, OutboxDispatcher, OutboxDispatcherOptions, OutboxMessage } from "@bieberkit/data/orm";
 import { ErrorReporter, Logger, Metrics, Tracer } from "@bieberkit/core";
 import { PluginMigrationStep } from "@bieberkit/data";
-import { _ as WorkerOptions, a as JobContext, b as queueError, c as JobResult, d as Queue, f as QueueError, g as Worker, i as Dispatched, l as JobStatus, m as QueueStats, n as DeadLetterPage, o as JobDef, p as QueueName, r as DispatchOptions, s as JobInput, t as DeadJob, u as QUEUE_NAMES, v as defaultBackoffMs, y as defineJob } from "./contract-DjjfZ0pN.js";
+import { _ as WorkerOptions, a as JobContext, b as queueError, c as JobResult, d as Queue, f as QueueError, g as Worker, i as Dispatched, l as JobStatus, m as QueueStats, n as DeadLetterPage, o as JobDef, p as QueueName, r as DispatchOptions, s as JobInput, t as DeadJob, u as QUEUE_NAMES, v as defaultBackoffMs, y as defineJob } from "./contract-lB7YG7UJ.js";
 interface Cron {
   matches(date: Date): boolean;
 }
@@ -39,6 +39,12 @@ export declare function parseCron(expression: string): Cron;
 export declare function registerOutbox(db: Database, queue: Queue, options?: Omit<OutboxDispatcherOptions, "publisher"> & {
   readonly logger?: Logger;
 }): OutboxDispatcher;
+interface QueueSubscription<Input = unknown> {
+  readonly event: string;
+  readonly job: JobDef<Input>;
+  readonly map?: (message: OutboxMessage) => Input;
+}
+export declare function applySubscriptions(queue: Queue, subscriptions: readonly QueueSubscription[]): void;
 interface WorkerPoolOptions {
   readonly size?: number;
   readonly maxQueued?: number;
@@ -101,7 +107,13 @@ export declare const packageName = "@bieberkit/queue";
 declare module "@bieberkit/core" {
   interface ModuleContributions {
     jobs?: readonly JobDef[];
+    subscriptions?: readonly QueueSubscription[];
   }
 }
-export { type CreateQueueOptions, type Cron, type DeadJob, type DeadLetterPage, type DispatchOptions, type Dispatched, type JobContext, type JobDef, type JobInput, type JobResult, type JobStatus, type PoolStats, QUEUE_NAMES, type Queue, QueueError, type QueueName, type QueueStats, type RunOptions, type Schedule, type Scheduler, type SchedulerOptions, type Worker, type WorkerOptions, type WorkerPool, type WorkerPoolOptions, defaultBackoffMs, defineJob, queueError };
+declare module "@bieberkit/core" {
+  interface ServiceRegistry {
+    queue: Queue;
+  }
+}
+export { type CreateQueueOptions, type Cron, type DeadJob, type DeadLetterPage, type DispatchOptions, type Dispatched, type JobContext, type JobDef, type JobInput, type JobResult, type JobStatus, type PoolStats, QUEUE_NAMES, type Queue, QueueError, type QueueName, type QueueStats, type QueueSubscription, type RunOptions, type Schedule, type Scheduler, type SchedulerOptions, type Worker, type WorkerOptions, type WorkerPool, type WorkerPoolOptions, defaultBackoffMs, defineJob, queueError };
 ```

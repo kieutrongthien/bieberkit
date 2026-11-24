@@ -86,7 +86,8 @@ Each ADR is written as `Proposed` with the spike result attached. The maintainer
 - [x] **[M]** ADR: formatter, Oxfmt or Biome fallback (§3). ADR 0002 keeps Oxfmt
 - [x] **[M]** ADR: where pino binds given `@bieberkit/core` has no runtime dependency (PKG-04, OBS-01). ADR 0003: `Logger` port in core, pino in `@bieberkit/log/pino`
 - [x] **[M]** Decide the open questions in spec §26: MariaDB support level, docs site generator and hosting, default license of generated projects, Ant Design 6 `vi_VN` locale check. ADR 0005, 0006, 0007, and the locale check in spec §26
-- [ ] **[M]** Reserve the `@bieberkit` npm scope, the `bieberkit` and `create-bieberkit` names and the GitHub organization; confirm the employer question (§26)
+- [x] **[M]** Reserve the `@bieberkit` npm scope and the names `bieberkit` and `create-bieberkit`. Done on 2026-11-25: all 26 package names exist on npm at `0.0.1` as placeholders, checked with `npm view <name> dist-tags` for each. The tag `placeholder` is on them, and `latest` points at them too, until the first beta
+- [ ] **[M]** The GitHub organization (the repository is `kieutrongthien/bieberkit`, under a personal account) and the employer question (§26)
 - [x] Update `docs/adr/README.md` index for every ADR added. ADRs 0001 to 0014 are listed
 
 Done when: every ADR above has status `Accepted` and the spec §3 table matches them.
@@ -99,7 +100,7 @@ Done when: every ADR above has status `Accepted` and the spec §3 table matches 
 - [x] `tools/check-workflows.ts` runs in `pnpm check`, and `actionlint` and `zizmor` run in CI as containers pinned by digest (SEC-13, SEC-15, SEC-16, SEC-21, ADR 0014). Tests and negative controls pass
 - [x] API report per package committed, diff shows in pull requests, changeset required on change (§22.3 step 4). `pnpm check:api`, `pnpm api:update` and the `changeset` job, with tests and a negative control
 - [ ] **[D]** Release workflow: protected tags, manual approval environment, trusted publishing with provenance, no PR cache sharing, no install or build in the job holding `id-token: write` (SEC-15, SEC-16, SEC-21). Three jobs (`verify`, `build`, `publish`), tarballs packed once and checked by checksum, layer order, a rerun skips existing versions (ADR 0014). Written and linted, and its publish script ran against a local registry (partial run, rerun, tamper check). Tick after the dry run on GitHub
-- [ ] **[D]** Dry-run release publishes a throwaway package end to end. The steps are in `docs/releasing.md` and need the organization, the npm scope and the trusted publishers, which the maintainer sets up
+- [ ] **[D]** Dry-run release publishes a throwaway package end to end. The steps are in `docs/releasing.md` and need the npm scope and the trusted publishers, which the maintainer sets up. The npm side is in place: the 26 names exist as placeholders, and the maintainer reports that the trusted publishers are set (not checked here, since `npm trust list` needs the account). Open: a run of `release.yml` on GitHub that publishes, with provenance
 - [ ] Renovate rules: 7 day release age, fast path for Better Auth and TanStack Start advisories (AUTH-08, SITE-06). `renovate.json` is written and valid against the published schema. Tick after the Renovate app runs on the repository. Renovate keeps the action SHAs current (ADR 0014)
 - [ ] Database service containers (PostgreSQL, MySQL, Valkey) available to CI for later phases (TST, §9.1). The `services` job is written with the images pinned by digest. Tick after the first run on GitHub. The job `integration` now starts them with `tools/test-services.sh` and runs the whole suite; tick after its first run on GitHub
 - [x] Format the repository once with Oxfmt in its own commit, list it in `.git-blame-ignore-revs`, and let the header checker accept blank lines after Markdown frontmatter, with a test named `HDR-01`. `pnpm format:check` must pass before the CI item above can be ticked (HDR-01, ADR 0002)
@@ -299,6 +300,23 @@ Deferred by the maintainer until Phase 2 and a verified pre-1.0 npm release. The
 - [ ] Pilot built on the `blank` template, defect list fed back as issues
 - [ ] Pilot runs web, worker and scheduler behind a load balancer
 - [ ] Pilot survives a rolling deploy and a restore from backup
+
+### M1.11 Complete base plugins
+
+Depends on the M1.8 baseline. This milestone hardens the shared base for domain-independent projects; it does not complete M1.10 Pilot or either phase gate. The design is [base-plugins-complete.md](modules/base-plugins-complete.md), with the S0 plan in `docs/superpowers/plans/2026-11-25-base-plugins-s0-platform.md`.
+
+- [x] **S0 / BPL-01** Disabled-user schema and atomic disable/enable services; reject password, magic-link, passkey, TOTP, cookie and API-key access, including cached sessions. Evidence: `auth/src/profile.dialects.test.ts`, `user-service.dialects.test.ts` (including audit-failure rollback)
+- [x] **S0 / IDN-01** Provider identity columns with a local default and per-provider uniqueness, auth migration 0.5.0. Evidence: `IDN-01 a new user has source "local" and no external id`, the uniqueness case and `AUTH-10 the drift check passes with the profile fields`
+- [x] **S0 / BPL-02** Typed mail/queue/cache in process roles, seeders and the memory test app; auth mail, `mailbox`, `runOutbox()`. Evidence: the `BPL-02` boot, seed, auth-mail and test-app cases; the `AUTH-06` unknown-address reset case
+- [x] **S0 / BPL-03** Prove existing plugin service contribution and duplicate-name rejection. Evidence: the two `BPL-03` cases in `testing/src/app.test.ts`
+- [x] **S0 / BPL-04 mechanism** Contributed outbox-to-job mappings, commit/rollback behavior and duplicate-event rejection across drivers. Evidence: `queue/src/subscriptions.test.ts`, the shared contract case and `BPL-04` boot/test-app cases. Media deletion remains S4
+- [ ] **S1 [D]** Complete users and roles
+- [ ] **S2** Complete settings, with maintainer review of its declaration
+- [ ] **S3** Complete notifications
+- [ ] **S4** Complete media, including deletion after commit
+- [ ] **S5** Complete audit-log and pruning
+- [ ] **S6 [D]** Enterprise policies, managed identities, retention and operational controls
+- [ ] Cross-slice acceptance BPL-05/BPL-06: each mutation audits atomically and each list proves cursor/limit rules in its own slice
 
 ### Phase 1 gate **[M]**
 

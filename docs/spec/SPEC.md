@@ -818,6 +818,18 @@ A template is a preset of plugins, configuration and seed data. After creation t
 
 The `cms` template includes the server-rendered public site (section 16.2) by default. Other templates add it with `--site`.
 
+### 12.1 Base-plugin platform (slice S0)
+
+The base plugins use the framework services below. Full users/roles, settings, notifications, media, audit-log and enterprise behavior is delivered in later slices of [the complete base-plugins design](../modules/base-plugins-complete.md).
+
+- **BPL-01** The auth user row MUST carry `disabledAt`, `disabledReason` and `disabledBy`. `disableUser` MUST set that state, revoke the user's database sessions and record `users.user.disabled` in one transaction. `enableUser` clears the state and records `users.user.enabled`. Repeating either state change is a no-op; an unknown user is `USERS_NOT_FOUND` (404). Sign-in session creation and cookie/API-key authentication MUST refuse a resolved disabled user with `AUTH_USER_DISABLED` (403). Authentication MUST check current user status even when secondary storage still holds an enabled-user snapshot. Cookie authentication MUST also verify that its durable session still exists, including on native auth routes when an API key is present. Session issuance MUST serialize its insert with disable/enable. Enabling MUST NOT revive a revoked cached session. A revoked session follows the normal unauthenticated path.
+- **BPL-02** The plugin service registry MUST expose typed `mail`, `queue` and `cache` services in every process role and seeders. Web processes MAY dispatch to the database queue without starting a worker. Reset and verification callbacks MUST send through the mail contract; inside a transaction they MUST write a `mail.send` outbox intent and deliver only after commit. Failed initialization MUST release acquired resources and preserve the original error. `createTestApp` MUST register the same contracts backed by memory and a sync queue, expose the sent `mailbox`, and provide `runOutbox()` to dispatch one committed batch explicitly.
+- **BPL-03** A plugin MAY publish a named service through its `services` declaration. Other plugins consume it through `ServiceRegistry` declaration merging and `RouteContext.services`. Registering a service name twice MUST fail with `CORE_SERVICE_DUPLICATE`; this uses the existing module/container mechanism.
+- **BPL-04** Modules MAY contribute `subscriptions` mapping an outbox event to a registered job, optionally mapping the message to its input. Boot, seed and test-app wiring MUST apply these mappings. An unregistered subscription job MUST fail at registration with `QUEUE_JOB_UNKNOWN` (500). A rolled-back transaction MUST leave no event for the job to consume. Delivery follows Q-01 and MOD-18, including the stable outbox job id; consumers remain idempotent. One event has one job mapping, and a second subscription MUST fail with `QUEUE_SUBSCRIPTION_DUPLICATE` (500) on every driver. Deleting a media object after commit is an application of this mechanism delivered with the media slice.
+- **IDN-01** The auth user row MUST carry `source` (non-null, default `local`) and nullable `externalId`, unique together within a provider. Several users MAY have no external id. These columns and BPL-01 status columns are additive auth migration steps at version 0.5.0 and are declared through Better Auth's non-input `additionalFields`. Provider-managed editing and provisioning are later slices.
+
+BPL-05/BPL-06 and IDN-02/IDN-03 remain proposals in the design for the slices that implement them; S0 does not claim their acceptance tests.
+
 ## 13. HTTP API
 
 The API is REST over JSON on Fastify 5, described by an OpenAPI 3.1 document generated at build time. Entity routes are generated from `api` settings, and custom routes use the same validation and permission helpers.
@@ -1381,7 +1393,7 @@ Tests run against real databases in containers, and a large share of tests is ge
 | Accessibility and SEO | Playwright with axe, Lighthouse CI | Generic admin screens against WCAG 2.2 AA (UI-07), cms site pages against SEO-09 | Pull requests to main |
 
 - **TST-01** Coverage targets: 90% lines for `@bieberkit/core`, `data`, `http` and `auth`. 80% for other packages and first-party plugins.
-- **TST-02** `@bieberkit/testing` provides `createTestApp({ modules })`, entity factories, `actingAs(user, roles)` and `withTenant(tenant)`.
+- **TST-02** `@bieberkit/testing` provides `createTestApp({ modules })`, entity factories, `actingAs(user, roles)` and `withTenant(tenant)`. Its platform services use memory and a sync queue; `mailbox` exposes sent messages, and `runOutbox()` delivers one committed batch and returns the number of rows claimed (BPL-02).
 - **TST-03** A test that needs a network call outside the test containers fails, so tests stay deterministic.
 
 ## 22. AI-assisted development
@@ -1600,6 +1612,7 @@ Open questions:
 
 | Version | Date | Changes |
 | --- | --- | --- |
+| 0.8.12 | 2026-11-25 | Base-plugin platform S0: BPL-01 to BPL-04 and IDN-01; disabled users, identity columns, typed mail/queue/cache services, authentication mail, outbox subscriptions and test-app mailbox/outbox helpers. Other base-plugin slices remain open |
 | 0.8.11 | 2026-11-24 | UI-14: the address of the admin is `ADMIN_URL`, a path or a host of its own, and the build does not know it |
 | 0.8.10 | 2026-11-24 | DATA-28: every table of the framework and of first-party plugins starts with `bk_` (ADR 0027) |
 | 0.8.9 | 2026-11-24 | M1.9: the base image of the generated Dockerfile is `node:26-slim` by digest until the hardened image can be pulled (ADR 0026), the files of section 19.2 (`.dockerignore`, `.env.production.example`, `deploy/`), and the first k6 results against section 18.1 |

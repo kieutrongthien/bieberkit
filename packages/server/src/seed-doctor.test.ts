@@ -81,6 +81,20 @@ export default defineConfig({ name: 'demo', author: 'Test <test@example.com>', l
 
 const seeded = (): string[] => Reflect.get(globalThis, '__seeded') ?? [];
 
+it('BPL-02 project seeders can consume mail, queue and cache', async () => {
+  const fixture = project({
+    'apps/server/src/seed.ts': `
+export default async function seed(services) {
+  await services.mail.verify();
+  await services.cache.set('seed.probe', 'ready', 60000);
+  if (await services.cache.get('seed.probe') !== 'ready') throw new Error('Cache did not store the value');
+  await services.queue.stats();
+}
+`,
+  });
+  expect((await seed({ cwd: fixture.root, env: await testEnv(fixture.root) })).ran).toEqual(['project']);
+});
+
 describe('section 5.2 db:seed', () => {
   it('5.2 runs the seed of each plugin in boot order, and then the seed of the project', async () => {
     Reflect.set(globalThis, '__seeded', []);

@@ -28,3 +28,11 @@ export { createMailer, MAIL_JOB } from './mailer.ts';
 export type { Mail, Mailer, MailerOptions } from './mailer.ts';
 export { createLogTransport, createMemoryTransport } from './transports.ts';
 export type { LogTransportOptions, MemoryTransport } from './transports.ts';
+import type { Mail as ServiceMail } from './mailer.ts';
+
+declare module '@bieberkit/core' {
+  interface ServiceRegistry {
+    /** Queued mail delivery through the configured transport. */
+    mail: ServiceMail;
+  }
+}
