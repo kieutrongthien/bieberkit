@@ -62,13 +62,15 @@ export async function seed(options: SeedOptions = {}): Promise<Seeded> {
   });
   const entities = contributed<EntityDef<string>>(modules, 'entities');
   const db = await createDatabase(env, { entities: [...compileEntities(entities), ...authEntities], audit: 'table' });
-  const platform = await createRuntimePlatform(env, {
-    jobs: contributed<JobDef>(modules, 'jobs'),
-    subscriptions: contributed<QueueSubscription>(modules, 'subscriptions'),
-    db,
-    logger: createLogger({ level: env.LOG_LEVEL, role: 'migrate' }),
-  });
+  let platform: Awaited<ReturnType<typeof createRuntimePlatform>> | undefined;
+  let result: Seeded;
   try {
+    platform = await createRuntimePlatform(env, {
+      jobs: contributed<JobDef>(modules, 'jobs'),
+      subscriptions: contributed<QueueSubscription>(modules, 'subscriptions'),
+      db,
+      logger: createLogger({ level: env.LOG_LEVEL, role: 'migrate' }),
+    });
     const container = createContainer();
     registerRuntimeServices(container, {
       env,
@@ -98,12 +100,15 @@ export async function seed(options: SeedOptions = {}): Promise<Seeded> {
       await exported(services);
       ran.push('project');
     }
-    return { ran };
-  } finally {
-    try {
-      await platform.close();
-    } finally {
-      await db.close();
-    }
+    result = { ran };
+  } catch (error) {
+    await Promise.allSettled([platform?.close(), db.close()]);
+    throw error;
   }
+  try {
+    await platform.close();
+  } finally {
+    await db.close();
+  }
+  return result;
 }

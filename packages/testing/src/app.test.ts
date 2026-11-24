@@ -94,6 +94,26 @@ describeDialects('BPL-02 the platform of the test app', ({ open }) => {
     ]);
   });
 
+  it('BPL-02 transactional auth mail is delivered from the outbox after commit', async () => {
+    const app = await createTestApp({ open });
+    onTestFinished(() => app.close());
+    const auth = app.services.auth;
+    const headers = new Headers({ origin: app.services.config.APP_URL });
+    await auth.api.signUpEmail({
+      body: { name: 'Reader', email: 'outbox@example.test', password: 'correct-test-password' },
+      headers,
+    });
+    await runInTransaction(app.db, async () => {
+      await auth.api.requestPasswordReset({ body: { email: 'outbox@example.test' }, headers });
+      expect(app.mailbox).toEqual([]);
+    });
+    expect(app.mailbox).toEqual([]);
+    expect(await app.runOutbox()).toBe(1);
+    expect(app.mailbox).toEqual([expect.objectContaining({ to: [{ address: 'outbox@example.test' }] })]);
+    expect(await app.runOutbox()).toBe(0);
+    expect(app.mailbox).toHaveLength(1);
+  });
+
   it('AUTH-06 a reset request for an unknown address sends no mail and answers the same', async () => {
     const app = await createTestApp({ open });
     onTestFinished(() => app.close());
@@ -223,6 +243,7 @@ describeDialects('BPL-03 plugin services', ({ open }) => {
         modules: [greeterPlugin().module, greeterPlugin('@fixture/plugin-other').module],
       }),
     ).rejects.toMatchObject({ code: 'CORE_SERVICE_DUPLICATE' });
+    expect(await db.orm.isConnected()).toBe(false);
   });
 });
 const dataOf = (body: Readonly<Record<string, unknown>>): Record<string, unknown>[] => {

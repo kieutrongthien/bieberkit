@@ -344,7 +344,7 @@ git commit -s -m "docs: add the platform requirements of the base plugins to the
 
 ### Task 7: Verify and hand over
 
-- [ ] **Step 1: Run the four commands, in this order, and read the output.**
+- [x] **Step 1: Run the four commands, in this order, and read the output.**
 
 ```bash
 pnpm check && pnpm typecheck && pnpm lint && pnpm test
@@ -352,5 +352,25 @@ pnpm check && pnpm typecheck && pnpm lint && pnpm test
 
 Expected: all pass. Then the full dialect run: `sh tools/test-services.sh start` and `BK_REQUIRE_DIALECTS=all pnpm test`. Report any failure with its output; do not claim success before this.
 
-- [ ] **Step 2: Request review** with `superpowers:requesting-code-review` on the branch.
-- [ ] **Step 3: Finish** with `superpowers:finishing-a-development-branch`: keep the branch or open a pull request. Never merge, never push to `main`.
+- [x] **Step 2: Request review** with `superpowers:requesting-code-review` on the branch.
+- [x] **Step 3: Finish** with `superpowers:finishing-a-development-branch`: keep `feat/base-plugins-platform` locally. Never merge, never push to `main`.
+
+**Task 7 final review record:** A single independent read-only review covered `a57c292..8314528`. The findings were handled in one fix pass with regression tests before implementation:
+
+- **Critical, accepted:** cached sessions could survive disable/enable. Cookie resolution now checks both the current owner and durable session row; the old cookie remains unauthorized after enable.
+- **Critical, accepted:** a valid key of another owner could hide a disabled native-handler cookie. Native auth routes validate the exact cookie independently of entity-route key precedence.
+- **Important, accepted:** auth mail dispatched inside a request transaction could deadlock SQLite's database queue or escape rollback on other drivers. Transactional callbacks now emit a prepared `mail.send` outbox intent; the built-in subscription delivers after commit. Direct API calls outside a transaction retain normal mail-contract behavior. The mounted reset/verification probe owns its child-process deadline and exits after shutdown; dependency timers do not extend the probe.
+- **Important, accepted:** a status read before actual session insertion left a race with disable. The auth adapter now calls a service that locks the user and inserts the session in one transaction, including direct auth API issuance. The deterministic race test failed with 200 before the fix and passed with 403 on all three dialects afterward.
+- **Important, accepted:** failed boot/seed/test-app registration leaked acquired resources. Initialization now closes acquired resources while preserving the original domain error. Regressions observe real database connectivity and reuse the metrics port after failure.
+- **Minor, raised to Important and accepted:** an unregistered subscription job could poison an outbox batch. Every driver now rejects it during registration with `QUEUE_JOB_UNKNOWN`; the shared contract tests it.
+- **Deferred by scope, unchanged:** self/last-admin policy belongs to S1, provider-managed editing and enterprise policies to S6, physical media cleanup to S4. ADR 0028 acceptance remains a maintainer decision. None is an S0 completion requirement.
+
+Pre-review verification passed the default suite (3223 tests, 316 skipped), artifact tests (2 tests), and all 20 package tarball checks. The first all-services run was explicitly stopped to apply the review fixes; it is not counted as passing. Final-tree verification is recorded below when complete. No second review was dispatched.
+
+**Final verification and handover (2026-11-25):**
+
+- Required commands passed in order: `pnpm check`, `pnpm typecheck`, `pnpm lint`, then `pnpm test --maxWorkers=2 --testTimeout=15000`: **3234 passed, 317 skipped, 218 files passed and 1 skipped**, 342.10 s.
+- Full service-backed suite with `sh tools/test-services.sh env` (including `BK_REQUIRE_DIALECTS=all`): **4659 passed, 60 skipped, 219 files passed**, 667.44 s, exit 0. PostgreSQL, MySQL, SQLite, queue/cache Valkey and MinIO were available. Skip counts are reported unchanged from Vitest.
+- Final focused regression verification: **14 passed** on all three database dialects and all five queue configurations; **214 filtered-out cases**. This includes actual post-commit auth-mail delivery, the direct session-issuance race, resource cleanup and unregistered subscription jobs.
+- `pnpm build`, `pnpm api:update`, `pnpm check:api` (56 reports), API changeset coverage against `main`, `pnpm test:artifacts` (2 tests), `pnpm check:packages` (20 tarballs, publint and attw esm-only), and `git diff --check` passed.
+- All accepted review findings are fixed. ADR 0028 remains Proposed. The branch is kept locally; no merge, push, npm publication or Pilot task was performed as part of S0. S1 to S6 and cross-slice acceptance remain open.

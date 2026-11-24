@@ -205,3 +205,5 @@ Without `map`, job input is the event payload. Boot and seed install these mappi
 Every driver shares the registration check: a second subscription for one event throws `QUEUE_SUBSCRIPTION_DUPLICATE` (500), even if it names the same job. This replaces silent overwrites and preserves the original mapping. Register one job per event; that job can coordinate any subsequent work.
 
 Tests: `subscriptions.test.ts`, the `BPL-04` shared queue-contract case on sync/database/Redis, and boot/test-app integration cases. Media-object deletion is an application delivered in S4 rather than part of this generic mechanism.
+
+Subscription registration rejects a job absent from the queue registry with `QUEUE_JOB_UNKNOWN` (500), before an outbox batch can be claimed. The runtime owns the built-in `mail.send` subscription for transactional authentication mail. Boot, seed and test-app initialization release acquired resources if registration fails, preserving the original configuration error.

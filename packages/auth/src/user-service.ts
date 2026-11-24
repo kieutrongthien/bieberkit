@@ -25,7 +25,9 @@
 import type { EntityManager } from '@mikro-orm/core';
 import { requestContext } from '@bieberkit/core';
 import { uuid7 } from '@bieberkit/data';
-import { recordAudit, runInTransaction } from '@bieberkit/data/orm';
+import { currentEntityManager, recordAudit, requestKysely, runInTransaction } from '@bieberkit/data/orm';
+import { APIError } from 'better-auth/api';
+import { isDisabledUser, userDisabledError } from './user-status.ts';
 import type { Database } from '@bieberkit/data/orm';
 import { authError } from './errors.ts';
 import { AuthSession, AuthUser } from './tables.ts';
@@ -61,6 +63,21 @@ function audit(em: EntityManager, input: EnableUserInput, action: string, data?:
       ...(data === undefined ? {} : { data }),
     }),
   );
+}
+
+/** Serializes the actual session insert with disable/enable, also for direct Better Auth API calls. */
+export async function withEnabledSession<T>(db: Database, userId: string, create: () => Promise<T>): Promise<T> {
+  const guarded = async (): Promise<T> => {
+    let query = requestKysely(db).selectFrom('authUser').select('disabledAt').where('id', '=', userId);
+    // SQLite's service transaction already holds its one writer (BEGIN IMMEDIATE).
+    if (db.dialect !== 'sqlite') query = query.forUpdate();
+    const user = await query.executeTakeFirst();
+    if (user === undefined)
+      throw new APIError('UNAUTHORIZED', { code: 'USER_NOT_FOUND', message: 'The user does not exist.' });
+    if (isDisabledUser(user)) throw new APIError('FORBIDDEN', userDisabledError().toJSON());
+    return create();
+  };
+  return currentEntityManager()?.isInTransaction() === true ? guarded() : runInTransaction(db, guarded);
 }
 
 /** Disables a user and revokes all database sessions atomically with the audit entry. */

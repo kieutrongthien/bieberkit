@@ -68,6 +68,17 @@ export function queueContractSuite(
   };
 
   describe(`Q-11 the contract of the queue on ${name}`, () => {
+    it('BPL-04 refuses an unregistered subscription job before accepting events', async () => {
+      const job = defineJob({ name: 'contract.not-registered', input: empty, handler: async () => {} });
+      const { queue, close } = await make([]);
+      try {
+        expect(() => queue.subscribe('contract.event', job)).toThrowError(
+          expect.objectContaining({ code: 'QUEUE_JOB_UNKNOWN' }),
+        );
+      } finally {
+        await close();
+      }
+    });
     it('BPL-04 rejects a duplicate event subscription without overwriting it', async () => {
       const job = defineJob({ name: 'contract.subscription', input: empty, handler: async () => {} });
       const other = defineJob({ name: 'contract.subscription-other', input: empty, handler: async () => {} });

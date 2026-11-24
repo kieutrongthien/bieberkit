@@ -26,6 +26,7 @@ import { buildPermissionRegistry, createAuth } from '@bieberkit/auth';
 import type { Container, CoreEnv, Logger, ModuleDef } from '@bieberkit/core';
 import type { Cache } from '@bieberkit/cache';
 import { createCacheFromConfig } from '@bieberkit/cache/bentocache';
+import { MAIL_JOB, parseSender } from '@bieberkit/mail';
 import type { Mail } from '@bieberkit/mail';
 import { createMailerFromConfig } from '@bieberkit/mail/nodemailer';
 import { applySubscriptions } from '@bieberkit/queue';
@@ -67,26 +68,28 @@ export async function createRuntimePlatform(
   env: CoreEnv,
   options: QueueFromConfigOptions & { readonly logger: Logger; readonly subscriptions?: readonly QueueSubscription[] },
 ): Promise<RuntimePlatform> {
-  const mailer = createMailerFromConfig(env, options);
-  const cache = createCacheFromConfig(env, options);
+  const acquired: (() => Promise<void>)[] = [];
   try {
+    const mailer = createMailerFromConfig(env, options);
+    acquired.push(() => mailer.close());
+    const cache = createCacheFromConfig(env, options);
+    acquired.push(() => cache.close());
     const queue = await createQueueFromConfig(env, { ...options, jobs: [...options.jobs, mailer.job] });
-    try {
-      applySubscriptions(queue, options.subscriptions ?? []);
-    } catch (error) {
-      await queue.close();
-      throw error;
-    }
+    acquired.push(() => queue.close());
+    queue.subscribe(MAIL_JOB, mailer.job);
+    applySubscriptions(queue, options.subscriptions ?? []);
     return {
       mail: mailer.over(queue),
       queue,
       cache,
       close: async () => {
-        await Promise.all([queue.close(), mailer.close(), cache.close()]);
+        const results = await Promise.allSettled(acquired.toReversed().map((close) => close()));
+        const rejected = results.find((result) => result.status === 'rejected');
+        if (rejected?.status === 'rejected') throw rejected.reason;
       },
     };
   } catch (error) {
-    await Promise.allSettled([mailer.close(), cache.close()]);
+    await Promise.allSettled(acquired.toReversed().map((close) => close()));
     throw error;
   }
 }
@@ -123,7 +126,7 @@ export function registerRuntimeServices(
         dialect: db.dialect,
         secret: env.AUTH_SECRET,
         baseUrl: env.APP_URL,
-        mail: authMessages(services.mail),
+        mail: authMessages(services.mail, parseSender(env.MAIL_FROM)),
         // The admin may have a host of its own, and a sign in from there is not a cross site request (UI-14).
         trustedOrigins: [adminLocation(env.APP_URL, env.ADMIN_URL).origin],
         ...(env.APP_KEY_PREVIOUS === undefined ? {} : { previousSecrets: [env.APP_KEY_PREVIOUS] }),

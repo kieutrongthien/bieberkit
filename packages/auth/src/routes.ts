@@ -28,6 +28,7 @@ import type { Database } from '@bieberkit/data/orm';
 import type { HttpServer } from '@bieberkit/http';
 import { limiterOf } from './better-auth.ts';
 import type { AuthInstance } from './better-auth.ts';
+import { principalOfSession } from './authenticator.ts';
 
 export interface AuthRoutesOptions {
   readonly auth: AuthInstance;
@@ -110,14 +111,33 @@ export function registerAuthRoutes(server: HttpServer, options: AuthRoutesOption
           headers: { 'content-type': 'application/json' },
         });
       }
+      // Native endpoints consume a cookie themselves, independently of API-key precedence on entity routes.
+      // Validate that exact cookie, and remove revoked session cookies so public sign-in still works.
+      let nativeRequest = request;
+      const cookie = request.headers.get('cookie');
+      if (cookie?.includes('__Host-bk_session=') === true) {
+        const principal = await principalOfSession(auth, cookie);
+        if (principal === undefined) {
+          const headers = new Headers(request.headers);
+          const kept = cookie
+            .split(';')
+            .filter((part) => !/^\s*__Host-bk_session(?:_data)?=/.test(part))
+            .join(';');
+          if (kept.trim() === '') headers.delete('cookie');
+          else headers.set('cookie', kept);
+          nativeRequest = new Request(request, { headers });
+        } else {
+          requestContext.update({ userId: principal.id });
+        }
+      }
       const writes = request.method !== 'GET' || WRITING_GETS.has(path);
-      if (!writes) return auth.handler(request);
+      if (!writes) return auth.handler(nativeRequest);
       const recorded = RECORDED[path];
 
       const attempt = async (): Promise<Response> => {
         try {
           return await runInTransaction(db, async (em) => {
-            const response = await auth.handler(request);
+            const response = await auth.handler(nativeRequest);
             if (response.status >= 400) throw new RolledBack(response);
             if (recorded !== undefined) {
               const actor = (await userIdOf(response)) ?? requestContext.get()?.userId;

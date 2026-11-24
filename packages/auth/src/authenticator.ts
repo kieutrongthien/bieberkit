@@ -22,32 +22,40 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Authenticator } from '@bieberkit/http';
+import type { Authenticator, Principal } from '@bieberkit/http';
 import { keyOf, principalOfKey } from './api-keys.ts';
 import type { AuthInstance } from './better-auth.ts';
 import { requireEnabledUser } from './user-status.ts';
 
 const COOKIE = '__Host-bk_session';
 
-/**
- * Reads the session cookie with Better Auth and gives the principal. A missing, forged, expired or revoked session is no principal.
- * A cookie that is not there costs no query, so a public page does not touch the database. A key in `X-API-Key`, or a bearer token
- * with the prefix of our keys, makes the principal of a machine client instead (AUTH-07).
- */
+/** Resolves a cookie only while its durable session and current owner are still valid. */
+export async function principalOfSession(auth: AuthInstance, cookie: string): Promise<Principal | undefined> {
+  if (!cookie.includes(`${COOKIE}=`)) return undefined;
+  const session = await auth.api.getSession({ headers: new Headers({ cookie }) });
+  if (session === null || !(await requireEnabledUser(auth, session.user.id))) return undefined;
+  const context = await auth.$context;
+  const stored = await context.adapter.findOne<{ userId: string; expiresAt: Date }>({
+    model: 'session',
+    where: [
+      { field: 'id', value: session.session.id },
+      { field: 'userId', value: session.user.id },
+    ],
+  });
+  if (stored === null || new Date(stored.expiresAt).getTime() <= Date.now()) return undefined;
+  const mfa = 'twoFactorEnabled' in session.user && session.user.twoFactorEnabled === true;
+  return { id: session.user.id, kind: 'user', via: 'cookie', sessionId: session.session.id, mfa };
+}
+
+/** Reads a durable cookie session or the machine key that takes precedence on entity routes (AUTH-07). */
 export function createAuthenticator(auth: AuthInstance): Authenticator {
   return {
     async authenticate(request) {
-      // A machine client sends a key, and a key wins over a cookie (AUTH-07).
       const key = keyOf(request.headers);
       if (key !== undefined) return principalOfKey(auth, key);
       const header = request.headers['cookie'];
       const cookie = Array.isArray(header) ? header.join('; ') : header;
-      if (cookie === undefined || !cookie.includes(`${COOKIE}=`)) return undefined;
-      const session = await auth.api.getSession({ headers: new Headers({ cookie }) });
-      if (session === null || !(await requireEnabledUser(auth, session.user.id))) return undefined;
-      // The user has a second factor when he turned it on. A session of such a user is made only after the code (AUTH-05).
-      const mfa = 'twoFactorEnabled' in session.user && session.user.twoFactorEnabled === true;
-      return { id: session.user.id, kind: 'user', via: 'cookie', sessionId: session.session.id, mfa };
+      return cookie === undefined ? undefined : principalOfSession(auth, cookie);
     },
   };
 }

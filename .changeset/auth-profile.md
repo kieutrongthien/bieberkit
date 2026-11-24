@@ -29,3 +29,5 @@
 Add disabled-user status and identity-provider fields to `AuthUserRow` and Better Auth user records, with six additive migration steps at version 0.5.0. New users default to the local provider; external identifiers are unique within their provider.
 
 Add `disableUser` and `enableUser` with atomic session revocation and audit entries. Disabled users receive `AUTH_USER_DISABLED` (403) on password, magic-link, passkey and second-factor sign-in, cookie requests and API-key requests. Cookie and key authentication read the current owner status, including when a cached session still describes an enabled user.
+
+Verify durable cookie sessions on framework and native auth routes, including mixed API-key/cookie requests. Enabling an account does not revive cached sessions; session insertion is serialized with disable/enable, including direct auth API calls.

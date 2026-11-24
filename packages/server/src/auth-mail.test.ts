@@ -27,11 +27,19 @@ import { createLogger } from '@bieberkit/core';
 import { createMailer, createMemoryTransport } from '@bieberkit/mail';
 import { authMessages } from './auth-mail.ts';
 import { createQueue } from '@bieberkit/queue';
+import {
+  applyPluginMigrations,
+  createDatabase,
+  DATA_PLUGIN,
+  dataMigrationSteps,
+  runInTransaction,
+} from '@bieberkit/data/orm';
 
 async function setup() {
   const transport = createMemoryTransport();
+  const from = { name: 'BieberKit', address: 'hello@example.test' };
   const mailer = createMailer({
-    from: { name: 'BieberKit', address: 'hello@example.test' },
+    from,
     transport,
     logger: createLogger({ level: 'fatal', role: 'web', write: () => {} }),
   });
@@ -40,7 +48,7 @@ async function setup() {
     await queue.close();
     await mailer.close();
   });
-  return { messages: authMessages(mailer.over(queue)), transport };
+  return { messages: authMessages(mailer.over(queue), from), transport };
 }
 
 it('BPL-02 the reset message names the link and has no line break in its subject', async () => {
@@ -67,4 +75,27 @@ it('BPL-02 the verification message names the verification link', async () => {
     text: expect.stringContaining(url),
   });
   expect(transport.sent[0]?.subject).not.toMatch(/[\r\n]/);
+});
+it('BPL-02 authentication mail stays in the transaction and rollback sends nothing', async () => {
+  const { messages, transport } = await setup();
+  const db = await createDatabase(
+    { DB_CONNECTION: 'sqlite', DATABASE_URL: ':memory:', DATABASE_READ_URLS: [], DB_POOL_MAX: 1 },
+    { entities: [] },
+  );
+  onTestFinished(() => db.close());
+  await applyPluginMigrations(db, dataMigrationSteps, { pluginOrder: [DATA_PLUGIN] });
+  await expect(
+    runInTransaction(db, async (em) => {
+      await messages.sendResetPassword({
+        to: 'reader@example.test',
+        url: 'https://app.test/reset?token=42',
+        token: '42',
+      });
+      expect(transport.sent).toEqual([]);
+      await em.flush();
+      throw new Error('cancelled');
+    }),
+  ).rejects.toThrow('cancelled');
+  expect(transport.sent).toEqual([]);
+  expect(await db.orm.em.getConnection().execute('select * from bk_outbox')).toEqual([]);
 });

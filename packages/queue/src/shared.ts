@@ -64,6 +64,14 @@ export function registerSubscription<Input>(
       'Register one job for each event.',
     );
   }
+  if (!shared.jobs.has(job.name)) {
+    throw queueError(
+      'QUEUE_JOB_UNKNOWN',
+      500,
+      `The job ${job.name} is not registered.`,
+      'Contribute the job before subscribing to its event.',
+    );
+  }
   shared.subscriptions.set(event, { job, map: map ?? ((message) => message.payload) });
 }
 

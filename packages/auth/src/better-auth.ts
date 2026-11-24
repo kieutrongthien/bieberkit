@@ -38,6 +38,7 @@ import { authError } from './errors.ts';
 import { accountKey, createRateLimiter, rulesOf } from './limits.ts';
 import type { AuthLimits, RateLimiter } from './limits.ts';
 import { isDisabledUser, userDisabledError } from './user-status.ts';
+import { withEnabledSession } from './user-service.ts';
 
 export type { AuthLimits, Limit, Limit2 } from './limits.ts';
 export type { BetterAuthOptions };
@@ -149,9 +150,22 @@ export function createAuth(options: CreateAuthOptions): AuthInstance {
   const limiter = createRateLimiter(options.db);
   const rules = rulesOf(options.limits);
   const { mail } = options;
+  const database = kyselyAdapter(requestKysely(options.db), { type: options.dialect, transaction: false });
   // The options are typed as `BetterAuthOptions`, so `AuthInstance` is one type for every project (the plugins of slice C add to it).
   const config: BetterAuthOptions = {
-    database: kyselyAdapter(requestKysely(options.db), { type: options.dialect, transaction: false }),
+    database: (authConfig: BetterAuthOptions) => {
+      const adapter = database(authConfig);
+      const create: typeof adapter.create = <T extends Record<string, unknown>, R = T>(
+        input: Parameters<typeof adapter.create<T, R>>[0],
+      ): Promise<R> => {
+        const userId: unknown = Reflect.get(input.data, 'userId');
+        if ((input.model === 'session' || input.model === 'authSession') && typeof userId === 'string') {
+          return withEnabledSession(options.db, userId, () => adapter.create<T, R>(input));
+        }
+        return adapter.create<T, R>(input);
+      };
+      return { ...adapter, create };
+    },
     secret: options.secret,
     // Always the envelope with a key id, so that a later rotation can still open what was written now (APP_KEY_PREVIOUS).
     secrets: [options.secret, ...(options.previousSecrets ?? [])].map((value) => ({

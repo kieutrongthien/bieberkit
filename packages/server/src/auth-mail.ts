@@ -23,19 +23,32 @@
  */
 
 import type { AuthMail } from '@bieberkit/auth';
-import type { Mail } from '@bieberkit/mail';
+import { MAIL_JOB, prepareMessage } from '@bieberkit/mail';
+import type { Mail, Mailbox, Message } from '@bieberkit/mail';
+import { currentEntityManager, emitEvent } from '@bieberkit/data/orm';
 
 /** Human-facing messages for the authentication callbacks; delivery goes through the queue. */
-export function authMessages(mail: Mail): {
+export function authMessages(
+  mail: Mail,
+  from?: Mailbox,
+): {
   sendResetPassword(message: AuthMail): Promise<void>;
   sendVerification(message: AuthMail): Promise<void>;
 } {
+  const send = async (message: Message): Promise<void> => {
+    const em = currentEntityManager();
+    if (em?.isInTransaction() === true) {
+      emitEvent(em, { name: MAIL_JOB, payload: prepareMessage(message, from) });
+      return;
+    }
+    await mail.send(message);
+  };
   return {
     sendResetPassword: async ({ to, url }) => {
-      await mail.send({ to, subject: 'Reset your password', text: 'Reset your password using this link:\n\n' + url });
+      await send({ to, subject: 'Reset your password', text: 'Reset your password using this link:\n\n' + url });
     },
     sendVerification: async ({ to, url }) => {
-      await mail.send({
+      await send({
         to,
         subject: 'Verify your email address',
         text: 'Verify your email address using this link:\n\n' + url,

@@ -22,13 +22,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { expect, it } from 'vitest';
+import { expect, it, onTestFinished } from 'vitest';
 import { uuid7 } from '@bieberkit/data';
 import { runInUnitOfWork } from '@bieberkit/data/orm';
 import { disableUser, enableUser } from './index.ts';
 import type { AuthSecondaryStorage } from './better-auth.ts';
 import { AuthUser } from './tables.ts';
-import { authServer, BASE_URL, cookieNamed, cookieOf, TENANT_A } from './testing/auth-server.ts';
+import { authServer, BASE_URL, cookieNamed, cookieOf, PASSWORD, TENANT_A } from './testing/auth-server.ts';
 import type { AuthServer, ServerReply } from './testing/auth-server.ts';
 import { describeDialects } from './testing/dialects.ts';
 import { totpCode } from './testing/totp.ts';
@@ -225,6 +225,67 @@ describeDialects('BPL-01 disabled users', ({ open }) => {
     // The snapshot still says enabled. Rejection requires a fresh user-status read.
     expect(store.values.get(token)).toBe(snapshot);
     refused(await app.send('GET', '/api/v1/crm/deals', { cookie, tenant: TENANT_A }));
+    await enableUser(app.db, { userId: id, actorId: null });
+    expect((await app.send('GET', '/api/v1/crm/deals', { cookie, tenant: TENANT_A })).status).toBe(401);
+    expect((await app.api('POST', '/update-user', { cookie, payload: { name: 'Revoked cookie' } })).status).toBe(401);
+    const fresh = cookieOf(await app.signIn('cached@example.test'));
+    expect(fresh).toBeDefined();
+    expect((await app.send('GET', '/api/v1/crm/deals', { cookie: fresh ?? '', tenant: TENANT_A })).status).toBe(200);
+  });
+
+  it('BPL-01 the native handler cannot use a disabled cookie hidden behind another API key', async () => {
+    const store = secondaryStore();
+    const app = await authServer(open, { secondaryStorage: store.storage, apiKeys: true });
+    const disabled = await app.login('native-disabled@example.test');
+    const active = await app.login('native-key@example.test');
+    const key = await app.createKey({ userId: active.id, name: 'ci', permissions: ['crm.deal.read'] });
+    await disableUser(app.db, { userId: disabled.id, reason: 'Account review', actorId: null });
+    refused(
+      await app.api('POST', '/update-user', {
+        cookie: disabled.cookie,
+        headers: { 'x-api-key': key.key },
+        payload: { name: 'Changed while disabled' },
+      }),
+    );
+    await runInUnitOfWork(app.db, async (em) => {
+      expect((await em.findOneOrFail(AuthUser, { id: disabled.id })).name).toBe('Test User');
+    });
+  });
+
+  it('BPL-01 disabling during direct session issuance leaves no surviving session', async () => {
+    const app = await authServer(open);
+    const { id } = await app.login('session-race@example.test');
+    const adapter = (await app.auth.$context).adapter;
+    const create = adapter.create;
+    const { promise: reached, resolve: reach } = Promise.withResolvers<void>();
+    const { promise: released, resolve: release } = Promise.withResolvers<void>();
+    adapter.create = async <T extends Record<string, unknown>, R = T>(
+      input: Parameters<typeof create<T, R>>[0],
+    ): Promise<R> => {
+      if (input.model === 'session' || input.model === 'authSession') {
+        reach();
+        await released;
+      }
+      return create<T, R>(input);
+    };
+    onTestFinished(() => release());
+    const signingIn = app.auth.api.signInEmail({
+      body: { email: 'session-race@example.test', password: PASSWORD },
+      headers: new Headers({ origin: BASE_URL }),
+      asResponse: true,
+    });
+    await reached;
+    try {
+      await disableUser(app.db, { userId: id, reason: 'Account review', actorId: null });
+    } finally {
+      release();
+    }
+    const result = await signingIn;
+    expect(result.status).toBe(403);
+    expect(await result.json()).toMatchObject({ code: 'AUTH_USER_DISABLED' });
+    expect(await app.count('bk_auth_sessions')).toBe(0);
+    await enableUser(app.db, { userId: id, actorId: null });
+    expect(await app.count('bk_auth_sessions')).toBe(0);
   });
 
   it('BPL-01 an API key of a disabled user is refused', async () => {
