@@ -32,6 +32,12 @@ export type { IdempotencyBegin, IdempotencyStore, MemoryIdempotencyOptions, Stor
 export { createHttpFetch, HttpFetchError, isBlockedAddress } from './http-fetch.ts';
 export type { HttpFetch, HttpFetchInit, HttpFetchOptions, ResolvedAddress } from './http-fetch.ts';
 export type { CorsOptions } from './security.ts';
+export { authorizationFor } from './authorization.ts';
+export type { Authorization } from './authorization.ts';
+export { BULK_JOB, createBulkJob, JOBS_PATH, registerJobRoutes } from './bulk-job.ts';
+export type { BulkJob, BulkJobOptions } from './bulk-job.ts';
+export { MAX_BULK, MAX_BULK_INLINE } from './bulk.ts';
+export type { BulkInput, BulkQueue } from './bulk.ts';
 export { entityRoutes, registerEntityRoutes } from './entity-routes.ts';
 export type { EntityRoutesContext } from './entity-routes.ts';
 export { META_SCHEMA, registerMeta } from './meta.ts';

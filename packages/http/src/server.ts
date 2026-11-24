@@ -30,6 +30,7 @@ import type { ErrorReporter, Logger } from '@bieberkit/core';
 import { createAjv, issuesOf } from '@bieberkit/data/build';
 import { normalizeInput } from '@bieberkit/data/schema';
 import type { AjvError, AjvInstance } from '@bieberkit/data/build';
+import { authorizationFor } from './authorization.ts';
 import { createMemoryIdempotencyStore } from './idempotency.ts';
 import type { IdempotencyStore } from './idempotency.ts';
 import type { CsrfProtection } from './csrf.ts';
@@ -788,25 +789,7 @@ export function createHttpServer(env: HttpEnv, options: HttpServerOptions = {}):
           header: (name, value) => {
             current.headers[name] = value;
           },
-          can: async (permission) =>
-            current.principal !== undefined &&
-            (await options.authorizer?.can(current.principal, permission, pickInfo(request))) === true,
-          allows: async (entity, action, row) => {
-            if (options.authorizer === undefined) return true;
-            if (current.principal === undefined) return false;
-            return (
-              (await options.authorizer.allows?.(current.principal, entity, action, row, pickInfo(request))) ?? true
-            );
-          },
-          access: async (entity, action) => {
-            if (options.authorizer === undefined) return { allowed: true };
-            if (current.principal === undefined) return { allowed: false, reason: 'no-permission' };
-            return (
-              (await options.authorizer.access?.(current.principal, entity, action, pickInfo(request))) ?? {
-                allowed: true,
-              }
-            );
-          },
+          ...authorizationFor(options.authorizer, current.principal, pickInfo(request)),
         };
         const result: unknown = await route.handler(context);
         for (const [name, value] of Object.entries(current.headers)) void reply.header(name, value);

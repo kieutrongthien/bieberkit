@@ -346,6 +346,9 @@ importers:
       '@bieberkit/data':
         specifier: workspace:*
         version: link:../data
+      '@bieberkit/queue':
+        specifier: workspace:*
+        version: link:../queue
       fastify:
         specifier: 5.12.8
         version: 5.12.8

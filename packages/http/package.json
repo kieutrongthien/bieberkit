@@ -38,6 +38,7 @@
   "dependencies": {
     "@bieberkit/core": "workspace:*",
     "@bieberkit/data": "workspace:*",
+    "@bieberkit/queue": "workspace:*",
     "fastify": "5.12.8"
   },
   "devDependencies": {

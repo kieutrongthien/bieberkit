@@ -41,6 +41,8 @@ import {
 } from '@bieberkit/data/orm';
 import type { Database, OrmSchema } from '@bieberkit/data/orm';
 import type { AccessAnswer } from './ports.ts';
+import { MAX_BULK, MAX_BULK_INLINE } from './bulk.ts';
+import type { BulkQueue } from './bulk.ts';
 import { apiFields, toJsonSchema } from '@bieberkit/data/schema';
 import type { ApiField, EntityDef, JsonSchema } from '@bieberkit/data/schema';
 import { HttpError, ValidationFailed } from './problem.ts';
@@ -58,11 +60,13 @@ export interface EntityRoutesContext {
   readonly db: Database;
   /** The compiled schemas of the project. A relation can be included when the schema of its target is here. */
   readonly schemas: readonly OrmSchema[];
+  /** Where a bulk call of more than 100 rows goes as a job (API-14). Without it such a call is refused. */
+  readonly bulk?: BulkQueue;
+  /** True for the routes that a queued job runs: a bulk call is then run whatever its size, as the principal that queued it. */
+  readonly background?: true;
 }
 
 const MAX_PAGE_ROWS = 10_000;
-const MAX_BULK = 500;
-const MAX_BULK_INLINE = 100;
 const DEFAULT_PAGE_SIZE = 25;
 const MAX_PAGE_SIZE = 100;
 const FILTER = /^filter\[([A-Za-z][A-Za-z0-9]*)\]\[(eq|ne|in|lt|lte|gt|gte|null)\]$/;
@@ -784,6 +788,8 @@ export function entityRoutes(schema: OrmSchema, context: EntityRoutesContext): R
       method: 'POST',
       url: `${base}/bulk`,
       permission: permissionOf(def, 'read'),
+      // A call that is sent again with the same Idempotency-Key gets the first answer, so a job is not queued twice (§13.1).
+      idempotent: true,
       schema: {
         body: {
           type: 'object',
@@ -798,6 +804,17 @@ export function entityRoutes(schema: OrmSchema, context: EntityRoutesContext): R
           additionalProperties: false,
         },
         response: {
+          202: {
+            type: 'object',
+            properties: {
+              data: {
+                type: 'object',
+                properties: { jobId: { type: 'string' }, status: { enum: ['queued'] } },
+                required: ['jobId', 'status'],
+              },
+            },
+            required: ['data'],
+          },
           200: {
             type: 'object',
             properties: {
@@ -870,13 +887,20 @@ export function entityRoutes(schema: OrmSchema, context: EntityRoutesContext): R
           : 'update';
     const write = await need(ctx, action);
     if (operation === 'update') checkWritable(write, asRow(body['data']), 'update');
-    if (requested.length > MAX_BULK_INLINE) {
-      throw new HttpError(
-        'HTTP_BULK_TOO_LARGE',
-        422,
-        `${requested.length} items are more than ${MAX_BULK_INLINE}.`,
-        `Send up to ${MAX_BULK_INLINE} items. Larger batches run as a queued job, which needs the queue of M1.5.`,
-      );
+    if (requested.length > MAX_BULK_INLINE && context.background !== true) {
+      if (context.bulk === undefined) {
+        throw new HttpError(
+          'HTTP_BULK_TOO_LARGE',
+          422,
+          `${requested.length} items are more than ${MAX_BULK_INLINE}.`,
+          `Send up to ${MAX_BULK_INLINE} items. A larger call runs as a queued job, and this server has no queue for it.`,
+        );
+      }
+      // The caller is told now that the call is allowed. The job asks again when it runs, as the same principal (Q-10).
+      const queued = await context.bulk.enqueue({ entity: def.name, body: asRow(ctx.body), principal: ctx.principal });
+      ctx.status(202);
+      ctx.header('Location', queued.location);
+      return { data: { jobId: queued.id, status: 'queued' } };
     }
     return runInUnitOfWork(db, async (em) => {
       const found = await findAllScoped(em, schema, ids, write.scope);
@@ -966,9 +990,14 @@ export function entityRoutes(schema: OrmSchema, context: EntityRoutesContext): R
 export function registerEntityRoutes(
   server: HttpServer,
   schemas: readonly OrmSchema[],
-  options: { db: Database },
+  options: { db: Database; bulk?: BulkQueue },
 ): void {
   for (const schema of schemas) {
-    for (const route of entityRoutes(schema, { db: options.db, schemas })) server.route(route);
+    for (const route of entityRoutes(schema, {
+      db: options.db,
+      schemas,
+      ...(options.bulk === undefined ? {} : { bulk: options.bulk }),
+    }))
+      server.route(route);
   }
 }
