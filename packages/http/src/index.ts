@@ -57,6 +57,8 @@ export type {
 } from './ports.ts';
 export { HttpError, ValidationFailed } from './problem.ts';
 export type { Problem } from './problem.ts';
+export { serveStatic } from './static.ts';
+export type { StaticOptions } from './static.ts';
 export { defineRoute, METHODS } from './route.ts';
 export type { Method, RouteContext, RouteDef, RouteSchema } from './route.ts';
 export { createHttpServer, STAGE_NAMES } from './server.ts';

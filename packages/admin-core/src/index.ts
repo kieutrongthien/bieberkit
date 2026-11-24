@@ -22,7 +22,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-// Public API of @bieberkit/admin-core. Implementation starts after the Phase 0 ADRs (docs/adr/README.md).
+// Public API of @bieberkit/admin-core: headless, with no dependency (ADR 0025). The screens are in an adapter such as @bieberkit/admin-antd (UI-10).
 
 /** npm name of this package. */
 export const packageName = '@bieberkit/admin-core';
+
+export { AdminApiError, createAdminClient } from './client.ts';
+export type { AdminClient, AdminClientOptions, FieldProblem } from './client.ts';
+export { allows, bodyOf, columnsOf, formFieldsOf, initialValues, labelOf, listFields } from './screens.ts';
+export type { ListParams, Meta, MetaEntity, MetaField, MetaMenuItem, Page, Row, SessionUser } from './types.ts';

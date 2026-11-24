@@ -1596,7 +1596,7 @@ Open questions:
 
 | Version | Date | Changes |
 | --- | --- | --- |
-| 0.8.8 | 2026-11-24 | M1.8 (migrations): the lock of the migrate role (DATA-25), `migrate --allow-destructive` in section 5.2 |
+| 0.8.8 | 2026-11-24 | M1.8: the lock of the migrate role (DATA-25), `migrate --allow-destructive` in section 5.2, the base plugins and their services, the first admin slice without TanStack Table, Form and Virtual (ADR 0025), and the policy of the admin (UI-14) |
 | 0.8.7 | 2026-11-24 | M1.6 and M1.7 (the defaults of `--yes` and the missing flags in section 5.1): traces and metrics without an SDK (OBS-02 to OBS-04, ADR 0023), the log package (ADR 0022), and in section 5.2 the command `bieberkit generate`, the names of the rules of `bieberkit check` and the ignore directive |
 | 0.8.6 | 2026-11-22 | Section 11.2: the codes raised by `definePlugin` and by the manifest check (`PLG_NAME`, `PLG_MANIFEST_NAME`, and the existing ones), and how the short name of a plugin is derived. Found while implementing M1.1 |
 | 0.8.5 | 2026-11-22 | Section 23.5: changeset files are exempt from the header, because their text becomes the changelog. Found while adding the first changeset of M1.1 |

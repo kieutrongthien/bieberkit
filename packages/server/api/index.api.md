@@ -30,7 +30,13 @@ Generated from the built declaration files by `pnpm api:update`. Do not edit by 
 ```ts
 import { BkError, CoreEnv, EnvOwner, EnvSource, KeyCollector, ModuleDef, PluginDef, ProjectConfigInput, Role } from "@bieberkit/core";
 import { Database, MadeMigration, PluginRun } from "@bieberkit/data/orm";
+import { HttpServer } from "@bieberkit/http";
 import { PluginMigrationStep } from "@bieberkit/data";
+export declare const ADMIN_PACKAGE = "@bieberkit/admin-antd";
+export declare const ADMIN_PREFIX = "/admin";
+export declare const ADMIN_POLICY: string;
+export declare function adminDirectory(root: string): string | undefined;
+export declare function registerAdmin(server: HttpServer, root: string): boolean;
 type BootRole = Role | "dev";
 interface BootOptions {
   readonly role: BootRole;

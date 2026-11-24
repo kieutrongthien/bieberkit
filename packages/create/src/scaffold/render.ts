@@ -287,6 +287,8 @@ export function renderProject(choices: Choices, plan: Plan): ProjectFile[] {
         type: 'module',
         dependencies: {
           ...pins(['@bieberkit/core', '@bieberkit/data', '@bieberkit/http', '@bieberkit/queue', '@bieberkit/server']),
+          // The admin is the application of this package, served by the web role under /admin/ (UI-14).
+          ...(choices.admin ? pins(['@bieberkit/admin-antd']) : {}),
           ...pluginPins,
           zod: '4.6.7',
         },

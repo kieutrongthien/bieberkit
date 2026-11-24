@@ -911,7 +911,8 @@ export function createHttpServer(env: HttpEnv, options: HttpServerOptions = {}):
         const retry = response.headers.get('x-retry-after');
         if (response.status === 429 && retry !== null && response.headers.get('retry-after') === null)
           void reply.header('retry-after', retry);
-        void reply.code(response.status).send(await response.text());
+        // The body goes out as bytes, so that a file that is not text (an image, a font) arrives as it was.
+        void reply.code(response.status).send(Buffer.from(await response.arrayBuffer()));
         return reply;
       },
     });

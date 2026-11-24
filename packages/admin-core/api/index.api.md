@@ -28,5 +28,98 @@
 Generated from the built declaration files by `pnpm api:update`. Do not edit by hand. A change here is a change to the public API and needs a changeset (spec section 22.3).
 
 ```ts
+interface MetaField {
+  readonly key: string;
+  readonly kind: string;
+  readonly widget: string;
+  readonly required: boolean;
+  readonly readOnly: boolean;
+  readonly filterable: boolean;
+  readonly sortable: boolean;
+  readonly pii?: boolean;
+  readonly encrypted?: boolean;
+  readonly default?: unknown;
+  readonly values?: readonly string[];
+  readonly validation?: Readonly<Record<string, unknown>>;
+}
+interface MetaEntity {
+  readonly name: string;
+  readonly path: string;
+  readonly label: Readonly<Record<string, string>>;
+  readonly operations: Readonly<Record<"list" | "get" | "create" | "update" | "delete", boolean>>;
+  readonly can: Readonly<Record<"read" | "create" | "update" | "delete", boolean>>;
+  readonly softDelete: boolean;
+  readonly tenant: boolean;
+  readonly title?: string;
+  readonly icon?: string;
+  readonly list: readonly string[];
+  readonly form: readonly string[];
+  readonly fields: readonly MetaField[];
+}
+interface MetaMenuItem {
+  readonly label: string;
+  readonly path: string;
+  readonly permission?: string;
+}
+interface Meta {
+  readonly schemaVersion: number;
+  readonly entities: readonly MetaEntity[];
+  readonly menu: readonly MetaMenuItem[];
+  readonly permissions: readonly string[];
+}
+type Row = Readonly<Record<string, unknown>>;
+interface Page {
+  readonly rows: readonly Row[];
+  readonly page: number;
+  readonly pageSize: number;
+  readonly total?: number;
+}
+interface SessionUser {
+  readonly id: string;
+  readonly email: string;
+  readonly name: string;
+}
+interface ListParams {
+  readonly page?: number;
+  readonly pageSize?: number;
+  readonly sort?: string;
+  readonly fields?: readonly string[];
+}
+interface FieldProblem {
+  readonly path: string;
+  readonly code: string;
+  readonly message: string;
+}
+export declare class AdminApiError extends Error {
+  readonly status: number;
+  readonly code: string;
+  readonly fix: string;
+  readonly problems: readonly FieldProblem[];
+  constructor(status: number, code: string, message: string, fix: string, problems?: readonly FieldProblem[]);
+}
+interface AdminClientOptions {
+  readonly baseUrl?: string;
+  readonly fetch?: typeof fetch;
+}
+interface AdminClient {
+  session(): Promise<SessionUser | undefined>;
+  signIn(email: string, password: string): Promise<SessionUser>;
+  signOut(): Promise<void>;
+  meta(): Promise<Meta>;
+  list(entity: MetaEntity, params?: ListParams): Promise<Page>;
+  get(entity: MetaEntity, id: string): Promise<Row>;
+  create(entity: MetaEntity, body: Row): Promise<Row>;
+  update(entity: MetaEntity, id: string, body: Row, version: number): Promise<Row>;
+  remove(entity: MetaEntity, id: string, version: number): Promise<void>;
+}
+export declare function createAdminClient(options?: AdminClientOptions): AdminClient;
+export declare function labelOf(entity: MetaEntity, language: string): string;
+export declare function columnsOf(entity: MetaEntity): readonly MetaField[];
+export declare function formFieldsOf(entity: MetaEntity): readonly MetaField[];
+export declare function listFields(entity: MetaEntity): readonly string[];
+export declare function initialValues(entity: MetaEntity, row?: Row): Record<string, unknown>;
+export declare function bodyOf(entity: MetaEntity, values: Readonly<Record<string, unknown>>, updating: boolean): Row;
+export declare function allows(entity: MetaEntity, action: "create" | "update" | "delete"): boolean;
 export declare const packageName = "@bieberkit/admin-core";
+export type { AdminClient, AdminClientOptions, FieldProblem, ListParams, Meta, MetaEntity, MetaField, MetaMenuItem, Page, Row, SessionUser };
 ```

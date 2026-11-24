@@ -2,7 +2,7 @@
   "name": "@bieberkit/admin-antd",
   "version": "0.0.0",
   "private": true,
-  "description": "Default admin UI adapter on Ant Design.",
+  "description": "The Ant Design adapter of the admin: login, the generic list and form, built as static files for /admin/.",
   "keywords": [
     "bieberkit"
   ],
@@ -32,12 +32,24 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsdown",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "build": "tsdown && vite build",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "dev": "vite"
   },
   "dependencies": {
     "@bieberkit/admin-core": "workspace:*",
-    "@bieberkit/tokens": "workspace:*"
+    "@bieberkit/tokens": "workspace:*",
+    "@tanstack/react-query": "5.108.0",
+    "@tanstack/react-router": "1.170.46",
+    "antd": "6.7.1",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.3.0",
+    "vite": "8.3.8"
   },
   "engines": {
     "node": ">=24.12"

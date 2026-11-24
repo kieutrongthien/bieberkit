@@ -1,0 +1,93 @@
+/**
+ * BieberKit
+ *
+ * @file        packages/admin-antd/src/app/Gate.tsx
+ * @description The gate and the frame of the admin: nobody is shown anything until the session says who signed in, then the menu of the entities that the user may read and the screen of the route (UI-02, AUTH-01).
+ * @author      Bieber Kieu <kieutrongthien@gmail.com>
+ * @copyright   Copyright (c) 2026 Bieber Kieu
+ * @license     Apache-2.0
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import { labelOf } from '@bieberkit/admin-core';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { Link, Outlet } from '@tanstack/react-router';
+import { Button, Layout, Menu, Result, Skeleton, Space, Typography } from 'antd';
+import type { JSX } from 'react';
+import { useClient, useMeta } from './context.ts';
+import { Login } from './Login.tsx';
+
+const { Header, Sider, Content } = Layout;
+
+function Frame(props: { readonly email: string }): JSX.Element {
+  const client = useClient();
+  const queries = useQueryClient();
+  const meta = useMeta();
+  const entities = (meta.data?.entities ?? []).filter((entity) => entity.operations.list && entity.can.read);
+  return (
+    <Layout style={{ minHeight: '100vh' }}>
+      <Sider breakpoint="md" collapsedWidth={0} theme="light" width={240}>
+        <div style={{ padding: 16 }}>
+          <Typography.Title level={4} style={{ margin: 0 }}>
+            <Link to="/">Admin</Link>
+          </Typography.Title>
+        </div>
+        <Menu
+          mode="inline"
+          items={entities.map((entity) => ({
+            key: entity.path,
+            label: <Link to={`/${entity.path.replace('/api/v1/', '')}`}>{labelOf(entity, 'en')}</Link>,
+          }))}
+        />
+      </Sider>
+      <Layout>
+        <Header style={{ background: 'transparent', textAlign: 'right' }}>
+          <Space>
+            <Typography.Text>{props.email}</Typography.Text>
+            <Button
+              onClick={() => {
+                // Everything that was read as this user is dropped, and the session is asked again.
+                void client.signOut().then(() => queries.resetQueries());
+              }}
+            >
+              Sign out
+            </Button>
+          </Space>
+        </Header>
+        <Content style={{ margin: 24 }}>
+          {meta.isError ? (
+            <Result status="error" title="The menu could not be loaded" subTitle={meta.error.message} />
+          ) : (
+            <Outlet />
+          )}
+        </Content>
+      </Layout>
+    </Layout>
+  );
+}
+
+/** Asks who is signed in. Nobody gets the login page, and a user gets the frame with the screen of the route. */
+export function Gate(): JSX.Element {
+  const client = useClient();
+  const session = useQuery({ queryKey: ['session'], queryFn: async () => (await client.session()) ?? null });
+  if (session.isPending) return <Skeleton active style={{ padding: 24 }} />;
+  if (session.isError) {
+    return <Result status="error" title="The server did not answer" subTitle={session.error.message} />;
+  }
+  // A query may not answer `undefined`, so nobody signed in is `null`.
+  if (session.data === null) return <Login />;
+  return <Frame email={session.data.email} />;
+}

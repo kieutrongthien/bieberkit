@@ -22,6 +22,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { boot, roleOf } from './boot.ts';
@@ -149,6 +150,34 @@ describe('section 7.1 the roles', () => {
     expect((await get(one.port, '/api/v1/crm/people')).status).toBe(401);
     const signedIn = await fetch(`${base}/api/v1/crm/people`, { headers: { cookie: cookie ?? '' } });
     expect(signedIn.status).toBe(403);
+    // The metadata is what the admin draws from, and it is for a signed in user only.
+    expect((await get(one.port, '/api/v1/_meta')).status).toBe(401);
+    expect((await fetch(`${base}/api/v1/_meta`, { headers: { cookie: cookie ?? '' } })).status).toBe(200);
+  });
+
+  it('UI-14 the web role serves the admin under /admin/ with its own policy when an adapter is installed, and the API keeps its own', async () => {
+    const fixture = makeProject();
+    fixtures.push(fixture);
+    const folder = join(fixture.root, 'node_modules/@bieberkit/admin-antd');
+    mkdirSync(join(folder, 'dist/app/assets'), { recursive: true });
+    writeFileSync(join(folder, 'package.json'), JSON.stringify({ name: '@bieberkit/admin-antd', version: '0.0.0' }));
+    writeFileSync(join(folder, 'dist/app/index.html'), '<!doctype html><title>admin</title>');
+    const env = await testEnv(fixture.root);
+    const one = await boot({ role: 'web', cwd: fixture.root, env });
+    running.push(one);
+    const base = `http://127.0.0.1:${String(one.port)}`;
+    const page = await fetch(`${base}/admin/settings/settings`);
+    expect(page.status).toBe(200);
+    expect(await page.text()).toContain('<title>admin</title>');
+    expect(page.headers.get('content-security-policy')).toContain("script-src 'self'");
+    expect((await fetch(`${base}/api/v1/crm/ping`)).headers.get('content-security-policy')).toContain(
+      "default-src 'none'",
+    );
+  });
+
+  it('UI-14 without an adapter, /admin/ is not served', async () => {
+    const { one } = await start('web');
+    expect((await get(one.port, '/admin/')).status).toBe(404);
   });
 
   it('7.1 the worker role starts the queue and the outbox dispatcher, and stops them', async () => {

@@ -354,11 +354,17 @@ describe('section 5.1 the choices', () => {
     expect((await create(cwd, ['demo', '--yes', '--no-install', '--no-git'])).code).toBe(0);
   });
 
-  it('5.1 --site and --admin are accepted, and the result says that their apps are not part of this version', async () => {
+  it('5.1 --site is accepted and the result says that its app is not part of this version, and the admin is a dependency of the server app', async () => {
     const cwd = workdir();
     const { data } = await create(cwd, ['demo', '--yes', '--site', '--no-install', '--no-git', '--json']);
-    expect(data.notes).toEqual([expect.stringContaining('admin app and the site app')]);
+    expect(data.notes).toEqual([expect.stringContaining('site app')]);
     expect(read(cwd, 'demo/.env')).toContain('SITE_SERVICE_TOKEN=secret-');
+    expect(JSON.parse(read(cwd, 'demo/apps/server/package.json')).dependencies).toHaveProperty('@bieberkit/admin-antd');
+    const bare = workdir();
+    await create(bare, ['demo', '--yes', '--no-admin', '--no-install', '--no-git']);
+    expect(JSON.parse(read(bare, 'demo/apps/server/package.json')).dependencies).not.toHaveProperty(
+      '@bieberkit/admin-antd',
+    );
   });
 });
 

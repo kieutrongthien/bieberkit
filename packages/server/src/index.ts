@@ -25,6 +25,7 @@
 /** npm name of this package. */
 export const packageName = '@bieberkit/server';
 
+export { ADMIN_PACKAGE, ADMIN_POLICY, ADMIN_PREFIX, adminDirectory, registerAdmin } from './admin.ts';
 export { boot, roleOf } from './boot.ts';
 export type { BootOptions, BootRole, Running } from './boot.ts';
 export { diagnose } from './doctor.ts';

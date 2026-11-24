@@ -102,7 +102,6 @@ export function planProject(choices: Choices, cwd: string, deps: PlanDeps): Plan
     random: deps.random,
   };
   const notes: string[] = [];
-  if (choices.admin || choices.site)
-    notes.push('The admin app and the site app come with their own milestones: this project has the server.');
+  if (choices.site) notes.push('The site app comes with its own milestone: this project has the server and the admin.');
   return { target, plan, files: renderProject(choices, plan), notes };
 }

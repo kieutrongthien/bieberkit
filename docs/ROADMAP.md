@@ -267,7 +267,7 @@ Depends on: M1.1 to M1.6 (can start the resolver and flags earlier).
 
 Done when: `pnpm create bieberkit@latest demo --yes` boots, migrates, seeds an admin and `bieberkit dev` serves the API.
 
-State on 2026-11-24: a project made by `create` starts through its `main.ts` (a test runs it in a real process), `dev` makes the framework tables and serves the API, and `db:seed` runs the seeders. The administrator is seeded by the base plugins, and the `pnpm create bieberkit@latest` form needs the first release, so this line closes with M1.8.
+State on 2026-11-24: a project made by `create` starts through its `main.ts` (a test runs it in a real process), `dev` makes the framework tables and serves the API, and `db:seed` runs the seeders. The administrator is seeded by the base plugins (M1.8): a test creates a blank project, migrates, seeds, boots the web role and signs the administrator in, and the browser test does it again through the admin. Only the `pnpm create bieberkit@latest` form needs the first release.
 
 ### M1.8 Blank template and base plugins
 
@@ -275,10 +275,10 @@ Depends on: M1.7. Built and hardened first, as every other template relies on th
 
 - [x] CLI commands `migrate:make` and `migrate` (`--status`, `--rollback`, `--allow-destructive`, as the spec has them) over `openMigrator`, `bieberkit build` over `writeStandalone` (regenerate, `tsc --noEmit`, the standalone files; the bundle of the server comes with the image of M1.9), a lock so that one migrate run is guaranteed (`bieberkit_migration_lock`, on the three dialects), and the `bieberkit check` rules from `detectDestructive` (`migrations`) and `findStepRisks` (`plugin-steps`) (DATA-08, DATA-25, DATA-27). The migrate role runs the same in production
 - [x] Plugins: `users`, `roles`, `settings`, `audit-log`, `notifications`, `media` (`docs/modules/plugins.md`). `auth-ui` is a set of screens, so it comes with the admin slice below
-- [ ] `templates/blank/template.ts` with plugin list, seeders and menu order; administrator account and base roles seeded (§12). Done: the blank template lists the base plugins in the scaffolder (`BUILTIN_TEMPLATES`, with the bundled manifests), `create` writes the password of the administrator, and `blank.test.ts` migrates, seeds, boots and signs the administrator in. Open: the menu order, which comes with the admin, and `auth-ui` in the list
-- [ ] Thin admin slice: `@bieberkit/admin-core` metadata loading, routing, permissions; `@bieberkit/admin-antd` login, generic list and form, no more (UI-01, UI-02, UI-10)
-- [ ] Admin served under `/admin/` with its own CSP (UI-14, SEC-01)
-- [ ] Playwright flow: login and CRUD in the admin (§21)
+- [ ] `templates/blank/template.ts` with plugin list, seeders and menu order; administrator account and base roles seeded (§12). Done: the blank template lists the base plugins in the scaffolder (`BUILTIN_TEMPLATES`, with the bundled manifests), `create` writes the password of the administrator, and `blank.test.ts` migrates, seeds, boots and signs the administrator in. Open: the menu order (the admin lists the entities that the user may read, and no plugin fills the menu of the metadata yet)
+- [x] Thin admin slice: `@bieberkit/admin-core` metadata loading, routing, permissions; `@bieberkit/admin-antd` login, generic list and form, no more (UI-01, UI-02, UI-10). The login is the `auth-ui` of the plugin list. What it leaves out is in `docs/modules/admin.md`
+- [x] Admin served under `/admin/` with its own CSP (UI-14, SEC-01)
+- [x] Playwright flow: login and CRUD in the admin (§21). `pnpm test:e2e` after `pnpm build`; the CI job that runs it is a change of `.github/workflows/`, which waits for the maintainer
 
 ### M1.9 Deployment and benchmarks
 

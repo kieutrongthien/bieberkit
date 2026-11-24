@@ -36,12 +36,13 @@ import type { EnvSource, Role } from '@bieberkit/core';
 import type { EntityDef } from '@bieberkit/data';
 import { compileEntities, createDatabase, createOutboxDispatcher } from '@bieberkit/data/orm';
 import type { Database } from '@bieberkit/data/orm';
-import { createHttpServer, registerEntityRoutes, registerOpenApi } from '@bieberkit/http';
+import { createHttpServer, registerEntityRoutes, registerMeta, registerOpenApi } from '@bieberkit/http';
 import type { HttpServer, RouteDef } from '@bieberkit/http';
 import { createScheduler } from '@bieberkit/queue';
 import type { JobDef, Queue } from '@bieberkit/queue';
 import { createQueueFromConfig } from '@bieberkit/queue/redis';
 import { ServerError } from './errors.ts';
+import { registerAdmin } from './admin.ts';
 import { migrate } from './migrate.ts';
 import { permissionCatalog, registerRuntimeServices } from './services.ts';
 import { runMigrations } from './migrations.ts';
@@ -175,8 +176,11 @@ export async function boot(options: BootOptions): Promise<Running> {
     authorizer.install(server);
     registerAuthRoutes(server, { auth, db });
     registerEntityRoutes(server, schemas, { db });
+    // What the admin reads to draw its menu, its lists and its forms (UI-02).
+    registerMeta(server, entities);
     for (const route of contributed<RouteDef>(modules, 'routes')) server.route(route);
     registerOpenApi(server, { title: project.config.name, version: '0.0.0' });
+    registerAdmin(server, project.root);
     const web = server;
     lifecycle.onBoot('http', async () => {
       port = (await web.listen({ port: env.APP_PORT })).port;

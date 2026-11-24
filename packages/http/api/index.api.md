@@ -359,11 +359,18 @@ interface Problem {
   }[];
   readonly [extension: string]: unknown;
 }
+interface StaticOptions {
+  readonly prefix: string;
+  readonly directory: string;
+  readonly policy: string;
+  readonly fallback?: string;
+}
+export declare function serveStatic(server: HttpServer, options: StaticOptions): void;
 export declare const packageName = "@bieberkit/http";
 declare module "@bieberkit/core" {
   interface ModuleContributions {
     routes?: readonly RouteDef[];
   }
 }
-export { type AccessAnswer, type Authenticator, type Authorization, type Authorizer, type BulkInput, type BulkJob, type BulkJobOptions, type BulkQueue, type CorsOptions, type CsrfProtection, type EntityRoutesContext, type HttpEnv, type HttpFetch, type HttpFetchInit, type HttpFetchOptions, type HttpServer, type HttpServerOptions, type IdempotencyBegin, type IdempotencyStore, type InjectOptions, type InjectResponse, type MemoryIdempotencyOptions, type Method, type MountDef, type OpenApiDocument, type OpenApiInfo, type Principal, type Problem, type RateLimitResult, type RateLimiter, type RegisterHttpOptions, type RequestInfo, type ResolvedAddress, type RouteContext, type RouteDef, type RouteSchema, type StageContext, type StageHook, type StageName, type StoredResponse, type TenantResolver, pathOf as entityPath };
+export { type AccessAnswer, type Authenticator, type Authorization, type Authorizer, type BulkInput, type BulkJob, type BulkJobOptions, type BulkQueue, type CorsOptions, type CsrfProtection, type EntityRoutesContext, type HttpEnv, type HttpFetch, type HttpFetchInit, type HttpFetchOptions, type HttpServer, type HttpServerOptions, type IdempotencyBegin, type IdempotencyStore, type InjectOptions, type InjectResponse, type MemoryIdempotencyOptions, type Method, type MountDef, type OpenApiDocument, type OpenApiInfo, type Principal, type Problem, type RateLimitResult, type RateLimiter, type RegisterHttpOptions, type RequestInfo, type ResolvedAddress, type RouteContext, type RouteDef, type RouteSchema, type StageContext, type StageHook, type StageName, type StaticOptions, type StoredResponse, type TenantResolver, pathOf as entityPath };
 ```
