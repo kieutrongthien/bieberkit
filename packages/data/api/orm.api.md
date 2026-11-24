@@ -448,6 +448,17 @@ export declare class BieberEntityManager extends SqlEntityManager {
 }
 export declare function softDelete(em: EntityManager, row: Record<string, unknown>): void;
 export declare function restore(em: EntityManager, row: Record<string, unknown>): void;
+export declare const READ_YOUR_WRITES_MS: number;
+interface ReadYourWrites {
+  record(userId: string): Promise<void>;
+  recently(userId: string): Promise<boolean>;
+}
+interface MemoryReadYourWritesOptions {
+  readonly windowMs?: number;
+  readonly now?: () => number;
+}
+export declare function createMemoryReadYourWrites(options?: MemoryReadYourWritesOptions): ReadYourWrites;
+export declare function useReadYourWrites(port: ReadYourWrites): void;
 export declare function expectVersion(row: object, expected: number | string): void;
 type Row$3 = Record<string, unknown>;
 interface SortOption {
@@ -483,5 +494,5 @@ export declare function setTranslation(em: EntityManager, schema: OrmSchema, rec
 type Row = Record<string, unknown>;
 export declare function toApiRow(schema: OrmSchema, row: Row): Row;
 export declare function toOrmData(schema: OrmSchema, input: Row, _mode: "create" | "update"): Row;
-export type { AggregateOptions, AggregateResult, AggregateRow, AttachmentInput, AttachmentRow, AuditEntry, AuditLogRow, AuditSink, AvailableTransition, CommentRow, CompileOptions, Database, DatabaseEnv, DatabaseOptions, DispatchResult, EncryptionKeys, FeaturePage, ListOptions, MadeMigration, MigrationEnv, MigrationStatus, Migrator, MigratorOptions, Orm, OrmSchema, OutboxDispatcher, OutboxDispatcherOptions, OutboxEntryRow, OutboxEvent, OutboxLag, OutboxMessage, OutboxProcessedRow, OutboxPublisher, Page, PageRequest, PluginRefusal, PluginRun, PluginRunOptions, PurgeOptions, ReencryptOptions, ReencryptResult, ReferenceVisibility, RequestKysely, ResolvedConnection, SequenceKey, SequenceOptions, SequenceRow, SortOption, SqliteOptions, SystemScopeEntry, TagRow, TimelineInput, TimelineRow, TransitionResult, UpOptions };
+export type { AggregateOptions, AggregateResult, AggregateRow, AttachmentInput, AttachmentRow, AuditEntry, AuditLogRow, AuditSink, AvailableTransition, CommentRow, CompileOptions, Database, DatabaseEnv, DatabaseOptions, DispatchResult, EncryptionKeys, FeaturePage, ListOptions, MadeMigration, MemoryReadYourWritesOptions, MigrationEnv, MigrationStatus, Migrator, MigratorOptions, Orm, OrmSchema, OutboxDispatcher, OutboxDispatcherOptions, OutboxEntryRow, OutboxEvent, OutboxLag, OutboxMessage, OutboxProcessedRow, OutboxPublisher, Page, PageRequest, PluginRefusal, PluginRun, PluginRunOptions, PurgeOptions, ReadYourWrites, ReencryptOptions, ReencryptResult, ReferenceVisibility, RequestKysely, ResolvedConnection, SequenceKey, SequenceOptions, SequenceRow, SortOption, SqliteOptions, SystemScopeEntry, TagRow, TimelineInput, TimelineRow, TransitionResult, UpOptions };
 ```

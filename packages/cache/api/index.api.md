@@ -29,6 +29,7 @@ Generated from the built declaration files by `pnpm api:update`. Do not edit by 
 
 ```ts
 import { IdempotencyStore } from "@bieberkit/http";
+import { ReadYourWrites } from "@bieberkit/data/orm";
 import { a as Lock, c as createCache, i as CacheReader, n as Cache, o as LockOptions, r as CacheOptions, s as TaggedCache, t as AtomicCache } from "./cache-Ck2Ln4Bi.js";
 import { i as CacheValue, n as CacheEngine, r as CacheError, t as Atomic } from "./contract--ExGYgOW.js";
 interface CacheIdempotencyOptions {
@@ -36,6 +37,10 @@ interface CacheIdempotencyOptions {
   readonly pendingTtlMs?: number;
 }
 export declare function createCacheIdempotencyStore(cache: Cache, options?: CacheIdempotencyOptions): IdempotencyStore;
+interface CacheReadYourWritesOptions {
+  readonly windowMs?: number;
+}
+export declare function createCacheReadYourWrites(cache: Cache, options?: CacheReadYourWritesOptions): ReadYourWrites;
 interface LayeredEngineOptions {
   readonly first: CacheEngine;
   readonly shared: CacheEngine;
@@ -47,5 +52,5 @@ interface MemoryEngineOptions {
   readonly now?: () => number;
 }
 export declare function createMemoryEngine(options?: MemoryEngineOptions): CacheEngine;
-export { type Atomic, type AtomicCache, type Cache, type CacheEngine, CacheError, type CacheIdempotencyOptions, type CacheOptions, type CacheReader, type CacheValue, type LayeredEngineOptions, type Lock, type LockOptions, type MemoryEngineOptions, type TaggedCache, createCache };
+export { type Atomic, type AtomicCache, type Cache, type CacheEngine, CacheError, type CacheIdempotencyOptions, type CacheOptions, type CacheReadYourWritesOptions, type CacheReader, type CacheValue, type LayeredEngineOptions, type Lock, type LockOptions, type MemoryEngineOptions, type TaggedCache, createCache };
 ```
