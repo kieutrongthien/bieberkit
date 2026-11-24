@@ -29,6 +29,8 @@ on:
   push:
     tags:
       - 'v[0-9]+.[0-9]+.[0-9]+'
+      # A suffix names the npm tag: v0.1.0-beta publishes version 0.1.0 under the beta tag. The `v` stays, because the ruleset guards `v*`.
+      - 'v[0-9]+.[0-9]+.[0-9]+-*'
 
 permissions: {}
 
@@ -54,7 +56,12 @@ jobs:
         run: |
           git merge-base --is-ancestor "$GITHUB_SHA" origin/main
           version="$(node -p "require('./package.json').version")"
-          test "v$version" = "$TAG"
+          # The tag is v<version>, or v<version>-<npm tag> where the suffix is one lower case word (beta, next, rc1).
+          case "$TAG" in
+            "v$version") ;;
+            "v$version"-*) printf '%s' "${TAG#"v$version"-}" | grep -Eq '^[a-z][a-z0-9]*$' ;;
+            *) false ;;
+          esac
 
   build:
     name: Build, test and pack
@@ -118,6 +125,8 @@ jobs:
           package-manager-cache: false
       - name: Publish in layer order, skipping versions that already exist
         working-directory: artifacts
+        env:
+          TAG: ${{ github.ref_name }}
         run: |
           # npm trusted publishing needs npm 11.5.1 or later.
           test "$(printf '%s\n' 11.5.1 "$(npm -v)" | sort -V | head -n 1)" = "11.5.1"
@@ -132,6 +141,10 @@ jobs:
             case "$version" in
               0.*) tag=beta ;;
               *) tag=latest ;;
+            esac
+            # A suffix on the git tag (v0.1.0-beta) names the npm tag, and overrides the rule above.
+            case "$TAG" in
+              *-*) tag="${TAG#*-}" ;;
             esac
             npm publish "./$file" --access public --tag "$tag"
           done < PUBLISH_ORDER

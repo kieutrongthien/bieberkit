@@ -48,8 +48,8 @@ This repository has no git remote, so a release cannot run end to end. This ADR 
 
 Option A.
 
-1. **Trigger.** Only a push of a tag `v<major>.<minor>.<patch>`. A repository ruleset on `refs/tags/v*` limits creation to the maintainer and blocks update and deletion. Top-level `permissions: {}`. One concurrent release (`cancel-in-progress: false`).
-2. **`verify` job** (`contents: read`). The tagged commit must be an ancestor of `origin/main` and the root `package.json` version must equal the tag.
+1. **Trigger.** Only a push of a tag `v<major>.<minor>.<patch>`, or `v<major>.<minor>.<patch>-<word>` where the word names the npm tag (amendment of 2026-11-25: `v0.1.0-beta` publishes 0.1.0 under `beta`, and the `verify` job refuses a suffix that is not one lower case word). A repository ruleset on `refs/tags/v*` limits creation to the maintainer and blocks update and deletion. Top-level `permissions: {}`. One concurrent release (`cancel-in-progress: false`).
+2. **`verify` job** (`contents: read`). The tagged commit must be an ancestor of `origin/main` and the root `package.json` version must equal the tag without its suffix.
 3. **`build` job** (`contents: read`, no `id-token`). Frozen install, then `check`, `typecheck`, `lint`, `test` and `build`, then pack every package from inside the workspace, write `SHA256SUMS`, run `publint`, and upload one artifact. No cache. `pnpm/setup` runs with `cache: false` and `install: false`.
 4. **`publish` job** (`contents: read`, `id-token: write`, `environment: release`). It downloads the artifact, checks `SHA256SUMS`, and publishes each tarball in layer order (foundation, contracts, product, tools). It skips a version that already exists, so a rerun after a partial failure completes the release. It runs `setup-node` without `registry-url` (that would set `NODE_AUTH_TOKEN`, which overrides the OIDC exchange). It installs, builds and tests nothing. Provenance is added by npm.
 5. **Environment `release`.** Required reviewer is the maintainer, and deployments are limited to `v*` tags. With a single maintainer this is a deliberate pause, not a second pair of eyes, so "prevent self-review" stays off.
