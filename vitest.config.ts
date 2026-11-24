@@ -44,6 +44,8 @@ export default defineConfig({
       // The Valkey of the cache suites of @bieberkit/cache (packages/cache/src/testing). Its policy must evict (`allkeys-lru`).
       cacheRedisUrl: process.env['CACHE_TEST_REDIS_URL'] ?? '',
       // The S3 compatible server of the storage suites of @bieberkit/storage (packages/storage/src/testing), MinIO with the default keys.
+      // The Valkey of the queue suites of @bieberkit/queue (packages/queue/src/adapters/redis). Its policy must be `noeviction` (Q-08).
+      queueRedisUrl: process.env['QUEUE_TEST_REDIS_URL'] ?? '',
       storageS3Endpoint: process.env['STORAGE_TEST_S3_ENDPOINT'] ?? '',
     },
     // `pnpm test:coverage`. TST-01: 90 percent of lines for core, data, http and auth, 80 percent for the rest.

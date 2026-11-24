@@ -154,3 +154,26 @@ pgWakeSource({ url, logger?, retryMs?, maxRetryMs? }): WakeSource
 5. **Other dialects** have no notification and poll as before. A `WakeSource` is a port, so another one (a broker) is a new adapter.
 
 Tests: `wake.dialects.test.ts`, on PostgreSQL: a worker that polls every 30 s takes a job of another queue object within a moment (and does not without a source), the hint carries the queue, a duplicate announces once, a rolled back insert and an uncommitted one wake nobody, the connection that is killed comes back and the next job wakes, `stop` closes the connection, other channels and bad payloads, a source that cannot connect, a source that throws; on every dialect, a worker that stops before its source is ready stops it.
+
+## The redis driver on BullMQ and Valkey (ADR 0010, ADR 0020)
+
+Prepared on 2026-11-24. **It installs only after a maintainer adds `allowBuilds: { msgpackr-extract: false }` to `pnpm-workspace.yaml` (ADR 0020).** Until then the branch `feat/queue-redis` is not for `main`.
+
+```ts
+// @bieberkit/queue/redis
+createRedisQueue({ url, jobs, prefix?, logger?, errorReporter?, now? }): Promise<Queue>
+createQueueFromConfig({ QUEUE_DRIVER, REDIS_URL }, { jobs, db?, prefix?, logger?, errorReporter? }): Promise<Queue>
+```
+
+1. **Same contract, same suite.** The queue has `dispatch`, `subscribe`, `publisher`, `createWorker`, `deadLetters`, `retry`, `discard`, `stats`, `purge` and `close`, and passes the nine cases of ADR 0010 (`queueContractSuite`), with none skipped.
+2. **A BullMQ queue and a worker for each of `critical`, `default` and `reports`**, so a busy `reports` never keeps `critical` waiting (Q-03). A worker takes its slots from `concurrency`. Keys are under `prefix` (`bk` by default), so apps can share one Valkey.
+3. **The job.** The input is stored as text with the tenant, the user, the request id and a token. `jobId` is the id of BullMQ, written with `j-` in front and `%` and `:` as percent codes, because BullMQ refuses ids that are whole numbers or have a colon. `add` with an id that exists answers the first job, so the token says who was first: `duplicate` is true when it is not ours (Q-01). Finished jobs are kept for 7 days, as in the table of the database driver, so the id keeps deduplicating.
+4. **Retries.** `attempts` of the job, and a backoff strategy that calls `backoffMs(attempt)` of the job. A job whose stored input no longer fits, or that is not registered, is an `UnrecoverableError`: no second attempt (Q-02).
+5. **Dead jobs.** BullMQ keeps them as failed. `deadLetters` pages them newest first (the cursor is an offset), `retry` puts one back with its attempts counted again from zero, and `discard` removes it. A job that fails for good, and one that stalls more than twice, is logged and reported once (OBS-06).
+6. **A worker that dies.** The lock of a job lasts `leaseMs` and is renewed every `heartbeatMs`. The stalled check of any worker, every `leaseMs`, gives the job to another worker (case 7). A job that stalls three times is dead.
+7. **The outbox.** The publisher adds the job to Valkey and does not use the transaction of the dispatcher. If the row is not deleted afterwards, it is published again, and the id of the message (`ob-<id>`) makes the second add a no-op.
+8. **The scheduler** is the same one (`createScheduler`): it takes the lock of a tick in the database of the project, and the id of a job that names the tick makes a lost lock harmless.
+9. **Valkey needs `maxmemory-policy noeviction`** (Q-08): a job that is evicted is lost. `checkRedisInstances` of `@bieberkit/cache/bentocache` checks it for `doctor`, and BullMQ logs a warning of its own.
+10. **Not done.** The wake is BullMQ's own (blocking commands), so `wake` is ignored. A cursor by offset can skip or repeat a job when dead jobs are added or removed between two pages.
+
+Tests: `adapters/redis/redis.test.ts` against a Valkey with `noeviction` (`QUEUE_TEST_REDIS_URL`; `BK_REQUIRE_DIALECTS=all` makes a missing URL fail): the nine cases, the ids, dead letters (pages, retry, discard, refusals), an input that no longer fits, a poison job that stalls, the outbox, stats and purge, two prefixes on one server, the config.
