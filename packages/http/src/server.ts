@@ -25,8 +25,8 @@
 import { createHash } from 'node:crypto';
 import Fastify, { LogController } from 'fastify';
 import type { FastifyReply, FastifyRequest } from 'fastify';
-import { createLogger, reportError, requestContext } from '@bieberkit/core';
-import type { ErrorReporter, Logger } from '@bieberkit/core';
+import { createLogger, createNoopMetrics, createNoopTracer, reportError, requestContext } from '@bieberkit/core';
+import type { ErrorReporter, Logger, Metrics, OpenSpan, Tracer } from '@bieberkit/core';
 import { createAjv, issuesOf } from '@bieberkit/data/build';
 import { normalizeInput } from '@bieberkit/data/schema';
 import type { AjvError, AjvInstance } from '@bieberkit/data/build';
@@ -102,6 +102,10 @@ export interface HttpServerOptions {
   readonly idempotencyStore?: IdempotencyStore;
   /** Receives an error that is a bug of ours (a 5xx), after it was logged, with the route, the request and the user (OBS-06). */
   readonly errorReporter?: ErrorReporter;
+  /** Records a span for each request, a child of the span of the caller (OBS-02). Defaults to one that records nothing. */
+  readonly tracer?: Tracer;
+  /** Receives the duration of each request by method, route and status (OBS-03). Defaults to a registry that keeps nothing. */
+  readonly metrics?: Metrics;
 }
 
 export interface InjectOptions {
@@ -169,6 +173,8 @@ interface RequestState {
   /** The code of the problem that answered the request, and its extra members. */
   problemCode: string | undefined;
   problemDetails: Readonly<Record<string, unknown>> | undefined;
+  /** The span of the request, open until the answer was sent (OBS-02). */
+  span: OpenSpan | undefined;
 }
 
 type Compiled = ((data: unknown) => boolean) & { errors?: AjvError[] | null };
@@ -336,6 +342,7 @@ function stateOf(map: WeakMap<FastifyRequest, RequestState>, request: FastifyReq
       replayed: false,
       problemCode: undefined,
       problemDetails: undefined,
+      span: undefined,
     };
     map.set(request, state);
   }
@@ -353,6 +360,12 @@ export function createHttpServer(env: HttpEnv, options: HttpServerOptions = {}):
   const keepAliveTimeoutMs = checkLimit('keepAliveTimeoutMs', options.keepAliveTimeoutMs ?? DEFAULT_KEEP_ALIVE, 0);
   const showFix = env.APP_ENV !== 'production';
   const security = securityConfig(options.headers, options.cors);
+  const tracer = options.tracer ?? createNoopTracer();
+  const duration = (options.metrics ?? createNoopMetrics()).histogram(
+    'bk_http_request_duration_seconds',
+    'Time to answer an HTTP request, by method, route and status.',
+    { labels: ['method', 'route', 'status'] },
+  );
 
   const app = Fastify({
     loggerInstance: fastifyLogger(logger),
@@ -386,13 +399,26 @@ export function createHttpServer(env: HttpEnv, options: HttpServerOptions = {}):
   app.addHook('onRequest', (request, reply, done) => {
     const trace = traceOf(request.headers['traceparent']);
     void reply.header('x-request-id', request.id);
+    // The probes of the server are not traced and not counted: a load balancer calls them every few seconds.
+    const route = routeStateOf(request);
+    const span =
+      route?.internal === true
+        ? undefined
+        : tracer.startSpan(`${request.method} ${request.routeOptions.url ?? 'unmatched'}`, {
+            kind: 'server',
+            parent: trace,
+            attributes: { 'http.method': request.method, 'http.route': request.routeOptions.url ?? 'unmatched' },
+          });
+    if (span !== undefined && tracer.enabled) stateOf(requests, request).span = span;
+    // With a tracer the context names the span of this request. Without one it keeps the span of the caller.
+    const ids = span !== undefined && tracer.enabled ? { traceId: span.traceId, spanId: span.spanId } : trace;
     requestContext.run(
       {
         requestId: request.id,
-        traceId: trace.traceId,
-        ...(trace.spanId === undefined ? {} : { spanId: trace.spanId }),
+        traceId: ids.traceId,
+        ...(ids.spanId === undefined ? {} : { spanId: ids.spanId }),
       },
-      done,
+      () => (span === undefined ? done() : tracer.within(span, done)),
     );
   });
 
@@ -667,6 +693,19 @@ export function createHttpServer(env: HttpEnv, options: HttpServerOptions = {}):
   // wrote (the audit of a denial), and a shutdown does not lose it.
   const finishing = new Set<Promise<void>>();
   app.addHook('onResponse', async (request, reply) => {
+    const span = stateOf(requests, request).span;
+    if (span !== undefined) {
+      span.setAttribute('http.status_code', reply.statusCode);
+      if (reply.statusCode >= 500) span.fail(undefined);
+      span.end();
+    }
+    if (routeStateOf(request)?.internal !== true) {
+      duration.observe(reply.elapsedTime / 1000, {
+        method: request.method,
+        route: request.routeOptions.url ?? 'unmatched',
+        status: String(reply.statusCode),
+      });
+    }
     const level = reply.statusCode >= 500 ? 'error' : 'info';
     logger[level]('request completed', {
       method: request.method,
@@ -688,6 +727,13 @@ export function createHttpServer(env: HttpEnv, options: HttpServerOptions = {}):
     } finally {
       finishing.delete(work);
     }
+  });
+
+  // A client that leaves before the answer gets no `onResponse`, and the span of its request must still end.
+  app.addHook('onRequestAbort', async (request) => {
+    const span = stateOf(requests, request).span;
+    span?.setAttribute('http.aborted', true);
+    span?.end();
   });
 
   const answer = (error: unknown, request: FastifyRequest, reply: FastifyReply): FastifyReply => {

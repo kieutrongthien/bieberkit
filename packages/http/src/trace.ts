@@ -23,10 +23,10 @@
  */
 
 import { randomBytes } from 'node:crypto';
+import { parseTraceparent } from '@bieberkit/core';
 import { uuid7 } from '@bieberkit/data';
 
 const REQUEST_ID = /^[A-Za-z0-9._:-]{1,128}$/;
-const TRACEPARENT = /^([0-9a-f]{2})-([0-9a-f]{32})-([0-9a-f]{16})-[0-9a-f]{2}(?:-.*)?$/;
 
 const first = (value: string | string[] | undefined): string | undefined => (Array.isArray(value) ? value[0] : value);
 
@@ -44,17 +44,5 @@ export interface Trace {
 
 /** The trace of a request: that of a valid `traceparent` (W3C), or a new random one. */
 export function traceOf(header: string | string[] | undefined): Trace {
-  const match = TRACEPARENT.exec(first(header) ?? '');
-  const [, version, traceId, spanId] = match ?? [];
-  if (
-    version !== undefined &&
-    version !== 'ff' &&
-    traceId !== undefined &&
-    spanId !== undefined &&
-    !/^0+$/.test(traceId) &&
-    !/^0+$/.test(spanId)
-  ) {
-    return { traceId, spanId };
-  }
-  return { traceId: randomBytes(16).toString('hex') };
+  return parseTraceparent(header) ?? { traceId: randomBytes(16).toString('hex') };
 }

@@ -71,6 +71,39 @@ export { createSentryReporter, framesOf, parseDsn } from './reporting/sentry.ts'
 export type { ParsedDsn, SentryReporterOptions } from './reporting/sentry.ts';
 export { createLogger, createLogSanitizer, RESERVED_LOG_FIELDS } from './logging/logger.ts';
 export type { LogFields, Logger, LoggerOptions, LogSanitizer } from './logging/logger.ts';
+export { createOtlpExporter, createTracerFromConfig, otlpTraceBody } from './observability/otlp.ts';
+export type { OtlpExporterOptions, TracerFromConfigOptions, TracingConfig } from './observability/otlp.ts';
+export { createMetrics, createNoopMetrics, DEFAULT_BUCKETS } from './observability/metrics.ts';
+export type {
+  CollectorOptions,
+  Counter,
+  Gauge,
+  Histogram,
+  HistogramOptions,
+  MetricLabels,
+  MetricOptions,
+  MetricSample,
+  Metrics,
+} from './observability/metrics.ts';
+export { startMetricsServer } from './observability/metrics-server.ts';
+export type { MetricsServer, MetricsServerOptions } from './observability/metrics-server.ts';
+export { registerProcessMetrics } from './observability/process-metrics.ts';
+export { createMemorySpanExporter, createNoopTracer, createTracer } from './observability/tracing.ts';
+export type {
+  AttributeValue,
+  FinishedSpan,
+  MemorySpanExporter,
+  OpenSpan,
+  Span,
+  SpanAttributes,
+  SpanExporter,
+  SpanKind,
+  SpanOptions,
+  Tracer,
+  TracerOptions,
+} from './observability/tracing.ts';
+export { formatTraceparent, parseTraceparent } from './observability/traceparent.ts';
+export type { TraceParent } from './observability/traceparent.ts';
 export { requestContext } from './logging/request-context.ts';
 export type { RequestContext } from './logging/request-context.ts';
 export { createContainer } from './container/container.ts';
