@@ -854,7 +854,7 @@ The API is REST over JSON on Fastify 5, described by an OpenAPI 3.1 document gen
 * **API-12** Calls from the site server carry a service token (`SITE_SERVICE_TOKEN`) and forward the visitor's IP address and session cookie. The API rate-limits by the forwarded IP, and relaxes the Fetch Metadata CSRF check only for requests with a valid service token arriving from the internal network.
 
 - **API-13** Optimistic concurrency: every entity has a `version` column. Updates and transitions MUST send `If-Match` with the ETag or `version` they read, and a stale write returns 412 with the current record, so two editors never silently overwrite each other.
-- **API-14** Bulk endpoints (`POST /<resource>/bulk` for update, delete and transitions) accept up to 500 ids, check permissions and conditions per row, run in one transaction for 100 rows or fewer and as a queued job above that, and report per-row results.
+- **API-14** Bulk endpoints (`POST /<resource>/bulk` for update, delete and transitions) accept up to 500 ids, check permissions and conditions per row, run in one transaction for 100 rows or fewer and as a queued job above that, and report per-row results. A call above 100 rows is answered `202` with the id of the job and its `Location`; the job runs as the same principal, asks the authorizer again, and its owner reads the per-row results at `GET /api/v1/_jobs/:id` (Q-10, Q-15).
 - **API-15** An aggregate endpoint (`GET /<resource>/aggregate?groupBy=&sum=&count=`) serves dashboards. It applies the same tenant filter, permission conditions and field masks as lists, and only allows fields declared `aggregatable()`.
 - **API-16** Deprecated endpoints and fields send `Deprecation` and `Sunset` headers and are listed in the OpenAPI document.
 

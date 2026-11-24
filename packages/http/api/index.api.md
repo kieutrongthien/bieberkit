@@ -31,6 +31,7 @@ Generated from the built declaration files by `pnpm api:update`. Do not edit by 
 import { BkError, ErrorReporter, Lifecycle, Logger } from "@bieberkit/core";
 import { Database, OrmSchema } from "@bieberkit/data/orm";
 import { EntityDef, JsonSchema } from "@bieberkit/data/schema";
+import { JobDef, Queue } from "@bieberkit/queue";
 import { ValidationIssue } from "@bieberkit/data/build";
 interface StoredResponse {
   readonly status: number;
@@ -263,13 +264,50 @@ interface HttpFetch {
   fetch(input: string | URL, init?: HttpFetchInit): Promise<Response>;
 }
 export declare function createHttpFetch(options?: HttpFetchOptions): HttpFetch;
+interface Authorization {
+  can(permission: string): Promise<boolean>;
+  allows(entity: string, action: string, row: Readonly<Record<string, unknown>>): Promise<boolean>;
+  access(entity: string, action: string): Promise<AccessAnswer>;
+}
+export declare function authorizationFor(authorizer: Authorizer | undefined, principal: Principal | undefined, info: RequestInfo): Authorization;
+interface BulkInput {
+  readonly entity: string;
+  readonly body: Readonly<Record<string, unknown>>;
+  readonly principal: Principal | undefined;
+}
+interface BulkQueue {
+  enqueue(input: BulkInput): Promise<{
+    readonly id: string;
+    readonly location: string;
+  }>;
+}
+export declare const MAX_BULK_INLINE: number;
+export declare const MAX_BULK: number;
+export declare const BULK_JOB = "http.bulk";
+export declare const JOBS_PATH = "/api/v1/_jobs";
+interface BulkJobOptions {
+  readonly db: Database;
+  readonly schemas: readonly OrmSchema[];
+  readonly authorizer?: Authorizer;
+}
+interface BulkJob {
+  readonly job: JobDef<BulkInput>;
+  over(queue: Queue): BulkQueue;
+}
+export declare function createBulkJob(options: BulkJobOptions): BulkJob;
+export declare function registerJobRoutes(server: HttpServer, options: {
+  readonly queue: Queue;
+}): void;
 interface EntityRoutesContext {
   readonly db: Database;
   readonly schemas: readonly OrmSchema[];
+  readonly bulk?: BulkQueue;
+  readonly background?: true;
 }
 export declare function entityRoutes(schema: OrmSchema, context: EntityRoutesContext): RouteDef[];
 export declare function registerEntityRoutes(server: HttpServer, schemas: readonly OrmSchema[], options: {
   db: Database;
+  bulk?: BulkQueue;
 }): void;
 export declare const META_SCHEMA: JsonSchema;
 export declare function registerMeta(server: HttpServer, entities: readonly EntityDef<string>[]): void;
@@ -317,5 +355,5 @@ interface Problem {
   readonly [extension: string]: unknown;
 }
 export declare const packageName = "@bieberkit/http";
-export type { AccessAnswer, Authenticator, Authorizer, CorsOptions, CsrfProtection, EntityRoutesContext, HttpEnv, HttpFetch, HttpFetchInit, HttpFetchOptions, HttpServer, HttpServerOptions, IdempotencyBegin, IdempotencyStore, InjectOptions, InjectResponse, MemoryIdempotencyOptions, Method, MountDef, OpenApiDocument, OpenApiInfo, Principal, Problem, RateLimitResult, RateLimiter, RegisterHttpOptions, RequestInfo, ResolvedAddress, RouteContext, RouteDef, RouteSchema, StageContext, StageHook, StageName, StoredResponse, TenantResolver };
+export type { AccessAnswer, Authenticator, Authorization, Authorizer, BulkInput, BulkJob, BulkJobOptions, BulkQueue, CorsOptions, CsrfProtection, EntityRoutesContext, HttpEnv, HttpFetch, HttpFetchInit, HttpFetchOptions, HttpServer, HttpServerOptions, IdempotencyBegin, IdempotencyStore, InjectOptions, InjectResponse, MemoryIdempotencyOptions, Method, MountDef, OpenApiDocument, OpenApiInfo, Principal, Problem, RateLimitResult, RateLimiter, RegisterHttpOptions, RequestInfo, ResolvedAddress, RouteContext, RouteDef, RouteSchema, StageContext, StageHook, StageName, StoredResponse, TenantResolver };
 ```
