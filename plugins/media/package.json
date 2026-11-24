@@ -1,6 +1,6 @@
 {
   "name": "@bieberkit/plugin-media",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Media records for files in the storage: a name, a type, a size and a state, confirmed after the upload.",
   "keywords": [
     "bieberkit",
@@ -19,7 +19,8 @@
   },
   "files": [
     "dist",
-    "NOTICE"
+    "NOTICE",
+    "CHANGELOG.md"
   ],
   "type": "module",
   "sideEffects": false,

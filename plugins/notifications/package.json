@@ -1,6 +1,6 @@
 {
   "name": "@bieberkit/plugin-notifications",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Notifications for a user: a title, a text and a read time, with the read-own permission.",
   "keywords": [
     "bieberkit",
@@ -19,7 +19,8 @@
   },
   "files": [
     "dist",
-    "NOTICE"
+    "NOTICE",
+    "CHANGELOG.md"
   ],
   "type": "module",
   "sideEffects": false,

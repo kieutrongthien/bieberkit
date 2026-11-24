@@ -105,6 +105,8 @@ Done when: every ADR above has status `Accepted` and the spec §3 table matches 
 - [ ] Database service containers (PostgreSQL, MySQL, Valkey) available to CI for later phases (TST, §9.1). The `services` job is written with the images pinned by digest. Tick after the first run on GitHub. The job `integration` now starts them with `tools/test-services.sh` and runs the whole suite; tick after its first run on GitHub
 - [x] Format the repository once with Oxfmt in its own commit, list it in `.git-blame-ignore-revs`, and let the header checker accept blank lines after Markdown frontmatter, with a test named `HDR-01`. `pnpm format:check` must pass before the CI item above can be ticked (HDR-01, ADR 0002)
 
+Release preparation on 2026-11-25: the S0 changesets produce the fixed **0.2.0** train across all 26 packages and plugins, with npm tag **beta** and intended git tag **v0.2.0-beta**. [Release notes](releases/0.2.0-beta.md) record scope and the publication handoff. This preparation does not tick the GitHub dry-run or publication gates.
+
 Done when: the header checker and trusted publishing work end to end (spec §25 gate text).
 
 ### Phase 0 gate **[M]**

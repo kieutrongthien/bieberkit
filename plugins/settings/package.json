@@ -1,6 +1,6 @@
 {
   "name": "@bieberkit/plugin-settings",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Settings stored in the database: a key and a value, read and changed through the API and the admin.",
   "keywords": [
     "bieberkit",
@@ -19,7 +19,8 @@
   },
   "files": [
     "dist",
-    "NOTICE"
+    "NOTICE",
+    "CHANGELOG.md"
   ],
   "type": "module",
   "sideEffects": false,

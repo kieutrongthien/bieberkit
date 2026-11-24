@@ -1,6 +1,6 @@
 {
   "name": "@bieberkit/server",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Boot of the process roles: web, worker, scheduler and migrate.",
   "keywords": [
     "bieberkit"
@@ -18,7 +18,8 @@
   },
   "files": [
     "dist",
-    "NOTICE"
+    "NOTICE",
+    "CHANGELOG.md"
   ],
   "type": "module",
   "sideEffects": false,
