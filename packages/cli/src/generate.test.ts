@@ -120,6 +120,7 @@ describe('GEN-01 the generated files', () => {
       [
         '.bieberkit/meta/plugins.json',
         '.bieberkit/openapi.json',
+        '.bieberkit/oxlintrc.json',
         '.bieberkit/schemas/crm.Person.create.json',
         '.bieberkit/schemas/crm.Person.read.json',
         '.bieberkit/schemas/crm.Person.update.json',

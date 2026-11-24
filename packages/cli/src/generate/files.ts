@@ -71,6 +71,20 @@ export function generateFiles(app: App): GeneratedFile[] {
     },
     { path: '.bieberkit/openapi.json', content: json(document), committed: false },
     {
+      path: '.bieberkit/oxlintrc.json',
+      content: json({
+        $schema: '../node_modules/oxlint/configuration_schema.json',
+        jsPlugins: ['bieberkit/oxlint'],
+        rules: Object.fromEntries(
+          ['headers', 'env-access', 'boundaries', 'orm', 'sql', 'transactions'].map((name) => [
+            `bieberkit/${name}`,
+            ['error', { root: '.', author: config.author, license: config.license }],
+          ]),
+        ),
+      }),
+      committed: false,
+    },
+    {
       path: '.bieberkit/vitest.config.ts',
       content: `${generatedHeader(config, '.bieberkit/vitest.config.ts', 'The Vitest preset of the project: the files it tests, the databases of its containers and the guard on the network.', 'bieberkit generate')}import { resolve } from 'node:path';
 import { defineConfig } from 'vitest/config';

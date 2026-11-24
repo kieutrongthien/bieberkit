@@ -25,9 +25,17 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { coreEnv, describeEnv, mergeEnv } from '@bieberkit/core';
+import type { EnvDescription } from '@bieberkit/core';
 import { renderEnvExample } from 'create-bieberkit';
 import type { Command } from '../command.ts';
 import { envOwnersOf, loadProject } from '../project.ts';
+import type { Project } from '../project.ts';
+
+/** The rows and the text of `.env.example` for the project as it is now: core first, then the plugins in boot order. */
+export function envExampleOf(project: Pick<Project, 'plugins'>): { rows: readonly EnvDescription[]; text: string } {
+  const rows = describeEnv(mergeEnv([{ name: 'core', schema: coreEnv }, ...envOwnersOf(project)]));
+  return { rows, text: renderEnvExample(rows) };
+}
 
 export const envExampleCommand: Command = {
   name: 'env:example',
@@ -42,8 +50,7 @@ export const envExampleCommand: Command = {
   ],
   async run(context) {
     const project = await loadProject(context.cwd);
-    const rows = describeEnv(mergeEnv([{ name: 'core', schema: coreEnv }, ...envOwnersOf(project)]));
-    const text = renderEnvExample(rows);
+    const { rows, text } = envExampleOf(project);
     const path = join(project.root, '.env.example');
     const current = existsSync(path) ? readFileSync(path, 'utf8') : undefined;
     if (context.args.flags['write'] === true) {

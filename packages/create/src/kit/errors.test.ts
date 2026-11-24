@@ -45,6 +45,12 @@ describe('AI-02 failures', () => {
     expect(failure).toMatchObject({ code: 'PLG_CYCLE', fix: 'Break the cycle.', exit: 1, docs: docsLink('PLG_CYCLE') });
   });
 
+  it('AI-02 an error of another copy of core, for example one that a plugin brought, is still an error of the framework', () => {
+    const foreign = Object.assign(new Error('bad graph'), { code: 'PLG_CYCLE', fix: 'Break the cycle.' });
+    expect(failureOf(foreign)).toMatchObject({ code: 'PLG_CYCLE', fix: 'Break the cycle.', exit: 1 });
+    expect(failureOf(Object.assign(new Error('x'), { code: 'ENOENT' })).code).toBe('BK_UNEXPECTED');
+  });
+
   it('AI-02 an error with no fix still says where to look', () => {
     expect(failureOf(new BkError('bad', { code: 'X_Y' })).fix).not.toBe('');
   });

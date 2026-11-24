@@ -22,6 +22,11 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
+    "./oxlint": {
+      "@bieberkit/source": "./src/oxlint.ts",
+      "types": "./dist/oxlint.d.ts",
+      "default": "./dist/oxlint.js"
+    },
     "./package.json": "./package.json"
   },
   "publishConfig": {
@@ -29,6 +34,10 @@
       ".": {
         "types": "./dist/index.d.ts",
         "default": "./dist/index.js"
+      },
+      "./oxlint": {
+        "types": "./dist/oxlint.d.ts",
+        "default": "./dist/oxlint.js"
       },
       "./package.json": "./package.json"
     },

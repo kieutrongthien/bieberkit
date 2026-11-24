@@ -31,6 +31,7 @@ import { envCheckCommand } from './commands/env-check.ts';
 import { envExampleCommand } from './commands/env-example.ts';
 import { clientGenerateCommand, generateCommand } from './commands/generate.ts';
 import { makeEntityCommand, makeJobCommand, makeModuleCommand } from './commands/make.ts';
+import { addCommand, removeCommand } from './commands/plugin.ts';
 import { openapiCommand } from './commands/openapi.ts';
 import { pluginsCommand } from './commands/plugins.ts';
 import { routesCommand } from './commands/routes.ts';
@@ -54,6 +55,8 @@ export const COMMANDS: readonly Command[] = [
   makeEntityCommand,
   makeJobCommand,
   pluginsCommand,
+  addCommand(),
+  removeCommand(),
   envCheckCommand,
   envExampleCommand,
 ];

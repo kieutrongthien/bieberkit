@@ -29,7 +29,7 @@ Generated from the built declaration files by `pnpm api:update`. Do not edit by 
 
 ```ts
 import { EnvSource } from "@bieberkit/core";
-import { _ as failureOf, a as FlagDef, c as Positional, d as CliError, f as CliErrorOptions, g as docsLink, h as Failure, i as Outcome, l as parseArgs, m as ExitCode, n as Command, o as GLOBAL_FLAGS, p as DOCS_BASE, r as CommandContext, s as ParsedArgs, t as Ask, u as splitCommand, v as usageError } from "./command-DlY-Q08B.js";
+import { _ as failureOf, a as FlagDef, c as Positional, d as CliError, f as CliErrorOptions, g as docsLink, h as Failure, i as Outcome, l as parseArgs, m as ExitCode, n as Command, o as GLOBAL_FLAGS, p as DOCS_BASE, r as CommandContext, s as ParsedArgs, t as Ask, u as splitCommand, v as usageError } from "./command-DqM9OTzA.js";
 interface Io {
   stdout(text: string): void;
   stderr(text: string): void;

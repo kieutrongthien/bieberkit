@@ -29,7 +29,7 @@ Generated from the built declaration files by `pnpm api:update`. Do not edit by 
 
 ```ts
 import { Dialect, EnvDescription, Manifest } from "@bieberkit/core";
-import { n as Command, s as ParsedArgs, t as Ask } from "./command-DlY-Q08B.js";
+import { n as Command, s as ParsedArgs, t as Ask } from "./command-DqM9OTzA.js";
 interface ProjectName {
   readonly name: string;
   readonly folder: string;

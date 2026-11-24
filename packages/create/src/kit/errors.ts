@@ -90,11 +90,24 @@ function problemsOf(error: unknown): readonly Readonly<Record<string, unknown>>[
  * The failure to show for anything that was thrown. An error of the framework keeps its own code (`CFG_ENV_MISSING`, `PLG_CYCLE`), and
  * a bug of ours or of a plugin is `BK_UNEXPECTED`, with the message and no stack, because a stack is not for an agent to repair.
  */
+/**
+ * A framework error, also when it comes from another copy of core than this one (a plugin that was installed with its own): it has a
+ * stable code, and `instanceof` cannot tell two copies apart.
+ */
+function isBkError(error: unknown): error is BkError {
+  return (
+    error instanceof BkError ||
+    (error instanceof Error &&
+      typeof Reflect.get(error, 'code') === 'string' &&
+      /^[A-Z][A-Z0-9]*_[A-Z0-9_]+$/.test(String(Reflect.get(error, 'code'))))
+  );
+}
+
 export function failureOf(error: unknown): Failure {
   if (error instanceof CliError) {
     return { code: error.code, message: error.message, fix: error.fix, docs: docsLink(error.code), exit: error.exit };
   }
-  if (error instanceof BkError) {
+  if (isBkError(error)) {
     return {
       code: error.code,
       message: error.message,
