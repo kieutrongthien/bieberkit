@@ -85,7 +85,7 @@ describeDialects('AUTHZ-05 the audit of impersonation', ({ open }) => {
         data: { actorId: ADMIN, targetId: CUSTOMER, phase: 'end' },
       },
     ]);
-    const events = await db.orm.em.getConnection().execute('select event from bieberkit_outbox order by created_at');
+    const events = await db.orm.em.getConnection().execute('select event from bk_outbox order by created_at');
     expect(events.map((row: { event: string }) => row.event)).toEqual([
       'auth.impersonation.start',
       'auth.impersonation.end',
@@ -151,6 +151,6 @@ describeDialects('AUTHZ-05 the audit of impersonation', ({ open }) => {
       ),
     ).rejects.toThrow('the session could not be made');
     expect(await entries(db)).toEqual([]);
-    expect(await db.orm.em.getConnection().execute('select event from bieberkit_outbox')).toEqual([]);
+    expect(await db.orm.em.getConnection().execute('select event from bk_outbox')).toEqual([]);
   });
 });

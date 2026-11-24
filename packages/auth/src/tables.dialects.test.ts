@@ -55,12 +55,18 @@ describeDialects('AUTH-09 the auth tables', ({ open }) => {
 
   it('DATA-24 the steps made the five tables, and the ledger has them', async () => {
     const db = await open([]);
-    for (const table of ['auth_users', 'auth_sessions', 'auth_accounts', 'auth_verifications', 'auth_rate_limits']) {
+    for (const table of [
+      'bk_auth_users',
+      'bk_auth_sessions',
+      'bk_auth_accounts',
+      'bk_auth_verifications',
+      'bk_auth_rate_limits',
+    ]) {
       await expect(db.orm.em.getConnection().execute(`select * from ${table} where 1 = 0`)).resolves.toEqual([]);
     }
     const ledger: { step_id: string }[] = await db.orm.em
       .getConnection()
-      .execute(`select step_id from bieberkit_plugin_migrations where plugin = '${AUTH_PLUGIN}' and version = '0.2.0'`);
+      .execute(`select step_id from bk_plugin_migrations where plugin = '${AUTH_PLUGIN}' and version = '0.2.0'`);
     expect(ledger.map((row) => row.step_id).toSorted((a, b) => a.localeCompare(b))).toEqual(
       authMigrationSteps
         .filter((step) => step.version === '0.2.0')
@@ -96,15 +102,15 @@ describeDialects('AUTH-09 the auth tables', ({ open }) => {
     });
     const rows: { external_account_ref: string }[] = await db.orm.em
       .getConnection()
-      .execute('select external_account_ref from auth_accounts');
+      .execute('select external_account_ref from bk_auth_accounts');
     expect(rows).toHaveLength(1);
-    const columns: unknown[] = await db.orm.em.getConnection().execute('select * from auth_accounts where 1 = 0');
+    const columns: unknown[] = await db.orm.em.getConnection().execute('select * from bk_auth_accounts where 1 = 0');
     expect(columns).toEqual([]);
   });
 
   it('AUTH-10 the column of the external account is not called account_id', async () => {
     const db = await open([]);
-    await expect(db.orm.em.getConnection().execute('select account_id from auth_accounts')).rejects.toBeInstanceOf(
+    await expect(db.orm.em.getConnection().execute('select account_id from bk_auth_accounts')).rejects.toBeInstanceOf(
       Error,
     );
   });
@@ -157,7 +163,7 @@ describeDialects('AUTH-09 the auth tables', ({ open }) => {
     await runInUnitOfWork(db, async (em) => {
       await em.nativeDelete(AuthUser, { id: userId });
     });
-    for (const table of ['auth_users', 'auth_sessions', 'auth_accounts']) {
+    for (const table of ['bk_auth_users', 'bk_auth_sessions', 'bk_auth_accounts']) {
       expect(await db.orm.em.getConnection().execute(`select * from ${table}`)).toEqual([]);
     }
   });

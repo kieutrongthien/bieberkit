@@ -55,7 +55,7 @@ describeDialects('AUTHZ-01 the roles tables', ({ open }) => {
     const app = await authApp(open);
     const rows: { step_id: string }[] = await app.db.orm.em
       .getConnection()
-      .execute(`select step_id from bieberkit_plugin_migrations where plugin = '${AUTH_PLUGIN}'`);
+      .execute(`select step_id from bk_plugin_migrations where plugin = '${AUTH_PLUGIN}'`);
     expect(rows.map((row) => row.step_id).toSorted()).toEqual(authMigrationSteps.map((step) => step.id).toSorted());
     await app.grant('reader', ['crm.deal.read']);
     expect((await loadGrants(app.db, TENANT_A, user)).permissions).toEqual(new Set(['crm.deal.read']));
@@ -146,7 +146,7 @@ describeDialects('AUTHZ-01 the roles tables', ({ open }) => {
     await runInUnitOfWork(app.db, async (em) => {
       await em.nativeDelete(AuthRole, { id: role });
     });
-    const left: unknown[] = await app.db.orm.em.getConnection().execute('select role_id from auth_role_permissions');
+    const left: unknown[] = await app.db.orm.em.getConnection().execute('select role_id from bk_auth_role_permissions');
     expect(left).toEqual([]);
     expect((await loadGrants(app.db, TENANT_A, user)).permissions.size).toBe(0);
   });

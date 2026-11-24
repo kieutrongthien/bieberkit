@@ -118,7 +118,7 @@ export function accountKey(path: string, email: string): string {
 }
 
 /**
- * The counters live in `auth_rate_limits`, so every replica sees them. One statement records a request and reads the count, so
+ * The counters live in `bk_auth_rate_limits`, so every replica sees them. One statement records a request and reads the count, so
  * requests at the same time cannot all pass a stale read. A counter is a fixed window: it starts at the first request, and a
  * request after the window starts a new one.
  */
@@ -150,8 +150,8 @@ export function createRateLimiter(db: Database): RateLimiter {
         row = await insert
           .onConflict((conflict) =>
             conflict.column('key').doUpdateSet({
-              count: sql`case when auth_rate_limits.last_request <= ${start} then 1 else auth_rate_limits.count + 1 end`,
-              lastRequest: sql`case when auth_rate_limits.last_request <= ${start} then ${now} else auth_rate_limits.last_request end`,
+              count: sql`case when bk_auth_rate_limits.last_request <= ${start} then 1 else bk_auth_rate_limits.count + 1 end`,
+              lastRequest: sql`case when bk_auth_rate_limits.last_request <= ${start} then ${now} else bk_auth_rate_limits.last_request end`,
             }),
           )
           .returning(['count', 'lastRequest'])

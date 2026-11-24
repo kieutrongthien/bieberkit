@@ -44,11 +44,11 @@ describeDialects('AUTH-06 limits', ({ open }) => {
     expect(Number(last.headers['retry-after'])).toBeGreaterThan(0);
   });
 
-  it('AUTH-10 the counter is in auth_rate_limits and stays although the failed request was rolled back', async () => {
+  it('AUTH-10 the counter is in bk_auth_rate_limits and stays although the failed request was rolled back', async () => {
     const app = await authServer(open, { limits: { signIn: { perIp: { window: 30, max: 3 } } } });
     await app.signUp('an@example.vn', { ip: '203.0.113.50' });
     await wrong(app, 'an@example.vn', '203.0.113.9');
-    const counters = await app.rows('select * from auth_rate_limits');
+    const counters = await app.rows('select * from bk_auth_rate_limits');
     expect(counters.some((row) => String(row['key']).includes('203.0.113.9'))).toBe(true);
   });
 
@@ -89,7 +89,7 @@ describeDialects('AUTH-06 limits', ({ open }) => {
     const app = await authServer(open, { limits: { signIn: { perAccount: { window: 60, max: 5 } } } });
     await app.signUp('private.person@example.vn', { ip: '203.0.113.50' });
     await wrong(app, 'private.person@example.vn', '203.0.113.9');
-    const keys = (await app.rows('select * from auth_rate_limits')).map((row) => String(row['key']));
+    const keys = (await app.rows('select * from bk_auth_rate_limits')).map((row) => String(row['key']));
     expect(keys.some((key) => key.startsWith('account:'))).toBe(true);
     expect(keys.some((key) => key.includes('@') || key.includes('private'))).toBe(false);
   });
@@ -99,7 +99,7 @@ describeDialects('AUTH-06 limits', ({ open }) => {
     const statuses = [];
     for (let n = 0; n < 4; n += 1) statuses.push((await app.signUp(`u${n}@example.vn`, { ip: '203.0.113.9' })).status);
     expect(statuses).toEqual([200, 200, 429, 429]);
-    expect(await app.count('auth_users')).toBe(2);
+    expect(await app.count('bk_auth_users')).toBe(2);
   });
 
   it('AUTH-06 the request of a password reset is limited per address and per account', async () => {

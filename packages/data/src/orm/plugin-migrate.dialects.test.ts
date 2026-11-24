@@ -61,7 +61,7 @@ interface LedgerRow {
 
 async function ledger(db: Db): Promise<LedgerRow[]> {
   const { rows } =
-    await sql<LedgerRow>`select plugin, step_id, version, kind, deploy_id, applied_at from bieberkit_plugin_migrations order by plugin, step_id`.execute(
+    await sql<LedgerRow>`select plugin, step_id, version, kind, deploy_id, applied_at from bk_plugin_migrations order by plugin, step_id`.execute(
       db,
     );
   return rows;
@@ -234,7 +234,7 @@ describeDialects('DATA-24 plugin migration runner', ({ dialect, open }) => {
       ),
     );
     expect(error).toMatchObject({ code: 'DATA_MIGRATION_STEP_INVALID' });
-    expect(await failureOf(() => sql`select 1 from bieberkit_plugin_migrations`.execute(db))).toBeDefined();
+    expect(await failureOf(() => sql`select 1 from bk_plugin_migrations`.execute(db))).toBeDefined();
   });
 
   it('DATA-27 a table rebuild does not delete the rows of the tables that point at it', async () => {

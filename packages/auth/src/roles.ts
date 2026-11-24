@@ -59,7 +59,7 @@ const uuid = <T extends object>(extra: T): { type: typeof Uuid7Type } & T => ({ 
 /** A role of one tenant. It only grants. */
 export const AuthRole: EntitySchema<AuthRoleRow> = new EntitySchema<AuthRoleRow>({
   name: 'bieberkit.AuthRole',
-  tableName: 'auth_roles',
+  tableName: 'bk_auth_roles',
   properties: {
     id: uuid({ primary: true, onCreate: () => uuid7() }),
     tenant: uuid({ fieldName: 'tenant_id' }),
@@ -67,13 +67,13 @@ export const AuthRole: EntitySchema<AuthRoleRow> = new EntitySchema<AuthRoleRow>
     system: { type: 'boolean', onCreate: () => false },
     requireMfa: { type: 'boolean', fieldName: 'require_mfa', onCreate: () => false },
   },
-  uniques: [{ name: 'auth_roles_tenant_name_unique', properties: ['tenant', 'name'] }],
+  uniques: [{ name: 'bk_auth_roles_tenant_name_unique', properties: ['tenant', 'name'] }],
 });
 
 /** A permission string that a role grants. */
 export const AuthRolePermission: EntitySchema<AuthRolePermissionRow> = new EntitySchema<AuthRolePermissionRow>({
   name: 'bieberkit.AuthRolePermission',
-  tableName: 'auth_role_permissions',
+  tableName: 'bk_auth_role_permissions',
   properties: {
     roleId: uuid({ primary: true, fieldName: 'role_id' }),
     permission: { type: 'string', length: 200, primary: true },
@@ -83,13 +83,13 @@ export const AuthRolePermission: EntitySchema<AuthRolePermissionRow> = new Entit
 /** A role that a user has in a tenant. */
 export const AuthUserRole: EntitySchema<AuthUserRoleRow> = new EntitySchema<AuthUserRoleRow>({
   name: 'bieberkit.AuthUserRole',
-  tableName: 'auth_user_roles',
+  tableName: 'bk_auth_user_roles',
   properties: {
     tenant: uuid({ primary: true, fieldName: 'tenant_id' }),
     userId: uuid({ primary: true, fieldName: 'user_id' }),
     roleId: uuid({ primary: true, fieldName: 'role_id' }),
   },
-  indexes: [{ name: 'auth_user_roles_user_index', properties: ['tenant', 'userId'] }],
+  indexes: [{ name: 'bk_auth_user_roles_user_index', properties: ['tenant', 'userId'] }],
 });
 
 export const authEntities: readonly EntitySchema[] = [AuthRole, AuthRolePermission, AuthUserRole, ...authTableEntities];
@@ -105,39 +105,39 @@ function step(id: string, up: PluginMigrationStep['up']): PluginMigrationStep {
 const roleSteps: readonly PluginMigrationStep[] = [
   step('roles-create', async (trx, dialect) => {
     await trx.schema
-      .createTable('auth_roles')
+      .createTable('bk_auth_roles')
       .addColumn('id', uuidType(dialect), (c) => c.notNull())
       .addColumn('tenant_id', uuidType(dialect), (c) => c.notNull())
       .addColumn('name', 'varchar(120)', (c) => c.notNull())
       .addColumn('system', 'boolean', (c) => c.notNull())
       .addColumn('require_mfa', 'boolean', (c) => c.notNull())
-      .addPrimaryKeyConstraint('auth_roles_pkey', ['id'])
-      .addUniqueConstraint('auth_roles_tenant_name_unique', ['tenant_id', 'name'])
-      .addUniqueConstraint('auth_roles_tenant_id_unique', ['tenant_id', 'id'])
+      .addPrimaryKeyConstraint('bk_auth_roles_pkey', ['id'])
+      .addUniqueConstraint('bk_auth_roles_tenant_name_unique', ['tenant_id', 'name'])
+      .addUniqueConstraint('bk_auth_roles_tenant_id_unique', ['tenant_id', 'id'])
       .execute();
   }),
   step('role-permissions-create', async (trx, dialect) => {
     await trx.schema
-      .createTable('auth_role_permissions')
+      .createTable('bk_auth_role_permissions')
       .addColumn('role_id', uuidType(dialect), (c) => c.notNull())
       .addColumn('permission', 'varchar(200)', (c) => c.notNull())
-      .addPrimaryKeyConstraint('auth_role_permissions_pkey', ['role_id', 'permission'])
-      .addForeignKeyConstraint('auth_role_permissions_role_fk', ['role_id'], 'auth_roles', ['id'], (c) =>
+      .addPrimaryKeyConstraint('bk_auth_role_permissions_pkey', ['role_id', 'permission'])
+      .addForeignKeyConstraint('bk_auth_role_permissions_role_fk', ['role_id'], 'bk_auth_roles', ['id'], (c) =>
         c.onDelete('cascade'),
       )
       .execute();
   }),
   step('user-roles-create', async (trx, dialect) => {
     await trx.schema
-      .createTable('auth_user_roles')
+      .createTable('bk_auth_user_roles')
       .addColumn('tenant_id', uuidType(dialect), (c) => c.notNull())
       .addColumn('user_id', uuidType(dialect), (c) => c.notNull())
       .addColumn('role_id', uuidType(dialect), (c) => c.notNull())
-      .addPrimaryKeyConstraint('auth_user_roles_pkey', ['tenant_id', 'user_id', 'role_id'])
+      .addPrimaryKeyConstraint('bk_auth_user_roles_pkey', ['tenant_id', 'user_id', 'role_id'])
       .addForeignKeyConstraint(
-        'auth_user_roles_role_fk',
+        'bk_auth_user_roles_role_fk',
         ['tenant_id', 'role_id'],
-        'auth_roles',
+        'bk_auth_roles',
         ['tenant_id', 'id'],
         (c) => c.onDelete('cascade'),
       )
@@ -145,8 +145,8 @@ const roleSteps: readonly PluginMigrationStep[] = [
   }),
   step('user-roles-user-index', async (trx) => {
     await trx.schema
-      .createIndex('auth_user_roles_user_index')
-      .on('auth_user_roles')
+      .createIndex('bk_auth_user_roles_user_index')
+      .on('bk_auth_user_roles')
       .columns(['tenant_id', 'user_id'])
       .execute();
   }),

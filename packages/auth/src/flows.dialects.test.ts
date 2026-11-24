@@ -37,10 +37,12 @@ describeDialects('AUTH-09 the flows of ADR 0012', ({ open }) => {
     const reply = await app.signUp('an@example.vn');
     expect(reply.status).toBe(200);
     expect(idOf(reply.body)).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-/);
-    expect([await app.count('auth_users'), await app.count('auth_accounts'), await app.count('auth_sessions')]).toEqual(
-      [1, 1, 1],
-    );
-    const [account] = await app.rows('select password from auth_accounts');
+    expect([
+      await app.count('bk_auth_users'),
+      await app.count('bk_auth_accounts'),
+      await app.count('bk_auth_sessions'),
+    ]).toEqual([1, 1, 1]);
+    const [account] = await app.rows('select password from bk_auth_accounts');
     expect(String(account?.['password'])).not.toContain(PASSWORD);
     expect(String(account?.['password'])).toContain(':');
   });
@@ -82,12 +84,14 @@ describeDialects('AUTH-09 the flows of ADR 0012', ({ open }) => {
 
   it('AUTH-09 a failure after the sign up takes back the user, the account, the session, the audit and the outbox', async () => {
     const app = await authServer(open);
-    await app.rows('drop table bieberkit_outbox');
+    await app.rows('drop table bk_outbox');
     const reply = await app.signUp('an@example.vn');
     expect(reply.status).toBeGreaterThanOrEqual(500);
-    expect([await app.count('auth_users'), await app.count('auth_accounts'), await app.count('auth_sessions')]).toEqual(
-      [0, 0, 0],
-    );
+    expect([
+      await app.count('bk_auth_users'),
+      await app.count('bk_auth_accounts'),
+      await app.count('bk_auth_sessions'),
+    ]).toEqual([0, 0, 0]);
     expect((await app.audit()).filter((entry) => entry.action.startsWith('auth.'))).toEqual([]);
   });
 
@@ -96,7 +100,7 @@ describeDialects('AUTH-09 the flows of ADR 0012', ({ open }) => {
     await app.signUp('an@example.vn');
     const again = await app.signUp('an@example.vn', { ip: '203.0.113.2' });
     expect(again.status).toBeGreaterThanOrEqual(400);
-    expect(await app.count('auth_users')).toBe(1);
+    expect(await app.count('bk_auth_users')).toBe(1);
     expect((await app.audit()).filter((entry) => entry.action === 'auth.user.signed-up')).toHaveLength(1);
   });
 
@@ -135,7 +139,7 @@ describeDialects('AUTH-09 the flows of ADR 0012', ({ open }) => {
     const verified = await app.api('GET', `/verify-email?token=${encodeURIComponent(mail?.token ?? '')}`);
     expect([200, 302]).toContain(verified.status);
     expect(
-      (await app.rows(`select email_verified from auth_users where email = 'an@example.vn'`))[0]?.['email_verified'],
+      (await app.rows(`select email_verified from bk_auth_users where email = 'an@example.vn'`))[0]?.['email_verified'],
     ).toSatisfy((value: unknown) => value === true || value === 1);
     expect((await app.audit()).map((entry) => entry.action)).toContain('auth.email.verified');
   });
@@ -162,10 +166,10 @@ describeDialects('AUTH-09 the flows of ADR 0012', ({ open }) => {
   it('AUTH-01 sign out removes the session, and the cookie then names nobody', async () => {
     const app = await authServer(open);
     const { cookie } = await app.login('an@example.vn');
-    const before = await app.count('auth_sessions');
+    const before = await app.count('bk_auth_sessions');
     const reply = await app.api('POST', '/sign-out', { cookie, payload: {} });
     expect(reply.status).toBe(200);
-    expect(await app.count('auth_sessions')).toBe(before - 1);
+    expect(await app.count('bk_auth_sessions')).toBe(before - 1);
     expect((await app.api('GET', '/get-session', { cookie })).body['user']).toBeUndefined();
     expect((await app.audit()).map((entry) => entry.action)).toContain('auth.session.revoked');
   });
@@ -173,7 +177,7 @@ describeDialects('AUTH-09 the flows of ADR 0012', ({ open }) => {
   it('SEC-03 a sign out from another site with a cookie is refused by the check of the origin', async () => {
     const app = await authServer(open);
     const { cookie } = await app.login('an@example.vn');
-    const before = await app.count('auth_sessions');
+    const before = await app.count('bk_auth_sessions');
     const reply = await app.api('POST', '/sign-out', {
       cookie,
       payload: {},
@@ -181,7 +185,7 @@ describeDialects('AUTH-09 the flows of ADR 0012', ({ open }) => {
       headers: { origin: 'https://evil.test' },
     });
     expect(reply.status).toBe(403);
-    expect(await app.count('auth_sessions')).toBe(before);
+    expect(await app.count('bk_auth_sessions')).toBe(before);
   });
 
   it('AUTH-10 a cookie value that Better Auth did not sign is no session', async () => {

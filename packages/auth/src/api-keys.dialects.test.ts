@@ -63,8 +63,8 @@ describeDialects('AUTH-07 creating a key', ({ open }) => {
     const created = await key(app, userId, ['crm.deal.read']);
     expect(created.key.startsWith('bk_')).toBe(true);
     expect(created.key.length).toBeGreaterThan(30);
-    expect(JSON.stringify(await app.rows('select * from auth_api_keys'))).not.toContain(created.key);
-    expect(await app.count('auth_api_keys')).toBe(1);
+    expect(JSON.stringify(await app.rows('select * from bk_auth_api_keys'))).not.toContain(created.key);
+    expect(await app.count('bk_auth_api_keys')).toBe(1);
   });
 
   it('AUTH-07 writes an audit entry and an outbox event with the permissions and the expiry, and never the key', async () => {
@@ -108,15 +108,15 @@ describeDialects('AUTH-07 creating a key', ({ open }) => {
     await bad({ name: '  ' });
     await bad({ tenantId: 'acme' });
     await bad({ userId: uuid7() });
-    expect(await app.count('auth_api_keys')).toBe(0);
+    expect(await app.count('bk_auth_api_keys')).toBe(0);
     expect(await app.audit()).not.toContainEqual(expect.objectContaining({ action: 'auth.apikey.created' }));
   });
 
   it('AUTH-07 a failure of the outbox takes the key back with the audit entry', async () => {
     const { app, userId } = await world(open);
-    await app.rows('drop table bieberkit_outbox');
+    await app.rows('drop table bk_outbox');
     await expect(key(app, userId, ['crm.deal.read'])).rejects.toBeInstanceOf(Error);
-    expect(await app.count('auth_api_keys')).toBe(0);
+    expect(await app.count('bk_auth_api_keys')).toBe(0);
   });
 
   it('SEC-07 the routes of Better Auth for keys are not served: a signed in user cannot make a key with the permissions that he likes', async () => {
@@ -129,7 +129,7 @@ describeDialects('AUTH-07 creating a key', ({ open }) => {
       });
       expect([path, reply.status]).toEqual([path, 404]);
     }
-    expect(await app.count('auth_api_keys')).toBe(0);
+    expect(await app.count('bk_auth_api_keys')).toBe(0);
   });
 });
 
@@ -277,7 +277,7 @@ describeDialects('AUTH-07 a key on the entity routes', ({ open }) => {
     await runInUnitOfWork(app.db, async (em) => {
       await em.nativeDelete(AuthUser, { id: userId });
     });
-    expect(await app.count('auth_api_keys')).toBe(0);
+    expect(await app.count('bk_auth_api_keys')).toBe(0);
     expect((await app.send('GET', DEALS, { headers: { 'x-api-key': created.key } })).status).toBe(401);
   });
 });

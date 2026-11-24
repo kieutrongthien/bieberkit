@@ -153,7 +153,7 @@ const instant = (fieldName: string): { type: typeof DateTimeType; length: 3; fie
 /** The model names are the entity names, and Better Auth is told them with `modelName`. */
 export const AuthUser: EntitySchema<AuthUserRow> = new EntitySchema<AuthUserRow>({
   name: 'authUser',
-  tableName: 'auth_users',
+  tableName: 'bk_auth_users',
   properties: {
     id: id(),
     name: { type: 'string', length: 200 },
@@ -164,13 +164,13 @@ export const AuthUser: EntitySchema<AuthUserRow> = new EntitySchema<AuthUserRow>
     createdAt: instant('created_at'),
     updatedAt: instant('updated_at'),
   },
-  uniques: [{ name: 'auth_users_email_unique', properties: ['email'] }],
+  uniques: [{ name: 'bk_auth_users_email_unique', properties: ['email'] }],
 });
 
 // The relation is typed by the entity of the target, which the row type does not know, so the schema has no row type.
 export const AuthSession: EntitySchema = new EntitySchema({
   name: 'authSession',
-  tableName: 'auth_sessions',
+  tableName: 'bk_auth_sessions',
   properties: {
     id: id(),
     userId: { kind: 'm:1', entity: () => AuthUser, mapToPk: true, fieldName: 'user_id', deleteRule: 'cascade' },
@@ -181,14 +181,14 @@ export const AuthSession: EntitySchema = new EntitySchema({
     createdAt: instant('created_at'),
     updatedAt: instant('updated_at'),
   },
-  uniques: [{ name: 'auth_sessions_token_unique', properties: ['token'] }],
-  indexes: [{ name: 'auth_sessions_user_index', properties: ['userId'] }],
+  uniques: [{ name: 'bk_auth_sessions_token_unique', properties: ['token'] }],
+  indexes: [{ name: 'bk_auth_sessions_user_index', properties: ['userId'] }],
 });
 
 // The relation is typed by the entity of the target, which the row type does not know, so the schema has no row type.
 export const AuthAccount: EntitySchema = new EntitySchema({
   name: 'authAccount',
-  tableName: 'auth_accounts',
+  tableName: 'bk_auth_accounts',
   properties: {
     id: id(),
     userId: { kind: 'm:1', entity: () => AuthUser, mapToPk: true, fieldName: 'user_id', deleteRule: 'cascade' },
@@ -204,12 +204,12 @@ export const AuthAccount: EntitySchema = new EntitySchema({
     createdAt: instant('created_at'),
     updatedAt: instant('updated_at'),
   },
-  indexes: [{ name: 'auth_accounts_user_index', properties: ['userId'] }],
+  indexes: [{ name: 'bk_auth_accounts_user_index', properties: ['userId'] }],
 });
 
 export const AuthVerification: EntitySchema<AuthVerificationRow> = new EntitySchema<AuthVerificationRow>({
   name: 'authVerification',
-  tableName: 'auth_verifications',
+  tableName: 'bk_auth_verifications',
   properties: {
     // Better Auth names some rows by a digest (the reservation of a single-use value), which is no UUID, so this id is text.
     id: { type: 'string', length: 64, primary: true, onCreate: () => uuid7() },
@@ -219,25 +219,25 @@ export const AuthVerification: EntitySchema<AuthVerificationRow> = new EntitySch
     createdAt: instant('created_at'),
     updatedAt: instant('updated_at'),
   },
-  indexes: [{ name: 'auth_verifications_identifier_index', properties: ['identifier'] }],
+  indexes: [{ name: 'bk_auth_verifications_identifier_index', properties: ['identifier'] }],
 });
 
 export const AuthRateLimit: EntitySchema<AuthRateLimitRow> = new EntitySchema<AuthRateLimitRow>({
   name: 'authRateLimit',
-  tableName: 'auth_rate_limits',
+  tableName: 'bk_auth_rate_limits',
   properties: {
     id: id(),
     key: { type: 'string', length: 255 },
     count: { type: 'integer' },
     lastRequest: { type: 'bigint', fieldName: 'last_request' },
   },
-  uniques: [{ name: 'auth_rate_limits_key_unique', properties: ['key'] }],
+  uniques: [{ name: 'bk_auth_rate_limits_key_unique', properties: ['key'] }],
 });
 
 // Better Auth names the model `twoFactor` and the table option `twoFactorTable`; both are set to `authTwoFactor`.
 export const AuthTwoFactor: EntitySchema = new EntitySchema({
   name: 'authTwoFactor',
-  tableName: 'auth_two_factors',
+  tableName: 'bk_auth_two_factors',
   properties: {
     id: id(),
     userId: { kind: 'm:1', entity: () => AuthUser, mapToPk: true, fieldName: 'user_id', deleteRule: 'cascade' },
@@ -247,12 +247,12 @@ export const AuthTwoFactor: EntitySchema = new EntitySchema({
     failedVerificationCount: { type: 'integer', fieldName: 'failed_verification_count', nullable: true },
     lockedUntil: { ...instant('locked_until'), nullable: true },
   },
-  indexes: [{ name: 'auth_two_factors_user_index', properties: ['userId'] }],
+  indexes: [{ name: 'bk_auth_two_factors_user_index', properties: ['userId'] }],
 });
 
 export const AuthPasskey: EntitySchema = new EntitySchema({
   name: 'authPasskey',
-  tableName: 'auth_passkeys',
+  tableName: 'bk_auth_passkeys',
   properties: {
     id: id(),
     userId: { kind: 'm:1', entity: () => AuthUser, mapToPk: true, fieldName: 'user_id', deleteRule: 'cascade' },
@@ -266,13 +266,13 @@ export const AuthPasskey: EntitySchema = new EntitySchema({
     createdAt: { ...instant('created_at'), nullable: true },
     aaguid: { type: 'string', length: 64, nullable: true },
   },
-  uniques: [{ name: 'auth_passkeys_credential_unique', properties: ['credentialID'] }],
-  indexes: [{ name: 'auth_passkeys_user_index', properties: ['userId'] }],
+  uniques: [{ name: 'bk_auth_passkeys_credential_unique', properties: ['credentialID'] }],
+  indexes: [{ name: 'bk_auth_passkeys_user_index', properties: ['userId'] }],
 });
 
 export const AuthApiKey: EntitySchema = new EntitySchema({
   name: 'authApiKey',
-  tableName: 'auth_api_keys',
+  tableName: 'bk_auth_api_keys',
   properties: {
     id: id(),
     configId: { type: 'string', length: 64, fieldName: 'config_id' },
@@ -303,8 +303,8 @@ export const AuthApiKey: EntitySchema = new EntitySchema({
     permissions: { type: 'text', nullable: true },
     metadata: { type: 'text', nullable: true },
   },
-  uniques: [{ name: 'auth_api_keys_key_unique', properties: ['key'] }],
-  indexes: [{ name: 'auth_api_keys_user_index', properties: ['referenceId'] }],
+  uniques: [{ name: 'bk_auth_api_keys_key_unique', properties: ['key'] }],
+  indexes: [{ name: 'bk_auth_api_keys_user_index', properties: ['referenceId'] }],
 });
 
 export const authTableEntities: readonly EntitySchema[] = [
@@ -328,7 +328,7 @@ const instantType = (dialect: string): 'timestamptz' | 'datetime' =>
 export const authTableSteps: readonly PluginMigrationStep[] = [
   authStep(VERSION, 'users-create', async (trx, dialect) => {
     await trx.schema
-      .createTable('auth_users')
+      .createTable('bk_auth_users')
       .addColumn('id', uuidType(dialect), (c) => c.notNull())
       .addColumn('name', 'varchar(200)', (c) => c.notNull())
       .addColumn('email', 'varchar(254)', (c) => c.notNull())
@@ -336,13 +336,13 @@ export const authTableSteps: readonly PluginMigrationStep[] = [
       .addColumn('image', 'varchar(500)')
       .addColumn('created_at', instantType(dialect), (c) => c.notNull())
       .addColumn('updated_at', instantType(dialect), (c) => c.notNull())
-      .addPrimaryKeyConstraint('auth_users_pkey', ['id'])
-      .addUniqueConstraint('auth_users_email_unique', ['email'])
+      .addPrimaryKeyConstraint('bk_auth_users_pkey', ['id'])
+      .addUniqueConstraint('bk_auth_users_email_unique', ['email'])
       .execute();
   }),
   authStep(VERSION, 'sessions-create', async (trx, dialect) => {
     await trx.schema
-      .createTable('auth_sessions')
+      .createTable('bk_auth_sessions')
       .addColumn('id', uuidType(dialect), (c) => c.notNull())
       .addColumn('user_id', uuidType(dialect), (c) => c.notNull())
       .addColumn('token', 'varchar(255)', (c) => c.notNull())
@@ -351,17 +351,19 @@ export const authTableSteps: readonly PluginMigrationStep[] = [
       .addColumn('user_agent', 'varchar(500)')
       .addColumn('created_at', instantType(dialect), (c) => c.notNull())
       .addColumn('updated_at', instantType(dialect), (c) => c.notNull())
-      .addPrimaryKeyConstraint('auth_sessions_pkey', ['id'])
-      .addUniqueConstraint('auth_sessions_token_unique', ['token'])
-      .addForeignKeyConstraint('auth_sessions_user_fk', ['user_id'], 'auth_users', ['id'], (c) => c.onDelete('cascade'))
+      .addPrimaryKeyConstraint('bk_auth_sessions_pkey', ['id'])
+      .addUniqueConstraint('bk_auth_sessions_token_unique', ['token'])
+      .addForeignKeyConstraint('bk_auth_sessions_user_fk', ['user_id'], 'bk_auth_users', ['id'], (c) =>
+        c.onDelete('cascade'),
+      )
       .execute();
   }),
   authStep(VERSION, 'sessions-user-index', async (trx) => {
-    await trx.schema.createIndex('auth_sessions_user_index').on('auth_sessions').column('user_id').execute();
+    await trx.schema.createIndex('bk_auth_sessions_user_index').on('bk_auth_sessions').column('user_id').execute();
   }),
   authStep(VERSION, 'accounts-create', async (trx, dialect) => {
     await trx.schema
-      .createTable('auth_accounts')
+      .createTable('bk_auth_accounts')
       .addColumn('id', uuidType(dialect), (c) => c.notNull())
       .addColumn('user_id', uuidType(dialect), (c) => c.notNull())
       .addColumn('external_account_ref', 'varchar(255)', (c) => c.notNull())
@@ -375,50 +377,52 @@ export const authTableSteps: readonly PluginMigrationStep[] = [
       .addColumn('password', 'text')
       .addColumn('created_at', instantType(dialect), (c) => c.notNull())
       .addColumn('updated_at', instantType(dialect), (c) => c.notNull())
-      .addPrimaryKeyConstraint('auth_accounts_pkey', ['id'])
-      .addForeignKeyConstraint('auth_accounts_user_fk', ['user_id'], 'auth_users', ['id'], (c) => c.onDelete('cascade'))
+      .addPrimaryKeyConstraint('bk_auth_accounts_pkey', ['id'])
+      .addForeignKeyConstraint('bk_auth_accounts_user_fk', ['user_id'], 'bk_auth_users', ['id'], (c) =>
+        c.onDelete('cascade'),
+      )
       .execute();
   }),
   authStep(VERSION, 'accounts-user-index', async (trx) => {
-    await trx.schema.createIndex('auth_accounts_user_index').on('auth_accounts').column('user_id').execute();
+    await trx.schema.createIndex('bk_auth_accounts_user_index').on('bk_auth_accounts').column('user_id').execute();
   }),
   authStep(VERSION, 'verifications-create', async (trx, dialect) => {
     await trx.schema
-      .createTable('auth_verifications')
+      .createTable('bk_auth_verifications')
       .addColumn('id', 'varchar(64)', (c) => c.notNull())
       .addColumn('identifier', 'varchar(255)', (c) => c.notNull())
       .addColumn('value', 'text', (c) => c.notNull())
       .addColumn('expires_at', instantType(dialect), (c) => c.notNull())
       .addColumn('created_at', instantType(dialect), (c) => c.notNull())
       .addColumn('updated_at', instantType(dialect), (c) => c.notNull())
-      .addPrimaryKeyConstraint('auth_verifications_pkey', ['id'])
+      .addPrimaryKeyConstraint('bk_auth_verifications_pkey', ['id'])
       .execute();
   }),
   authStep(VERSION, 'verifications-identifier-index', async (trx) => {
     await trx.schema
-      .createIndex('auth_verifications_identifier_index')
-      .on('auth_verifications')
+      .createIndex('bk_auth_verifications_identifier_index')
+      .on('bk_auth_verifications')
       .column('identifier')
       .execute();
   }),
   authStep(VERSION, 'rate-limits-create', async (trx, dialect) => {
     await trx.schema
-      .createTable('auth_rate_limits')
+      .createTable('bk_auth_rate_limits')
       .addColumn('id', uuidType(dialect), (c) => c.notNull())
       .addColumn('key', 'varchar(255)', (c) => c.notNull())
       .addColumn('count', 'integer', (c) => c.notNull())
       .addColumn('last_request', 'bigint', (c) => c.notNull())
-      .addPrimaryKeyConstraint('auth_rate_limits_pkey', ['id'])
-      .addUniqueConstraint('auth_rate_limits_key_unique', ['key'])
+      .addPrimaryKeyConstraint('bk_auth_rate_limits_pkey', ['id'])
+      .addUniqueConstraint('bk_auth_rate_limits_key_unique', ['key'])
       .execute();
   }),
   // Version 0.3.0: the second factor and the passkeys.
   authStep(STRONG, 'users-two-factor-flag', async (trx) => {
-    await trx.schema.alterTable('auth_users').addColumn('two_factor_enabled', 'boolean').execute();
+    await trx.schema.alterTable('bk_auth_users').addColumn('two_factor_enabled', 'boolean').execute();
   }),
   authStep(STRONG, 'two-factors-create', async (trx, dialect) => {
     await trx.schema
-      .createTable('auth_two_factors')
+      .createTable('bk_auth_two_factors')
       .addColumn('id', uuidType(dialect), (c) => c.notNull())
       .addColumn('user_id', uuidType(dialect), (c) => c.notNull())
       .addColumn('secret', 'text', (c) => c.notNull())
@@ -426,18 +430,22 @@ export const authTableSteps: readonly PluginMigrationStep[] = [
       .addColumn('verified', 'boolean')
       .addColumn('failed_verification_count', 'integer')
       .addColumn('locked_until', instantType(dialect))
-      .addPrimaryKeyConstraint('auth_two_factors_pkey', ['id'])
-      .addForeignKeyConstraint('auth_two_factors_user_fk', ['user_id'], 'auth_users', ['id'], (c) =>
+      .addPrimaryKeyConstraint('bk_auth_two_factors_pkey', ['id'])
+      .addForeignKeyConstraint('bk_auth_two_factors_user_fk', ['user_id'], 'bk_auth_users', ['id'], (c) =>
         c.onDelete('cascade'),
       )
       .execute();
   }),
   authStep(STRONG, 'two-factors-user-index', async (trx) => {
-    await trx.schema.createIndex('auth_two_factors_user_index').on('auth_two_factors').column('user_id').execute();
+    await trx.schema
+      .createIndex('bk_auth_two_factors_user_index')
+      .on('bk_auth_two_factors')
+      .column('user_id')
+      .execute();
   }),
   authStep(STRONG, 'passkeys-create', async (trx, dialect) => {
     await trx.schema
-      .createTable('auth_passkeys')
+      .createTable('bk_auth_passkeys')
       .addColumn('id', uuidType(dialect), (c) => c.notNull())
       .addColumn('user_id', uuidType(dialect), (c) => c.notNull())
       .addColumn('name', 'varchar(255)')
@@ -449,18 +457,20 @@ export const authTableSteps: readonly PluginMigrationStep[] = [
       .addColumn('transports', 'varchar(255)')
       .addColumn('created_at', instantType(dialect))
       .addColumn('aaguid', 'varchar(64)')
-      .addPrimaryKeyConstraint('auth_passkeys_pkey', ['id'])
-      .addUniqueConstraint('auth_passkeys_credential_unique', ['credential_id'])
-      .addForeignKeyConstraint('auth_passkeys_user_fk', ['user_id'], 'auth_users', ['id'], (c) => c.onDelete('cascade'))
+      .addPrimaryKeyConstraint('bk_auth_passkeys_pkey', ['id'])
+      .addUniqueConstraint('bk_auth_passkeys_credential_unique', ['credential_id'])
+      .addForeignKeyConstraint('bk_auth_passkeys_user_fk', ['user_id'], 'bk_auth_users', ['id'], (c) =>
+        c.onDelete('cascade'),
+      )
       .execute();
   }),
   authStep(STRONG, 'passkeys-user-index', async (trx) => {
-    await trx.schema.createIndex('auth_passkeys_user_index').on('auth_passkeys').column('user_id').execute();
+    await trx.schema.createIndex('bk_auth_passkeys_user_index').on('bk_auth_passkeys').column('user_id').execute();
   }),
   // Version 0.4.0: the API keys.
   authStep(KEYS, 'api-keys-create', async (trx, dialect) => {
     await trx.schema
-      .createTable('auth_api_keys')
+      .createTable('bk_auth_api_keys')
       .addColumn('id', uuidType(dialect), (c) => c.notNull())
       .addColumn('config_id', 'varchar(64)', (c) => c.notNull())
       .addColumn('name', 'varchar(255)')
@@ -483,14 +493,14 @@ export const authTableSteps: readonly PluginMigrationStep[] = [
       .addColumn('updated_at', instantType(dialect), (c) => c.notNull())
       .addColumn('permissions', 'text')
       .addColumn('metadata', 'text')
-      .addPrimaryKeyConstraint('auth_api_keys_pkey', ['id'])
-      .addUniqueConstraint('auth_api_keys_key_unique', ['key'])
-      .addForeignKeyConstraint('auth_api_keys_user_fk', ['reference_id'], 'auth_users', ['id'], (c) =>
+      .addPrimaryKeyConstraint('bk_auth_api_keys_pkey', ['id'])
+      .addUniqueConstraint('bk_auth_api_keys_key_unique', ['key'])
+      .addForeignKeyConstraint('bk_auth_api_keys_user_fk', ['reference_id'], 'bk_auth_users', ['id'], (c) =>
         c.onDelete('cascade'),
       )
       .execute();
   }),
   authStep(KEYS, 'api-keys-user-index', async (trx) => {
-    await trx.schema.createIndex('auth_api_keys_user_index').on('auth_api_keys').column('reference_id').execute();
+    await trx.schema.createIndex('bk_auth_api_keys_user_index').on('bk_auth_api_keys').column('reference_id').execute();
   }),
 ];

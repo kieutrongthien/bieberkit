@@ -35,14 +35,14 @@ import { Uuid7Type } from './uuid7-type.ts';
 /** The name of the plugin that owns the framework tables in the ledger of plugin steps. */
 export const DATA_PLUGIN = '@bieberkit/data';
 
-export const OUTBOX_TABLE = 'bieberkit_outbox';
-export const PROCESSED_TABLE = 'bieberkit_outbox_processed';
-export const AUDIT_TABLE = 'audit_log';
-export const SEQUENCE_TABLE = 'bieberkit_sequences';
-export const COMMENT_TABLE = 'bieberkit_comments';
-export const TAG_TABLE = 'bieberkit_tags';
-export const ATTACHMENT_TABLE = 'bieberkit_attachments';
-export const TIMELINE_TABLE = 'bieberkit_timeline';
+export const OUTBOX_TABLE = 'bk_outbox';
+export const PROCESSED_TABLE = 'bk_outbox_processed';
+export const AUDIT_TABLE = 'bk_audit_log';
+export const SEQUENCE_TABLE = 'bk_sequences';
+export const COMMENT_TABLE = 'bk_comments';
+export const TAG_TABLE = 'bk_tags';
+export const ATTACHMENT_TABLE = 'bk_attachments';
+export const TIMELINE_TABLE = 'bk_timeline';
 /** The class name of the audit schema. The unit of work refuses to change an entity of this name (DATA-25). */
 export const AUDIT_ENTITY = 'bieberkit.AuditLog';
 
@@ -152,7 +152,7 @@ export const OutboxEntry: EntitySchema<OutboxEntryRow> = new EntitySchema<Outbox
     attempts: { type: 'integer', onCreate: () => 0 },
     lastError: { type: 'text', nullable: true },
   },
-  indexes: [{ name: 'bieberkit_outbox_due_index', properties: ['availableAt', 'createdAt', 'id'] }],
+  indexes: [{ name: 'bk_outbox_due_index', properties: ['availableAt', 'createdAt', 'id'] }],
 });
 
 export const OutboxProcessed: EntitySchema<OutboxProcessedRow> = new EntitySchema<OutboxProcessedRow>({
@@ -163,7 +163,7 @@ export const OutboxProcessed: EntitySchema<OutboxProcessedRow> = new EntitySchem
     eventId: uuid({ primary: true }),
     processedAt: { type: 'bigint' },
   },
-  indexes: [{ name: 'bieberkit_outbox_processed_at_index', properties: ['processedAt'] }],
+  indexes: [{ name: 'bk_outbox_processed_at_index', properties: ['processedAt'] }],
 });
 
 export const AuditLog: EntitySchema<AuditLogRow> = new EntitySchema<AuditLogRow>({
@@ -181,7 +181,7 @@ export const AuditLog: EntitySchema<AuditLogRow> = new EntitySchema<AuditLogRow>
     reason: { type: 'text', nullable: true },
     data: { type: 'text', nullable: true },
   },
-  indexes: [{ name: 'audit_log_tenant_at_index', properties: ['tenant', 'at'] }],
+  indexes: [{ name: 'bk_audit_log_tenant_at_index', properties: ['tenant', 'at'] }],
 });
 
 export const Sequence: EntitySchema<SequenceRow> = new EntitySchema<SequenceRow>({
@@ -207,7 +207,7 @@ export const Comment: EntitySchema<CommentEntryRow> = new EntitySchema<CommentEn
     createdAt: { type: DateTimeType, length: 3, onCreate: () => new Date() },
     createdBy: uuid({ nullable: true }),
   },
-  indexes: [{ name: 'bieberkit_comments_record_index', properties: ['tenant', 'entity', 'recordId'] }],
+  indexes: [{ name: 'bk_comments_record_index', properties: ['tenant', 'entity', 'recordId'] }],
 });
 
 export const Tag: EntitySchema<TagEntryRow> = new EntitySchema<TagEntryRow>({
@@ -223,8 +223,8 @@ export const Tag: EntitySchema<TagEntryRow> = new EntitySchema<TagEntryRow>({
     createdAt: { type: DateTimeType, length: 3, onCreate: () => new Date() },
     createdBy: uuid({ nullable: true }),
   },
-  indexes: [{ name: 'bieberkit_tags_record_index', properties: ['tenant', 'entity', 'recordId'] }],
-  uniques: [{ name: 'bieberkit_tags_unique', properties: ['tenant', 'entity', 'recordId', 'tagKey'] }],
+  indexes: [{ name: 'bk_tags_record_index', properties: ['tenant', 'entity', 'recordId'] }],
+  uniques: [{ name: 'bk_tags_unique', properties: ['tenant', 'entity', 'recordId', 'tagKey'] }],
 });
 
 export const Attachment: EntitySchema<AttachmentEntryRow> = new EntitySchema<AttachmentEntryRow>({
@@ -242,7 +242,7 @@ export const Attachment: EntitySchema<AttachmentEntryRow> = new EntitySchema<Att
     createdAt: { type: DateTimeType, length: 3, onCreate: () => new Date() },
     createdBy: uuid({ nullable: true }),
   },
-  indexes: [{ name: 'bieberkit_attachments_record_index', properties: ['tenant', 'entity', 'recordId'] }],
+  indexes: [{ name: 'bk_attachments_record_index', properties: ['tenant', 'entity', 'recordId'] }],
 });
 
 export const TimelineEntry: EntitySchema<TimelineEntryRow> = new EntitySchema<TimelineEntryRow>({
@@ -258,7 +258,7 @@ export const TimelineEntry: EntitySchema<TimelineEntryRow> = new EntitySchema<Ti
     at: { type: DateTimeType, length: 3, onCreate: () => new Date() },
     actorId: uuid({ nullable: true }),
   },
-  indexes: [{ name: 'bieberkit_timeline_record_index', properties: ['tenant', 'entity', 'recordId'] }],
+  indexes: [{ name: 'bk_timeline_record_index', properties: ['tenant', 'entity', 'recordId'] }],
 });
 
 /** The schemas that `createDatabase` adds to the entities of the project. */
@@ -323,7 +323,7 @@ function featureSteps(): PluginMigrationStep[] {
       },
       FEATURE_VERSION,
     ),
-    indexStep('bieberkit_comments_record_index', COMMENT_TABLE, KEY),
+    indexStep('bk_comments_record_index', COMMENT_TABLE, KEY),
     step(
       'tags-create',
       'expand',
@@ -343,8 +343,8 @@ function featureSteps(): PluginMigrationStep[] {
       },
       FEATURE_VERSION,
     ),
-    indexStep('bieberkit_tags_record_index', TAG_TABLE, KEY),
-    indexStep('bieberkit_tags_unique', TAG_TABLE, [...KEY, 'tag_key'], true),
+    indexStep('bk_tags_record_index', TAG_TABLE, KEY),
+    indexStep('bk_tags_unique', TAG_TABLE, [...KEY, 'tag_key'], true),
     step(
       'attachments-create',
       'expand',
@@ -366,7 +366,7 @@ function featureSteps(): PluginMigrationStep[] {
       },
       FEATURE_VERSION,
     ),
-    indexStep('bieberkit_attachments_record_index', ATTACHMENT_TABLE, KEY),
+    indexStep('bk_attachments_record_index', ATTACHMENT_TABLE, KEY),
     step(
       'timeline-create',
       'expand',
@@ -386,7 +386,7 @@ function featureSteps(): PluginMigrationStep[] {
       },
       FEATURE_VERSION,
     ),
-    indexStep('bieberkit_timeline_record_index', TIMELINE_TABLE, KEY),
+    indexStep('bk_timeline_record_index', TIMELINE_TABLE, KEY),
   ];
 }
 
@@ -418,7 +418,7 @@ export const dataMigrationSteps: readonly PluginMigrationStep[] = [
   }),
   step('outbox-due-index', 'expand', async (trx: Trx) => {
     await trx.schema
-      .createIndex('bieberkit_outbox_due_index')
+      .createIndex('bk_outbox_due_index')
       .on(OUTBOX_TABLE)
       .columns(['available_at', 'created_at', 'id'])
       .execute();
@@ -433,11 +433,7 @@ export const dataMigrationSteps: readonly PluginMigrationStep[] = [
       .execute();
   }),
   step('outbox-processed-index', 'expand', async (trx: Trx) => {
-    await trx.schema
-      .createIndex('bieberkit_outbox_processed_at_index')
-      .on(PROCESSED_TABLE)
-      .column('processed_at')
-      .execute();
+    await trx.schema.createIndex('bk_outbox_processed_at_index').on(PROCESSED_TABLE).column('processed_at').execute();
   }),
   step('audit-log-create', 'expand', async (trx: Trx, dialect) => {
     await trx.schema
@@ -456,18 +452,18 @@ export const dataMigrationSteps: readonly PluginMigrationStep[] = [
       .execute();
   }),
   step('audit-log-index', 'expand', async (trx: Trx) => {
-    await trx.schema.createIndex('audit_log_tenant_at_index').on(AUDIT_TABLE).columns(['tenant_id', 'at']).execute();
+    await trx.schema.createIndex('bk_audit_log_tenant_at_index').on(AUDIT_TABLE).columns(['tenant_id', 'at']).execute();
   }),
   // On SQLite a trigger is the append-only rule. PostgreSQL and MySQL use grants instead (`grantAuditLog`).
   step('audit-log-no-update', 'expand', async (trx: Trx, dialect) => {
     if (dialect !== 'sqlite') return;
-    await sql`create trigger audit_log_no_update before update on audit_log begin select raise(abort, 'audit_log is append-only'); end`.execute(
+    await sql`create trigger bk_audit_log_no_update before update on bk_audit_log begin select raise(abort, 'bk_audit_log is append-only'); end`.execute(
       trx,
     );
   }),
   step('audit-log-no-delete', 'expand', async (trx: Trx, dialect) => {
     if (dialect !== 'sqlite') return;
-    await sql`create trigger audit_log_no_delete before delete on audit_log begin select raise(abort, 'audit_log is append-only'); end`.execute(
+    await sql`create trigger bk_audit_log_no_delete before delete on bk_audit_log begin select raise(abort, 'bk_audit_log is append-only'); end`.execute(
       trx,
     );
   }),

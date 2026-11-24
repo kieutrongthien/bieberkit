@@ -146,7 +146,7 @@ export async function openMigrator(env: MigrationEnv, options: MigratorOptions):
         glob: '!(*.d).{js,ts}',
         emit: 'ts',
         generator: FileGenerator,
-        tableName: 'bieberkit_migrations',
+        tableName: 'bk_migrations',
         snapshot: true,
         snapshotName: snapshot,
         // The snapshot changes only when a migration is made, never from the live database.

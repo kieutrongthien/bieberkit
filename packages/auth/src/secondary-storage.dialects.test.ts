@@ -76,7 +76,7 @@ run('AUTH-02 sessions on Valkey', () => {
       const { id, cookie } = await app.login('an@example.vn');
       expect(store.sets.some((key) => key.includes('session') || key.includes('active'))).toBe(true);
       // `login` signs up, which makes a session, and signs in, which makes another.
-      expect(await app.count('auth_sessions')).toBe(2);
+      expect(await app.count('bk_auth_sessions')).toBe(2);
       store.gets.length = 0;
       const answer = await app.api('GET', '/get-session', { cookie });
       expect(answer.status).toBe(200);
@@ -119,11 +119,11 @@ run('AUTH-02 sessions on Valkey', () => {
       const app = await authServer(open, { secondaryStorage: store.storage });
       const { cookie } = await app.login('an@example.vn');
       store.deletes.length = 0;
-      const before = await app.count('auth_sessions');
+      const before = await app.count('bk_auth_sessions');
       const out = await app.api('POST', '/sign-out', { cookie, payload: {} });
       expect(out.status).toBe(200);
       expect(store.deletes.length).toBeGreaterThan(0);
-      expect(await app.count('auth_sessions')).toBe(before - 1);
+      expect(await app.count('bk_auth_sessions')).toBe(before - 1);
       const after = await app.api('GET', '/get-session', { cookie });
       expect(after.body['user']).toBeUndefined();
       await store.close();
@@ -134,7 +134,7 @@ run('AUTH-02 sessions on Valkey', () => {
       const { cookie } = await app.login('an@example.vn');
       expect(cookieOf(await app.signIn('an@example.vn'))).toBeDefined();
       expect((await app.api('GET', '/get-session', { cookie })).status).toBe(200);
-      expect(await app.count('auth_sessions')).toBeGreaterThanOrEqual(1);
+      expect(await app.count('bk_auth_sessions')).toBeGreaterThanOrEqual(1);
     });
   });
 });

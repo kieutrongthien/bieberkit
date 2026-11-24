@@ -72,7 +72,7 @@ describeDialects('AUTHZ-01 the ability of one request', ({ open }) => {
   it('AUTHZ-01 loads the grants once for a request that asks several times, and not again for the next request', async () => {
     const app = await authApp(open);
     await app.grant('admin', ['crm.deal.read', 'crm.deal.update']);
-    const countRoleReads = () => app.queries.filter((text) => /auth_user_roles/.test(text)).length;
+    const countRoleReads = () => app.queries.filter((text) => /bk_auth_user_roles/.test(text)).length;
     const before = countRoleReads();
     // One list asks for the route permission and for the scope: two questions, one load.
     expect((await app.as('admin').get(DEALS)).status).toBe(200);
@@ -141,7 +141,7 @@ describeDialects('AUTHZ-05 the audit of a denial', ({ open }) => {
 
   it('AUTHZ-05 a failing audit write does not change the answer that the caller gets', async () => {
     const app = await authApp(open);
-    await app.db.orm.em.getConnection().execute('drop table audit_log');
+    await app.db.orm.em.getConnection().execute('drop table bk_audit_log');
     expect((await app.as('none').get(DEALS)).status).toBe(403);
   });
 });

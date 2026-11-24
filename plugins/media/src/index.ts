@@ -35,7 +35,7 @@ const ENTITY = 'media.Media';
 /** One file: its name, its type and its size as the person said them, and whether the bytes arrived (`ready`) or not (`pending`). */
 export const Media: EntityDef<'media.Media'> = defineEntity({
   name: ENTITY,
-  table: 'media_media',
+  table: 'bk_media',
   fields: {
     id: f.id(),
     filename: f.string({ min: 1, max: 200 }),

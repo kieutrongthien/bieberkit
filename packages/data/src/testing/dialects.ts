@@ -151,7 +151,13 @@ export function describeDialects(name: string, suite: (context: DialectContext) 
           const own = ddl
             .split(';')
             .map((text) => text.trim())
-            .filter((text) => text !== '' && !/bieberkit_|audit_log/.test(text));
+            .filter(
+              (text) =>
+                text !== '' &&
+                !/\bbk_(?:auth_|audit_log|migration|plugin_migrations|outbox|sequences|comments|attachments|timeline|tags|jobs|locks)/.test(
+                  text,
+                ),
+            );
           for (const text of own) await database.orm.em.getConnection().execute(text);
           return database;
         },

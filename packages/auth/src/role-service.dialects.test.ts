@@ -55,7 +55,7 @@ async function entries(db: Database) {
 }
 
 const events = async (db: Database): Promise<string[]> =>
-  (await db.orm.em.getConnection().execute('select event from bieberkit_outbox order by created_at')).map(
+  (await db.orm.em.getConnection().execute('select event from bk_outbox order by created_at')).map(
     (row: { event: string }) => row.event,
   );
 
@@ -154,7 +154,7 @@ describeDialects('AUTHZ-05 the service of roles', ({ open }) => {
     await assignRole(db, { tenantId: TENANT, userId: two, roleId: id });
     await asActor(() => deleteRole(db, id));
     expect((await loadGrants(db, TENANT, one)).permissions.size).toBe(0);
-    expect(await db.orm.em.getConnection().execute('select * from auth_role_permissions')).toEqual([]);
+    expect(await db.orm.em.getConnection().execute('select * from bk_auth_role_permissions')).toEqual([]);
     const gone = (await entries(db)).find((entry) => entry.action === 'auth.role.deleted');
     expect(gone?.data).toMatchObject({ name: 'sales', users: 2 });
     await expect(deleteRole(db, id)).rejects.toMatchObject({ code: 'AUTH_ROLE_NOT_FOUND', status: 404 });
@@ -208,12 +208,12 @@ describeDialects('AUTHZ-05 the service of roles', ({ open }) => {
 
   it('AUTHZ-05 a failure of the outbox takes back the change: no role, no permission, no audit entry', async () => {
     const db = await open([]);
-    await db.orm.em.getConnection().execute('drop table bieberkit_outbox');
+    await db.orm.em.getConnection().execute('drop table bk_outbox');
     await expect(createRole(db, { tenantId: TENANT, name: 'sales', permissions: ['a.read'] })).rejects.toBeInstanceOf(
       Error,
     );
-    expect(await db.orm.em.getConnection().execute('select * from auth_roles')).toEqual([]);
-    expect(await db.orm.em.getConnection().execute('select * from auth_role_permissions')).toEqual([]);
+    expect(await db.orm.em.getConnection().execute('select * from bk_auth_roles')).toEqual([]);
+    expect(await db.orm.em.getConnection().execute('select * from bk_auth_role_permissions')).toEqual([]);
     expect(await entries(db)).toEqual([]);
   });
 });

@@ -46,7 +46,7 @@ const waitFor = async (done: () => boolean | Promise<boolean>, timeoutMs = 15_00
 const idOf = (payload: unknown): string =>
   typeof payload === 'object' && payload !== null && 'id' in payload ? String(payload.id) : '';
 const outboxRows = async (db: Database): Promise<number> =>
-  (await db.orm.em.getConnection().execute('select * from bieberkit_outbox')).length;
+  (await db.orm.em.getConnection().execute('select * from bk_outbox')).length;
 const jobRows = async (db: Database) => (await rawKysely(db)).selectFrom(JOBS_TABLE).selectAll().execute();
 
 const emit = (db: Database, name = 'crm.deal.won', id = 'd1') =>
@@ -134,7 +134,7 @@ describeDialects('Q-06 the outbox and the queue', ({ open }) => {
     await emit(db);
     const kysely = await rawKysely(db);
     // The dispatcher inserted the job and then died before the commit: the job exists, and the row is still there.
-    const rowsNow: unknown[] = await db.orm.em.getConnection().execute('select * from bieberkit_outbox');
+    const rowsNow: unknown[] = await db.orm.em.getConnection().execute('select * from bk_outbox');
     const row = rowsNow[0];
     expect(row).toBeDefined();
     await kysely.transaction().execute(async (trx) => {

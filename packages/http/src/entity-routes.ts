@@ -81,10 +81,14 @@ const OPERATORS: Readonly<Record<string, string>> = {
 };
 const STANDARD_KEYS = ['id', 'version', 'createdAt', 'updatedAt', 'createdBy', 'updatedBy'] as const;
 
-/** `crm.Customer` on `crm_customers`: module `crm`, resource `customers`. */
+/**
+ * `crm.Customer` on `crm_customers`: module `crm`, resource `customers`. The prefix `bk_` of the tables of the framework and of its
+ * plugins is not part of an address, so `settings.Setting` on `bk_settings` is `/api/v1/settings/settings` (DATA-28).
+ */
 export function pathOf(def: EntityDef<string>): string {
   const module = def.name.slice(0, def.name.indexOf('.'));
-  const table = def.table.startsWith(`${module}_`) ? def.table.slice(module.length + 1) : def.table;
+  const bare = def.table.startsWith('bk_') ? def.table.slice(3) : def.table;
+  const table = bare.startsWith(`${module}_`) ? bare.slice(module.length + 1) : bare;
   return `/api/v1/${module}/${table.replaceAll('_', '-')}`;
 }
 

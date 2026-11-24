@@ -43,7 +43,7 @@ describeDialects('AUTH-03 TOTP', ({ open }) => {
     const uri = String(reply.body['totpURI']);
     expect(uri).toMatch(/^otpauth:\/\/totp\/BieberKit%20Test:/);
     expect(Array.isArray(reply.body['backupCodes']) ? reply.body['backupCodes'] : []).toHaveLength(10);
-    const stored = JSON.stringify(await app.rows('select * from auth_two_factors'));
+    const stored = JSON.stringify(await app.rows('select * from bk_auth_two_factors'));
     expect(stored).not.toContain(secretOf(uri));
   });
 
@@ -52,7 +52,7 @@ describeDialects('AUTH-03 TOTP', ({ open }) => {
     const { cookie } = await app.login('an@example.vn');
     const reply = await app.api('POST', '/two-factor/enable', { cookie, payload: { password: 'not the password' } });
     expect(reply.status).toBeGreaterThanOrEqual(400);
-    expect(await app.count('auth_two_factors')).toBe(0);
+    expect(await app.count('bk_auth_two_factors')).toBe(0);
   });
 
   it('AUTH-03 after it is on, a sign in with the password alone gives no session, and the code gives one', async () => {
@@ -149,10 +149,10 @@ describeDialects('AUTH-03 TOTP', ({ open }) => {
   it('AUTH-09 enabling and confirming are in one transaction each: a failure of the outbox leaves the secret unwritten', async () => {
     const app = await authServer(open, { totp: true });
     const { cookie } = await app.login('an@example.vn');
-    await app.rows('drop table bieberkit_outbox');
+    await app.rows('drop table bk_outbox');
     const reply = await app.api('POST', '/two-factor/enable', { cookie, payload: { password: PASSWORD } });
     expect(reply.status).toBeGreaterThanOrEqual(500);
-    expect(await app.count('auth_two_factors')).toBe(0);
+    expect(await app.count('bk_auth_two_factors')).toBe(0);
   });
 });
 
@@ -195,7 +195,7 @@ describeDialects('AUTH-03 the magic link', ({ open }) => {
     const unknown = await ask(app, 'nobody@example.vn', '203.0.113.32');
     expect([unknown.status, unknown.body]).toEqual([known.status, known.body]);
     expect(app.mails.length).toBe(before);
-    expect(await app.count('auth_users')).toBe(1);
+    expect(await app.count('bk_auth_users')).toBe(1);
   });
 
   it('AUTH-03 a link that has expired does not sign in', async () => {
@@ -252,7 +252,7 @@ describeDialects('AUTH-03 passkeys', ({ open }) => {
     const app = await authServer(open, { passkey: true });
     const { added, id } = await registered(app);
     expect(added.status).toBe(200);
-    expect(await app.count('auth_passkeys')).toBe(1);
+    expect(await app.count('bk_auth_passkeys')).toBe(1);
     expect(await actions(app)).toContain('auth.passkey.added');
     const entry = (await app.audit()).find((item) => item.action === 'auth.passkey.added');
     expect(entry?.actorId).toBe(id);
@@ -302,7 +302,7 @@ describeDialects('AUTH-03 passkeys', ({ open }) => {
     expect(listed).toHaveLength(1);
     const removed = await app.api('POST', '/passkey/delete-passkey', { cookie, payload: { id: listed[0]?.id } });
     expect(removed.status).toBe(200);
-    expect(await app.count('auth_passkeys')).toBe(0);
+    expect(await app.count('bk_auth_passkeys')).toBe(0);
     expect(cookieOf(await signInWith(app, device, '203.0.113.10'))).toBeUndefined();
     expect(await actions(app)).toContain('auth.passkey.removed');
   });

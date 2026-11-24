@@ -97,7 +97,7 @@ describe('section 7.1 the roles', () => {
       .getConnection()
       .execute("select name from sqlite_master where type = 'table'");
     const names = rows.map((row: unknown) => String(Object(row).name));
-    for (const table of ['crm_people', 'bieberkit_outbox', 'audit_log', 'auth_roles']) expect(names).toContain(table);
+    for (const table of ['crm_people', 'bk_outbox', 'bk_audit_log', 'bk_auth_roles']) expect(names).toContain(table);
   });
 
   it('DATA-25 the migrate role in production runs the files of the project on MIGRATE_DATABASE_URL, and makes no table from the entities', async () => {
@@ -116,7 +116,7 @@ describe('section 7.1 the roles', () => {
       .getConnection()
       .execute("select name from sqlite_master where type = 'table'");
     const names = rows.map((row: unknown) => String(Object(row).name));
-    for (const table of ['crm_people', 'bieberkit_migrations', 'bieberkit_plugin_migrations', 'bk_jobs'])
+    for (const table of ['crm_people', 'bk_migrations', 'bk_plugin_migrations', 'bk_jobs'])
       expect(names).toContain(table);
   });
 

@@ -193,7 +193,7 @@ describeDialects('MOD-12 sequences', ({ openFramework }) => {
     const { rows } = await sql<{
       value: string | number;
       period: string;
-    }>`select value, period from bieberkit_sequences order by value desc`.execute(await kyselyOf(db.orm.em));
+    }>`select value, period from bk_sequences order by value desc`.execute(await kyselyOf(db.orm.em));
     expect(rows.map((row) => [Number(row.value), row.period])).toEqual([
       [2, YEAR],
       [1, YEAR],

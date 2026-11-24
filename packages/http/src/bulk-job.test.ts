@@ -92,7 +92,13 @@ async function setup(options: { authorizer?: Authorizer; withQueue?: boolean } =
   for (const text of ddl
     .split(';')
     .map((part) => part.trim())
-    .filter((part) => part !== '' && !/bieberkit_|audit_log|\bbk_jobs|\bbk_locks/.test(part))) {
+    .filter(
+      (part) =>
+        part !== '' &&
+        !/\bbk_(?:auth_|audit_log|migration|plugin_migrations|outbox|sequences|comments|attachments|timeline|tags|jobs|locks)/.test(
+          part,
+        ),
+    )) {
     await db.orm.em.getConnection().execute(text);
   }
   const bulkJob = createBulkJob({ db, schemas, authorizer });

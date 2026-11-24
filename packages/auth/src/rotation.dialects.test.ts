@@ -49,7 +49,7 @@ describeDialects('SEC-08 the rotation of the secret', ({ open }) => {
 
   it('SEC-08 the TOTP secret is stored as an envelope with the id of the key, so a later rotation can find the key', async () => {
     const { first } = await enrolled();
-    const [row] = await first.rows('select * from auth_two_factors');
+    const [row] = await first.rows('select * from bk_auth_two_factors');
     expect(String(row?.['secret'])).toMatch(/^\$ba\$\d+\$/);
   });
 

@@ -81,7 +81,8 @@ async function run(root: string, deps: BackupDeps, argv: string[]) {
   };
 }
 
-describe('DEP-09 backup:verify on SQLite, with no container', () => {
+// Each test derives a key with 600 000 rounds, twice, and one of them migrates a database: a loaded machine needs more than 5 s.
+describe('DEP-09 backup:verify on SQLite, with no container', { timeout: 30_000 }, () => {
   it('restores the newest dump of a database that has been migrated, and says that nothing is left to migrate', async () => {
     const { root, backups } = world();
     const { runMigrations, makeMigration } = await import('@bieberkit/server');
@@ -183,7 +184,7 @@ function docker(options: { failOn?: string } = {}): { exec: Exec; calls: string[
   return { exec, calls };
 }
 
-describe('DEP-09 backup:verify on PostgreSQL, over a throwaway container', () => {
+describe('DEP-09 backup:verify on PostgreSQL, over a throwaway container', { timeout: 30_000 }, () => {
   it('starts a container that is thrown away, restores into it, and always removes it, even when the restore fails', async () => {
     const { root, backups } = world('postgres');
     writeFileSync(join(backups, 'postgres-2026-01-02.dump.enc'), encrypt(Buffer.from('dump')));

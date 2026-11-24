@@ -135,7 +135,7 @@ export async function nextSequence(
     .onConflict((conflict) =>
       conflict
         .columns(['tenant_id', 'name', 'period'])
-        .doUpdateSet((eb) => ({ value: eb('bieberkit_sequences.value', '+', 1) })),
+        .doUpdateSet((eb) => ({ value: eb('bk_sequences.value', '+', 1) })),
     )
     .returning('value')
     .executeTakeFirstOrThrow();

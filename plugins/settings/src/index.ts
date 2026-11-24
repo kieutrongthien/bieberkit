@@ -30,7 +30,7 @@ import type { EntityDef } from '@bieberkit/data';
 /** One setting of the application: a key that is unique and a value as text (JSON when it holds more than a word). */
 export const Setting: EntityDef<'settings.Setting'> = defineEntity({
   name: 'settings.Setting',
-  table: 'settings_settings',
+  table: 'bk_settings',
   fields: {
     id: f.id(),
     key: f.string({ min: 1, max: 120 }).unique(),

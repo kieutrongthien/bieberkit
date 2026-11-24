@@ -28,7 +28,7 @@ import type { Dialect } from '@bieberkit/core';
 import { dataError } from '../errors.ts';
 import type { StepDatabase } from '../migrations/steps.ts';
 
-export const MIGRATION_LOCK_TABLE = 'bieberkit_migration_lock';
+export const MIGRATION_LOCK_TABLE = 'bk_migration_lock';
 const LOCK_NAME = 'migrate';
 
 export interface MigrationLockOptions {

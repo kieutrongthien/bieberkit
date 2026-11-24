@@ -62,7 +62,8 @@ const env = (url: string, dialect: Dialect) =>
     DB_POOL_MAX: dialect === 'sqlite' ? 1 : 5,
   }) as const;
 /** The tables that the migration steps make, which the schema must not make a second time. */
-const STEP_TABLES = /bieberkit_|audit_log|\bauth_/;
+const STEP_TABLES =
+  /\bbk_(?:auth_|audit_log|migration|plugin_migrations|outbox|sequences|comments|attachments|timeline|tags|jobs|locks)/;
 
 /** Opens the database at `url` and makes its tables: the steps of the framework and of auth, then the tables of the entities. */
 async function prepare(

@@ -28,10 +28,10 @@ import type { ScopedPermission } from '@bieberkit/auth';
 import { defineEntity, f } from '@bieberkit/data';
 import type { EntityDef } from '@bieberkit/data';
 
-/** A notification for one user. `userId` is the id of the user in `auth_users`. */
+/** A notification for one user. `userId` is the id of the user in `bk_auth_users`. */
 export const Notification: EntityDef<'notifications.Notification'> = defineEntity({
   name: 'notifications.Notification',
-  table: 'notifications_notifications',
+  table: 'bk_notifications',
   fields: {
     id: f.id(),
     userId: f.string({ min: 36, max: 36 }).index(),

@@ -318,7 +318,7 @@ export declare function rawKysely(db: {
     readonly em: EntityManager;
   };
 }): Promise<Kysely<StepDatabase>>;
-export declare const MIGRATION_LOCK_TABLE = "bieberkit_migration_lock";
+export declare const MIGRATION_LOCK_TABLE = "bk_migration_lock";
 interface MigrationLockOptions {
   readonly owner?: string;
   readonly ttlMs?: number;

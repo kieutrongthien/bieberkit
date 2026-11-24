@@ -154,7 +154,7 @@ describeDialects('DATA-08 project migrations', ({ dialect, emptyDatabase }) => {
     expect(await migrator.up()).toEqual([]);
     const look = await p.look();
     expect(await look.query('select count(*) as n from notes_notes')).toHaveLength(1);
-    expect(await look.query('select count(*) as n from bieberkit_migrations')).toHaveLength(1);
+    expect(await look.query('select count(*) as n from bk_migrations')).toHaveLength(1);
     await look.db.close();
   });
 
@@ -271,7 +271,7 @@ describeDialects('DATA-08 project migrations', ({ dialect, emptyDatabase }) => {
     expect(run.applied).toEqual(['a/make']);
     const look = await p.look();
     expect(await look.query('select id from a_things')).toEqual([]);
-    expect(await look.query('select step_id from bieberkit_plugin_migrations')).toEqual([{ step_id: 'make' }]);
+    expect(await look.query('select step_id from bk_plugin_migrations')).toEqual([{ step_id: 'make' }]);
     await look.db.close();
   });
 });

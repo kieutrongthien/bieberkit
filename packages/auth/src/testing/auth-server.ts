@@ -306,6 +306,6 @@ export async function authServer(
           }));
       }),
     outbox: async () =>
-      (await rows('select event from bieberkit_outbox order by created_at')).map((row) => String(row['event'])),
+      (await rows('select event from bk_outbox order by created_at')).map((row) => String(row['event'])),
   };
 }

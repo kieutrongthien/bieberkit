@@ -62,7 +62,7 @@ const USER = '0191a2b3-0000-7000-8000-000000000002';
 describeDialects('MOD-18 framework tables', ({ dialect, openFramework, emptyDatabase }) => {
   it('DATA-24 the steps of the data plugin are in the ledger of plugin steps', async () => {
     const db = await openFramework();
-    const { rows } = await sql<{ plugin: string }>`select distinct plugin from bieberkit_plugin_migrations`.execute(
+    const { rows } = await sql<{ plugin: string }>`select distinct plugin from bk_plugin_migrations`.execute(
       await kyselyOf(db.orm.em),
     );
     expect(rows).toEqual([{ plugin: DATA_PLUGIN }]);
@@ -79,7 +79,14 @@ describeDialects('MOD-18 framework tables', ({ dialect, openFramework, emptyData
   it('DATA-24 the steps and the schemas of the ORM describe the same tables', async () => {
     const db = await openFramework();
     const statements = await db.orm.schema.getUpdateSchemaSQL({ safe: true });
-    const touching = statements.split(';').filter((text) => /bieberkit_|audit_log/.test(text) && text.trim() !== '');
+    const touching = statements
+      .split(';')
+      .filter(
+        (text) =>
+          /\bbk_(?:auth_|audit_log|migration|plugin_migrations|outbox|sequences|comments|attachments|timeline|tags|jobs|locks)/.test(
+            text,
+          ) && text.trim() !== '',
+      );
     expect(touching).toEqual([]);
   });
 
@@ -251,8 +258,8 @@ describeDialects('MOD-18 framework tables', ({ dialect, openFramework, emptyData
       await em.flush();
     });
     const kysely = await kyselyOf(db.orm.em);
-    expect(await failureOf(() => sql`update audit_log set action = 'x'`.execute(kysely))).toBeDefined();
-    expect(await failureOf(() => sql`delete from audit_log`.execute(kysely))).toBeDefined();
+    expect(await failureOf(() => sql`update bk_audit_log set action = 'x'`.execute(kysely))).toBeDefined();
+    expect(await failureOf(() => sql`delete from bk_audit_log`.execute(kysely))).toBeDefined();
     expect(await db.fork().count(AuditLog)).toBe(1);
   });
 
@@ -290,9 +297,9 @@ describeDialects('MOD-18 framework tables', ({ dialect, openFramework, emptyData
           });
           expect(await app.fork().count(AuditLog)).toBe(1);
           const appKysely = await kyselyOf(app.orm.em);
-          expect(await failureOf(() => sql`update audit_log set action = 'x'`.execute(appKysely))).toBeDefined();
-          expect(await failureOf(() => sql`delete from audit_log`.execute(appKysely))).toBeDefined();
-          expect(await failureOf(() => sql`drop table audit_log`.execute(appKysely))).toBeDefined();
+          expect(await failureOf(() => sql`update bk_audit_log set action = 'x'`.execute(appKysely))).toBeDefined();
+          expect(await failureOf(() => sql`delete from bk_audit_log`.execute(appKysely))).toBeDefined();
+          expect(await failureOf(() => sql`drop table bk_audit_log`.execute(appKysely))).toBeDefined();
         } finally {
           await app.close();
         }
@@ -321,7 +328,7 @@ describeDialects('MOD-18 framework tables', ({ dialect, openFramework, emptyData
     const db = await openFramework();
     const kysely = await kyselyOf(db.orm.em);
     const error = await failureOf(() =>
-      kysely.transaction().execute((trx) => grantAuditLog(trx, dialect, 'x"; drop table audit_log; --')),
+      kysely.transaction().execute((trx) => grantAuditLog(trx, dialect, 'x"; drop table bk_audit_log; --')),
     );
     expect(error).toMatchObject({ code: 'DATA_IDENTIFIER_INVALID' });
   });

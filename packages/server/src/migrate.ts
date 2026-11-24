@@ -31,7 +31,8 @@ import { QUEUE_PLUGIN, queueMigrationSteps } from '@bieberkit/queue';
 import { ServerError } from './errors.ts';
 
 /** The tables that the steps make. The schema of the entities must not make them a second time. */
-const STEP_TABLES = /bieberkit_|audit_log|\bauth_|\bbk_jobs|\bbk_locks/;
+const STEP_TABLES =
+  /\bbk_(?:auth_|audit_log|migration|plugin_migrations|outbox|sequences|comments|attachments|timeline|tags|jobs|locks)/;
 
 export interface Migrated {
   /** The steps that were applied now. */

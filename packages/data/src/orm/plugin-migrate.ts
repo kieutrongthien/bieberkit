@@ -32,7 +32,7 @@ import type { PluginMigrationStep, StepDatabase } from '../migrations/steps.ts';
 import type { Database } from './connect.ts';
 import { kyselyOf } from './internals.ts';
 
-const LEDGER = 'bieberkit_plugin_migrations';
+const LEDGER = 'bk_plugin_migrations';
 
 export interface PluginRefusal {
   /** `plugin/id` */

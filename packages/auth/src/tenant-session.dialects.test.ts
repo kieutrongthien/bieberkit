@@ -34,10 +34,10 @@ describeDialects('AUTH-10 the tenant is not in the session', ({ open }) => {
     expect(properties.filter((name) => /tenant|organi[sz]ation/i.test(name))).toEqual([]);
     const tables = (await app.db.orm.schema.getCreateSchemaSQL()).toLowerCase();
     for (const name of [
-      'auth_organizations',
-      'auth_members',
-      'auth_invitations',
-      'auth_teams',
+      'bk_auth_organizations',
+      'bk_auth_members',
+      'bk_auth_invitations',
+      'bk_auth_teams',
       'organization',
       'invitation',
     ]) {
@@ -48,10 +48,10 @@ describeDialects('AUTH-10 the tenant is not in the session', ({ open }) => {
   it('DATA-19 a signed in user who names another tenant in each request is a member of that tenant for that request only', async () => {
     const app = await authServer(open);
     const { id, cookie } = await app.login('an@example.vn');
-    const before = await app.rows('select * from auth_sessions');
+    const before = await app.rows('select * from bk_auth_sessions');
     await app.send('GET', '/api/v1/crm/deals', { cookie, tenant: '0190f6b2-7c4e-7000-8000-0000000000a1' });
     await app.send('GET', '/api/v1/crm/deals', { cookie, tenant: '0190f6b2-7c4e-7000-8000-0000000000a2' });
-    expect(await app.rows('select * from auth_sessions')).toEqual(before);
+    expect(await app.rows('select * from bk_auth_sessions')).toEqual(before);
     expect(id).toMatch(/^[0-9a-f-]{36}$/);
   });
 });

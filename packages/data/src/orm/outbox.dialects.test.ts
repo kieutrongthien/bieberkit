@@ -442,7 +442,7 @@ describeDialects('MOD-18 outbox dispatcher', ({ dialect, openFramework }) => {
     const held = deferred();
     const holder = kysely.transaction().execute(async (trx) => {
       await trx
-        .selectFrom('bieberkit_outbox')
+        .selectFrom('bk_outbox')
         .select('id')
         .where('available_at', '<=', Date.now())
         .orderBy('available_at')

@@ -58,6 +58,7 @@ Status values: `Proposed`, `Accepted`, `Rejected`, `Superseded by NNNN`. Only th
 | [0024](0024-the-server-package.md)                   | A package that boots the process roles: `@bieberkit/server`                                        | Accepted |
 | [0025](0025-the-admin-stack.md)                      | The admin stack of the first slice: React, Ant Design, TanStack Query and Router, Vite, Playwright | Accepted |
 | [0026](0026-deployment-files.md)                     | The deployment files: images, proxy, backup                                                        | Accepted |
+| [0027](0027-table-prefix.md)                         | One prefix for every table of the framework: `bk_`                                                 | Accepted |
 
 ## Needed for the Phase 0 gate
 
