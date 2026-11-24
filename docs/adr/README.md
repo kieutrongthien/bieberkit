@@ -60,6 +60,8 @@ Status values: `Proposed`, `Accepted`, `Rejected`, `Superseded by NNNN`. Only th
 | [0026](0026-deployment-files.md)                     | The deployment files: images, proxy, backup                                                        | Accepted |
 | [0027](0027-table-prefix.md)                         | One prefix for every table of the framework: `bk_`                                                 | Accepted |
 
+| [0028](0028-test-app-platform-services.md) | The test app reuses the mail and cache contracts | Proposed |
+
 ## Needed for the Phase 0 gate
 
 The gate "ADRs accepted" (spec section 25) needs decisions on the items below. Spikes that feed them are listed in spec section 26.

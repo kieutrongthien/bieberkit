@@ -39,12 +39,11 @@ import type { Database } from '@bieberkit/data/orm';
 import { createHttpServer, registerEntityRoutes, registerMeta, registerOpenApi } from '@bieberkit/http';
 import type { HttpServer, RouteDef } from '@bieberkit/http';
 import { createScheduler } from '@bieberkit/queue';
-import type { JobDef, Queue } from '@bieberkit/queue';
-import { createQueueFromConfig } from '@bieberkit/queue/redis';
+import type { JobDef } from '@bieberkit/queue';
 import { ServerError } from './errors.ts';
 import { adminLocation, registerAdmin } from './admin.ts';
 import { migrate } from './migrate.ts';
-import { permissionCatalog, registerRuntimeServices } from './services.ts';
+import { createRuntimePlatform, permissionCatalog, registerRuntimeServices } from './services.ts';
 import { runMigrations } from './migrations.ts';
 import { allModules, contributed, contributedRecord } from './modules.ts';
 import { observe } from './observe.ts';
@@ -121,10 +120,6 @@ export async function boot(options: BootOptions): Promise<Running> {
     tracer,
     metrics,
   });
-  const container = createContainer();
-  registerRuntimeServices(container, { env, extra, db, permissions: permissionCatalog(project, modules) });
-  for (const module of modules) registerModule(container, module);
-  await container.boot();
   const lifecycle = createLifecycle();
   lifecycle.onShutdown('database', () => db.close());
   lifecycle.onShutdown('observability', () => seen.close());
@@ -143,20 +138,20 @@ export async function boot(options: BootOptions): Promise<Running> {
 
   let port: number | undefined;
   let server: HttpServer | undefined;
-  let queue: Queue | undefined;
-  const needQueue = roles.includes('worker') || roles.includes('scheduler');
-
-  if (needQueue) {
-    queue = await createQueueFromConfig(env, {
-      jobs: contributed<JobDef>(modules, 'jobs'),
-      db,
-      logger,
-      errorReporter: reporter,
-      tracer,
-      metrics,
-    });
-    lifecycle.onShutdown('queue', () => queue?.close());
-  }
+  const platform = await createRuntimePlatform(env, {
+    jobs: contributed<JobDef>(modules, 'jobs'),
+    db,
+    logger,
+    errorReporter: reporter,
+    tracer,
+    metrics,
+  });
+  const { queue } = platform;
+  lifecycle.onShutdown('platform', () => platform.close());
+  const container = createContainer();
+  registerRuntimeServices(container, { env, extra, db, ...platform, permissions: permissionCatalog(project, modules) });
+  for (const module of modules) registerModule(container, module);
+  await container.boot();
 
   if (roles.includes('web')) {
     const scoped = contributedRecord<ScopedPermission>(modules, 'scopedPermissions');
@@ -198,7 +193,7 @@ export async function boot(options: BootOptions): Promise<Running> {
     });
   }
 
-  if (roles.includes('worker') && queue !== undefined) {
+  if (roles.includes('worker')) {
     const worker = queue.createWorker();
     const dispatcher = createOutboxDispatcher(db, { publisher: queue.publisher, logger });
     lifecycle.onBoot('worker', () => {
@@ -211,7 +206,7 @@ export async function boot(options: BootOptions): Promise<Running> {
     });
   }
 
-  if (roles.includes('scheduler') && queue !== undefined) {
+  if (roles.includes('scheduler')) {
     // No module declares a schedule yet, so the scheduler has nothing to tick. It still runs, so that a schedule that a plugin adds
     // later is ticked under the lock of Q-07 with no change here.
     const scheduler = await createScheduler(queue, [], { db });

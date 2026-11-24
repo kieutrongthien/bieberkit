@@ -23,13 +23,21 @@
  */
 
 import { buildPermissionRegistry, createAuth } from '@bieberkit/auth';
-import type { Container, CoreEnv, ModuleDef } from '@bieberkit/core';
+import type { Container, CoreEnv, Logger, ModuleDef } from '@bieberkit/core';
+import type { Cache } from '@bieberkit/cache';
+import { createCacheFromConfig } from '@bieberkit/cache/bentocache';
+import type { Mail } from '@bieberkit/mail';
+import { createMailerFromConfig } from '@bieberkit/mail/nodemailer';
+import type { Queue } from '@bieberkit/queue';
+import { createQueueFromConfig } from '@bieberkit/queue/redis';
+import type { QueueFromConfigOptions } from '@bieberkit/queue/redis';
 import type { EntityDef } from '@bieberkit/data';
 import type { Database } from '@bieberkit/data/orm';
 import type { RouteDef } from '@bieberkit/http';
 import type { Storage } from '@bieberkit/storage';
 import { createStorageFromConfig } from '@bieberkit/storage/flydrive';
 import { adminLocation } from './admin.ts';
+import { authMessages } from './auth-mail.ts';
 import { contributed, contributedRecord } from './modules.ts';
 import type { Project } from './project.ts';
 
@@ -46,7 +54,38 @@ export function permissionCatalog(project: Pick<Project, 'plugins'>, modules: re
   return [...all].toSorted((a, b) => a.localeCompare(b));
 }
 
-/** Registers `config`, `pluginEnv`, `database` and `auth`. The modules register theirs after these, and may depend on them. */
+interface RuntimePlatform {
+  readonly mail: Mail;
+  readonly queue: Queue;
+  readonly cache: Cache;
+  close(): Promise<void>;
+}
+
+/** The platform shared by process boot and seeders, with one owner for its resources. */
+export async function createRuntimePlatform(
+  env: CoreEnv,
+  options: QueueFromConfigOptions & { readonly logger: Logger },
+): Promise<RuntimePlatform> {
+  const mailer = createMailerFromConfig(env, options);
+  const cache = createCacheFromConfig(env, options);
+  try {
+    const queue = await createQueueFromConfig(env, { ...options, jobs: [...options.jobs, mailer.job] });
+    return {
+      mail: mailer.over(queue),
+      queue,
+      cache,
+      close: async () => {
+        await Promise.all([queue.close(), mailer.close(), cache.close()]);
+      },
+    };
+  } catch (error) {
+    await Promise.allSettled([mailer.close(), cache.close()]);
+    throw error;
+  }
+}
+
+/** Registers framework services before the modules, including mail, queue and cache for every role. */
+
 export function registerRuntimeServices(
   container: Container,
   input: {
@@ -54,9 +93,15 @@ export function registerRuntimeServices(
     extra: Readonly<Record<string, unknown>>;
     db: Database;
     permissions: readonly string[];
+    mail: Mail;
+    queue: Queue;
+    cache: Cache;
   },
 ): void {
-  const { env, extra, db, permissions } = input;
+  const { env, extra, db, permissions, mail, queue, cache } = input;
+  container.register('mail', { scope: 'singleton', create: () => mail });
+  container.register('queue', { scope: 'singleton', create: () => queue });
+  container.register('cache', { scope: 'singleton', create: () => cache });
   container.register('config', { scope: 'singleton', create: () => env });
   container.register('pluginEnv', { scope: 'singleton', create: () => extra });
   container.register('storage', { scope: 'singleton', create: (): Storage => createStorageFromConfig(env) });
@@ -64,12 +109,14 @@ export function registerRuntimeServices(
   container.register('database', { scope: 'singleton', create: () => db });
   container.register('auth', {
     scope: 'singleton',
-    create: () =>
+    deps: ['mail'],
+    create: (services) =>
       createAuth({
         db,
         dialect: db.dialect,
         secret: env.AUTH_SECRET,
         baseUrl: env.APP_URL,
+        mail: authMessages(services.mail),
         // The admin may have a host of its own, and a sign in from there is not a cross site request (UI-14).
         trustedOrigins: [adminLocation(env.APP_URL, env.ADMIN_URL).origin],
         ...(env.APP_KEY_PREVIOUS === undefined ? {} : { previousSecrets: [env.APP_KEY_PREVIOUS] }),

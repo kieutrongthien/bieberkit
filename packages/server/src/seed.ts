@@ -24,13 +24,14 @@
 
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { createContainer, loadEnv, registerModule } from '@bieberkit/core';
+import { createContainer, createLogger, loadEnv, registerModule } from '@bieberkit/core';
+import type { JobDef } from '@bieberkit/queue';
 import type { EnvSource, ServiceRegistry } from '@bieberkit/core';
 import { createDatabase, compileEntities } from '@bieberkit/data/orm';
 import type { EntityDef } from '@bieberkit/data';
 import { authEntities } from '@bieberkit/auth';
 import { allModules, contributed } from './modules.ts';
-import { permissionCatalog, registerRuntimeServices } from './services.ts';
+import { createRuntimePlatform, permissionCatalog, registerRuntimeServices } from './services.ts';
 import { envOwnersOf, importFile, loadProject } from './project.ts';
 import { ServerError } from './errors.ts';
 
@@ -61,9 +62,20 @@ export async function seed(options: SeedOptions = {}): Promise<Seeded> {
   });
   const entities = contributed<EntityDef<string>>(modules, 'entities');
   const db = await createDatabase(env, { entities: [...compileEntities(entities), ...authEntities], audit: 'table' });
+  const platform = await createRuntimePlatform(env, {
+    jobs: contributed<JobDef>(modules, 'jobs'),
+    db,
+    logger: createLogger({ level: env.LOG_LEVEL, role: 'migrate' }),
+  });
   try {
     const container = createContainer();
-    registerRuntimeServices(container, { env, extra, db, permissions: permissionCatalog(project, modules) });
+    registerRuntimeServices(container, {
+      env,
+      extra,
+      db,
+      ...platform,
+      permissions: permissionCatalog(project, modules),
+    });
     for (const module of modules) registerModule(container, module);
     await container.boot();
     const services: ServiceRegistry = container.services;
@@ -87,6 +99,10 @@ export async function seed(options: SeedOptions = {}): Promise<Seeded> {
     }
     return { ran };
   } finally {
-    await db.close();
+    try {
+      await platform.close();
+    } finally {
+      await db.close();
+    }
   }
 }

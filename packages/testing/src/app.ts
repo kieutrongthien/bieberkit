@@ -28,7 +28,10 @@ import { createContainer, loadEnv, registerModule } from '@bieberkit/core';
 import type { ModuleDef, ServiceRegistry } from '@bieberkit/core';
 import { uuid7 } from '@bieberkit/data';
 import type { EntityDef } from '@bieberkit/data';
-import { compileEntities } from '@bieberkit/data/orm';
+import { compileEntities, createOutboxDispatcher } from '@bieberkit/data/orm';
+import { createCache, createMemoryEngine } from '@bieberkit/cache';
+import { createMailer, createMemoryTransport } from '@bieberkit/mail';
+import type { PreparedMessage } from '@bieberkit/mail';
 import type { Database, OrmSchema } from '@bieberkit/data/orm';
 import { createHttpServer, registerEntityRoutes } from '@bieberkit/http';
 import type { HttpServer, Principal, RouteDef } from '@bieberkit/http';
@@ -74,10 +77,14 @@ export interface TestApp {
   readonly server: HttpServer;
   /** The queue of the modules' jobs. It runs a job when it is dispatched (the `sync` driver). */
   readonly queue: Queue;
+  /** Messages sent by the in-memory mailer, shared by the tenant views. */
+  readonly mailbox: readonly PreparedMessage[];
+  /** Dispatches one committed outbox batch and returns the number of rows claimed. */
+  runOutbox(): Promise<number>;
   readonly schemas: readonly OrmSchema[];
   readonly entities: readonly EntityDef<string>[];
   readonly authorizer: AccessAuthorizer;
-  /** The services of the app: `config`, `pluginEnv`, `database`, `auth`, and what the modules registered. The seeds of plugins take them. */
+  /** The services of the app: `config`, `pluginEnv`, `database`, `auth`, `mail`, `queue`, `cache`, and what the modules registered. The seeds of plugins take them. */
   readonly services: ServiceRegistry;
   /** The disk behind the `storage` service. A test sends the bytes of a signed upload to it. */
   readonly disk: MemoryDisk;
@@ -98,7 +105,7 @@ export interface TestApp {
   withTenant(tenant: string): TestApp;
   /** Makes rows of `entity`, valid for it, in the tenant of this view. */
   factory(entity: EntityDef<string>): Factory;
-  /** Closes the database and the queue. */
+  /** Closes the server, platform services and database. */
   close(): Promise<void>;
 }
 
@@ -139,7 +146,24 @@ export async function createTestApp(options: TestAppOptions = {}): Promise<TestA
     ]),
   ];
   const { env } = loadEnv({ source: { APP_ENV: 'test' } });
+  const memory = createMemoryTransport();
+  const mailer = createMailer({
+    transport: memory,
+    logger,
+    from: { name: 'BieberKit Test', address: 'hello@example.test' },
+  });
+  const queue = await createQueue({
+    driver: 'sync',
+    jobs: [...contributed<JobDef>(modules, 'jobs'), mailer.job],
+    logger,
+  });
+  const mail = mailer.over(queue);
+  const cache = createCache({ engine: createMemoryEngine() });
+  const dispatcher = createOutboxDispatcher(db, { publisher: queue.publisher, logger });
   const container = createContainer();
+  container.register('mail', { scope: 'singleton', create: () => mail });
+  container.register('queue', { scope: 'singleton', create: () => queue });
+  container.register('cache', { scope: 'singleton', create: () => cache });
   container.register('config', { scope: 'singleton', create: () => env });
   container.register('pluginEnv', { scope: 'singleton', create: () => options.pluginEnv ?? {} });
   const disk = createMemoryDisk({ signing: true });
@@ -148,7 +172,22 @@ export async function createTestApp(options: TestAppOptions = {}): Promise<TestA
   container.register('database', { scope: 'singleton', create: () => db });
   container.register('auth', {
     scope: 'singleton',
-    create: () => createAuth({ db, dialect: db.dialect, secret: env.AUTH_SECRET, baseUrl: env.APP_URL }),
+    deps: ['mail'],
+    create: (services) =>
+      createAuth({
+        db,
+        dialect: db.dialect,
+        secret: env.AUTH_SECRET,
+        baseUrl: env.APP_URL,
+        mail: {
+          sendResetPassword: async ({ to, url }) => {
+            await services.mail.send({ to, subject: 'Reset your password', text: url });
+          },
+          sendVerification: async ({ to, url }) => {
+            await services.mail.send({ to, subject: 'Verify your email address', text: url });
+          },
+        },
+      }),
   });
   for (const module of modules) registerModule(container, module);
   await container.boot();
@@ -175,7 +214,6 @@ export async function createTestApp(options: TestAppOptions = {}): Promise<TestA
   authorizer.install(server);
   registerEntityRoutes(server, schemas, { db });
   for (const route of contributed<RouteDef>(modules, 'routes')) server.route(route);
-  const queue = await createQueue({ driver: 'sync', jobs: contributed<JobDef>(modules, 'jobs'), logger });
 
   const catalog = new Map<string, readonly string[]>(Object.entries(options.roles ?? {}));
   catalog.set('admin', everything);
@@ -222,6 +260,8 @@ export async function createTestApp(options: TestAppOptions = {}): Promise<TestA
       db,
       server,
       queue,
+      mailbox: memory.sent,
+      runOutbox: async () => (await dispatcher.dispatchOnce()).claimed,
       schemas,
       entities,
       authorizer,
@@ -239,7 +279,8 @@ export async function createTestApp(options: TestAppOptions = {}): Promise<TestA
       withTenant: (other) => viewOf(other),
       factory,
       close: async () => {
-        await queue.close();
+        await server.stop({ drainMs: 0 });
+        await Promise.all([queue.close(), mailer.close(), cache.close()]);
         await db.close();
       },
     };

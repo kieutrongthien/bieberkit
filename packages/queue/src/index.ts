@@ -61,3 +61,11 @@ declare module '@bieberkit/core' {
     jobs?: readonly JobDef[];
   }
 }
+import type { Queue as ServiceQueue } from './contract.ts';
+
+declare module '@bieberkit/core' {
+  interface ServiceRegistry {
+    /** The configured queue; a worker runs only in its process role. */
+    queue: ServiceQueue;
+  }
+}

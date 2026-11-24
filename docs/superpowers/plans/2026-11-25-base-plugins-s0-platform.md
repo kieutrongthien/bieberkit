@@ -206,30 +206,32 @@ git commit -s -m "feat(auth): refuse a disabled user on sign in, on a session an
   - `authMessages(from: Mail): { sendResetPassword(mail: AuthMail): Promise<void>; sendVerification(mail: AuthMail): Promise<void> }` in `auth-mail.ts`: a subject and a plain-text body with the link, English only (M-02 templates are M2.4).
   - `TestApp.mailbox: readonly PreparedMessage[]` (read from `createMemoryTransport()`), and `TestApp.runOutbox(): Promise<number>` (one `dispatchOnce()` of `createOutboxDispatcher(db, { publisher: queue.publisher })`, the count of rows taken).
 
-- [ ] **Step 1: Write the failing tests:**
+- [x] **Step 1: Write the failing tests:**
   - `boot.test.ts`: `it('BPL-02 the web role has the services mail, queue and cache')` and `it('BPL-02 the web role starts, serves and stops with the database queue and runs no worker')` (assert the shutdown closes the queue).
   - `app.test.ts`: `it('BPL-02 createTestApp registers mail, queue and cache in memory')`; `it('BPL-02 a password reset request sends one message with the link')` (sign up, `auth.api.requestPasswordReset`, `app.mailbox` has one message to that address whose text holds the link); `it('AUTH-06 a reset request for an unknown address sends no mail and answers the same')`.
   - `auth-mail.test.ts`: `it('BPL-02 the reset message names the link and has no line break in its subject')` (M-03).
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `pnpm test packages/server/src/boot.test.ts packages/testing/src/app.test.ts`
 Expected: FAIL (`services.mail` is not registered).
 
-- [ ] **Step 3: GATE.** Show the maintainer the tests and wait.
+**Execution record (2026-11-25):** The boot, auth-mail and test-app files ran with all three dialects: **16 expected failures, 43 passes, no skips**. The real web fixture reaches its route and fails on the missing runtime services. The test app reports unregistered `mail`, no `runOutbox`, and password reset disabled because the mail callbacks are unwired. The two auth-mail cases fail because `auth-mail.ts` does not exist yet. The database-queue case dispatches a real job, requires it to remain waiting through shutdown, and observes the real queue's `close()` through a wrapper; it does not replace the driver. Extra cases cover verification mail and consuming committed outbox rows once. Mail subjects reject line breaks; unknown-address reset must return the same answer with no additional mail. Fixture type errors and a missing route response schema were corrected before the final RED run. `pnpm check`, `pnpm typecheck`, `pnpm lint` and `git diff --check` passed. The maintainer approved Gate 3 ("Duyệt test Task 3, tiếp tục triển khai"). ADR 0028 records the two internal dependencies (`@bieberkit/mail`, `@bieberkit/cache`) of `@bieberkit/testing`; its status remains Proposed. The manifest and lockfile were updated by an offline pnpm install; no third-party library was added. The temporary RED lookups/guards were replaced by direct imports/properties.
 
-- [ ] **Step 4: Implement.**
+- [x] **Step 3: GATE.** Show the maintainer the tests and wait.
+
+- [x] **Step 4: Implement.**
   - Declaration merging in the three `index.ts` files, each with a one-line doc comment.
   - `boot.ts`: build the queue for **every** role (`createQueueFromConfig`, with `jobs` the contributed jobs plus `mailer.job`), build the mailer with `createMailerFromConfig(env, { logger, errorReporter })` and the cache with `createCacheFromConfig(env, { logger, tracer, metrics })`, pass `queue`, `mail: mailer.over(queue)` and `cache` to `registerRuntimeServices`, and add shutdown hooks that close what each contract can close (`queue.close()`, `mailer.close()`, `cache.close()`). The worker and the dispatcher still start only in the worker role.
   - `services.ts`: register the three services, and give `createAuth` `mail: authMessages(mail)`, declaring `deps: ['mail']` on the `auth` registration so the container orders them.
   - `app.ts`: register `mail` (`createMailer({ transport: memory }).over(queue)`), `queue` (the sync queue it already makes, with `mailer.job` among its jobs) and `cache` (`createCache({ engine: createMemoryEngine() })`), build `mailbox` and `runOutbox`.
 
-- [ ] **Step 5: Run to verify it passes**
+- [x] **Step 5: Run to verify it passes**
 
 Run: `BK_REQUIRE_DIALECTS=all pnpm test packages/server packages/testing packages/mail packages/queue packages/cache`
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add packages
@@ -237,6 +239,10 @@ git commit -s -m "feat(server,testing): register mail, queue and cache for every
 ```
 
 ---
+
+**Task 3 GREEN record:** All 67 focused tests passed, including the added seeder case. The complete five-package command passed **707 tests, 27 skipped, across 37 files** on the configured services and three dialects. `pnpm check`, `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm check:api` and `git diff --check` passed. API reports and a changeset accompany the change.
+
+**Ruling:** `seed()` is a second caller of `registerRuntimeServices` omitted by the plan's file list, and BPL-02 explicitly includes seed services. Add a RED→GREEN seeder test and share `createRuntimePlatform` in `services.ts` between boot and seed, with one resource owner. This adds two seed files to the task but avoids a caller with missing services. Web/worker/scheduler separation is unchanged. The web fixture now runs migration before boot, as deployment does; its first implementation run exposed `no such table: bk_jobs`. The reset-link assertion follows Better Auth's token-in-path URL rather than incorrectly requiring a `token` query parameter. Test-app mail callbacks capture the links through the memory mailer; server message wording is tested by `auth-mail.test.ts`, avoiding a testing-to-server layer dependency.
 
 ### Task 4: Outbox event to job, by contribution (BPL-04 mechanism)
 

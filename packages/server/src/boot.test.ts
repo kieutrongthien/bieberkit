@@ -22,7 +22,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { request as httpRequest } from 'node:http';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -57,7 +57,64 @@ const get = async (port: number | undefined, path: string): Promise<{ status: nu
   return { status: response.status, body: await response.text() };
 };
 
+/** A real module consumes the runtime services and observes queue shutdown without replacing its driver. */
+async function startPlatform(extra: Record<string, string> = {}) {
+  const fixture = makeProject();
+  fixtures.push(fixture);
+  const marker = join(fixture.root, 'queue.closed');
+  const ran = join(fixture.root, 'job.ran');
+  const folder = join(fixture.root, 'apps/server/src/modules/platform');
+  mkdirSync(folder, { recursive: true });
+  writeFileSync(
+    join(folder, 'module.ts'),
+    `
+import { defineModule } from '@bieberkit/core';
+import { defineJob } from '@bieberkit/queue';
+import { writeFileSync } from 'node:fs';
+import { z } from 'zod';
+
+const job = defineJob({
+  name: 'platform.probe',
+  input: z.object({}),
+  handler: async () => { writeFileSync(${JSON.stringify(ran)}, 'ran'); },
+});
+let observed = false;
+const route = {
+  method: 'GET',
+  url: '/api/v1/platform/services',
+  public: true,
+  schema: { response: { 200: { type: 'object', properties: { cache: { type: 'string' }, job: { type: 'string' } }, required: ['cache', 'job'] } } },
+  handler: async ({ services }) => {
+    await services.mail.verify();
+    await services.cache.set('platform.probe', 'ready', 60000);
+    const queue = services.queue;
+    if (!observed) {
+      observed = true;
+      const close = queue.close.bind(queue);
+      queue.close = async () => {
+        await close();
+        writeFileSync(${JSON.stringify(marker)}, 'closed');
+      };
+    }
+    const dispatched = await queue.dispatch(job, {});
+    const status = await queue.status(dispatched.id);
+    return { cache: await services.cache.get('platform.probe'), job: status?.status };
+  },
+};
+export default defineModule({ name: 'platform', jobs: [job], routes: [route] });
+`,
+  );
+  const env = await testEnv(fixture.root, extra);
+  // Deployment runs migrations before starting a web process; the web role never creates its tables.
+  const migrated = await boot({ role: 'migrate', cwd: fixture.root, env });
+  expect(await migrated.stop()).toBe(0);
+  const one = await boot({ role: 'web', cwd: fixture.root, env });
+  running.push(one);
+  return { one, marker, ran };
+}
+
 /** An adapter whose page has one file, installed in the project, and the env of a booted process with the given addresses. */
+
 async function adminProject(urls: (port: number) => Record<string, string>) {
   const fixture = makeProject();
   fixtures.push(fixture);
@@ -320,6 +377,27 @@ describe('section 7.1 the roles', () => {
     const again = await boot({ role: 'web', cwd: fixtures[0]?.root ?? '', env });
     running.push(again);
     expect(again.port).toBe(port);
+  });
+});
+
+describe('BPL-02 platform services on the web role', () => {
+  it('BPL-02 the web role has the services mail, queue and cache', async () => {
+    const { one } = await startPlatform();
+    const response = await get(one.port, '/api/v1/platform/services');
+    expect(response.status).toBe(200);
+    expect(JSON.parse(response.body)).toEqual({ cache: 'ready', job: 'done' });
+  });
+
+  it('BPL-02 the web role starts, serves and stops with the database queue and runs no worker', async () => {
+    const { one, marker, ran } = await startPlatform({ QUEUE_DRIVER: 'database' });
+    const response = await get(one.port, '/api/v1/platform/services');
+    expect(response.status).toBe(200);
+    expect(JSON.parse(response.body)).toEqual({ cache: 'ready', job: 'waiting' });
+    expect(existsSync(ran)).toBe(false);
+    expect(await one.stop()).toBe(0);
+    running.pop();
+    expect(readFileSync(marker, 'utf8')).toBe('closed');
+    expect(existsSync(ran)).toBe(false);
   });
 });
 

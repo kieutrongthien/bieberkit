@@ -103,5 +103,10 @@ declare module "@bieberkit/core" {
     jobs?: readonly JobDef[];
   }
 }
+declare module "@bieberkit/core" {
+  interface ServiceRegistry {
+    queue: Queue;
+  }
+}
 export { type CreateQueueOptions, type Cron, type DeadJob, type DeadLetterPage, type DispatchOptions, type Dispatched, type JobContext, type JobDef, type JobInput, type JobResult, type JobStatus, type PoolStats, QUEUE_NAMES, type Queue, QueueError, type QueueName, type QueueStats, type RunOptions, type Schedule, type Scheduler, type SchedulerOptions, type Worker, type WorkerOptions, type WorkerPool, type WorkerPoolOptions, defaultBackoffMs, defineJob, queueError };
 ```

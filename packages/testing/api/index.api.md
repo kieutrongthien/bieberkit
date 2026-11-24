@@ -35,6 +35,7 @@ import { Database, DatabaseOptions, OrmSchema } from "@bieberkit/data/orm";
 import { EntityDef } from "@bieberkit/data";
 import { HttpServer } from "@bieberkit/http";
 import { MemoryDisk } from "@bieberkit/storage";
+import { PreparedMessage } from "@bieberkit/mail";
 import { Queue } from "@bieberkit/queue";
 interface Reply {
   readonly status: number;
@@ -104,6 +105,8 @@ interface TestApp {
   readonly db: Database;
   readonly server: HttpServer;
   readonly queue: Queue;
+  readonly mailbox: readonly PreparedMessage[];
+  runOutbox(): Promise<number>;
   readonly schemas: readonly OrmSchema[];
   readonly entities: readonly EntityDef<string>[];
   readonly authorizer: AccessAuthorizer;

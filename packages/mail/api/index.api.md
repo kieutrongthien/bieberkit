@@ -41,5 +41,10 @@ interface MemoryTransport extends MailTransport {
   failWith(...errors: MailError[]): void;
 }
 export declare function createMemoryTransport(): MemoryTransport;
+declare module "@bieberkit/core" {
+  interface ServiceRegistry {
+    mail: Mail;
+  }
+}
 export { type Address, type LogTransportOptions, MAIL_JOB, MAX_RECIPIENTS, type Mail, MailError, type MailReceipt, type MailTransport, type Mailbox, type Mailer, type MailerOptions, type MemoryTransport, type Message, type PreparedMessage, createMailer, parseSender, prepareMessage };
 ```

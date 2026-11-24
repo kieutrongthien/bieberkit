@@ -22,7 +22,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { expect, it } from 'vitest';
+import { expect, it, onTestFinished } from 'vitest';
+import { emitEvent, runInTransaction } from '@bieberkit/data/orm';
 import { createTestApp, describeDialects } from './index.ts';
 import { Account, crm, touchJob } from './fixtures.ts';
 
@@ -32,6 +33,78 @@ const roles = {
   writer: ['crm.account.read', 'crm.account.create', 'crm.account.update', 'crm.account.delete'],
 };
 
+describeDialects('BPL-02 the platform of the test app', ({ open }) => {
+  it('BPL-02 createTestApp registers mail, queue and cache in memory', async () => {
+    const app = await createTestApp({ open });
+    onTestFinished(() => app.close());
+    expect(app.services.mail).toMatchObject({
+      send: expect.any(Function),
+      sendNow: expect.any(Function),
+      verify: expect.any(Function),
+    });
+    expect(app.services.queue).toBe(app.queue);
+    expect(app.services.cache).toMatchObject({
+      get: expect.any(Function),
+      set: expect.any(Function),
+      remember: expect.any(Function),
+    });
+    expect(app.mailbox).toEqual([]);
+  });
+
+  it('BPL-02 runOutbox delivers committed events once and returns their count', async () => {
+    const app = await createTestApp({ open });
+    onTestFinished(() => app.close());
+    expect(await app.runOutbox()).toBe(0);
+    await runInTransaction(app.db, async (em) => {
+      emitEvent(em, { name: 'platform.probe', payload: { value: 42 } });
+      await em.flush();
+    });
+    expect(await app.runOutbox()).toBe(1);
+    expect(await app.runOutbox()).toBe(0);
+  });
+
+  it('BPL-02 a password reset request sends one message with the link', async () => {
+    const app = await createTestApp({ open });
+    onTestFinished(() => app.close());
+    const auth = app.services.auth;
+    const base = app.services.config.APP_URL;
+    const headers = new Headers({ origin: base });
+    await auth.api.signUpEmail({
+      body: { name: 'Reader', email: 'reader@example.test', password: 'correct-test-password' },
+      headers,
+    });
+    const response = await auth.api.requestPasswordReset({
+      body: { email: 'reader@example.test', redirectTo: base + '/reset-password' },
+      headers,
+      asResponse: true,
+    });
+    expect(response.status).toBe(200);
+    expect(app.mailbox).toEqual([
+      expect.objectContaining({
+        to: [{ address: 'reader@example.test' }],
+        subject: expect.stringMatching(/password|reset/i),
+        text: expect.stringMatching(/https?:\/\/\S+\/api\/auth\/reset-password\/[^/?\s]+\?callbackURL=/),
+      }),
+    ]);
+  });
+
+  it('AUTH-06 a reset request for an unknown address sends no mail and answers the same', async () => {
+    const app = await createTestApp({ open });
+    onTestFinished(() => app.close());
+    const auth = app.services.auth;
+    const headers = new Headers({ origin: app.services.config.APP_URL });
+    await auth.api.signUpEmail({
+      body: { name: 'Reader', email: 'reader@example.test', password: 'correct-test-password' },
+      headers,
+    });
+    const known = await auth.api.requestPasswordReset({ body: { email: 'reader@example.test' }, headers });
+    const before: unknown = app.mailbox;
+    expect(before).toHaveLength(1);
+    const unknown = await auth.api.requestPasswordReset({ body: { email: 'nobody@example.test' }, headers });
+    expect(unknown).toEqual(known);
+    expect(app.mailbox).toHaveLength(1);
+  });
+});
 const dataOf = (body: Readonly<Record<string, unknown>>): Record<string, unknown>[] => {
   const data = body['data'];
   return Array.isArray(data) ? data.map((row: unknown) => Object.fromEntries(Object.entries(Object(row)))) : [];
