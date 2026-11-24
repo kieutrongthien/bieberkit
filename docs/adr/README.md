@@ -30,30 +30,32 @@ Status values: `Proposed`, `Accepted`, `Rejected`, `Superseded by NNNN`. Only th
 
 ## Index
 
-| No.                                                  | Title                                                   | Status   |
-| ---------------------------------------------------- | ------------------------------------------------------- | -------- |
-| [0001](0001-record-architecture-decisions.md)        | Record architecture decisions                           | Accepted |
-| [0002](0002-formatter-oxfmt.md)                      | Formatter: Oxfmt, with conditions                       | Accepted |
-| [0003](0003-logging-binding.md)                      | Logging: a port in core, pino behind a contract package | Accepted |
-| [0004](0004-content-editor.md)                       | Content editor: Tiptap 3                                | Accepted |
-| [0005](0005-mariadb-support-level.md)                | MariaDB support level                                   | Accepted |
-| [0006](0006-docs-site.md)                            | Documentation site generator and hosting                | Accepted |
-| [0007](0007-generated-project-license.md)            | Default license of generated projects                   | Accepted |
-| [0008](0008-orm-and-dialects.md)                     | ORM and dialects: MikroORM 7, with rules from the spike | Accepted |
-| [0009](0009-define-entity-api.md)                    | defineEntity and the field DSL                          | Accepted |
-| [0010](0010-queue-drivers.md)                        | Queue drivers: BullMQ on Valkey and a database driver   | Accepted |
-| [0011](0011-plugin-manifest-and-migrations.md)       | Plugin manifest, resolver and per-plugin migrations     | Accepted |
-| [0012](0012-authentication.md)                       | Authentication: Better Auth on MikroORM's Kysely        | Accepted |
-| [0013](0013-authorization.md)                        | Authorization: an own CASL to MikroORM translator       | Accepted |
-| [0014](0014-release-pipeline.md)                     | Release pipeline: trusted publishing from tarballs      | Accepted |
-| [0015](0015-runtime-dependencies-of-phase-1.md)      | Runtime dependencies of Phase 1                         | Accepted |
-| [0016](0016-cache-engines.md)                        | Cache engines: BentoCache drivers and ioredis           | Accepted |
-| [0017](0017-storage-disks.md)                        | Storage disks: FlyDrive, visibility as a prefix         | Accepted |
-| [0018](0018-mail-transport.md)                       | Mail: nodemailer behind a transport port                | Accepted |
-| [0019](0019-queue-wake-listen-notify.md)             | Queue wake: LISTEN/NOTIFY on PostgreSQL                 | Accepted |
-| [0020](0020-bullmq-install-script.md)                | BullMQ and the install script of msgpackr-extract       | Accepted |
-| [0021](0021-tenants-are-ours.md)                     | Tenants are ours: no organization plugin                | Accepted |
-| [0022](0022-pino-redaction-through-the-sanitizer.md) | The pino adapter redacts with the sanitizer of core     | Accepted |
+| No.                                                  | Title                                                       | Status   |
+| ---------------------------------------------------- | ----------------------------------------------------------- | -------- |
+| [0001](0001-record-architecture-decisions.md)        | Record architecture decisions                               | Accepted |
+| [0002](0002-formatter-oxfmt.md)                      | Formatter: Oxfmt, with conditions                           | Accepted |
+| [0003](0003-logging-binding.md)                      | Logging: a port in core, pino behind a contract package     | Accepted |
+| [0004](0004-content-editor.md)                       | Content editor: Tiptap 3                                    | Accepted |
+| [0005](0005-mariadb-support-level.md)                | MariaDB support level                                       | Accepted |
+| [0006](0006-docs-site.md)                            | Documentation site generator and hosting                    | Accepted |
+| [0007](0007-generated-project-license.md)            | Default license of generated projects                       | Accepted |
+| [0008](0008-orm-and-dialects.md)                     | ORM and dialects: MikroORM 7, with rules from the spike     | Accepted |
+| [0009](0009-define-entity-api.md)                    | defineEntity and the field DSL                              | Accepted |
+| [0010](0010-queue-drivers.md)                        | Queue drivers: BullMQ on Valkey and a database driver       | Accepted |
+| [0011](0011-plugin-manifest-and-migrations.md)       | Plugin manifest, resolver and per-plugin migrations         | Accepted |
+| [0012](0012-authentication.md)                       | Authentication: Better Auth on MikroORM's Kysely            | Accepted |
+| [0013](0013-authorization.md)                        | Authorization: an own CASL to MikroORM translator           | Accepted |
+| [0014](0014-release-pipeline.md)                     | Release pipeline: trusted publishing from tarballs          | Accepted |
+| [0015](0015-runtime-dependencies-of-phase-1.md)      | Runtime dependencies of Phase 1                             | Accepted |
+| [0016](0016-cache-engines.md)                        | Cache engines: BentoCache drivers and ioredis               | Accepted |
+| [0017](0017-storage-disks.md)                        | Storage disks: FlyDrive, visibility as a prefix             | Accepted |
+| [0018](0018-mail-transport.md)                       | Mail: nodemailer behind a transport port                    | Accepted |
+| [0019](0019-queue-wake-listen-notify.md)             | Queue wake: LISTEN/NOTIFY on PostgreSQL                     | Accepted |
+| [0020](0020-bullmq-install-script.md)                | BullMQ and the install script of msgpackr-extract           | Accepted |
+| [0021](0021-tenants-are-ours.md)                     | Tenants are ours: no organization plugin                    | Accepted |
+| [0022](0022-pino-redaction-through-the-sanitizer.md) | The pino adapter redacts with the sanitizer of core         | Accepted |
+| [0023](0023-observability-without-an-sdk.md)         | Traces and metrics without an SDK                           | Accepted |
+| [0024](0024-the-server-package.md)                   | A package that boots the process roles: `@bieberkit/server` | Accepted |
 
 ## Needed for the Phase 0 gate
 

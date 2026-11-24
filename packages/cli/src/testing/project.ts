@@ -75,7 +75,7 @@ export function makeProject(options: FixtureOptions = {}): Fixture {
   const modules = join(root, 'node_modules');
   mkdirSync(join(modules, '@bieberkit'), { recursive: true });
   // The framework packages of this repository, so that the project and its plugins import the real ones.
-  for (const name of ['core', 'data', 'http', 'queue'])
+  for (const name of ['core', 'data', 'http', 'queue', 'server', 'auth', 'log', 'cache', 'mail', 'storage', 'testing'])
     symlinkSync(join(PACKAGES, name), join(modules, '@bieberkit', name), 'dir');
   symlinkSync(join(PACKAGES, 'data', 'node_modules', 'zod'), join(modules, 'zod'), 'dir');
   for (const plugin of options.plugins ?? []) {

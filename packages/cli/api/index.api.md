@@ -28,25 +28,10 @@
 Generated from the built declaration files by `pnpm api:update`. Do not edit by hand. A change here is a change to the public API and needs a changeset (spec section 22.3).
 
 ```ts
+import { CONFIG_FILE, LoadedPlugin, Project, envOwnersOf, findProjectRoot, loadProject } from "@bieberkit/server";
 import { CliError, CliErrorOptions, Command, Command as Command$1, CommandContext, DOCS_BASE, ExitCode, Failure, FlagDef, GLOBAL_FLAGS, Io, Outcome, ParsedArgs, Positional, createRunner, docsLink, failureOf, parseArgs, usageError } from "create-bieberkit/kit";
-import { EnvOwner, PluginDef, ProjectConfigInput } from "@bieberkit/core";
 export declare const COMMANDS: readonly Command$1[];
 export declare const runCli: ReturnType<typeof createRunner>;
-export declare const CONFIG_FILE = "bieberkit.config.ts";
-interface LoadedPlugin {
-  readonly def: PluginDef<unknown>;
-  readonly options: unknown;
-}
-interface Project {
-  readonly root: string;
-  readonly configPath: string;
-  readonly config: ProjectConfigInput;
-  readonly plugins: readonly LoadedPlugin[];
-  readonly coreVersion: string;
-}
-export declare function findProjectRoot(from: string): string | undefined;
-export declare function envOwnersOf(project: Pick<Project, "plugins">): EnvOwner[];
-export declare function loadProject(cwd: string): Promise<Project>;
 export declare const packageName = "bieberkit";
-export { CliError, type CliErrorOptions, type Command, type CommandContext, DOCS_BASE, type ExitCode, type Failure, type FlagDef, GLOBAL_FLAGS, type Io, type LoadedPlugin, type Outcome, type ParsedArgs, type Positional, type Project, docsLink, failureOf, parseArgs, usageError };
+export { CONFIG_FILE, CliError, type CliErrorOptions, type Command, type CommandContext, DOCS_BASE, type ExitCode, type Failure, type FlagDef, GLOBAL_FLAGS, type Io, type LoadedPlugin, type Outcome, type ParsedArgs, type Positional, type Project, docsLink, envOwnersOf, failureOf, findProjectRoot, loadProject, parseArgs, usageError };
 ```

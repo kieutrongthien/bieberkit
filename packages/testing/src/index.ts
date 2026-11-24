@@ -36,6 +36,8 @@ export type { EntityContractOptions } from './contract.ts';
 export { describeDialects, openMemoryDatabase } from './database.ts';
 export type { DialectContext, OpenDatabase } from './database.ts';
 export { TestingError } from './errors.ts';
+export { installNetworkGuard, isLocalHost } from './network-guard.ts';
+export type { NetworkGuardOptions } from './network-guard.ts';
 export { createMemoryLogger } from './logger.ts';
 export type { LoggedLine, MemoryLogger } from './logger.ts';
 export { createFactory } from './factory.ts';

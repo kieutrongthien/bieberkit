@@ -34,11 +34,17 @@ import { makeEntityCommand, makeJobCommand, makeModuleCommand } from './commands
 import { openapiCommand } from './commands/openapi.ts';
 import { pluginsCommand } from './commands/plugins.ts';
 import { routesCommand } from './commands/routes.ts';
+import { dbSeedCommand, devCommand, doctorCommand, startCommand, testCommand } from './commands/runtime.ts';
 
 export type { Io } from 'create-bieberkit/kit';
 
 export const COMMANDS: readonly Command[] = [
   createCommand(),
+  devCommand(),
+  startCommand(),
+  dbSeedCommand,
+  doctorCommand,
+  testCommand(),
   checkCommand,
   generateCommand,
   clientGenerateCommand,

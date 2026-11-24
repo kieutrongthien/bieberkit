@@ -169,6 +169,7 @@ bieberkit/
 │   ├── content/     @bieberkit/content   block content schema and renderers
 │   ├── site-kit/    @bieberkit/site-kit  SEO head, sitemap, preview, cache helpers for the site
 │   ├── testing/     @bieberkit/testing   test app, factories, actingAs helpers
+│   ├── server/      @bieberkit/server    boot of the process roles (ADR 0024)
 │   ├── mcp/         @bieberkit/mcp       MCP server for AI agents
 │   ├── cli/         bieberkit            project CLI
 │   └── create/      create-bieberkit     scaffolder
@@ -221,7 +222,7 @@ Layers, top to bottom. Imports point downward only.
 | --- | --- | --- |
 | Tools | `bieberkit` (cli), `create-bieberkit`, `@bieberkit/mcp` | Act on the project, never imported by it |
 | Your project and plugins | | Use foundation libraries through `@bieberkit/*` re-exports |
-| Product | admin-core, admin-antd, site-kit, tokens, content, testing | |
+| Product | admin-core, admin-antd, site-kit, tokens, content, testing, server | |
 | Contracts | http, data, auth, queue, cache, storage, mail, search, log | Driver adapters sit behind them: BullMQ, BentoCache, FlyDrive, mail, search, error reporting, CDN purge |
 | Foundation | `@bieberkit/core` | Kernel, container, config, errors, events, plugin resolver |
 

@@ -43,6 +43,7 @@
     "@bieberkit/data": "workspace:*",
     "@bieberkit/http": "workspace:*",
     "@bieberkit/queue": "workspace:*",
+    "@bieberkit/server": "workspace:*",
     "create-bieberkit": "workspace:*"
   },
   "engines": {

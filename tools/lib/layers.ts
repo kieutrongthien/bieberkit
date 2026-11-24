@@ -54,6 +54,7 @@ export const PACKAGE_LAYERS: Readonly<Record<string, Layer>> = {
   '@bieberkit/content': 'product',
   '@bieberkit/site-kit': 'product',
   '@bieberkit/testing': 'product',
+  '@bieberkit/server': 'product',
 
   '@bieberkit/mcp': 'tools',
   bieberkit: 'tools',

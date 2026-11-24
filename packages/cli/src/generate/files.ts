@@ -71,6 +71,48 @@ export function generateFiles(app: App): GeneratedFile[] {
     },
     { path: '.bieberkit/openapi.json', content: json(document), committed: false },
     {
+      path: '.bieberkit/vitest.config.ts',
+      content: `${generatedHeader(config, '.bieberkit/vitest.config.ts', 'The Vitest preset of the project: the files it tests, the databases of its containers and the guard on the network.', 'bieberkit generate')}import { resolve } from 'node:path';
+import { defineConfig } from 'vitest/config';
+
+// The services come from the environment, the way CI gives them: the URLs of the test databases, and the hosts that a test may call
+// besides this machine (TST-03).
+export default defineConfig({
+  root: resolve(import.meta.dirname, '..'),
+  test: {
+    include: ['apps/**/*.test.ts', 'packages/**/*.test.ts'],
+    exclude: ['**/node_modules/**', '**/dist/**'],
+    setupFiles: ['./.bieberkit/vitest.setup.ts'],
+    provide: {
+      dialectUrls: {
+        postgres: process.env['DATABASE_URL_POSTGRES'] ?? '',
+        mysql: process.env['DATABASE_URL_MYSQL'] ?? '',
+        require: process.env['BK_REQUIRE_DIALECTS'] ?? '',
+      },
+      networkAllow: (process.env['TEST_NETWORK_ALLOW'] ?? '').split(',').map((host) => host.trim()).filter((host) => host !== ''),
+    },
+  },
+});
+`,
+      committed: false,
+    },
+    {
+      path: '.bieberkit/vitest.setup.ts',
+      content: `${generatedHeader(config, '.bieberkit/vitest.setup.ts', 'Runs before every test file: a test that connects outside this machine fails.', 'bieberkit generate')}import { installNetworkGuard } from '@bieberkit/testing';
+import { inject } from 'vitest';
+
+declare module 'vitest' {
+  export interface ProvidedContext {
+    networkAllow: string[];
+    dialectUrls: { postgres: string; mysql: string; require: string };
+  }
+}
+
+installNetworkGuard({ allow: inject('networkAllow') });
+`,
+      committed: false,
+    },
+    {
       path: '.bieberkit/meta/plugins.json',
       content: json({
         core: app.project.coreVersion,

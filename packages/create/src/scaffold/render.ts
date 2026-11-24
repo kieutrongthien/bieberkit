@@ -199,13 +199,9 @@ saveExact: true
 }
 
 function renderMain(choices: Choices, plan: Plan): string {
-  return `${header('block', choices, plan, 'apps/server/src/main.ts', 'The entry point of every process: it reads the role from the arguments and starts it.')}import { createLogger, loadEnv, parseRole } from '@bieberkit/core';
+  return `${header('block', choices, plan, 'apps/server/src/main.ts', 'The entry point of every process: it reads the role from the arguments (web, worker, scheduler, migrate or dev) and starts it.')}import { main } from '@bieberkit/server';
 
-const role = parseRole(process.argv.slice(2));
-const { env } = loadEnv();
-const log = createLogger({ level: env.LOG_LEVEL, role });
-
-log.info('the role starts here', { role });
+process.exitCode = await main();
 `;
 }
 
@@ -265,7 +261,7 @@ export function renderProject(choices: Choices, plan: Plan): ProjectFile[] {
           check: 'bieberkit check',
           test: 'bieberkit test',
         },
-        devDependencies: { bieberkit: plan.framework, typescript: '7.0.2' },
+        devDependencies: { ...pins(['bieberkit', '@bieberkit/testing']), typescript: '7.0.2', vitest: '4.1.12' },
         engines: { node: '>=24.12' },
       }),
     },
@@ -278,14 +274,7 @@ export function renderProject(choices: Choices, plan: Plan): ProjectFile[] {
         private: true,
         type: 'module',
         dependencies: {
-          ...pins([
-            '@bieberkit/auth',
-            '@bieberkit/core',
-            '@bieberkit/data',
-            '@bieberkit/http',
-            '@bieberkit/log',
-            '@bieberkit/queue',
-          ]),
+          ...pins(['@bieberkit/core', '@bieberkit/data', '@bieberkit/http', '@bieberkit/queue', '@bieberkit/server']),
           ...pluginPins,
           zod: '4.6.7',
         },

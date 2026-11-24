@@ -26,10 +26,11 @@
 export const ALLOWED_PREFIX = 'packages/core/src/config/';
 
 /**
- * The rule that `bieberkit check` runs on a project, and its tests, are made of the patterns and the sample code that they look for,
- * so a line scan of them finds the environment in a string. They read nothing.
+ * The rules that `bieberkit check` runs on a project and their tests are made of the patterns and the sample code that they look for,
+ * and the generators write the text of files (the Vitest preset reads the environment of CI). A line scan of them finds the environment
+ * in a string. They read nothing.
  */
-export const PATTERN_FILES: readonly string[] = ['packages/cli/src/check/'];
+export const PATTERN_FILES: readonly string[] = ['packages/cli/src/check/', 'packages/cli/src/generate/'];
 
 /** Top-level folders that hold framework or project code. `tools/` is covered by the lint rule `node/no-process-env`. */
 export const SCANNED_ROOTS: readonly string[] = ['packages', 'plugins', 'templates', 'examples'];

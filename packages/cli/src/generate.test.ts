@@ -124,6 +124,8 @@ describe('GEN-01 the generated files', () => {
         '.bieberkit/schemas/crm.Person.read.json',
         '.bieberkit/schemas/crm.Person.update.json',
         '.bieberkit/types/entities.d.ts',
+        '.bieberkit/vitest.config.ts',
+        '.bieberkit/vitest.setup.ts',
         'packages/client/package.json',
         'packages/client/src/index.ts',
       ].toSorted(),

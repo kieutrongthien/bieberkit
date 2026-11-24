@@ -237,9 +237,10 @@ describe('section 6 the files of a new project', () => {
     const server = JSON.parse(read(cwd, 'crm-app/apps/server/package.json'));
     expect(server.name).toBe('crm-app-server');
     expect(server.dependencies['@bieberkit/core']).toBe('1.2.3');
+    expect(server.dependencies['@bieberkit/server']).toBe('1.2.3');
     expect(JSON.parse(read(cwd, 'crm-app/package.json'))).toMatchObject({
       name: '@team/crm-app',
-      devDependencies: { bieberkit: '1.2.3' },
+      devDependencies: { bieberkit: '1.2.3', '@bieberkit/testing': '1.2.3' },
     });
   });
 

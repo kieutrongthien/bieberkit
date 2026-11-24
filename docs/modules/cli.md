@@ -89,6 +89,16 @@
 7. **Install and the first commit (steps 8 and 11).** `pnpm install` runs in the folder, then `git init -b main`, `git add -A` and a commit signed by the author of the project, so it works on a machine with no git identity. A step that fails does not remove the files: it is a `problem` of the result and the exit code is 1, and the commit is still made.
 8. **Not in C4.** The apps of the admin and the site (M1.8 and Phase 2: the result says so), the real `main.ts` that boots the roles (C5), the first migration and the administrator seed (they need the base plugins), and `.agents/skills`.
 
+## Behavior of C5
+
+1. **Where the code is.** The process lives in `@bieberkit/server` (ADR 0024), which a project may import and a tool may not. `start` and `dev` run `apps/server/src/main.ts` (or `apps/server/dist/main.js` when it was built) in a child process of this CLI, so that the signals of the terminal reach the server and its exit code is the exit code of the command. `docs/modules/server.md` has the boot.
+2. **`start <role>`** runs `node <entry> <role>` for `web`, `worker`, `scheduler` or `migrate`. A name that is not a role is `BK_USAGE_UNKNOWN_ROLE` (exit code 2), and a process that fails ends the command with 1.
+3. **`dev`** writes the generated files (GEN-02), starts the services of `compose.yaml` with `docker compose up -d` (a failure is a message, because the development defaults need none; `--no-services` skips it), then runs `node --watch <entry> dev`: web, worker and scheduler in one process, with the tables made first. A change under `apps/server/src` regenerates the files 300 ms after the last change.
+4. **`db:seed`** runs the seeders and says which ran. **`doctor`** prints one line for each check (`ok`, `warning` or `error`, with the fix), and an error is `BK_DOCTOR_FAILED` with the fixes, exit code 1.
+5. **`test [filter] [--watch] [--coverage]`** writes `.bieberkit/vitest.config.ts` and `.bieberkit/vitest.setup.ts` (part of `generate`, not committed) and runs `pnpm exec vitest` with them. The preset includes `apps/**` and `packages/**` tests, provides the URLs of the test databases from the environment the way CI gives them, and installs the guard on the network of `@bieberkit/testing` (TST-03).
+6. **A new project starts.** The test of this slice makes a project with `create`, links the packages of the repository where `pnpm install` would, starts its `main.ts web` in a real process on free ports, waits for `/health/ready` and the metrics, and stops it with SIGTERM: exit code 0.
+7. **Left for M1.8.** `build` (`writeStandalone`), `migrate:make`, `migrate`, `--status` and `--rollback` (`openMigrator`, with the lock of one run), and the first migration and the administrator seed that need the base plugins.
+
 ## Tests
 
 `args.test.ts` (flags in both forms, negation, short flags, `--`, each usage error), `errors.test.ts` (each kind of failure and its code, fix, link and exit code), `run.test.ts` (help, version, the shape of `--json`, stdout against stderr, the exit codes), `commands.test.ts` (throwaway projects on disk: plugin order, a plugin that is missing, not exported or given options it does not take, an invalid config, `env:check` valid and invalid, `env:example` printed, written, checked and stable).
@@ -98,3 +108,5 @@
 `generate.test.ts` (routes, openapi, the generated files, their determinism, `--check`, the client run with a fake `fetch` and compiled by the compiler of the repository, the rules `routes` and `generated`), `make.test.ts` (each recipe, the registration, the errors, and that what they write passes `check` and `generate`).
 
 `create-bieberkit` has `create.test.ts` (the files, the headers, `.env` against core, the dialects, the licenses, the choices and where they come from, every usage error, the plugin graph before a write, and install and git with a fake and with a real repository) and `kit/` (the arguments and the failures). `bieberkit` has `create.test.ts`: a project that was made is read by the CLI.
+
+`runtime.test.ts` (each command with a fake process: the arguments, the entry, the exit codes, the watch and the services; `db:seed` and `doctor` through the CLI; a project that `create` made, started in a real process).

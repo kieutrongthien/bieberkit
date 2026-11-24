@@ -140,7 +140,12 @@ interface EntityContractOptions {
 }
 export declare function describeEntityContracts(options: EntityContractOptions): void;
 export declare class TestingError extends BkError {}
+interface NetworkGuardOptions {
+  readonly allow?: readonly string[];
+}
+export declare function isLocalHost(host: string): boolean;
+export declare function installNetworkGuard(options?: NetworkGuardOptions): () => void;
 export declare function sampleOf(entity: string, field: ApiField, n: number): unknown;
 export declare const packageName = "@bieberkit/testing";
-export type { Client, DialectContext, EntityContractOptions, Factory, FactoryContext, InvalidCase, LoggedLine, MemoryLogger, OpenDatabase, Overrides, PageCase, Reply, TestApp, TestAppOptions, TestUser };
+export type { Client, DialectContext, EntityContractOptions, Factory, FactoryContext, InvalidCase, LoggedLine, MemoryLogger, NetworkGuardOptions, OpenDatabase, Overrides, PageCase, Reply, TestApp, TestAppOptions, TestUser };
 ```

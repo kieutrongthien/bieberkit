@@ -22,19 +22,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { ModuleDef } from '@bieberkit/core';
 import type { EntityDef } from '@bieberkit/data';
 import { compileEntities, createDatabase } from '@bieberkit/data/orm';
 import { entityRoutes } from '@bieberkit/http';
 import type { RouteDef } from '@bieberkit/http';
-import { CliError } from './errors.ts';
-import { importFile, loadProject } from './project.ts';
-import type { Project } from './project.ts';
+import { allModules, contributed, loadProject } from '@bieberkit/server';
+import type { Project } from '@bieberkit/server';
 
-/** Where the modules of the project live (section 4.2). */
-export const MODULES_DIR = 'apps/server/src/modules';
+export { MODULES_DIR } from '@bieberkit/server';
 
 export interface App {
   readonly project: Project;
@@ -47,45 +45,13 @@ export interface App {
   readonly version: string;
 }
 
-const isModule = (value: unknown): value is ModuleDef =>
-  typeof value === 'object' && value !== null && Reflect.get(value, 'kind') === 'module';
-
-/** The modules of the project: `modules/<name>/module.ts`, whose default export is the module (section 7.4). */
-async function projectModules(root: string): Promise<ModuleDef[]> {
-  const folder = join(root, MODULES_DIR);
-  if (!existsSync(folder)) return [];
-  const found: ModuleDef[] = [];
-  for (const entry of readdirSync(folder, { withFileTypes: true }).toSorted((a, b) => (a.name < b.name ? -1 : 1))) {
-    const file = join(folder, entry.name, 'module.ts');
-    if (!entry.isDirectory() || !existsSync(file)) continue;
-    const exported = await importFile(file);
-    if (!isModule(exported)) {
-      throw new CliError(`${MODULES_DIR}/${entry.name}/module.ts does not export a module as its default export.`, {
-        code: 'BK_MODULE_NOT_EXPORTED',
-        fix: 'The file is `export default defineModule({ name, entities, ... })`.',
-      });
-    }
-    found.push(exported);
-  }
-  return found;
-}
-
-function contributed<T>(modules: readonly ModuleDef[], key: string): T[] {
-  return modules.flatMap((module) => {
-    const value: unknown = module.contributions[key];
-    // The package that owns the key declared its type, a readonly list of `T`.
-    // oxlint-disable-next-line typescript/no-unsafe-type-assertion
-    return Array.isArray(value) ? (value as T[]) : [];
-  });
-}
-
 /**
  * Loads what the application is made of, without connecting to anything and without starting a server: the modules of the plugins
  * and of the project, their entities, and the routes that they make. A database in memory gives the routes something to close over.
  */
 export async function loadApp(cwd: string): Promise<App> {
   const project = await loadProject(cwd);
-  const modules = [...project.plugins.map(({ def }) => def.module), ...(await projectModules(project.root))];
+  const modules = await allModules(project);
   const byName = new Map<string, EntityDef<string>>();
   for (const entity of contributed<EntityDef<string>>(modules, 'entities')) byName.set(entity.name, entity);
   const entities = [...byName.values()];
