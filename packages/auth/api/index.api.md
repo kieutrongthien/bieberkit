@@ -35,7 +35,7 @@ import { Authenticator, HttpServer, TenantResolver } from "@bieberkit/http";
 import { BkError, Dialect } from "@bieberkit/core";
 import { Database } from "@bieberkit/data/orm";
 import { EntityDef as EntityDef$1 } from "@bieberkit/data/schema";
-import { EntityManager, EntitySchema } from "@mikro-orm/core";
+import { EntityManager, EntitySchema, OptionalProps } from "@mikro-orm/core";
 interface Limit {
   readonly window: number;
   readonly max: number;
@@ -186,12 +186,18 @@ interface AuthRoutesOptions {
 }
 export declare function registerAuthRoutes(server: HttpServer, options: AuthRoutesOptions): void;
 interface AuthUserRow {
+  [OptionalProps]?: "source";
   id: string;
   name: string;
   email: string;
   emailVerified: boolean;
   image?: string | null;
   twoFactorEnabled?: boolean | null;
+  disabledAt?: Date | null;
+  disabledReason?: string | null;
+  disabledBy?: string | null;
+  source: string;
+  externalId?: string | null;
   createdAt: Date;
   updatedAt: Date;
 }

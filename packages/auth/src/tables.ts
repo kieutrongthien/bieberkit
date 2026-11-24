@@ -23,12 +23,14 @@
  */
 
 import { DateTimeType, EntitySchema } from '@mikro-orm/core';
+import type { OptionalProps } from '@mikro-orm/core';
 import { uuid7 } from '@bieberkit/data';
 import type { PluginMigrationStep } from '@bieberkit/data';
 import { Uuid7Type, uuidType } from '@bieberkit/data/orm';
 import { authStep } from './plugin.ts';
 
 export interface AuthUserRow {
+  [OptionalProps]?: 'source';
   id: string;
   name: string;
   email: string;
@@ -36,6 +38,12 @@ export interface AuthUserRow {
   image?: string | null;
   /** Set by the two factor plugin. Empty until a user has turned it on or off. */
   twoFactorEnabled?: boolean | null;
+  disabledAt?: Date | null;
+  disabledReason?: string | null;
+  disabledBy?: string | null;
+  /** The identity provider; defaults to local when a row is created. */
+  source: string;
+  externalId?: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -161,10 +169,18 @@ export const AuthUser: EntitySchema<AuthUserRow> = new EntitySchema<AuthUserRow>
     emailVerified: { type: 'boolean', fieldName: 'email_verified', onCreate: () => false },
     image: { type: 'string', length: 500, nullable: true },
     twoFactorEnabled: { type: 'boolean', fieldName: 'two_factor_enabled', nullable: true },
+    disabledAt: { ...instant('disabled_at'), nullable: true },
+    disabledReason: { type: 'string', length: 500, fieldName: 'disabled_reason', nullable: true },
+    disabledBy: { type: Uuid7Type, fieldName: 'disabled_by', nullable: true },
+    source: { type: 'string', length: 60, onCreate: () => 'local', default: 'local' },
+    externalId: { type: 'string', length: 255, fieldName: 'external_id', nullable: true },
     createdAt: instant('created_at'),
     updatedAt: instant('updated_at'),
   },
-  uniques: [{ name: 'bk_auth_users_email_unique', properties: ['email'] }],
+  uniques: [
+    { name: 'bk_auth_users_email_unique', properties: ['email'] },
+    { name: 'bk_auth_users_source_external_unique', properties: ['source', 'externalId'] },
+  ],
 });
 
 // The relation is typed by the entity of the target, which the row type does not know, so the schema has no row type.
@@ -321,6 +337,7 @@ export const authTableEntities: readonly EntitySchema[] = [
 const VERSION = '0.2.0';
 const STRONG = '0.3.0';
 const KEYS = '0.4.0';
+const PROFILE = '0.5.0';
 const instantType = (dialect: string): 'timestamptz' | 'datetime' =>
   dialect === 'postgres' ? 'timestamptz' : 'datetime';
 
@@ -502,5 +519,32 @@ export const authTableSteps: readonly PluginMigrationStep[] = [
   }),
   authStep(KEYS, 'api-keys-user-index', async (trx) => {
     await trx.schema.createIndex('bk_auth_api_keys_user_index').on('bk_auth_api_keys').column('reference_id').execute();
+  }),
+  // Version 0.5.0: disabled users and provider-owned identities. Each step is one additive statement.
+  authStep(PROFILE, 'users-disabled-at', async (trx, dialect) => {
+    await trx.schema.alterTable('bk_auth_users').addColumn('disabled_at', instantType(dialect)).execute();
+  }),
+  authStep(PROFILE, 'users-disabled-reason', async (trx) => {
+    await trx.schema.alterTable('bk_auth_users').addColumn('disabled_reason', 'varchar(500)').execute();
+  }),
+  authStep(PROFILE, 'users-disabled-by', async (trx, dialect) => {
+    await trx.schema.alterTable('bk_auth_users').addColumn('disabled_by', uuidType(dialect)).execute();
+  }),
+  authStep(PROFILE, 'users-source', async (trx) => {
+    await trx.schema
+      .alterTable('bk_auth_users')
+      .addColumn('source', 'varchar(60)', (column) => column.notNull().defaultTo('local'))
+      .execute();
+  }),
+  authStep(PROFILE, 'users-external-id', async (trx) => {
+    await trx.schema.alterTable('bk_auth_users').addColumn('external_id', 'varchar(255)').execute();
+  }),
+  authStep(PROFILE, 'users-source-external-index', async (trx) => {
+    await trx.schema
+      .createIndex('bk_auth_users_source_external_unique')
+      .on('bk_auth_users')
+      .columns(['source', 'external_id'])
+      .unique()
+      .execute();
   }),
 ];

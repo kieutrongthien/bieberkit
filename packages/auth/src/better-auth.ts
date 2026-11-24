@@ -160,7 +160,16 @@ export function createAuth(options: CreateAuthOptions): AuthInstance {
     baseURL: base.origin,
     trustedOrigins: [base.origin, ...(options.trustedOrigins ?? [])],
     telemetry: { enabled: false },
-    user: { modelName: 'authUser' },
+    user: {
+      modelName: 'authUser',
+      additionalFields: {
+        disabledAt: { type: 'date', required: false, input: false },
+        disabledReason: { type: 'string', required: false, input: false },
+        disabledBy: { type: 'string', required: false, input: false },
+        source: { type: 'string', required: true, defaultValue: 'local', input: false },
+        externalId: { type: 'string', required: false, input: false },
+      },
+    },
     session: {
       modelName: 'authSession',
       ...(options.secondaryStorage === undefined ? {} : { storeSessionInDatabase: true }),
