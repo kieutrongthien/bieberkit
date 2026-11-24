@@ -35,6 +35,8 @@ import type {
   Dispatched,
   DispatchOptions,
   JobDef,
+  JobResult,
+  JobStatus,
   Queue,
   QueueName,
   QueueStats,
@@ -92,6 +94,10 @@ function isJobData(value: unknown): value is JobData {
     typeof value.token === 'string'
   );
 }
+
+/** What the handler returned is JSON, because the processor parsed it from JSON text and BullMQ keeps it as JSON. */
+// oxlint-disable-next-line typescript/no-unsafe-type-assertion
+const asResult = (value: unknown): JobResult => value as JobResult;
 
 const isOurs = (job: Job, token: string): boolean => isJobData(job.data) && job.data.token === token;
 
@@ -212,7 +218,7 @@ export async function createRedisQueue(options: RedisQueueOptions): Promise<Queu
             ...(data.requestId === undefined ? {} : { requestId: data.requestId }),
           },
         });
-        if (outcome.ok) return;
+        if (outcome.ok) return outcome.result === undefined ? undefined : JSON.parse(outcome.result);
         if (job.id !== undefined) causes.set(job.id, outcome.cause);
         // A job that cannot start to pass (an input that no longer fits) is not given another attempt.
         if (!outcome.retry) throw new UnrecoverableError(outcome.error);
@@ -337,6 +343,26 @@ export async function createRedisQueue(options: RedisQueueOptions): Promise<Queu
       return {
         jobs: page,
         nextCursor: found.length > offset + limit ? Buffer.from(String(offset + limit)).toString('base64url') : null,
+      };
+    },
+    async status(jobId): Promise<JobStatus | undefined> {
+      const job = await find(jobId);
+      if (job === undefined || !isJobData(job.data)) return undefined;
+      const state = await job.getState();
+      const queue = QUEUE_NAMES.find((name) => name === job.queueName) ?? 'default';
+      const returned: unknown = job.returnvalue;
+      return {
+        id: job.data.id,
+        name: job.data.name,
+        queue,
+        status: state === 'completed' ? 'done' : state === 'failed' ? 'dead' : state === 'active' ? 'active' : 'waiting',
+        attempts: job.attemptsMade,
+        ...(state === 'completed' && returned !== undefined && returned !== null ? { result: asResult(returned) } : {}),
+        ...(job.failedReason === undefined || job.failedReason === '' ? {} : { error: job.failedReason }),
+        ...(job.data.tenantId === undefined ? {} : { tenantId: job.data.tenantId }),
+        ...(job.data.userId === undefined ? {} : { userId: job.data.userId }),
+        createdAt: job.timestamp,
+        ...(job.finishedOn === undefined ? {} : { finishedAt: job.finishedOn }),
       };
     },
     async retry(jobId) {
