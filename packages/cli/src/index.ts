@@ -2,7 +2,7 @@
  * BieberKit
  *
  * @file        packages/cli/src/index.ts
- * @description Public entry point of bieberkit.
+ * @description Public API of bieberkit: the CLI as a function, so a test or another tool runs a command without a process (section 5).
  * @author      Bieber Kieu <kieutrongthien@gmail.com>
  * @copyright   Copyright (c) 2026 Bieber Kieu
  * @license     Apache-2.0
@@ -22,7 +22,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-// Public API of bieberkit. Implementation starts after the Phase 0 ADRs (docs/adr/README.md).
-
 /** npm name of this package. */
 export const packageName = 'bieberkit';
+
+export { runCli, COMMANDS } from './run.ts';
+export type { Io } from './run.ts';
+export type { Command, CommandContext, Outcome } from './command.ts';
+export { CliError, docsLink, DOCS_BASE, failureOf, usageError } from './errors.ts';
+export type { CliErrorOptions, ExitCode, Failure } from './errors.ts';
+export { CONFIG_FILE, envOwnersOf, findProjectRoot, loadProject } from './project.ts';
+export type { LoadedPlugin, Project } from './project.ts';
+export { parseArgs, GLOBAL_FLAGS } from './args.ts';
+export type { FlagDef, ParsedArgs, Positional } from './args.ts';

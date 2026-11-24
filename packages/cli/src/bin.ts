@@ -3,7 +3,7 @@
  * BieberKit
  *
  * @file        packages/cli/src/bin.ts
- * @description Executable entry point of the bieberkit command.
+ * @description The bieberkit executable: runs the command that the arguments name, and ends the process with its exit code.
  * @author      Bieber Kieu <kieutrongthien@gmail.com>
  * @copyright   Copyright (c) 2026 Bieber Kieu
  * @license     Apache-2.0
@@ -23,8 +23,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { packageName } from './index.ts';
+import { runCli } from './run.ts';
 
-// Placeholder until the bieberkit commands in spec section 5 are implemented.
-process.stdout.write(`${packageName} 0.0.0: not implemented yet. See docs/spec/SPEC.md section 5.\n`);
-process.exitCode = 1;
+process.exitCode = await runCli(process.argv.slice(2), {
+  stdout: (text) => void process.stdout.write(text),
+  stderr: (text) => void process.stderr.write(text),
+  cwd: process.cwd(),
+});
