@@ -36,9 +36,11 @@ export const STAFF_ROLE = 'staff';
 
 export { routes } from './routes.ts';
 
+import pkg from '../package.json' with { type: 'json' };
+
 const plugin: PluginDef = definePlugin({
   name: '@bieberkit/plugin-roles',
-  version: '0.1.0',
+  version: pkg.version,
   core: '*',
   dialects: ['postgres', 'mysql', 'sqlite'],
   permissions: ['roles.read', 'roles.manage'],

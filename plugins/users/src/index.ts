@@ -162,9 +162,11 @@ export const createUser: RouteDef = defineRoute({
   },
 });
 
+import pkg from '../package.json' with { type: 'json' };
+
 const plugin: PluginDef = definePlugin({
   name: '@bieberkit/plugin-users',
-  version: '0.1.0',
+  version: pkg.version,
   core: '*',
   dialects: ['postgres', 'mysql', 'sqlite'],
   requires: { '@bieberkit/plugin-roles': '*' },

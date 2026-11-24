@@ -31,6 +31,8 @@ export default defineConfig({
   },
   test: {
     include: ['packages/*/src/**/*.test.{ts,tsx}', 'plugins/*/src/**/*.test.{ts,tsx}', 'tools/**/*.test.ts'],
+    // Artifact checks require built output and run explicitly through pnpm test:artifacts.
+    exclude: ['tools/lib/plugin-artifacts.test.ts'],
     passWithNoTests: true,
     // TST-03: a test that opens a connection outside this machine fails.
     setupFiles: ['./tools/vitest-setup.ts'],

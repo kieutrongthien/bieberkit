@@ -293,6 +293,8 @@ Depends on: M1.7, M1.8.
 
 ### M1.10 Pilot
 
+Deferred by the maintainer until Phase 2 and a verified pre-1.0 npm release. The Pilot tasks and Phase 1 production gate remain open.
+
 - [ ] **[M]** Pick the pilot project and keep it in a separate repository
 - [ ] Pilot built on the `blank` template, defect list fed back as issues
 - [ ] Pilot runs web, worker and scheduler behind a load balancer
@@ -308,9 +310,11 @@ Depends on: M1.7, M1.8.
 
 Goal: `cms`, `crm`, `saas` templates, the full admin renderer, the public site and the registry, green on all three dialects.
 
+Execution order: M2.1 through M2.7, then the reviewed npm release, then M1.10 Pilot (spec section 25). M2.1 starts with the static manifest pipeline; its proposed slices and acceptance tests are in `docs/modules/plugin-hardening.md`. This sequencing change does not complete any phase gate.
+
 ### M2.1 Plugin system hardening
 
-- [ ] Static manifests generated at plugin build and checked in CI; first-party manifests bundled in `create-bieberkit` (PLG-07)
+- [x] Static manifests generated at plugin build and checked in CI; first-party manifests bundled in `create-bieberkit` (PLG-07). H1: `bieberkit build` in a plugin writes the field, `build --check` verifies without writing, `pnpm check:manifests` runs inside the existing CI check, and `pnpm test:artifacts` verifies the six plugin tarballs and the packed scaffolder graph after build (`docs/modules/plugin-hardening.md`)
 - [ ] Extension tables and `extends` for fields on other plugins' entities (PLG-06, §11.3)
 - [ ] `bieberkit plugins` graph, `make:plugin`, `remove` with migration prompt (PLG-03)
 - [ ] `check` rules for plugin imports and cross-plugin table queries (PLG-01, PLG-02)

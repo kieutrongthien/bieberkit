@@ -33,7 +33,7 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsdown",
+    "build": "tsdown && node --conditions=@bieberkit/source ../../tools/plugin-manifests.ts --write --plugin .",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
@@ -47,5 +47,31 @@
   },
   "engines": {
     "node": ">=24.12"
+  },
+  "bieberkit": {
+    "core": "*",
+    "dialects": [
+      "mysql",
+      "postgres",
+      "sqlite"
+    ],
+    "requires": {},
+    "conflicts": [],
+    "env": [],
+    "tables": [],
+    "routes": [
+      "DELETE /api/v1/roles/roles/:id",
+      "GET /api/v1/roles/permissions",
+      "GET /api/v1/roles/roles",
+      "PATCH /api/v1/roles/roles/:id",
+      "POST /api/v1/roles/roles",
+      "POST /api/v1/roles/roles/:id/assign",
+      "POST /api/v1/roles/roles/:id/revoke"
+    ],
+    "permissions": [
+      "roles.manage",
+      "roles.read"
+    ],
+    "admin": []
   }
 }

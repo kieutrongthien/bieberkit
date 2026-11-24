@@ -10,5 +10,12 @@
       "inputs": ["src/**", "tsconfig.json", "../../tsconfig.base.json"],
       "outputs": []
     }
-  }
+  },
+  "globalDependencies": [
+    "tools/plugin-manifests.ts",
+    "tools/lib/plugin-manifests.ts",
+    "packages/cli/src/plugin-manifest.ts",
+    "packages/server/src/manifest.ts",
+    "packages/core/src/plugins/manifest.ts"
+  ]
 }

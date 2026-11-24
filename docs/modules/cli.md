@@ -130,3 +130,22 @@
 `plugin-config.test.ts` (the list is read, added to and removed from in each style, and add then remove gives the file back), `plugin.test.ts` (add and remove with a pnpm that leaves what the real one does: the install, the config, the environment, the undone attempt, the confirmation, the migration and that check accepts it), `oxlint.test.ts` (the real Oxlint loads the plugin and agrees with check).
 
 `migrate.test.ts` (make, run, status, rollback and the usage error over a project and SQLite), `build.test.ts` (regeneration from scratch, the standalone files, the type check and its failure), and in `check.test.ts` the rules `plugin-steps` and `scoped-permissions`. The migrator, its lock and its files are tested on the three dialects in `packages/data` (`migration-lock.dialects.test.ts`).
+
+## Plugin manifest builds (M2.1 H1, PLG-07)
+
+In a plugin package, `bieberkit build` derives the static `bieberkit` field of `package.json` from the default-exported plugin definition, with the runtime key collectors. It does not load an application config, read application environment keys, boot a process, migrate or seed a database. It preserves the package's identity, exports and other metadata, and atomically replaces the JSON only after validation.
+
+The nearest package is recognized by a standard scoped `plugin-`/`bieberkit-plugin-` name, an unscoped `bieberkit-plugin-` name, or the `bieberkit-plugin` keyword. Entry selection accepts a string main export, the `.` export with `@bieberkit/source`, `import`, `node` or `default` conditions, or `main`. The entry must exist inside the package. A plugin's compiler remains its normal build tool; first-party plugin scripts run tsdown and then manifest generation.
+
+`bieberkit build --check` is read-only verification in a plugin package. Missing, stale or mismatched metadata fails with `PLG_MANIFEST_MISSING`, `PLG_MANIFEST_STALE`, `PLG_MANIFEST_NAME` or `PLG_MANIFEST_VERSION`. Object-key and key-list order alone do not make a manifest stale, but duplicate or changed list values do. A normal application `build` keeps its previous behavior; `build --check` in an application is `BK_USAGE_PLUGIN_CHECK` (exit 2), not a build that writes files.
+
+Other build diagnostics are `BK_PLUGIN_PACKAGE` (invalid package identity), `BK_PLUGIN_ENTRY` (missing or invalid declared entry), `BK_PLUGIN_IMPORT` (definition import failure), `BK_PLUGIN_NOT_EXPORTED` (the entry is not a plugin), and `BK_PLUGIN_MANIFEST_WRITE` (filesystem failure). They identify the package or entry and leave its JSON unchanged on validation/import failure.
+
+Repository commands:
+
+- `pnpm manifests:write` regenerates first-party package fields and the bundled index. The index is generated source and is never edited by hand.
+- `pnpm check:manifests` verifies package fields and the bundled index without repairing them. It runs inside `pnpm check`, including existing CI jobs.
+- `pnpm build` regenerates manifests before the workspace build. Each first-party plugin build also refreshes its own field; generator/checker inputs participate in Turbo cache hashes.
+- `pnpm test:artifacts` runs after `pnpm build`. It checks actual plugin tarballs and runs the packed scaffolder's graph resolver for all three dialects with no runtime plugin packages installed. It is separate from source-level unit tests because it checks built output.
+
+Metadata loading and collection are available to tools through `@bieberkit/server/plugins` without loading runtime adapters. No public entity or plugin-definition signature changes in H1.

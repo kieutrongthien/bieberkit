@@ -1548,7 +1548,7 @@ BieberKit has one maintainer, Bieber Kieu, who makes final decisions. Process ex
 
 ## 25. Roadmap
 
-BieberKit reaches 1.0 in four phases. A phase ends only when its gate is met, and the core is proven on a real pilot project before any business plugin is built.
+BieberKit reaches 1.0 in four phases. A phase ends only when its gate is met. The maintainer has chosen to implement Phase 2 and prepare a verified pre-1.0 npm release before M1.10 Pilot. Phase 2 work may proceed while the Phase 1 production gate remains open; neither publication nor template tests complete that gate. The core is proven on a real pilot project before 1.0 is declared production ready.
 
 | Phase | Duration | Scope | Gate |
 | --- | --- | --- | --- |

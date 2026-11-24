@@ -6,14 +6,14 @@
   "author": "Bieber Kieu <kieutrongthien@gmail.com>",
   "type": "module",
   "scripts": {
-    "build": "turbo run build",
+    "build": "pnpm manifests:write && turbo run build",
     "typecheck": "turbo run typecheck && tsc --noEmit -p tsconfig.json",
     "lint": "oxlint --type-aware",
     "format": "oxfmt",
     "format:check": "oxfmt --check",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "check": "pnpm check:headers && pnpm check:layers && pnpm check:env-access && pnpm check:skills && pnpm check:workflows",
+    "check": "pnpm check:headers && pnpm check:layers && pnpm check:env-access && pnpm check:skills && pnpm check:workflows && pnpm check:manifests",
     "check:headers": "node tools/check-headers.ts",
     "check:layers": "node tools/check-layers.ts",
     "check:env-access": "node tools/check-env-access.ts",
@@ -26,7 +26,10 @@
     "sync:skills": "node tools/sync-skills.ts",
     "changeset": "changeset",
     "test:e2e": "playwright test -c e2e/playwright.config.ts",
-    "bench": "node benchmarks/run.mjs"
+    "bench": "node benchmarks/run.mjs",
+    "manifests:write": "node --conditions=@bieberkit/source tools/plugin-manifests.ts --write",
+    "check:manifests": "node --conditions=@bieberkit/source tools/plugin-manifests.ts",
+    "test:artifacts": "vitest run --config vitest.artifacts.config.ts"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "0.18.5",

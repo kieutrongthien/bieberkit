@@ -19,7 +19,12 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./plugins": {
+      "@bieberkit/source": "./src/plugins.ts",
+      "types": "./dist/plugins.d.ts",
+      "default": "./dist/plugins.js"
+    }
   },
   "publishConfig": {
     "exports": {
@@ -27,7 +32,11 @@
         "types": "./dist/index.d.ts",
         "default": "./dist/index.js"
       },
-      "./package.json": "./package.json"
+      "./package.json": "./package.json",
+      "./plugins": {
+        "types": "./dist/plugins.d.ts",
+        "default": "./dist/plugins.js"
+      }
     },
     "access": "public"
   },

@@ -22,7 +22,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describeEnv, resolvePlugins, toManifest } from '../packages/core/src/index.ts';
+import { readFileSync } from 'node:fs';
+import { checkManifest, describeEnv, resolvePlugins, toManifest } from '../packages/core/src/index.ts';
 import { BUILTIN_PLUGIN_INDEX, BUILTIN_TEMPLATES } from '../packages/create/src/index.ts';
 import { COLLECTORS } from '../packages/server/src/index.ts';
 import audit from '../plugins/audit-log/src/index.ts';
@@ -68,5 +69,31 @@ it('12 the blank template lists the base plugins, and the graph resolves on ever
     );
     // `users` requires `roles`, so the roles seed makes the administrator role before the users seed gives it.
     expect(order.indexOf('@bieberkit/plugin-roles')).toBeLessThan(order.indexOf('@bieberkit/plugin-users'));
+  }
+});
+
+function packageOf(name: string): { name: string; version: string; bieberkit: unknown } {
+  const folder = name.replace('@bieberkit/plugin-', '');
+  const value: unknown = JSON.parse(
+    readFileSync(new URL(`../plugins/${folder}/package.json`, import.meta.url), 'utf8'),
+  );
+  if (typeof value !== 'object' || value === null) throw new Error('Expected a package object');
+  const pkgName: unknown = Reflect.get(value, 'name');
+  const version: unknown = Reflect.get(value, 'version');
+  const bieberkit: unknown = Reflect.get(value, 'bieberkit');
+  if (typeof pkgName !== 'string' || typeof version !== 'string') throw new Error('Expected a package identity');
+  return { name: pkgName, version, bieberkit };
+}
+
+it('PLG-07 every first-party package commits a manifest matching its definition and identity', () => {
+  for (const plugin of PLUGINS) {
+    expect(checkManifest(packageOf(plugin.name), plugin, COLLECTORS)).toEqual({ ok: true });
+  }
+});
+
+it('PLG-07 the bundled graph uses the package versions and committed static metadata', () => {
+  for (const plugin of PLUGINS) {
+    const pkg = packageOf(plugin.name);
+    expect(BUILTIN_PLUGIN_INDEX[plugin.name]).toMatchObject({ version: pkg.version, manifest: pkg.bieberkit });
   }
 });

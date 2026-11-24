@@ -66,9 +66,11 @@ export const scopedPermissions: Readonly<Record<string, ScopedPermission>> = {
   },
 };
 
+import pkg from '../package.json' with { type: 'json' };
+
 const plugin: PluginDef = definePlugin({
   name: '@bieberkit/plugin-notifications',
-  version: '0.1.0',
+  version: pkg.version,
   core: '*',
   dialects: ['postgres', 'mysql', 'sqlite'],
   permissions: ['notifications.read', 'notifications.manage', 'notifications.update'],
