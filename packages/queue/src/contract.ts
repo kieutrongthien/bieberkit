@@ -179,7 +179,7 @@ export interface Worker {
 }
 
 export interface Queue {
-  readonly driver: 'sync' | 'database';
+  readonly driver: 'sync' | 'database' | 'redis';
   /** Adds a job. The input is checked first (`QUEUE_INPUT_INVALID`). */
   dispatch<Input>(job: JobDef<Input>, input: Input, options?: DispatchOptions): Promise<Dispatched>;
   /** Says that the event named `event` of the outbox is the job `job`. `map` makes the input of the job from the message, and defaults to its payload. */

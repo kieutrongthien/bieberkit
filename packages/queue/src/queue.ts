@@ -46,22 +46,10 @@ export interface CreateQueueOptions {
 
 /**
  * Makes the queue. The driver is a choice of configuration and nothing in the code of a job depends on it (Q-11): every driver
- * passes the same suite. The `redis` driver comes with BullMQ in the next slice.
+ * passes the same suite. The `redis` driver is `createRedisQueue` of `@bieberkit/queue/redis`, because BullMQ is imported only there (PKG-03).
  */
 export async function createQueue(options: CreateQueueOptions): Promise<Queue> {
-  const jobs = new Map<string, JobDef>();
-  for (const job of options.jobs) {
-    if (jobs.has(job.name))
-      throw queueError('QUEUE_JOB_INVALID', 500, `The job ${job.name} is registered twice.`, 'Register each job once.');
-    jobs.set(job.name, job);
-  }
-  const shared: Shared = {
-    jobs,
-    subscriptions: new Map(),
-    logger: options.logger ?? createLogger({ level: 'info', role: 'worker' }),
-    reporter: options.errorReporter ?? createNoopReporter(),
-    now: options.now ?? Date.now,
-  };
+  const shared = createShared(options);
   if (options.driver === 'sync') return createSyncQueue(shared);
   if (options.driver === 'database') {
     if (options.db === undefined)
@@ -76,7 +64,24 @@ export async function createQueue(options: CreateQueueOptions): Promise<Queue> {
   throw queueError(
     'QUEUE_DRIVER_UNSUPPORTED',
     500,
-    `The queue driver "${String(options.driver)}" does not exist.`,
-    'Use sync or database.',
+    `The queue driver "${String(options.driver)}" does not exist here.`,
+    'Use sync or database. The redis driver is `createRedisQueue` of @bieberkit/queue/redis.',
   );
+}
+
+/** What every driver needs: the jobs by name (a name is registered once), the subscriptions, the logger, the reporter and the clock. */
+export function createShared(options: Pick<CreateQueueOptions, 'jobs' | 'logger' | 'errorReporter' | 'now'>): Shared {
+  const jobs = new Map<string, JobDef>();
+  for (const job of options.jobs) {
+    if (jobs.has(job.name))
+      throw queueError('QUEUE_JOB_INVALID', 500, `The job ${job.name} is registered twice.`, 'Register each job once.');
+    jobs.set(job.name, job);
+  }
+  return {
+    jobs,
+    subscriptions: new Map(),
+    logger: options.logger ?? createLogger({ level: 'info', role: 'worker' }),
+    reporter: options.errorReporter ?? createNoopReporter(),
+    now: options.now ?? Date.now,
+  };
 }

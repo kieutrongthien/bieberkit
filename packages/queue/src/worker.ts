@@ -49,7 +49,7 @@ const textOf = (value: unknown): string => (typeof value === 'string' ? value : 
 const optional = (value: unknown): string | undefined =>
   typeof value === 'string' && value !== '' ? value : undefined;
 
-function slotsOf(options: WorkerOptions, queue: QueueName): number {
+export function slotsOf(options: WorkerOptions, queue: QueueName): number {
   const set = options.concurrency;
   const value = typeof set === 'number' ? set : (set?.[queue] ?? 4);
   return Math.max(0, Math.floor(value));

@@ -24,6 +24,11 @@
       "types": "./dist/postgres.d.ts",
       "default": "./dist/postgres.js"
     },
+    "./redis": {
+      "@bieberkit/source": "./src/adapters/redis/index.ts",
+      "types": "./dist/redis.d.ts",
+      "default": "./dist/redis.js"
+    },
     "./testing": {
       "@bieberkit/source": "./src/testing/index.ts",
       "types": "./dist/testing.d.ts",
@@ -41,6 +46,10 @@
         "types": "./dist/postgres.d.ts",
         "default": "./dist/postgres.js"
       },
+      "./redis": {
+        "types": "./dist/redis.d.ts",
+        "default": "./dist/redis.js"
+      },
       "./testing": {
         "types": "./dist/testing.d.ts",
         "default": "./dist/testing.js"
@@ -56,6 +65,8 @@
   "dependencies": {
     "@bieberkit/core": "workspace:*",
     "@bieberkit/data": "workspace:*",
+    "bullmq": "6.7.6",
+    "ioredis": "5.11.1",
     "kysely": "0.29.8",
     "pg": "8.23.1",
     "zod": "4.6.7"
