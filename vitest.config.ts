@@ -62,6 +62,7 @@ export default defineConfig({
         'packages/cache/src/**': { lines: 90 },
         'packages/storage/src/**': { lines: 90 },
         'packages/mail/src/**': { lines: 90 },
+        'packages/log/src/**': { lines: 80 },
       },
     },
   },

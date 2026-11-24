@@ -46,6 +46,7 @@ export const PACKAGE_LAYERS: Readonly<Record<string, Layer>> = {
   '@bieberkit/storage': 'contracts',
   '@bieberkit/mail': 'contracts',
   '@bieberkit/search': 'contracts',
+  '@bieberkit/log': 'contracts',
 
   '@bieberkit/admin-core': 'product',
   '@bieberkit/admin-antd': 'product',
@@ -72,6 +73,7 @@ export function layerOf(name: string): Layer | undefined {
  */
 export const DRIVER_LIBRARIES: readonly string[] = [
   'bullmq',
+  'pino',
   'bentocache',
   'flydrive',
   'ioredis',

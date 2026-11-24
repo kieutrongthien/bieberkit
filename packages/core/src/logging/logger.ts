@@ -59,15 +59,29 @@ export interface LoggerOptions {
 
 const REDACTED = '[redacted]';
 const SECRET_KEY = /password|passwd|secret|token|authorization|cookie|api[-_]?key|private[-_]?key/i;
-const RESERVED = new Set(['time', 'level', 'msg', 'role', 'requestId', 'traceId', 'spanId', 'tenantId', 'userId']);
+/** The names of a line that a field or a binding never replaces (OBS-01). */
+export const RESERVED_LOG_FIELDS: ReadonlySet<string> = new Set([
+  'time',
+  'level',
+  'msg',
+  'role',
+  'requestId',
+  'traceId',
+  'spanId',
+  'tenantId',
+  'userId',
+]);
 const MAX_DEPTH = 8;
 
-interface Sanitizer {
+/** Removes what a line must not hold (CFG-05, SEC-09). Every logger uses it, so that a line reads the same whatever writes it. */
+export interface LogSanitizer {
+  /** A copy of `value` that is plain data, with secrets and the values of redacted keys replaced. `key` is the name of the field. */
   clean(value: unknown, key?: string): unknown;
+  /** `value` with the known secrets replaced. */
   text(value: string): string;
 }
 
-function createSanitizer(secrets: readonly string[], redactKeys: readonly string[] = []): Sanitizer {
+export function createLogSanitizer(secrets: readonly string[], redactKeys: readonly string[] = []): LogSanitizer {
   const named = new Set(redactKeys.map((key) => key.toLowerCase()));
   const known = secrets.filter((secret) => secret !== '').toSorted((a, b) => b.length - a.length);
   const text = (value: string): string => known.reduce((out, secret) => out.split(secret).join(REDACTED), value);
@@ -132,7 +146,7 @@ function severity(level: LogLevel): number {
 export function createLogger(options: LoggerOptions): Logger {
   const write = options.write ?? ((line: string) => void process.stdout.write(`${line}\n`));
   const now = options.now ?? (() => new Date());
-  const sanitizer = createSanitizer(options.secrets ?? [], options.redactKeys);
+  const sanitizer = createLogSanitizer(options.secrets ?? [], options.redactKeys);
   const threshold = severity(options.level);
 
   const make = (bindings: LogFields): Logger => {
@@ -151,7 +165,7 @@ export function createLogger(options: LoggerOptions): Logger {
       }
       for (const source of [bindings, fields ?? {}]) {
         for (const [name, value] of Object.entries(source)) {
-          if (RESERVED.has(name)) continue;
+          if (RESERVED_LOG_FIELDS.has(name)) continue;
           const cleaned = sanitizer.clean(value, name);
           if (cleaned !== undefined) line[name] = cleaned;
         }
