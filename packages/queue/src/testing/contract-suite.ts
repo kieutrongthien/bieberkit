@@ -53,7 +53,7 @@ async function waitFor(done: () => boolean | Promise<boolean>, timeoutMs = 20_00
 const empty = z.object({});
 
 /**
- * Registers the nine cases of ADR 0010 for a driver (Q-11). `make` gives a queue for the jobs of one test. The cases are numbered as
+ * Registers the nine cases of ADR 0010 for a driver (Q-11), and a tenth for the result of a job. `make` gives a queue for the jobs of one test. The cases are numbered as
  * in the ADR, so a failure names the guarantee that the driver breaks.
  */
 export function queueContractSuite(
@@ -282,6 +282,54 @@ export function queueContractSuite(
       expect(peak).toBeLessThanOrEqual(16);
       expect(peak).toBeGreaterThan(1);
       for (const worker of workers) await worker.stop();
+      await close();
+    });
+
+    run(10, 'what a job returns is kept, and status says where the job is, also for a job that is dead', async () => {
+      const answering = defineJob({
+        name: 'contract.answer',
+        input: empty,
+        handler: async () => ({ ok: true, list: [1, 2, 3], text: 'Nguyễn 🙂', nothing: null }),
+      });
+      const silent = defineJob({ name: 'contract.silent', input: empty, handler: async () => undefined });
+      const failing = defineJob({
+        name: 'contract.nope',
+        input: empty,
+        attempts: 1,
+        handler: async () => {
+          throw new Error('no answer today');
+        },
+      });
+      const { queue, close } = await make([answering, silent, failing]);
+      expect(await queue.status('missing')).toBeUndefined();
+      const worker = queue.createWorker({ pollMs: 20 });
+      worker.start();
+      await requestContext.run({ requestId: 'req-status', tenantId: TENANT, userId: USER }, async () => {
+        await queue.dispatch(answering, {}, { jobId: 'answer-1' });
+        await queue.dispatch(silent, {}, { jobId: 'silent-1' });
+        await queue.dispatch(failing, {}, { jobId: 'nope-1' });
+      });
+      await waitFor(async () => (await queue.status('answer-1'))?.status === 'done');
+      await waitFor(async () => (await queue.status('silent-1'))?.status === 'done');
+      await waitFor(async () => (await queue.status('nope-1'))?.status === 'dead');
+      const done = await queue.status('answer-1');
+      expect(done).toMatchObject({
+        id: 'answer-1',
+        name: 'contract.answer',
+        queue: 'default',
+        status: 'done',
+        attempts: 1,
+        result: { ok: true, list: [1, 2, 3], text: 'Nguyễn 🙂', nothing: null },
+        tenantId: TENANT,
+        userId: USER,
+      });
+      expect(done?.finishedAt).toBeGreaterThanOrEqual(done?.createdAt ?? Number.POSITIVE_INFINITY);
+      expect(done).not.toHaveProperty('error');
+      expect(await queue.status('silent-1')).not.toHaveProperty('result');
+      const dead = await queue.status('nope-1');
+      expect(dead?.error).toContain('no answer today');
+      expect(dead).not.toHaveProperty('result');
+      await worker.stop();
       await close();
     });
 

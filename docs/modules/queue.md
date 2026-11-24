@@ -100,6 +100,20 @@ queueContractSuite(name, make, { skip? })            // the nine cases of ADR 00
 - **An `active` job whose lease ran out may have no delivery left.** The claim counts the delivery and would run it once more than `attempts`, so it is made dead instead, with the reason.
 - **Case 6 needs a slot count for each queue.** One shared pool lets four slow `reports` jobs keep `critical` waiting, so each queue has its own loop and slots.
 
+## The result of a job (Q-15)
+
+Prepared on 2026-11-24. A handler may return JSON, and the queue keeps it for the caller: a bulk call that runs as a job (API-14), an export, an import with its failed rows (IO-02).
+
+```ts
+handler(input, context): Promise<JobResult | void>          // JobResult is any JSON value
+queue.status(jobId): Promise<JobStatus | undefined>          // { id, name, queue, status, attempts, result?, error?, tenantId?, userId?, createdAt, finishedAt? }
+```
+
+1. **What is kept.** The value that a handler returns is stored as JSON with the job when it is done, in the new column `bk_jobs.result` (migration step `jobs-result`, version 0.2.0: `MEDIUMTEXT` on MySQL, because `TEXT` holds 64 KB and the answer of a bulk call of 500 rows is more; `TEXT` elsewhere). A job that returns nothing has no `result`.
+2. **Limits.** A result that is not JSON (a `bigint`, a cycle) or is over 1 MiB is not kept, a warning is logged, and the job is still done: its work was done, and a retry would do it twice.
+3. **`status(jobId)`** answers where the job is (`waiting`, `active`, `done`, `dead`), its attempts, its result when done, its last error when it failed, and the tenant and the user that dispatched it, so that a route can show a job to its owner only. An id that does not exist is `undefined`. It lasts as long as the job does: 7 days after it ends.
+4. **Same on every driver.** The contract suite has a tenth case for it.
+
 ## Worker pool for CPU-heavy work (Q-09)
 
 Prepared on 2026-11-23. `createWorkerPool` runs a task on a `worker_threads` thread, so a PDF, a spreadsheet or an image transform that holds the CPU for seconds does not stop the timers, the heartbeats and the other jobs of the worker role. It needs no dependency.

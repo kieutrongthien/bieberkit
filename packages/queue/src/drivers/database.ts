@@ -36,6 +36,7 @@ import type {
   DispatchOptions,
   Dispatched,
   JobDef,
+  JobStatus,
   Queue,
   QueueName,
   QueueStats,
@@ -148,6 +149,27 @@ export async function createDatabaseQueue(db: Database, shared: Shared): Promise
       const worker = createDatabaseWorker({ kysely, dialect, shared }, options);
       workers.add(worker);
       return worker;
+    },
+    async status(jobId): Promise<JobStatus | undefined> {
+      const row = await kysely.selectFrom(JOBS_TABLE).selectAll().where('job_id', '=', jobId).executeTakeFirst();
+      if (row === undefined) return undefined;
+      const state = textOf(row['status']);
+      const result = typeof row['result'] === 'string' ? row['result'] : undefined;
+      return {
+        id: textOf(row['job_id']),
+        name: textOf(row['name']),
+        queue: queueOf(row['queue']),
+        status: state === 'active' || state === 'done' || state === 'dead' ? state : 'waiting',
+        attempts: numberOf(row['attempts']),
+        ...(result === undefined ? {} : { result: JSON.parse(result) }),
+        ...(typeof row['last_error'] === 'string' ? { error: row['last_error'] } : {}),
+        ...(typeof row['tenant_id'] === 'string' ? { tenantId: row['tenant_id'] } : {}),
+        ...(typeof row['user_id'] === 'string' ? { userId: row['user_id'] } : {}),
+        createdAt: numberOf(row['created_at']),
+        ...(row['finished_at'] === null || row['finished_at'] === undefined
+          ? {}
+          : { finishedAt: numberOf(row['finished_at']) }),
+      };
     },
     async deadLetters(options = {}): Promise<DeadLetterPage> {
       const limit = Math.min(Math.max(options.limit ?? 50, 1), 200);

@@ -33,6 +33,7 @@ import type {
   Queue,
   QueueName,
   QueueStats,
+  JobStatus,
   Worker,
 } from '../contract.ts';
 import { prepare, reportDead, runDelivery, sleep } from '../shared.ts';
@@ -47,6 +48,9 @@ interface Entry {
   error: string;
   attempts: number;
   diedAt: number;
+  result: string | undefined;
+  readonly createdAt: number;
+  finishedAt: number | undefined;
 }
 
 type Prepared = Awaited<ReturnType<typeof prepare>>;
@@ -72,12 +76,15 @@ export function createSyncQueue(shared: Shared): Queue {
       });
       if (outcome.ok) {
         record.status = 'done';
+        record.result = outcome.result;
+        record.finishedAt = shared.now();
         return;
       }
       record.error = outcome.error;
       if (!outcome.retry || attempt >= record.job.attempts) {
         record.status = 'dead';
         record.diedAt = shared.now();
+        record.finishedAt = record.diedAt;
         reportDead(
           shared,
           { jobId, name: record.job.name, queue: record.queue, attempt, context: record.context },
@@ -105,6 +112,9 @@ export function createSyncQueue(shared: Shared): Queue {
       error: '',
       attempts: 0,
       diedAt: 0,
+      result: undefined,
+      createdAt: shared.now(),
+      finishedAt: undefined,
     };
     records.set(prepared.jobId, record);
     if (prepared.delayMs > 0) await sleep(prepared.delayMs);
@@ -157,6 +167,23 @@ export function createSyncQueue(shared: Shared): Queue {
     publisher,
     createWorker(): Worker {
       return { start: () => undefined, stop: async () => undefined, crash: () => undefined };
+    },
+    async status(jobId): Promise<JobStatus | undefined> {
+      const record = records.get(jobId);
+      if (record === undefined) return undefined;
+      return {
+        id: jobId,
+        name: record.job.name,
+        queue: record.queue,
+        status: record.status,
+        attempts: record.attempts,
+        ...(record.result === undefined ? {} : { result: JSON.parse(record.result) }),
+        ...(record.error === '' ? {} : { error: record.error }),
+        ...(record.context.tenantId === undefined ? {} : { tenantId: record.context.tenantId }),
+        ...(record.context.userId === undefined ? {} : { userId: record.context.userId }),
+        createdAt: record.createdAt,
+        ...(record.finishedAt === undefined ? {} : { finishedAt: record.finishedAt }),
+      };
     },
     async deadLetters(options = {}): Promise<DeadLetterPage> {
       const jobs: DeadJob[] = [...records.entries()]

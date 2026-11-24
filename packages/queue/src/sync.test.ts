@@ -175,3 +175,20 @@ describe('OBS-06 the sync driver reports a job that failed for good', () => {
     await queue.close();
   });
 });
+
+describe('Q-11 the result of a job on the sync driver', () => {
+  it('Q-11 a result that is not JSON, or is over 1 MiB, is not kept, and the job is still done', async () => {
+    const odd = defineJob({ name: 'sync.odd', input: z.object({}), handler: async () => ({ big: 10n }) as never });
+    const huge = defineJob({ name: 'sync.huge', input: z.object({}), handler: async () => 'x'.repeat(1_100_000) });
+    const fine = defineJob({ name: 'sync.fine', input: z.object({}), handler: async () => 'x'.repeat(500_000) });
+    const queue = await createQueue({ driver: 'sync', jobs: [odd, huge, fine] });
+    await queue.dispatch(odd, {}, { jobId: 'odd-1' });
+    await queue.dispatch(huge, {}, { jobId: 'huge-1' });
+    await queue.dispatch(fine, {}, { jobId: 'fine-1' });
+    expect(await queue.status('odd-1')).toMatchObject({ status: 'done' });
+    expect(await queue.status('odd-1')).not.toHaveProperty('result');
+    expect(await queue.status('huge-1')).toMatchObject({ status: 'done' });
+    expect(await queue.status('huge-1')).not.toHaveProperty('result');
+    expect((await queue.status('fine-1'))?.result).toHaveLength(500_000);
+  });
+});

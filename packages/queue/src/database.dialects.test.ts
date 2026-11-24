@@ -251,3 +251,39 @@ describe('Q-02 the shape of the stats', () => {
     });
   });
 });
+
+describeDialects('Q-11 the result of a job on the database driver', ({ open, dialect }) => {
+  it('Q-11 keeps an answer of 300 KB, which MySQL could not hold in a TEXT column, and one that is over 1 MiB is dropped', async () => {
+    const db = await open([]);
+    const big = defineJob({ name: 'res.big', input: empty, handler: async () => ({ rows: 'Việt'.repeat(75_000) }) });
+    const huge = defineJob({ name: 'res.huge', input: empty, handler: async () => 'x'.repeat(1_200_000) });
+    const queue = await createQueue({ driver: 'database', jobs: [big, huge], db });
+    const worker = queue.createWorker({ pollMs: 20 });
+    worker.start();
+    await queue.dispatch(big, {}, { jobId: 'big-1' });
+    await queue.dispatch(huge, {}, { jobId: 'huge-1' });
+    await waitFor(
+      async () => (await queue.status('big-1'))?.status === 'done' && (await queue.status('huge-1'))?.status === 'done',
+    );
+    expect((await queue.status('big-1'))?.result).toEqual({ rows: 'Việt'.repeat(75_000) });
+    expect(await queue.status('huge-1')).not.toHaveProperty('result');
+    await worker.stop();
+    await queue.close();
+  });
+
+  it('Q-11 the column of the result exists on every dialect, and is empty before a job is done', async () => {
+    const db = await open([]);
+    const kysely = await rawKysely(db);
+    expect(await kysely.selectFrom(JOBS_TABLE).select('result').limit(1).execute()).toEqual([]);
+  });
+
+  it.skipIf(dialect !== 'mysql')('Q-11 the column of the result is a medium text on MySQL', async () => {
+    const db = await open([]);
+    const rows = await db.orm.em
+      .getConnection()
+      .execute(
+        "select data_type as t from information_schema.columns where table_name = 'bk_jobs' and column_name = 'result' and table_schema = database()",
+      );
+    expect(JSON.stringify(rows).toLowerCase()).toContain('mediumtext');
+  });
+});

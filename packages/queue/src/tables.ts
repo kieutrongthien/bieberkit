@@ -22,6 +22,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { sql } from 'kysely';
 import type { PluginMigrationStep } from '@bieberkit/data';
 
 /** The name of this package in the ledger of plugin steps. */
@@ -33,8 +34,8 @@ export const WAKE_CHANNEL: string = 'bk_jobs';
 export const JOBS_TABLE = 'bk_jobs';
 export const LOCKS_TABLE = 'bk_locks';
 
-function step(id: string, up: PluginMigrationStep['up']): PluginMigrationStep {
-  return { plugin: QUEUE_PLUGIN, version: '0.1.0', id, kind: 'expand', up };
+function step(id: string, up: PluginMigrationStep['up'], version = '0.1.0'): PluginMigrationStep {
+  return { plugin: QUEUE_PLUGIN, version, id, kind: 'expand', up };
 }
 
 /**
@@ -82,4 +83,15 @@ export const queueMigrationSteps: readonly PluginMigrationStep[] = [
       .addPrimaryKeyConstraint('bk_locks_pkey', ['name'])
       .execute();
   }),
+  // Version 0.2.0: what a job answered. MySQL needs MEDIUMTEXT, because TEXT is 64 KB and the answer of a bulk call is more.
+  step(
+    'jobs-result',
+    async (trx, dialect) => {
+      await trx.schema
+        .alterTable(JOBS_TABLE)
+        .addColumn('result', dialect === 'mysql' ? sql`mediumtext` : 'text')
+        .execute();
+    },
+    '0.2.0',
+  ),
 ];

@@ -35,6 +35,22 @@ declare const QUEUE_NAMES: readonly ["critical", "default", "reports"];
 type QueueName = (typeof QUEUE_NAMES)[number];
 declare class QueueError extends BkError {}
 declare function queueError(code: string, status: number, message: string, fix: string): QueueError;
+type JobResult = null | boolean | number | string | readonly JobResult[] | {
+  readonly [key: string]: JobResult;
+};
+interface JobStatus {
+  readonly id: string;
+  readonly name: string;
+  readonly queue: QueueName;
+  readonly status: "waiting" | "active" | "done" | "dead";
+  readonly attempts: number;
+  readonly result?: JobResult;
+  readonly error?: string;
+  readonly tenantId?: string;
+  readonly userId?: string;
+  readonly createdAt: number;
+  readonly finishedAt?: number;
+}
 interface JobContext {
   readonly jobId: string;
   readonly attempt: number;
@@ -50,7 +66,7 @@ interface JobInput<Input> {
   readonly attempts?: number;
   readonly backoffMs?: (attempt: number) => number;
   readonly timeoutMs?: number;
-  handler(input: Input, context: JobContext): Promise<void> | void;
+  handler(input: Input, context: JobContext): Promise<JobResult | void> | JobResult | void;
 }
 interface JobDef<Input = unknown> {
   readonly kind: "job";
@@ -60,7 +76,7 @@ interface JobDef<Input = unknown> {
   readonly attempts: number;
   readonly backoffMs: (attempt: number) => number;
   readonly timeoutMs: number;
-  handler(input: Input, context: JobContext): Promise<void> | void;
+  handler(input: Input, context: JobContext): Promise<JobResult | void> | JobResult | void;
 }
 interface DispatchOptions {
   readonly jobId?: string;
@@ -109,6 +125,7 @@ interface Queue {
   subscribe<Input>(event: string, job: JobDef<Input>, map?: (message: OutboxMessage) => Input): void;
   readonly publisher: OutboxPublisher;
   createWorker(options?: WorkerOptions): Worker;
+  status(jobId: string): Promise<JobStatus | undefined>;
   deadLetters(options?: {
     queue?: QueueName;
     limit?: number;
@@ -124,5 +141,5 @@ interface Queue {
 }
 declare const defaultBackoffMs: (attempt: number) => number;
 declare function defineJob<Input = unknown>(job: JobInput<Input>): JobDef<Input>;
-export { defineJob as _, JobContext as a, QUEUE_NAMES as c, QueueName as d, QueueStats as f, defaultBackoffMs as g, WorkerOptions as h, Dispatched as i, Queue as l, Worker as m, DeadLetterPage as n, JobDef as o, WakeSource as p, DispatchOptions as r, JobInput as s, DeadJob as t, QueueError as u, queueError as v };
+export { WorkerOptions as _, JobContext as a, queueError as b, JobResult as c, Queue as d, QueueError as f, Worker as g, WakeSource as h, Dispatched as i, JobStatus as l, QueueStats as m, DeadLetterPage as n, JobDef as o, QueueName as p, DispatchOptions as r, JobInput as s, DeadJob as t, QUEUE_NAMES as u, defaultBackoffMs as v, defineJob as y };
 ```

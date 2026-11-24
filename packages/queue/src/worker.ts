@@ -172,7 +172,13 @@ export function createDatabaseWorker(
     if (outcome.ok) {
       await kysely
         .updateTable(JOBS_TABLE)
-        .set({ status: 'done', finished_at: now, locked_by: null, locked_until: null })
+        .set({
+          status: 'done',
+          finished_at: now,
+          locked_by: null,
+          locked_until: null,
+          result: outcome.result ?? null,
+        })
         .where('id', '=', job.id)
         .where('locked_by', '=', id)
         .execute();

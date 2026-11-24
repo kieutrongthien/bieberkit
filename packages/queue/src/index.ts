@@ -34,6 +34,8 @@ export type {
   JobContext,
   JobDef,
   JobInput,
+  JobResult,
+  JobStatus,
   Queue,
   QueueName,
   QueueStats,

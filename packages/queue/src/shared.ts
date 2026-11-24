@@ -97,8 +97,30 @@ export async function prepare(
 }
 
 export type Outcome =
-  | { readonly ok: true }
+  | { readonly ok: true; readonly result?: string }
   | { readonly ok: false; readonly retry: boolean; readonly error: string; readonly cause: unknown };
+
+const MAX_RESULT_BYTES = 1024 * 1024;
+
+/** The result of a job as JSON text, or `undefined` when there is none, or it is not JSON, or it is over 1 MiB (it is logged, and the job is still done). */
+function encodeResult(shared: Shared, name: string, value: unknown): string | undefined {
+  if (value === undefined) return undefined;
+  let text: string | undefined;
+  try {
+    text = JSON.stringify(value);
+  } catch {
+    text = undefined;
+  }
+  if (text === undefined) {
+    shared.logger.warn('the result of a job is not JSON and was not kept', { job: name });
+    return undefined;
+  }
+  if (Buffer.byteLength(text) > MAX_RESULT_BYTES) {
+    shared.logger.warn('the result of a job is over 1 MiB and was not kept', { job: name });
+    return undefined;
+  }
+  return text;
+}
 
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -136,7 +158,7 @@ export async function runDelivery(
   };
   let timer: NodeJS.Timeout | undefined;
   try {
-    await Promise.race([
+    const value: unknown = await Promise.race([
       runAs(delivery.context, requestId, async () => job.handler(input, context)),
       new Promise<never>((_resolve, reject) => {
         timer = setTimeout(
@@ -145,7 +167,8 @@ export async function runDelivery(
         );
       }),
     ]);
-    return { ok: true };
+    const result = encodeResult(shared, job.name, value);
+    return result === undefined ? { ok: true } : { ok: true, result };
   } catch (error) {
     return { ok: false, retry: true, error: error instanceof Error ? error.message : String(error), cause: error };
   } finally {

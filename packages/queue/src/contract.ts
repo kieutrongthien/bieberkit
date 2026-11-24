@@ -47,6 +47,26 @@ export function queueError(code: string, status: number, message: string, fix: s
   return new QueueError(message, { code, status, fix });
 }
 
+/** What a handler may return, and the queue keeps for the caller: anything that is JSON. */
+export type JobResult = null | boolean | number | string | readonly JobResult[] | { readonly [key: string]: JobResult };
+
+/** Where a job is, and what it answered. */
+export interface JobStatus {
+  readonly id: string;
+  readonly name: string;
+  readonly queue: QueueName;
+  readonly status: 'waiting' | 'active' | 'done' | 'dead';
+  readonly attempts: number;
+  /** What the handler returned, for a job that is done. Kept as long as the job is (7 days). */
+  readonly result?: JobResult;
+  /** The last error, for a job that failed. */
+  readonly error?: string;
+  readonly tenantId?: string;
+  readonly userId?: string;
+  readonly createdAt: number;
+  readonly finishedAt?: number;
+}
+
 /** What a handler gets besides its input. The tenant and the user are those of the code that dispatched the job (Q-10). */
 export interface JobContext {
   /** The stable id of the job. The same on every delivery (Q-01). */
@@ -72,7 +92,7 @@ export interface JobInput<Input> {
   /** A handler that runs longer is a failed delivery. Defaults to 5 minutes. */
   readonly timeoutMs?: number;
   /** Must be idempotent: delivery is at least once (Q-01). */
-  handler(input: Input, context: JobContext): Promise<void> | void;
+  handler(input: Input, context: JobContext): Promise<JobResult | void> | JobResult | void;
 }
 
 /** The descriptor of a job. It holds no connection, so a module can declare it anywhere. */
@@ -84,7 +104,7 @@ export interface JobDef<Input = unknown> {
   readonly attempts: number;
   readonly backoffMs: (attempt: number) => number;
   readonly timeoutMs: number;
-  handler(input: Input, context: JobContext): Promise<void> | void;
+  handler(input: Input, context: JobContext): Promise<JobResult | void> | JobResult | void;
 }
 
 export interface DispatchOptions {
@@ -167,6 +187,8 @@ export interface Queue {
   /** The publisher for the dispatcher of the outbox (MOD-18). */
   readonly publisher: OutboxPublisher;
   createWorker(options?: WorkerOptions): Worker;
+  /** Where the job with this id is, and what it answered. `undefined` when there is no such job. */
+  status(jobId: string): Promise<JobStatus | undefined>;
   deadLetters(options?: { queue?: QueueName; limit?: number; cursor?: string }): Promise<DeadLetterPage>;
   /** Puts a dead job back, with its deliveries counted again from zero. */
   retry(jobId: string): Promise<void>;
