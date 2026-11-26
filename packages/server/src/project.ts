@@ -26,7 +26,7 @@ import { existsSync, readFileSync, statSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { resolvePlugins, toManifest, validateConfig } from '@bieberkit/core';
+import { envPrefixOf, resolvePlugins, toManifest, validateConfig } from '@bieberkit/core';
 import type { EnvOwner, PluginDef, ProjectConfigInput } from '@bieberkit/core';
 import { ServerError } from './errors.ts';
 import { COLLECTORS } from './manifest.ts';
@@ -106,7 +106,7 @@ async function loadPlugin(name: string, rooted: NodeJS.Require): Promise<PluginD
 export function envOwnersOf(project: Pick<Project, 'plugins'>): EnvOwner[] {
   return project.plugins.map(({ def }) => ({
     name: def.shortName,
-    prefix: `${def.shortName.toUpperCase()}_`,
+    prefix: envPrefixOf(def.name),
     schema: def.envSchema,
   }));
 }
