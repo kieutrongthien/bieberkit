@@ -2,7 +2,7 @@
  * BieberKit
  *
  * @file        packages/auth/src/user-status.ts
- * @description Shared disabled-user checks and fresh owner lookup for cookie and API-key authentication (BPL-01).
+ * @description Shared disabled-user checks, the fresh owner lookup for cookie and API-key authentication, and the session insert that serializes with disable and enable (BPL-01).
  * @author      Bieber Kieu <kieutrongthien@gmail.com>
  * @copyright   Copyright (c) 2026 Bieber Kieu
  * @license     Apache-2.0
@@ -22,6 +22,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { currentEntityManager, requestKysely, runInTransaction } from '@bieberkit/data/orm';
+import type { Database } from '@bieberkit/data/orm';
+import { APIError } from 'better-auth/api';
 import type { AuthInstance } from './better-auth.ts';
 import { authError } from './errors.ts';
 import type { AuthError } from './errors.ts';
@@ -41,4 +44,19 @@ export async function requireEnabledUser(auth: AuthInstance, userId: string): Pr
   if (user === null) return false;
   if (isDisabledUser(user)) throw userDisabledError();
   return true;
+}
+
+/** Serializes the actual session insert with disable/enable, also for direct Better Auth API calls. */
+export async function withEnabledSession<T>(db: Database, userId: string, create: () => Promise<T>): Promise<T> {
+  const guarded = async (): Promise<T> => {
+    let query = requestKysely(db).selectFrom('authUser').select(['disabledAt', 'deletedAt']).where('id', '=', userId);
+    // SQLite's service transaction already holds its one writer (BEGIN IMMEDIATE).
+    if (db.dialect !== 'sqlite') query = query.forUpdate();
+    const user = await query.executeTakeFirst();
+    if (user === undefined || (user.deletedAt ?? null) !== null)
+      throw new APIError('UNAUTHORIZED', { code: 'USER_NOT_FOUND', message: 'The user does not exist.' });
+    if (isDisabledUser(user)) throw new APIError('FORBIDDEN', userDisabledError().toJSON());
+    return create();
+  };
+  return currentEntityManager()?.isInTransaction() === true ? guarded() : runInTransaction(db, guarded);
 }

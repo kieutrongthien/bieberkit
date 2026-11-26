@@ -165,7 +165,7 @@ describeDialects('ROL the role service', ({ open }) => {
     await expect(as(admin.id, () => deleteRole(app.db, old))).rejects.toMatchObject({
       code: 'ROLES_IN_USE',
       status: 409,
-      details: { memberCount: 2 },
+      extensions: { memberCount: 2 },
     });
     await as(admin.id, () => deleteRole(app.db, old, { reassignTo: target }));
     expect((await getRole(app.db, target)).memberCount).toBe(2);

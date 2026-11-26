@@ -37,8 +37,7 @@ import type { Database } from '@bieberkit/data/orm';
 import { authError } from './errors.ts';
 import { accountKey, createRateLimiter, rulesOf } from './limits.ts';
 import type { AuthLimits, RateLimiter } from './limits.ts';
-import { isDisabledUser, userDisabledError } from './user-status.ts';
-import { withEnabledSession } from './user-service.ts';
+import { isDisabledUser, userDisabledError, withEnabledSession } from './user-status.ts';
 import { AuthUser } from './tables.ts';
 
 export type { AuthLimits, Limit, Limit2 } from './limits.ts';

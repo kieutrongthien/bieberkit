@@ -58,10 +58,48 @@ export type { ImpersonationEntry } from './impersonation.ts';
 export { checkScopedPermissions } from './check-conditions.ts';
 export type { ConditionFinding } from './check-conditions.ts';
 export { createAuthorizer } from './authorizer.ts';
-export { assignRole, createRole, deleteRole, revokeRole, setRolePermissions, updateRole } from './role-service.ts';
-export type { Assignment, NewRole } from './role-service.ts';
-export { disableUser, enableUser } from './user-service.ts';
-export type { DisableUserInput, EnableUserInput } from './user-service.ts';
+export { ADMIN_ROLE_NAME } from './admin-guard.ts';
+export {
+  assignRole,
+  assignRoles,
+  createRole,
+  deleteRole,
+  duplicateRole,
+  effectivePermissions,
+  getRole,
+  listMembers,
+  revokeRole,
+  revokeRoles,
+  setRolePermissions,
+  updateRole,
+} from './role-service.ts';
+export type {
+  Assignment,
+  BatchAssignment,
+  BatchResult,
+  EffectivePermission,
+  MemberPage,
+  NewRole,
+  RoleMember,
+  RoleView,
+} from './role-service.ts';
+export { createUserService, disableUser, enableUser } from './user-service.ts';
+export type {
+  DisableUserInput,
+  EnableUserInput,
+  NewUser,
+  UserAction,
+  UserChange,
+  UserDetail,
+  UserListQuery,
+  UserPage,
+  UserRecord,
+  UserService,
+  UserServiceOptions,
+  UserSession,
+  UserSort,
+  UserStatus,
+} from './user-service.ts';
 export { registerAuthRoutes } from './routes.ts';
 export type { AuthRoutesOptions } from './routes.ts';
 export {

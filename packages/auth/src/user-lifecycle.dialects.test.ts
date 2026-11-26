@@ -22,13 +22,23 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type { EntitySchema } from '@mikro-orm/core';
 import { expect, it } from 'vitest';
 import { requestContext } from '@bieberkit/core';
 import { uuid7 } from '@bieberkit/data';
 import { runInUnitOfWork } from '@bieberkit/data/orm';
 import { assignRole, createRole, revokeRole } from './role-service.ts';
 import { NIL_TENANT } from './roles.ts';
-import { AuthPasskey, AuthUser } from './tables.ts';
+import { AuthUserRole } from './roles.ts';
+import {
+  AuthAccount,
+  AuthApiKey,
+  AuthPasskey,
+  AuthSession,
+  AuthTwoFactor,
+  AuthUser,
+  AuthVerification,
+} from './tables.ts';
 import { authServer, PASSWORD, TENANT_A, TENANT_B } from './testing/auth-server.ts';
 import type { AuthServer } from './testing/auth-server.ts';
 import { describeDialects } from './testing/dialects.ts';
@@ -61,8 +71,9 @@ async function userRow(app: AuthServer, id: string) {
   return runInUnitOfWork(app.db, (em) => em.findOne(AuthUser, { id }));
 }
 
-const countFor = async (app: AuthServer, table: string, column: string, id: string): Promise<number> =>
-  Number((await app.rows(`select count(*) as n from ${table} where ${column} = '${id}'`))[0]?.['n']);
+/** Counts through the ORM, which writes the id in the form of the dialect: uuid, binary(16) or blob. Raw SQL with the text of an id finds nothing on MySQL and SQLite. */
+const countFor = async (app: AuthServer, entity: EntitySchema, column: string, id: string): Promise<number> =>
+  runInUnitOfWork(app.db, (em) => em.count(entity, { [column]: id }));
 
 const userAudits = async (app: AuthServer): Promise<string[]> =>
   (await app.audit()).filter((entry) => entry.action.startsWith('users.')).map((entry) => entry.action);
@@ -177,6 +188,17 @@ describeDialects('USR the user service', ({ open }) => {
       });
       await em.flush();
     });
+    const ways: [string, EntitySchema, string][] = [
+      ['sessions', AuthSession, 'userId'],
+      ['accounts', AuthAccount, 'userId'],
+      ['roles', AuthUserRole, 'userId'],
+      ['two factors', AuthTwoFactor, 'userId'],
+      ['passkeys', AuthPasskey, 'userId'],
+      ['api keys', AuthApiKey, 'referenceId'],
+    ];
+    for (const [name, entity, column] of ways) {
+      expect([name, (await countFor(app, entity, column, hal.id)) > 0]).toEqual([name, true]);
+    }
     await users.remove({ userId: hal.id, actorId: admin.id });
 
     const row = await userRow(app, hal.id);
@@ -187,15 +209,8 @@ describeDialects('USR the user service', ({ open }) => {
       deletedAt: expect.any(Date),
     });
     expect(row?.externalId ?? null).toBeNull();
-    for (const [table, column] of [
-      ['bk_auth_sessions', 'user_id'],
-      ['bk_auth_accounts', 'user_id'],
-      ['bk_auth_user_roles', 'user_id'],
-      ['bk_auth_two_factors', 'user_id'],
-      ['bk_auth_passkeys', 'user_id'],
-      ['bk_auth_api_keys', 'reference_id'],
-    ] as const) {
-      expect([table, await countFor(app, table, column, hal.id)]).toEqual([table, 0]);
+    for (const [name, entity, column] of ways) {
+      expect([name, await countFor(app, entity, column, hal.id)]).toEqual([name, 0]);
     }
     expect((await app.signUp('hal@example.test')).status).toBe(200);
     await expect(users.get(hal.id)).rejects.toMatchObject({ code: 'USERS_NOT_FOUND', status: 404 });
@@ -257,7 +272,7 @@ describeDialects('USR the user service', ({ open }) => {
     expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
     const rejected = results.find((result) => result.status === 'rejected');
     expect(rejected?.status === 'rejected' ? rejected.reason : undefined).toMatchObject({ code: 'USERS_LAST_ADMIN' });
-    expect(await countFor(app, 'bk_auth_user_roles', 'role_id', adminRole)).toBe(1);
+    expect(await countFor(app, AuthUserRole, 'roleId', adminRole)).toBe(1);
   });
 
   it('USR-07 the system (a seeder, the CLI) is held to the last-administrator rule too', async () => {
@@ -275,7 +290,7 @@ describeDialects('USR the user service', ({ open }) => {
     expect(listed[0]).toEqual({
       id: expect.any(String),
       ipAddress: '203.0.113.1',
-      userAgent: null,
+      userAgent: expect.any(String),
       createdAt: expect.any(String),
       lastUsedAt: expect.any(String),
     });
@@ -320,13 +335,13 @@ describeDialects('USR the user service', ({ open }) => {
     const before = Date.now();
     const made = await users.create({ name: 'Max', email: 'max@example.test', invite: true, actorId: admin.id });
     expect(made.status).toBe('invited');
-    expect(await countFor(app, 'bk_auth_accounts', 'user_id', made.id)).toBe(0);
+    expect(await countFor(app, AuthAccount, 'userId', made.id)).toBe(0);
     const [invite] = app.mails.filter((mail) => mail.kind === 'invite' && mail.to === 'max@example.test');
     expect(invite?.url).toContain(`/reset-password/${invite?.token ?? ''}`);
-    const [token] = await app.rows(
-      `select expires_at from bk_auth_verifications where identifier = 'reset-password:${invite?.token ?? ''}'`,
+    const token = await runInUnitOfWork(app.db, (em) =>
+      em.findOneOrFail(AuthVerification, { identifier: `reset-password:${invite?.token ?? ''}` }),
     );
-    const expires = new Date(String(token?.['expires_at'])).getTime();
+    const expires = new Date(token.expiresAt).getTime();
     expect(expires).toBeGreaterThan(before + 7 * DAY - 60_000);
     expect(expires).toBeLessThan(Date.now() + 7 * DAY + 60_000);
     expect((await app.signIn('max@example.test')).status).toBe(401);
@@ -370,10 +385,11 @@ describeDialects('USR the user service', ({ open }) => {
     const { app, users, admin } = await world(open, { totp: true });
     const pam = await app.login('pam@example.test');
     await app.enableTotp(pam.cookie);
+    expect(await countFor(app, AuthTwoFactor, 'userId', pam.id)).toBe(1);
     await users.resetMfa({ userId: pam.id, actorId: admin.id });
-    expect(await countFor(app, 'bk_auth_two_factors', 'user_id', pam.id)).toBe(0);
-    expect(await countFor(app, 'bk_auth_passkeys', 'user_id', pam.id)).toBe(0);
-    expect(await countFor(app, 'bk_auth_sessions', 'user_id', pam.id)).toBe(0);
+    expect(await countFor(app, AuthTwoFactor, 'userId', pam.id)).toBe(0);
+    expect(await countFor(app, AuthPasskey, 'userId', pam.id)).toBe(0);
+    expect(await countFor(app, AuthSession, 'userId', pam.id)).toBe(0);
     expect((await userRow(app, pam.id))?.twoFactorEnabled ?? false).toBe(false);
     expect(app.mails.filter((mail) => mail.kind === 'mfa-reset').map((mail) => mail.to)).toEqual(['pam@example.test']);
     expect(await userAudits(app)).toContain('users.user.mfa-reset');
