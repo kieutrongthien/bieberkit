@@ -33,7 +33,7 @@ import { createCommand } from './commands/create.ts';
 import type { CreateDeps } from './commands/create.ts';
 import { createRunner } from './kit/run.ts';
 import type { Prompts } from './kit/command.ts';
-import { scriptedPrompts } from './kit/scripted.ts';
+import { CANCEL, scriptedPrompts } from './kit/scripted.ts';
 import type { Exec } from './scaffold/run.ts';
 import type { PluginIndex, Template } from './scaffold/templates.ts';
 
@@ -311,17 +311,91 @@ describe('section 5.1 the choices', () => {
     expect(existsSync(join(cwd, 'demo'))).toBe(false);
   });
 
-  it('5.1 a person at the terminal is asked for what the flags did not say, and --yes or --json never asks', async () => {
+  it('5.1 --yes and --json never ask, even with a person at the terminal', async () => {
     const json = scriptedPrompts([]);
     const { data } = await create(workdir(), ['demo', '--no-install', '--no-git', '--json'], { prompts: json });
     expect(json.asked).toEqual([]);
     expect(data.dialect).toBeUndefined();
-    const person = scriptedPrompts(['mysql', 'blank']);
-    await create(workdir(), ['demo', '--no-install', '--no-git'], { prompts: person });
-    expect(person.asked).toEqual(['Which database?', 'Which template?']);
     const yes = scriptedPrompts([]);
     await create(workdir(), ['demo', '--yes', '--no-install', '--no-git'], { prompts: yes });
     expect(yes.asked).toEqual([]);
+  });
+
+  it('6 a person at the terminal is asked in order, sees a summary, and gets the project', async () => {
+    const cwd = workdir();
+    const prompts = scriptedPrompts(['mysql', true, 'MIT', true, true, true]);
+    const { code, out } = await create(cwd, ['demo'], { prompts });
+    expect(code).toBe(0);
+    expect(prompts.asked).toEqual([
+      'Which database?',
+      'Include the admin app?',
+      'License?',
+      'Run pnpm install?',
+      'Create a git repository?',
+      'Create the project?',
+    ]);
+    expect(prompts.shown[0]).toBe('create-bieberkit 1.2.3');
+    expect(prompts.notes['Summary']).toContain('MySQL');
+    expect(prompts.notes['Summary']).toContain('blank');
+    expect(prompts.shown).toEqual(expect.arrayContaining(['Writing files', 'Installing dependencies', 'Next steps']));
+    expect(prompts.shown.at(-1)).toBe('Done. Happy building!');
+    expect(out).toBe('');
+    expect(read(cwd, 'demo/bieberkit.config.ts')).toContain("dialect: 'mysql'");
+    expect(read(cwd, 'demo/LICENSE')).toContain('MIT License');
+  });
+
+  it('6 with several templates the person picks one, and the extra plugins are those of the dialect on top of it', async () => {
+    const cwd = workdir();
+    const blank = { name: 'blank', description: 'Nothing on top.', plugins: [] };
+    const crm = { name: 'crm', description: 'Customers and deals.', plugins: [] };
+    const prompts = scriptedPrompts(['postgres', 'crm', [], true, 'UNLICENSED', false, false, true]);
+    await create(cwd, ['demo'], { prompts, deps: { templates: { blank, crm } } });
+    expect(prompts.asked.slice(0, 3)).toEqual(['Which database?', 'Which template?', 'Extra plugins?']);
+    expect(prompts.notes['Summary']).toContain('crm');
+  });
+
+  it('5.1 another license is typed as an SPDX identifier', async () => {
+    const cwd = workdir();
+    const prompts = scriptedPrompts(['sqlite', true, 'other', 'BSD-3-Clause', false, false, true]);
+    await create(cwd, ['demo'], { prompts });
+    expect(prompts.asked).toContain('SPDX identifier?');
+    expect(read(cwd, 'demo/bieberkit.config.ts')).toContain("license: 'BSD-3-Clause'");
+  });
+
+  it('5.1 a missing name is asked, and a folder that is not empty is refused at the prompt', async () => {
+    const cwd = workdir();
+    const fresh = scriptedPrompts(['fresh', 'sqlite', true, 'UNLICENSED', false, false, true]);
+    await create(cwd, [], { prompts: fresh });
+    expect(fresh.asked[0]).toBe('Project name?');
+    expect(existsSync(join(cwd, 'fresh/bieberkit.config.ts'))).toBe(true);
+    const taken = await create(cwd, [], { prompts: scriptedPrompts(['fresh']) });
+    expect(taken.err).toContain('The folder fresh exists and is not empty.');
+  });
+
+  it('5.1 without a name and with nobody to ask, <name> is in the list of what is missing', async () => {
+    const { code, error } = await create(workdir(), ['--json', '--db', 'sqlite', '--template', 'blank']);
+    expect([code, error.code]).toEqual([2, 'BK_CREATE_CHOICE_NEEDED']);
+    expect(error.message).toContain('<name>');
+  });
+
+  it('6 a cancel at the summary writes nothing, exit 1', async () => {
+    const cwd = workdir();
+    const prompts = scriptedPrompts(['sqlite', true, 'UNLICENSED', true, true, CANCEL]);
+    const { code, err } = await create(cwd, ['demo'], { prompts });
+    expect(code).toBe(1);
+    expect(err).toContain('error[BK_CANCELLED]');
+    expect(existsSync(join(cwd, 'demo'))).toBe(false);
+  });
+
+  it('6 a failing install stops its spinner, and the problem is reported, exit 1', async () => {
+    const cwd = workdir();
+    const exec: Exec = async (file) => {
+      if (file === 'pnpm') throw new Error('ERR_PNPM_NO_MATURE_MATCHING_VERSION too young\nmore');
+    };
+    const prompts = scriptedPrompts(['sqlite', true, 'UNLICENSED', true, false, true]);
+    const { code } = await create(cwd, ['demo'], { prompts, deps: { exec } });
+    expect(code).toBe(1);
+    expect(prompts.notes['Problems']).toMatch(/^pnpm install failed: ERR_PNPM_NO_MATURE_MATCHING_VERSION/);
   });
 
   it('5.1 the author comes from the flag, then from git config', async () => {

@@ -54,7 +54,7 @@ export function createCommand(deps: CreateDeps = {}): Command {
   return {
     name: 'create',
     summary: 'Make a project: create-bieberkit <name> [flags].',
-    positionals: [{ name: 'name', required: true }],
+    positionals: [{ name: 'name' }],
     flags: [
       { name: 'db', type: 'string', description: 'postgres, mysql or sqlite.' },
       { name: 'template', type: 'string', description: 'blank (cms, crm and saas come with their plugins).' },
@@ -68,35 +68,51 @@ export function createCommand(deps: CreateDeps = {}): Command {
       { name: 'yes', type: 'boolean', description: 'Take the defaults, and never ask.' },
     ],
     async run(context) {
+      const { prompts } = context;
+      const framework = deps.framework ?? ownVersion();
+      prompts?.intro(`create-bieberkit ${framework}`);
+      const index = deps.index ?? BUILTIN_PLUGIN_INDEX;
       const choices = await resolveChoices(context.args, {
         templates: deps.templates ?? BUILTIN_TEMPLATES,
-        prompts: context.prompts,
+        prompts,
+        cwd: context.cwd,
+        index,
         gitUser: deps.gitUser ?? gitAuthor,
       });
       const planned = planProject(choices, context.cwd, {
-        index: deps.index ?? BUILTIN_PLUGIN_INDEX,
-        framework: deps.framework ?? ownVersion(),
+        index,
+        framework,
         year: (deps.now ?? (() => new Date()))().getFullYear(),
         random: deps.random ?? (() => randomBytes(32).toString('base64')),
       });
-      context.log(`Making ${choices.project.name} in ${planned.target}`);
-      const result = await scaffold(choices, planned, deps.exec ?? realExec);
+      if (prompts === undefined) context.log(`Making ${choices.project.name} in ${planned.target}`);
+      const result = await scaffold(choices, planned, deps.exec ?? realExec, prompts);
       const failed = result.problems.length > 0;
       const next = [`cd ${choices.project.folder}`, ...(result.installed ? [] : ['pnpm install']), 'pnpm dev'];
+      const urls = ['API    http://localhost:3000', ...(choices.admin ? ['Admin  http://localhost:3000/admin/'] : [])];
+      const data = {
+        root: result.root,
+        name: choices.project.name,
+        dialect: choices.dialect,
+        template: choices.template.name,
+        plugins: planned.plan.plugins.map((plugin) => plugin.name),
+        files: result.files,
+        installed: result.installed,
+        git: result.git,
+        problems: result.problems,
+        notes: planned.notes,
+        next,
+      };
+      const exit = failed ? 1 : 0;
+      if (prompts !== undefined) {
+        if (planned.notes.length > 0) prompts.note(planned.notes.join('\n'), 'Notes');
+        if (failed) prompts.note(result.problems.join('\n'), 'Problems');
+        prompts.note([...next, '', ...urls].join('\n'), 'Next steps');
+        prompts.outro(failed ? 'Made, with the problems above.' : 'Done. Happy building!');
+        return { data, text: '', exit };
+      }
       return {
-        data: {
-          root: result.root,
-          name: choices.project.name,
-          dialect: choices.dialect,
-          template: choices.template.name,
-          plugins: planned.plan.plugins.map((plugin) => plugin.name),
-          files: result.files,
-          installed: result.installed,
-          git: result.git,
-          problems: result.problems,
-          notes: planned.notes,
-          next,
-        },
+        data,
         text: [
           `Made ${choices.project.name}: ${result.files} files, ${choices.dialect}, template ${choices.template.name}.`,
           ...planned.notes,
@@ -105,7 +121,7 @@ export function createCommand(deps: CreateDeps = {}): Command {
           ...next.map((line) => `  ${line}`),
           'The API will be at http://localhost:3000.',
         ].join('\n'),
-        exit: failed ? 1 : 0,
+        exit,
       };
     },
   };

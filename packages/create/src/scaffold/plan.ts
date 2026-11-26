@@ -47,10 +47,18 @@ export interface Planned {
   readonly notes: readonly string[];
 }
 
-/** Step 1: the folder must not exist, or be empty. */
-function checkTarget(target: string, folder: string): void {
-  if (existsSync(target) && readdirSync(target).length > 0) {
-    throw new CliError(`The folder ${folder} exists and is not empty.`, {
+/** Step 1: the folder must not exist, or be empty. Answers the problem, so that the name prompt can show it and ask again. */
+export function targetProblem(cwd: string, folder: string): string | undefined {
+  const target = resolve(cwd, folder);
+  return existsSync(target) && readdirSync(target).length > 0
+    ? `The folder ${folder} exists and is not empty.`
+    : undefined;
+}
+
+function checkTarget(cwd: string, folder: string): void {
+  const problem = targetProblem(cwd, folder);
+  if (problem !== undefined) {
+    throw new CliError(problem, {
       code: 'BK_CREATE_TARGET_NOT_EMPTY',
       exit: 2,
       fix: 'Choose another name, or empty the folder.',
@@ -61,7 +69,7 @@ function checkTarget(target: string, folder: string): void {
 /** Steps 1 to 6 as data: the plugin graph is resolved with the resolver of core, on the manifests that the scaffolder carries (PLG-07). */
 export function planProject(choices: Choices, cwd: string, deps: PlanDeps): Planned {
   const target = resolve(cwd, choices.project.folder);
-  checkTarget(target, choices.project.folder);
+  checkTarget(cwd, choices.project.folder);
   const wanted = [...new Set([...choices.template.plugins, ...choices.extraPlugins])];
   const unknown = wanted.filter((name) => deps.index[name] === undefined);
   if (unknown.length > 0) {

@@ -28,6 +28,7 @@ import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
 import type { Choices } from './choices.ts';
 import type { Planned } from './plan.ts';
+import type { Prompts } from '../kit/command.ts';
 
 const run = promisify(execFile);
 
@@ -66,13 +67,21 @@ function write(planned: Planned): void {
  * Steps 6 to 11 of section 6: write the files, install, and make the first commit. The install and the git steps report what went
  * wrong and do not undo the files, because the project is made and the person can run the step by hand.
  */
-export async function scaffold(choices: Choices, planned: Planned, exec: Exec = realExec): Promise<Scaffolded> {
-  write(planned);
+export async function scaffold(
+  choices: Choices,
+  planned: Planned,
+  exec: Exec = realExec,
+  prompts?: Prompts,
+): Promise<Scaffolded> {
+  // A person sees each step under a spinner. The output of a program is kept, and only the first line of a failure is shown.
+  const step = async <T>(title: string, done: string, work: () => Promise<T>): Promise<T> =>
+    prompts === undefined ? work() : prompts.task(title, done, work);
+  await step('Writing files', `Files written (${planned.files.length})`, async () => write(planned));
   const problems: string[] = [];
   let installed = false;
   if (choices.install) {
     try {
-      await exec('pnpm', ['install'], planned.target);
+      await step('Installing dependencies', 'Dependencies installed', () => exec('pnpm', ['install'], planned.target));
       installed = true;
     } catch (error) {
       problems.push(
@@ -85,24 +94,26 @@ export async function scaffold(choices: Choices, planned: Planned, exec: Exec = 
     const name = choices.author.replace(/\s*<[^>]*>\s*$/, '');
     const email = /<([^>]*)>/.exec(choices.author)?.[1] ?? '';
     try {
-      await exec('git', ['init', '-b', 'main'], planned.target);
-      git = 'initialized';
-      await exec('git', ['add', '-A'], planned.target);
-      // The author of the project signs the first commit, so that it works on a machine with no git identity.
-      await exec(
-        'git',
-        [
-          '-c',
-          `user.name=${name}`,
-          '-c',
-          `user.email=${email}`,
-          'commit',
-          '-q',
-          '-m',
-          'chore: initial commit from create-bieberkit',
-        ],
-        planned.target,
-      );
+      await step('Creating the git repository', 'Git repository created', async () => {
+        await exec('git', ['init', '-b', 'main'], planned.target);
+        git = 'initialized';
+        await exec('git', ['add', '-A'], planned.target);
+        // The author of the project signs the first commit, so that it works on a machine with no git identity.
+        await exec(
+          'git',
+          [
+            '-c',
+            `user.name=${name}`,
+            '-c',
+            `user.email=${email}`,
+            'commit',
+            '-q',
+            '-m',
+            'chore: initial commit from create-bieberkit',
+          ],
+          planned.target,
+        );
+      });
       git = 'committed';
     } catch (error) {
       git = git === 'initialized' ? 'initialized' : 'failed';
