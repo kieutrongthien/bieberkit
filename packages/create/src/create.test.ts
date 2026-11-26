@@ -296,6 +296,14 @@ describe('section 6 the files of a new project', () => {
   });
 });
 
+/** An exec whose pnpm install is refused, as it is for a version younger than minimumReleaseAge. */
+const tooYoung: Exec = async (file) => {
+  if (file === 'pnpm')
+    throw Object.assign(new Error('Command failed: pnpm install\nlots of output'), {
+      stderr: 'Progress: resolved 1\nERR_PNPM_NO_MATURE_MATCHING_VERSION create-bieberkit@0.2.0 is too young\n',
+    });
+};
+
 describe('section 5.1 the choices', () => {
   it('5.1 without --yes and with nobody to ask, the command lists every flag that is missing, exit code 2', async () => {
     const cwd = workdir();
@@ -387,12 +395,38 @@ describe('section 5.1 the choices', () => {
     expect(existsSync(join(cwd, 'demo'))).toBe(false);
   });
 
+  it('6 a failed install says why, with the end of what pnpm printed', async () => {
+    const { data } = await create(workdir(), ['demo', '--yes', '--no-git', '--json'], { deps: { exec: tooYoung } });
+    expect(data.problems[0]).toContain('ERR_PNPM_NO_MATURE_MATCHING_VERSION create-bieberkit@0.2.0 is too young');
+  });
+
+  it('6 a person whose task is stopped stops its program: the install is given the signal of the task', async () => {
+    const signals: (AbortSignal | undefined)[] = [];
+    const exec: Exec = async (_file, _args, _cwd, signal) => {
+      signals.push(signal);
+    };
+    const prompts = scriptedPrompts(['sqlite', true, 'UNLICENSED', true, true, true]);
+    await create(workdir(), ['demo'], { prompts, deps: { exec } });
+    expect(signals.length).toBeGreaterThan(1);
+    expect(signals.every((signal) => signal instanceof AbortSignal)).toBe(true);
+  });
+
+  it('5.1 a name given on the command line whose folder is not empty is asked again before the other questions', async () => {
+    const cwd = workdir();
+    mkdirSync(join(cwd, 'taken'));
+    writeFileSync(join(cwd, 'taken/file'), 'x');
+    const prompts = scriptedPrompts(['fresh', 'sqlite', true, 'UNLICENSED', false, false, true]);
+    await create(cwd, ['taken'], { prompts });
+    expect(prompts.asked[0]).toBe('Project name?');
+    expect(existsSync(join(cwd, 'fresh/bieberkit.config.ts'))).toBe(true);
+  });
+
   it('6 a failing install stops its spinner, and the problem is reported, exit 1', async () => {
     const cwd = workdir();
     const prompts = scriptedPrompts(['sqlite', true, 'UNLICENSED', true, false, true]);
     const { code } = await create(cwd, ['demo'], { prompts, deps: { exec: failingInstall } });
     expect(code).toBe(1);
-    expect(prompts.notes['Problems']).toMatch(/^pnpm install failed: network is down\./);
+    expect(prompts.notes['Problems']).toMatch(/^pnpm install failed: network is down\nRun it/);
   });
 
   it('5.1 the author comes from the flag, then from git config', async () => {

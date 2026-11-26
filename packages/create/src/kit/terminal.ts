@@ -60,6 +60,27 @@ function valueOf<T extends string>(options: readonly PromptOption<T>[], answer: 
   return found.value;
 }
 
+/** What `guardExit` needs of `process`, so that a test can give its own. */
+export interface ExitTarget {
+  once(event: 'exit', listener: () => void): unknown;
+  removeListener(event: 'exit', listener: () => void): unknown;
+  exitCode?: number | string | null | undefined;
+}
+
+/**
+ * While a spinner runs, clack holds stdin in raw mode, so Ctrl+C is a key and not a signal, and clack ends the process with
+ * `process.exit(0)`. This turns that exit into a failure (exit 1) and aborts the task, so that the program it started is killed
+ * instead of left running. It answers the function that takes the guard away when the task ends.
+ */
+export function guardExit(target: ExitTarget, controller: AbortController): () => void {
+  const onExit = (): void => {
+    target.exitCode = 1;
+    controller.abort();
+  };
+  target.once('exit', onExit);
+  return () => void target.removeListener('exit', onExit);
+}
+
 /** Prompts with arrow keys, notes and spinners, as create-vite shows them. */
 export function terminalPrompts(): Prompts {
   return {
@@ -100,15 +121,19 @@ export function terminalPrompts(): Prompts {
       ),
     password: async (message) => answered<string>(await password({ message, output })),
     task: async (title, done, work) => {
-      const spin = spinner({ output });
+      const spin = spinner({ output, cancelMessage: 'Cancelled.' });
+      const controller = new AbortController();
+      const release = guardExit(process, controller);
       spin.start(title);
       try {
-        const result = await work();
+        const result = await work(controller.signal);
         spin.stop(done);
         return result;
       } catch (error) {
         spin.error(error instanceof Error ? (error.message.split('\n')[0] ?? title) : title);
         throw error;
+      } finally {
+        release();
       }
     },
   };

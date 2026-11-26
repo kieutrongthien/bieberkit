@@ -24,7 +24,9 @@
 
 import { describe, expect, it } from 'vitest';
 import { failureOf } from './errors.ts';
+import { EventEmitter } from 'node:events';
 import { CANCEL, scriptedPrompts } from './scripted.ts';
+import { guardExit } from './terminal.ts';
 
 describe('ADR-0029 scripted prompts', () => {
   it('5.1 a scripted prompt answers in order and records the questions', async () => {
@@ -63,5 +65,18 @@ describe('ADR-0029 scripted prompts', () => {
 
   it('5.1 a script that runs out of answers is an error of the test', async () => {
     await expect(scriptedPrompts([]).confirm('Again?', true)).rejects.toThrow('no answer');
+  });
+
+  it('ADR-0029 an exit while a task runs, as Ctrl+C under a spinner makes it, ends with 1 and stops the program of the task', () => {
+    const target = Object.assign(new EventEmitter(), { exitCode: undefined as number | string | null | undefined });
+    const controller = new AbortController();
+    const release = guardExit(target, controller);
+    target.emit('exit', 0);
+    expect([target.exitCode, controller.signal.aborted]).toEqual([1, true]);
+    const after = new AbortController();
+    guardExit(target, after)();
+    target.emit('exit', 0);
+    expect(after.signal.aborted).toBe(false);
+    release();
   });
 });

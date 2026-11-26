@@ -57,8 +57,11 @@ export interface Prompts {
   confirm(message: string, initial: boolean): Promise<boolean>;
   text(message: string, options?: TextOptions): Promise<string>;
   password(message: string): Promise<string>;
-  /** Runs `work` under a spinner: `title` while it runs, `done` or the first line of its error when it ends. An error is thrown again. */
-  task<T>(title: string, done: string, work: () => Promise<T>): Promise<T>;
+  /**
+   * Runs `work` under a spinner: `title` while it runs, `done` or the first line of its error when it ends. An error is thrown again.
+   * `signal` aborts when the person stops the task, so that a program that `work` started is stopped with it.
+   */
+  task<T>(title: string, done: string, work: (signal: AbortSignal) => Promise<T>): Promise<T>;
 }
 
 /** What a command is given. */

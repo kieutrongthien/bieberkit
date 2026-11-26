@@ -138,6 +138,14 @@ export async function resolveChoices(args: ParsedArgs, deps: ChoiceDeps): Promis
   const missing: string[] = [];
 
   let nameGiven = args.positionals[0];
+  // A name whose folder is not empty is asked again now, before the other questions, and not refused after the summary.
+  const given = nameGiven;
+  if (
+    given !== undefined &&
+    prompts !== undefined &&
+    targetProblem(deps.cwd, checkProjectName(given).folder) !== undefined
+  )
+    nameGiven = undefined;
   if (nameGiven === undefined && prompts !== undefined) {
     nameGiven = await prompts.text('Project name?', {
       placeholder: 'my-app',

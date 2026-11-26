@@ -100,7 +100,7 @@ export function scriptedPrompts(answers: readonly ScriptedAnswer[]): ScriptedPro
     password: async (message) => textOf(message),
     task: async (title, _done, work) => {
       shown.push(title);
-      return work();
+      return work(new AbortController().signal);
     },
   };
 }

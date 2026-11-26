@@ -32,12 +32,27 @@ import type { Prompts } from '../kit/command.ts';
 
 const run = promisify(execFile);
 
-/** Runs a program in a folder. A test gives its own, so that nothing is installed and nothing is committed by accident. */
-export type Exec = (file: string, args: readonly string[], cwd: string) => Promise<void>;
+/**
+ * Runs a program in a folder, and kills it when `signal` aborts. A test gives its own, so that nothing is installed and nothing is
+ * committed by accident.
+ */
+export type Exec = (file: string, args: readonly string[], cwd: string, signal?: AbortSignal) => Promise<void>;
 
-export const realExec: Exec = async (file, args, cwd) => {
-  await run(file, [...args], { cwd });
+export const realExec: Exec = async (file, args, cwd, signal) => {
+  await run(file, [...args], { cwd, ...(signal === undefined ? {} : { signal }) });
 };
+
+/** Why a program failed: the first line of the error, and the last lines that the program printed, where the reason is. */
+function failureOf(error: unknown): string {
+  if (!(error instanceof Error)) return String(error);
+  const printed = [Reflect.get(error, 'stderr'), Reflect.get(error, 'stdout')]
+    .map((value) => (typeof value === 'string' ? value.trim() : ''))
+    .find((value) => value !== '');
+  const first = error.message.split('\n')[0] ?? '';
+  if (printed === undefined) return first;
+  const tail = printed.split('\n').slice(-10);
+  return `${first}\n${tail.map((line) => `  ${line}`).join('\n')}`;
+}
 
 export interface Scaffolded {
   readonly root: string;
@@ -74,19 +89,19 @@ export async function scaffold(
   prompts?: Prompts,
 ): Promise<Scaffolded> {
   // A person sees each step under a spinner. The output of a program is kept, and only the first line of a failure is shown.
-  const step = async <T>(title: string, done: string, work: () => Promise<T>): Promise<T> =>
+  const step = async <T>(title: string, done: string, work: (signal?: AbortSignal) => Promise<T>): Promise<T> =>
     prompts === undefined ? work() : prompts.task(title, done, work);
   await step('Writing files', `Files written (${planned.files.length})`, async () => write(planned));
   const problems: string[] = [];
   let installed = false;
   if (choices.install) {
     try {
-      await step('Installing dependencies', 'Dependencies installed', () => exec('pnpm', ['install'], planned.target));
+      await step('Installing dependencies', 'Dependencies installed', (signal) =>
+        exec('pnpm', ['install'], planned.target, signal),
+      );
       installed = true;
     } catch (error) {
-      problems.push(
-        `pnpm install failed: ${error instanceof Error ? error.message.split('\n')[0] : String(error)}. Run it in the folder of the project.`,
-      );
+      problems.push(`pnpm install failed: ${failureOf(error)}\nRun it in the folder of the project.`);
     }
   }
   // An object, so that the step below can record how far git got before it failed.
@@ -95,10 +110,10 @@ export async function scaffold(
     const name = choices.author.replace(/\s*<[^>]*>\s*$/, '');
     const email = /<([^>]*)>/.exec(choices.author)?.[1] ?? '';
     try {
-      await step('Creating the git repository', 'Git repository created', async () => {
-        await exec('git', ['init', '-b', 'main'], planned.target);
+      await step('Creating the git repository', 'Git repository created', async (signal) => {
+        await exec('git', ['init', '-b', 'main'], planned.target, signal);
         state.git = 'initialized';
-        await exec('git', ['add', '-A'], planned.target);
+        await exec('git', ['add', '-A'], planned.target, signal);
         // The author of the project signs the first commit, so that it works on a machine with no git identity.
         await exec(
           'git',
@@ -113,12 +128,13 @@ export async function scaffold(
             'chore: initial commit from create-bieberkit',
           ],
           planned.target,
+          signal,
         );
       });
       state.git = 'committed';
     } catch (error) {
       state.git = state.git === 'initialized' ? 'initialized' : 'failed';
-      problems.push(`git: ${error instanceof Error ? error.message.split('\n')[0] : String(error)}`);
+      problems.push(`git: ${failureOf(error)}`);
     }
   }
   return { root: planned.target, files: planned.files.length, installed, git: state.git, problems };

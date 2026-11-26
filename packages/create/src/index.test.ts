@@ -49,7 +49,9 @@ describe('ADR-0029 clack is bundled', () => {
     const dist = join(ROOT, 'dist');
     const files = readdirSync(dist);
     for (const file of files.filter((name) => name.endsWith('.js')))
-      expect(`${file}: ${readFileSync(join(dist, file), 'utf8')}`).not.toMatch(/from\s*["'](?:@clack\/|sisteransi|fast-)/);
+      expect(`${file}: ${readFileSync(join(dist, file), 'utf8')}`).not.toMatch(
+        /from\s*["'](?:@clack\/|sisteransi|fast-)/,
+      );
     for (const file of files.filter((name) => name.endsWith('.d.ts')))
       expect(`${file}: ${readFileSync(join(dist, file), 'utf8')}`).not.toContain('@clack');
     const manifest: unknown = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'));
