@@ -24,7 +24,7 @@
 
 # 0029. Terminal prompts: @clack/prompts behind a port of the kit
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-11-26
 - Deciders: Bieber Kieu
 - Requirements: spec 5.1, spec 6, P1, P9

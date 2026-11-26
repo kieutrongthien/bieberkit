@@ -61,7 +61,7 @@ Status values: `Proposed`, `Accepted`, `Rejected`, `Superseded by NNNN`. Only th
 | [0027](0027-table-prefix.md)                         | One prefix for every table of the framework: `bk_`                                                 | Accepted |
 
 | [0028](0028-test-app-platform-services.md) | The test app reuses the mail and cache contracts | Proposed |
-| [0029](0029-terminal-prompts.md) | Terminal prompts: @clack/prompts behind a port of the kit | Proposed |
+| [0029](0029-terminal-prompts.md) | Terminal prompts: @clack/prompts behind a port of the kit | Accepted |
 
 ## Needed for the Phase 0 gate
 
