@@ -62,7 +62,7 @@ Status values: `Proposed`, `Accepted`, `Rejected`, `Superseded by NNNN`. Only th
 
 | [0028](0028-test-app-platform-services.md) | The test app reuses the mail and cache contracts | Proposed |
 | [0029](0029-terminal-prompts.md) | Terminal prompts: @clack/prompts behind a port of the kit | Accepted |
-| [0030](0030-setting-declarations.md) | Settings are declared with `defineSetting` and contributed under `settings` | Proposed |
+| [0030](0030-setting-declarations.md) | Settings are declared with `defineSetting` and contributed under `settings` | Accepted |
 
 ## Needed for the Phase 0 gate
 

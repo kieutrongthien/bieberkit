@@ -24,14 +24,17 @@
 
 import type { Container, Registration, ServiceName } from '../container/container.ts';
 import { BkError } from '../errors/errors.ts';
+import type { SettingDef } from '../settings/define-setting.ts';
 
 /**
  * What a module can contribute beyond services: entities, routes, jobs, schedules, workflows, events and admin screens.
  * Each package that handles one adds its key by declaration merging, through the package entry:
  * `declare module '@bieberkit/core' { interface ModuleContributions { jobs?: readonly JobDef[] } }`.
  */
-// oxlint-disable-next-line typescript/no-empty-interface
-export interface ModuleContributions {}
+export interface ModuleContributions {
+  /** The settings that the module declares (SET-01, ADR 0030). The settings plugin collects them from every module. */
+  readonly settings?: readonly SettingDef[];
+}
 
 export type ServiceDefs = { readonly [N in ServiceName]?: Registration<N> };
 

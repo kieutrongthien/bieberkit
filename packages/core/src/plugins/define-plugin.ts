@@ -137,6 +137,25 @@ function problemsOf(input: PluginInput<unknown>): PluginProblem[] {
       });
     }
   }
+  const settingPrefix = `${shortNameOf(input.name)}.`;
+  const seen = new Set<string>();
+  for (const setting of input.settings ?? []) {
+    if (!setting.key.startsWith(settingPrefix)) {
+      problems.push({
+        code: 'PLG_PREFIX_SETTING',
+        message: `${input.name}: setting ${setting.key} must start with ${settingPrefix}`,
+        fix: `Rename the setting to ${settingPrefix}${setting.key}.`,
+      });
+    }
+    if (seen.has(setting.key)) {
+      problems.push({
+        code: 'PLG_SETTING_DUPLICATE',
+        message: `${input.name}: setting ${setting.key} is declared twice.`,
+        fix: 'Declare each setting once.',
+      });
+    }
+    seen.add(setting.key);
+  }
   if (input.requires !== undefined && input.name in input.requires) {
     problems.push({
       code: 'PLG_CYCLE',

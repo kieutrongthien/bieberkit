@@ -865,7 +865,7 @@ A setting is declared in code with `defineSetting` of `@bieberkit/core` and cont
 - **SET-01** A setting MUST be declared before it is used: `key` (dotted, lower case, at most 120 characters, starting with the plugin's short name for a plugin), `type` (`string`, `number`, `boolean`, `enum` with `values`, or `json` with a `parser`), `default` (which MUST pass the setting's own check), `label`, and optionally `description`, `group`, `scope` (`global` by default, or `tenant`), `public` and `secret` (never both). A bad declaration is `CORE_SETTING_INVALID`. A key declared twice is `SETTINGS_DUPLICATE_KEY` at boot. Any route or service call with an undeclared key is `SETTINGS_UNKNOWN_KEY` (404).
 - **SET-02** There is one way to write a value: `GET /api/v1/settings/settings`, `GET .../settings/:key`, `PUT .../settings/:key` with `{ value }`, validated against the declaration (`SETTINGS_INVALID_VALUE`, 422), and `DELETE .../settings/:key`, which goes back to the default. The entity `settings.Setting` has no generated routes.
 - **SET-03** A `secret` value MUST be encrypted at rest (SEC-08). It MUST never be returned: a read shows `"********"` and `hasValue`. It MUST never appear in audit data. Writing one needs `settings.manage`.
-- **SET-04** A `tenant` setting has a value for each tenant. A read falls back to the global value, then to the default. A tenant never sees another tenant's value.
+- **SET-04** A `tenant` setting has a value for each tenant. A read falls back to the global value, then to the default. A tenant never sees another tenant's value. A `global` setting MUST be changed only outside a tenant (or in the nil tenant): from inside a tenant it is `SETTINGS_SCOPE_REFUSED` (403), so one tenant never changes what all tenants read.
 - **SET-05** Services read through `settings.get(def, { tenantId })`, typed by the declaration. Reads are cached under the tag `settings` and invalidated after commit (DATA-13). When the cache fails, a read falls back to the database, and then to the default.
 - **SET-06** A change or a reset writes `settings.setting.updated` or `settings.setting.reset` with the key, the old value and the new value (the key only, for a secret) in the transaction of the change.
 - **SET-07** `GET /api/v1/settings/public` returns the `public` settings without a session, with the cache headers of a public GET (API-09).
@@ -1652,7 +1652,7 @@ Open questions:
 
 | Version | Date | Changes |
 | --- | --- | --- |
-| 0.8.14 | 2026-11-26 | Base plugins S2: section 12.3, SET-01 to SET-07; settings are declared with `defineSetting` and contributed under `settings` (ADR 0030, proposed) |
+| 0.8.14 | 2026-11-26 | Base plugins S2: section 12.3, SET-01 to SET-07; settings are declared with `defineSetting` and contributed under `settings` (ADR 0030) |
 | 0.8.13 | 2026-11-26 | Base plugins S1: section 12.2, USR-01 to USR-12 and ROL-01 to ROL-08; the user service, auth migration 0.6.0 (`lastSignInAt`, `deletedAt`, the `lower(name)` index), invitations, deletion by anonymizing, the self and last-administrator guards and the escalation guard |
 | 0.8.12 | 2026-11-25 | Base-plugin platform S0: BPL-01 to BPL-04 and IDN-01; disabled users, identity columns, typed mail/queue/cache services, authentication mail, outbox subscriptions and test-app mailbox/outbox helpers. Other base-plugin slices remain open |
 | 0.8.11 | 2026-11-24 | UI-14: the address of the admin is `ADMIN_URL`, a path or a host of its own, and the build does not know it |

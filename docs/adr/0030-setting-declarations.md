@@ -24,7 +24,7 @@
 
 # 0030. Settings are declared with `defineSetting` and contributed under `settings`
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-11-26
 - Deciders: Bieber Kieu
 - Requirements: SET-01 to SET-07, P1, P9, PKG-01, PKG-04, BPL-03, PLG-07
