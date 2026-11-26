@@ -29,7 +29,7 @@ Generated from the built declaration files by `pnpm api:update`. Do not edit by 
 
 ```ts
 import { EnvSource } from "@bieberkit/core";
-import { _ as Failure, a as Prompts, b as usageError, c as GLOBAL_FLAGS, d as parseArgs, f as splitCommand, g as ExitCode, h as DOCS_BASE, i as PromptOption, l as ParsedArgs, m as CliErrorOptions, n as CommandContext, o as TextOptions, p as CliError, r as Outcome, s as FlagDef, t as Command, u as Positional, v as docsLink, y as failureOf } from "./command-C8PBaD1_.js";
+import { _ as Failure, a as Prompts, b as usageError, c as GLOBAL_FLAGS, d as parseArgs, f as splitCommand, g as ExitCode, h as DOCS_BASE, i as PromptOption, l as ParsedArgs, m as CliErrorOptions, n as CommandContext, o as TextOptions, p as CliError, r as Outcome, s as FlagDef, t as Command, u as Positional, v as docsLink, y as failureOf } from "./command-DZJ0Ew2X.js";
 export declare const CANCEL: unique symbol;
 type ScriptedAnswer = string | boolean | readonly string[] | typeof CANCEL;
 interface ScriptedPrompts extends Prompts {

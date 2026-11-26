@@ -29,7 +29,7 @@ Generated from the built declaration files by `pnpm api:update`. Do not edit by 
 
 ```ts
 import { Dialect, EnvDescription, Manifest } from "@bieberkit/core";
-import { a as Prompts, l as ParsedArgs, t as Command } from "./command-C8PBaD1_.js";
+import { a as Prompts, l as ParsedArgs, t as Command } from "./command-DZJ0Ew2X.js";
 interface ProjectName {
   readonly name: string;
   readonly folder: string;
@@ -107,7 +107,7 @@ interface Planned {
   readonly notes: readonly string[];
 }
 export declare function planProject(choices: Choices, cwd: string, deps: PlanDeps): Planned;
-type Exec = (file: string, args: readonly string[], cwd: string) => Promise<void>;
+type Exec = (file: string, args: readonly string[], cwd: string, signal?: AbortSignal) => Promise<void>;
 interface Scaffolded {
   readonly root: string;
   readonly files: number;

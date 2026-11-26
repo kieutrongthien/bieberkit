@@ -29,9 +29,9 @@ Generated from the built declaration files by `pnpm api:update`. Do not edit by 
 
 ```ts
 import { Database, OutboxDispatcher, OutboxDispatcherOptions, OutboxMessage } from "@bieberkit/data/orm";
-import { ErrorReporter, Logger, Metrics, Tracer } from "@bieberkit/core";
+import { ErrorReporter, Logger, Metrics, ModuleDef, Tracer } from "@bieberkit/core";
 import { PluginMigrationStep } from "@bieberkit/data";
-import { _ as WorkerOptions, a as JobContext, b as queueError, c as JobResult, d as Queue, f as QueueError, g as Worker, i as Dispatched, l as JobStatus, m as QueueStats, n as DeadLetterPage, o as JobDef, p as QueueName, r as DispatchOptions, s as JobInput, t as DeadJob, u as QUEUE_NAMES, v as defaultBackoffMs, y as defineJob } from "./contract-lB7YG7UJ.js";
+import { _ as WorkerOptions, a as JobContext, b as queueError, c as JobResult, d as Queue, f as QueueError, g as Worker, i as Dispatched, l as JobStatus, m as QueueStats, n as DeadLetterPage, o as JobDef, p as QueueName, r as DispatchOptions, s as JobInput, t as DeadJob, u as QUEUE_NAMES, v as defaultBackoffMs, y as defineJob } from "./contract-ZmIXfWEe.js";
 interface Cron {
   matches(date: Date): boolean;
 }
@@ -99,6 +99,12 @@ interface SchedulerOptions {
   readonly now?: () => number;
 }
 export declare function createScheduler(queue: Queue, schedules: readonly Schedule[], options: SchedulerOptions): Promise<Scheduler>;
+interface ScheduleContribution<Input = unknown> {
+  readonly job: JobDef<Input>;
+  readonly cron: string;
+  readonly input?: Input;
+}
+export declare function schedulesOf(modules: readonly ModuleDef[]): Schedule[];
 export declare const QUEUE_PLUGIN = "@bieberkit/queue";
 export declare const JOBS_TABLE = "bk_jobs";
 export declare const LOCKS_TABLE = "bk_locks";
@@ -108,6 +114,7 @@ declare module "@bieberkit/core" {
   interface ModuleContributions {
     jobs?: readonly JobDef[];
     subscriptions?: readonly QueueSubscription[];
+    schedules?: readonly ScheduleContribution[];
   }
 }
 declare module "@bieberkit/core" {
@@ -115,5 +122,5 @@ declare module "@bieberkit/core" {
     queue: Queue;
   }
 }
-export { type CreateQueueOptions, type Cron, type DeadJob, type DeadLetterPage, type DispatchOptions, type Dispatched, type JobContext, type JobDef, type JobInput, type JobResult, type JobStatus, type PoolStats, QUEUE_NAMES, type Queue, QueueError, type QueueName, type QueueStats, type QueueSubscription, type RunOptions, type Schedule, type Scheduler, type SchedulerOptions, type Worker, type WorkerOptions, type WorkerPool, type WorkerPoolOptions, defaultBackoffMs, defineJob, queueError };
+export { type CreateQueueOptions, type Cron, type DeadJob, type DeadLetterPage, type DispatchOptions, type Dispatched, type JobContext, type JobDef, type JobInput, type JobResult, type JobStatus, type PoolStats, QUEUE_NAMES, type Queue, QueueError, type QueueName, type QueueStats, type QueueSubscription, type RunOptions, type Schedule, type ScheduleContribution, type Scheduler, type SchedulerOptions, type Worker, type WorkerOptions, type WorkerPool, type WorkerPoolOptions, defaultBackoffMs, defineJob, queueError };
 ```

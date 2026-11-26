@@ -137,6 +137,7 @@ interface Queue {
   purge(options?: {
     olderThanMs?: number;
   }): Promise<number>;
+  settle(): Promise<void>;
   close(): Promise<void>;
 }
 declare const defaultBackoffMs: (attempt: number) => number;

@@ -30,7 +30,7 @@ Generated from the built declaration files by `pnpm api:update`. Do not edit by 
 ```ts
 import { Database } from "@bieberkit/data/orm";
 import { ErrorReporter, Logger, Metrics, Tracer } from "@bieberkit/core";
-import { d as Queue, o as JobDef } from "./contract-lB7YG7UJ.js";
+import { d as Queue, o as JobDef } from "./contract-ZmIXfWEe.js";
 interface RedisQueueOptions {
   readonly url: string;
   readonly jobs: readonly JobDef[];

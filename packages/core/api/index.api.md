@@ -469,9 +469,82 @@ export declare const requestContext: {
   get(): RequestContext | undefined;
   update(patch: Partial<RequestContext>): void;
 };
+interface Parser<T> {
+  parse(input: unknown): T;
+}
+export declare function runParser<T>(parser: Parser<T>, input: unknown, path: string): T;
+export declare class SettingError extends BkError {}
+type LocalizedText = {
+  readonly en: string;
+} & Readonly<Record<string, string>>;
+type SettingType = "string" | "number" | "boolean" | "enum" | "json";
+type SettingScope = "global" | "tenant";
+interface Common {
+  readonly key: string;
+  readonly label: LocalizedText;
+  readonly description?: LocalizedText;
+  readonly group?: string;
+  readonly scope?: SettingScope;
+  readonly public?: boolean;
+  readonly secret?: boolean;
+}
+type SettingInput<T> = (Common & {
+  readonly type: "string";
+  readonly default: T & string;
+}) | (Common & {
+  readonly type: "number";
+  readonly default: T & number;
+}) | (Common & {
+  readonly type: "boolean";
+  readonly default: T & boolean;
+}) | (Common & {
+  readonly type: "enum";
+  readonly values: readonly (T & string)[];
+  readonly default: T & string;
+}) | (Common & {
+  readonly type: "json";
+  readonly parser: Parser<T>;
+  readonly default: T;
+});
+interface SettingDef<T = unknown> {
+  readonly key: string;
+  readonly type: SettingType;
+  readonly default: T;
+  readonly label: LocalizedText;
+  readonly description?: LocalizedText;
+  readonly group?: string;
+  readonly scope: SettingScope;
+  readonly public: boolean;
+  readonly secret: boolean;
+  readonly values?: readonly string[];
+  check(input: unknown): T;
+}
+export declare function defineSetting<const T extends string>(input: Common & {
+  readonly type: "enum";
+  readonly values: readonly T[];
+  readonly default: NoInfer<T>;
+}): SettingDef<T>;
+export declare function defineSetting<T>(input: Common & {
+  readonly type: "json";
+  readonly parser: Parser<T>;
+  readonly default: T;
+}): SettingDef<T>;
+export declare function defineSetting(input: Common & {
+  readonly type: "string";
+  readonly default: string;
+}): SettingDef<string>;
+export declare function defineSetting(input: Common & {
+  readonly type: "number";
+  readonly default: number;
+}): SettingDef<number>;
+export declare function defineSetting(input: Common & {
+  readonly type: "boolean";
+  readonly default: boolean;
+}): SettingDef<boolean>;
 interface ServiceRegistry {
   config: CoreEnv;
   pluginEnv: Readonly<Record<string, unknown>>;
+  settingDeclarations: readonly SettingDef[];
 }
 type ServiceName = Extract<keyof ServiceRegistry, string>;
 type ServiceScope = "singleton" | "request" | "transient";
@@ -547,11 +620,9 @@ export declare function createEventBus(options?: EventBusOptions): EventBus;
 export declare const ROLES: readonly ["web", "worker", "scheduler", "migrate"];
 type Role = (typeof ROLES)[number];
 export declare function parseRole(argv: readonly string[]): Role;
-interface Parser<T> {
-  parse(input: unknown): T;
+interface ModuleContributions {
+  readonly settings?: readonly SettingDef[];
 }
-export declare function runParser<T>(parser: Parser<T>, input: unknown, path: string): T;
-interface ModuleContributions {}
 type ServiceDefs = { readonly [N in ServiceName]?: Registration<N>; };
 interface ModuleInput extends ModuleContributions {
   readonly name: string;
@@ -637,6 +708,7 @@ export declare function checkManifest(pkg: {
   readonly version: string;
   readonly bieberkit?: unknown;
 }, def: PluginDef<unknown>, collectors?: readonly KeyCollector[]): ManifestCheck;
+export declare function envPrefixOf(name: string): string;
 interface Installed {
   readonly name: string;
   readonly version: string;
@@ -679,5 +751,5 @@ export declare function defineConfig(input: ProjectConfigInput): ProjectConfigIn
 export declare function defineConfigSection<K extends keyof ConfigSections>(key: K, parser: Parser<ConfigSections[K]>): ConfigSection<K>;
 export declare function validateConfig(input: unknown, options?: ValidateConfigOptions): ProjectConfigInput;
 export declare const packageName = "@bieberkit/core";
-export type { AppEnv, AttributeValue, BkErrorOptions, CollectorOptions, ConfigProblem, ConfigSection, ConfigSections, Container, CoreEnv, CoreEnvResult, CoreEnvValues, Counter, Dialect, EmitResult, EnvCustomParse, EnvDescription, EnvKeyBuilder, EnvKeyDef, EnvKind, EnvOwner, EnvProblem, EnvSchema, EnvSource, EnvValues, ErrorBody, ErrorReportContext, ErrorReporter, EventBus, EventBusOptions, EventHandler, EventName, EventRegistry, FinishedSpan, Gauge, HandlerFailure, Histogram, HistogramOptions, Hook, HookFailure, Installed, IntOptions, KeyCollector, Lifecycle, LifecycleOptions, LoadEnvOptions, LogFields, LogLevel, LogSanitizer, Logger, LoggerOptions, Manifest, ManifestCheck, MemoryReporter, MemorySpanExporter, MetricLabels, MetricOptions, MetricSample, Metrics, MetricsServer, MetricsServerOptions, ModuleContributions, ModuleDef, ModuleEmitter, ModuleInput, OnOptions, OpenSpan, OtlpExporterOptions, ParsedDsn, Parser, Phase, PluginDef, PluginEntry, PluginInput, PluginProblem, ProcessHandlerOptions, ProcessLike, ProjectConfigInput, ReadCoreEnvOptions, Registration, ReportLevel, ReportSource, ReporterConfig, ReporterFromConfigOptions, RequestContext, RequestScope, Resolution, ResolveContext, Role, SeedFn, SentryReporterOptions, ServiceDefs, ServiceName, ServiceRegistry, ServiceScope, Span, SpanAttributes, SpanExporter, SpanKind, SpanOptions, StopResult, TraceParent, Tracer, TracerFromConfigOptions, TracerOptions, TracingConfig, ValidateConfigOptions };
+export type { AppEnv, AttributeValue, BkErrorOptions, CollectorOptions, ConfigProblem, ConfigSection, ConfigSections, Container, CoreEnv, CoreEnvResult, CoreEnvValues, Counter, Dialect, EmitResult, EnvCustomParse, EnvDescription, EnvKeyBuilder, EnvKeyDef, EnvKind, EnvOwner, EnvProblem, EnvSchema, EnvSource, EnvValues, ErrorBody, ErrorReportContext, ErrorReporter, EventBus, EventBusOptions, EventHandler, EventName, EventRegistry, FinishedSpan, Gauge, HandlerFailure, Histogram, HistogramOptions, Hook, HookFailure, Installed, IntOptions, KeyCollector, Lifecycle, LifecycleOptions, LoadEnvOptions, LocalizedText, LogFields, LogLevel, LogSanitizer, Logger, LoggerOptions, Manifest, ManifestCheck, MemoryReporter, MemorySpanExporter, MetricLabels, MetricOptions, MetricSample, Metrics, MetricsServer, MetricsServerOptions, ModuleContributions, ModuleDef, ModuleEmitter, ModuleInput, OnOptions, OpenSpan, OtlpExporterOptions, ParsedDsn, Parser, Phase, PluginDef, PluginEntry, PluginInput, PluginProblem, ProcessHandlerOptions, ProcessLike, ProjectConfigInput, ReadCoreEnvOptions, Registration, ReportLevel, ReportSource, ReporterConfig, ReporterFromConfigOptions, RequestContext, RequestScope, Resolution, ResolveContext, Role, SeedFn, SentryReporterOptions, ServiceDefs, ServiceName, ServiceRegistry, ServiceScope, SettingDef, SettingInput, SettingScope, SettingType, Span, SpanAttributes, SpanExporter, SpanKind, SpanOptions, StopResult, TraceParent, Tracer, TracerFromConfigOptions, TracerOptions, TracingConfig, ValidateConfigOptions };
 ```

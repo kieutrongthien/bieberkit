@@ -29,7 +29,7 @@ Generated from the built declaration files by `pnpm api:update`. Do not edit by 
 
 ```ts
 import { Logger } from "@bieberkit/core";
-import { h as WakeSource } from "./contract-lB7YG7UJ.js";
+import { h as WakeSource } from "./contract-ZmIXfWEe.js";
 export interface PgWakeSourceOptions {
   readonly url: string;
   readonly logger?: Logger;

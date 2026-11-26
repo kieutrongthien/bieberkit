@@ -71,6 +71,15 @@ interface AuditEntry {
 }
 export declare function recordAudit(em: EntityManager, entry: AuditEntry): void;
 export declare function auditTableSink(orm: Orm): AuditSink;
+interface AuditPruneOptions {
+  readonly before: Date;
+  readonly apply: boolean;
+}
+interface AuditPrune {
+  readonly count: number;
+  readonly pruned: boolean;
+}
+export declare function pruneAuditLog(db: Database, options: AuditPruneOptions): Promise<AuditPrune>;
 export declare const DATA_PLUGIN = "@bieberkit/data";
 interface OutboxEntryRow {
   id: string;
@@ -462,5 +471,5 @@ export declare function setTranslation(em: EntityManager, schema: OrmSchema, rec
 type Row = Record<string, unknown>;
 export declare function toApiRow(schema: OrmSchema, row: Row): Row;
 export declare function toOrmData(schema: OrmSchema, input: Row, _mode: "create" | "update"): Row;
-export { type AggregateOptions, type AggregateResult, type AggregateRow, type AttachmentInput, type AttachmentRow, type AuditEntry, type AuditLogRow, type AuditSink, type AvailableTransition, type CommentRow, type CompileOptions, type Database, type DatabaseEnv, type DatabaseOptions, type DispatchResult, type EncryptionKeys, type FeaturePage, type ListOptions, type MadeMigration, type MemoryReadYourWritesOptions, type MigrationEnv, type MigrationLockOptions, type MigrationStatus, type Migrator, type MigratorOptions, type Orm, type OrmSchema, type OutboxDispatcher, type OutboxDispatcherOptions, type OutboxEntryRow, type OutboxEvent, type OutboxLag, type OutboxMessage, type OutboxProcessedRow, type OutboxPublisher, type Page, type PageRequest, type PluginRefusal, type PluginRun, type PluginRunOptions, type PluginStatus, type PurgeOptions, type ReadYourWrites, type ReencryptOptions, type ReencryptResult, type ReferenceVisibility, type RequestKysely, type ResolvedConnection, type SequenceKey, type SequenceOptions, type SequenceRow, type SortOption, type SqliteOptions, type SystemScopeEntry, type TagRow, type TimelineInput, type TimelineRow, type TransitionResult, type UpOptions, afterCommit, createDatabase, currentEntityManager, currentTenantId, resolveConnection, runAsTenant, runInTransaction, runInUnitOfWork };
+export { type AggregateOptions, type AggregateResult, type AggregateRow, type AttachmentInput, type AttachmentRow, type AuditEntry, type AuditLogRow, type AuditPrune, type AuditPruneOptions, type AuditSink, type AvailableTransition, type CommentRow, type CompileOptions, type Database, type DatabaseEnv, type DatabaseOptions, type DispatchResult, type EncryptionKeys, type FeaturePage, type ListOptions, type MadeMigration, type MemoryReadYourWritesOptions, type MigrationEnv, type MigrationLockOptions, type MigrationStatus, type Migrator, type MigratorOptions, type Orm, type OrmSchema, type OutboxDispatcher, type OutboxDispatcherOptions, type OutboxEntryRow, type OutboxEvent, type OutboxLag, type OutboxMessage, type OutboxProcessedRow, type OutboxPublisher, type Page, type PageRequest, type PluginRefusal, type PluginRun, type PluginRunOptions, type PluginStatus, type PurgeOptions, type ReadYourWrites, type ReencryptOptions, type ReencryptResult, type ReferenceVisibility, type RequestKysely, type ResolvedConnection, type SequenceKey, type SequenceOptions, type SequenceRow, type SortOption, type SqliteOptions, type SystemScopeEntry, type TagRow, type TimelineInput, type TimelineRow, type TransitionResult, type UpOptions, afterCommit, createDatabase, currentEntityManager, currentTenantId, resolveConnection, runAsTenant, runInTransaction, runInUnitOfWork };
 ```

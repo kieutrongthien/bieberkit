@@ -28,8 +28,8 @@
 Generated from the built declaration files by `pnpm api:update`. Do not edit by hand. A change here is a change to the public API and needs a changeset (spec section 22.3).
 
 ```ts
+import { AuditPrune, Database, MadeMigration, PluginRun } from "@bieberkit/data/orm";
 import { BkError, CoreEnv, EnvSource, ModuleDef, Role } from "@bieberkit/core";
-import { Database, MadeMigration, PluginRun } from "@bieberkit/data/orm";
 import { HttpServer } from "@bieberkit/http";
 import { PluginMigrationStep } from "@bieberkit/data";
 import { a as envOwnersOf, c as loadConfig, i as ProjectConfig, l as loadProject, n as LoadedPlugin, o as findProjectRoot, r as Project, s as importFile, t as CONFIG_FILE, u as COLLECTORS } from "./project-CSBZwAGD.js";
@@ -108,6 +108,11 @@ interface MigrationsStatus {
   };
 }
 export declare function migrationStatus(options?: MigrationsOptions): Promise<MigrationsStatus>;
+interface PruneAuditOptions extends MigrationsOptions {
+  readonly before: Date;
+  readonly apply: boolean;
+}
+export declare function pruneAudit(options: PruneAuditOptions): Promise<AuditPrune>;
 interface SeedOptions {
   readonly cwd?: string;
   readonly env?: EnvSource;
@@ -123,5 +128,5 @@ export declare function allModules(project: Project): Promise<ModuleDef[]>;
 export declare function contributed<T>(modules: readonly ModuleDef[], key: string): T[];
 export declare function contributedRecord<T>(modules: readonly ModuleDef[], key: string): Record<string, T>;
 export declare const packageName = "@bieberkit/server";
-export { type AdminLocation, type BootOptions, type BootRole, COLLECTORS, CONFIG_FILE, type DoctorOptions, type Finding, type LoadedPlugin, type Migrated, type MigrationsOptions, type MigrationsRun, type MigrationsStatus, type Project, type ProjectConfig, type RunMigrationsOptions, type Running, type SeedOptions, type Seeded, envOwnersOf, findProjectRoot, importFile, loadConfig, loadProject };
+export { type AdminLocation, type BootOptions, type BootRole, COLLECTORS, CONFIG_FILE, type DoctorOptions, type Finding, type LoadedPlugin, type Migrated, type MigrationsOptions, type MigrationsRun, type MigrationsStatus, type Project, type ProjectConfig, type PruneAuditOptions, type RunMigrationsOptions, type Running, type SeedOptions, type Seeded, envOwnersOf, findProjectRoot, importFile, loadConfig, loadProject };
 ```

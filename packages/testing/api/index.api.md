@@ -34,7 +34,7 @@ import { BkError, Dialect, LogFields, Logger, ModuleDef, ServiceRegistry } from 
 import { Database, DatabaseOptions, OrmSchema } from "@bieberkit/data/orm";
 import { EntityDef } from "@bieberkit/data";
 import { HttpServer } from "@bieberkit/http";
-import { MemoryDisk } from "@bieberkit/storage";
+import { MemoryDisk, MemoryDiskOptions } from "@bieberkit/storage";
 import { PreparedMessage } from "@bieberkit/mail";
 import { Queue } from "@bieberkit/queue";
 interface Reply {
@@ -45,6 +45,7 @@ interface Reply {
 interface Client {
   get(url: string, headers?: Record<string, string>): Promise<Reply>;
   post(url: string, payload?: object, headers?: Record<string, string>): Promise<Reply>;
+  put(url: string, payload: object, headers?: Record<string, string>): Promise<Reply>;
   patch(url: string, payload: object, version: number, headers?: Record<string, string>): Promise<Reply>;
   delete(url: string, version: number, headers?: Record<string, string>): Promise<Reply>;
 }
@@ -100,6 +101,7 @@ interface TestAppOptions {
   readonly open?: OpenDatabase;
   readonly tenant?: string;
   readonly pluginEnv?: Readonly<Record<string, unknown>>;
+  readonly disk?: MemoryDiskOptions;
 }
 interface TestApp {
   readonly db: Database;

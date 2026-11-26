@@ -30,7 +30,7 @@ Generated from the built declaration files by `pnpm api:update`. Do not edit by 
 ```ts
 import { ErrorReporter, Logger } from "@bieberkit/core";
 import { a as MailTransport } from "./contract-BFl6GzOT.js";
-import { r as Mailer } from "./mailer-DUUP24mj.js";
+import { r as Mailer } from "./mailer-C-1JjZsE.js";
 interface NodemailerTransportOptions {
   readonly url: string;
   readonly connectionTimeoutMs?: number;

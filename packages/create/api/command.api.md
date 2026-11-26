@@ -89,7 +89,7 @@ interface Prompts {
   confirm(message: string, initial: boolean): Promise<boolean>;
   text(message: string, options?: TextOptions): Promise<string>;
   password(message: string): Promise<string>;
-  task<T>(title: string, done: string, work: () => Promise<T>): Promise<T>;
+  task<T>(title: string, done: string, work: (signal: AbortSignal) => Promise<T>): Promise<T>;
 }
 interface CommandContext {
   readonly cwd: string;

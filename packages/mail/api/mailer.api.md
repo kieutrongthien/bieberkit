@@ -42,6 +42,7 @@ interface MailerOptions {
 interface Mail {
   send(message: Message, options?: DispatchOptions): Promise<Dispatched>;
   sendNow(message: Message): Promise<MailReceipt>;
+  prepare(message: Message): PreparedMessage;
   verify(): Promise<void>;
 }
 interface Mailer {
