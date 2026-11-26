@@ -311,11 +311,11 @@ Depends on the M1.8 baseline. This milestone hardens the shared base for domain-
 - [x] **S0 / IDN-01** Provider identity columns with a local default and per-provider uniqueness, auth migration 0.5.0. Evidence: `IDN-01 a new user has source "local" and no external id`, the uniqueness case and `AUTH-10 the drift check passes with the profile fields`
 - [x] **S0 / BPL-02** Typed mail/queue/cache in process roles, seeders and the memory test app; auth mail, `mailbox`, `runOutbox()`. Evidence: the `BPL-02` boot, seed, auth-mail and test-app cases; the `AUTH-06` unknown-address reset case
 - [x] **S0 / BPL-03** Prove existing plugin service contribution and duplicate-name rejection. Evidence: the two `BPL-03` cases in `testing/src/app.test.ts`
-- [x] **S0 / BPL-04 mechanism** Contributed outbox-to-job mappings, commit/rollback behavior and duplicate-event rejection across drivers. Evidence: `queue/src/subscriptions.test.ts`, the shared contract case and `BPL-04` boot/test-app cases. Media deletion remains S4
+- [x] **S0 / BPL-04 mechanism** Contributed outbox-to-job mappings, commit/rollback behavior and duplicate-event rejection across drivers. Evidence: `queue/src/subscriptions.test.ts`, the shared contract case and `BPL-04` boot/test-app cases. Media deletion is applied in S4 (MED-03)
 - [x] **S1 [D]** Complete users and roles: USR-01 to USR-12, ROL-01 to ROL-08 (spec 12.2). Evidence: `auth/src/user-lifecycle.dialects.test.ts`, `role-lifecycle.dialects.test.ts`, the plugin tests of `users` and `roles`; BPL-05/BPL-06 proven for these two plugins
 - [x] **S2** Complete settings, with maintainer review of its declaration: SET-01 to SET-07 (spec 12.3, ADR 0030). Evidence: `core/src/settings/define-setting.test.ts`, the `SET-01` cases of `define-plugin.test.ts`, `plugins/settings/src/index.test.ts` on three dialects; BPL-05/BPL-06 proven for settings
 - [x] **S3** Complete notifications: NTF-01 to NTF-07 (spec 12.4). Evidence: `plugins/notifications/src/index.test.ts` on three dialects, `queue/src/schedules.test.ts`, the sync-driver case of `queue/src/subscriptions.test.ts`; BPL-05/BPL-06 proven for notifications
-- [ ] **S4** Complete media, including deletion after commit
+- [x] **S4** Complete media, including deletion after commit: MED-01 to MED-08 (spec 12.5). Evidence: `plugins/media/src/index.test.ts` on three dialects (MED-02 private-URL invariant and deletion after commit included); BPL-05/BPL-06 proven for media
 - [ ] **S5** Complete audit-log and pruning
 - [ ] **S6 [D]** Enterprise policies, managed identities, retention and operational controls
 - [ ] Cross-slice acceptance BPL-05/BPL-06: each mutation audits atomically and each list proves cursor/limit rules in its own slice

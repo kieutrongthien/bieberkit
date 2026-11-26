@@ -27,7 +27,7 @@
 - Packages: `@bieberkit/plugin-users`, `-roles`, `-settings`, `-audit-log`, `-notifications`, `-media`, and the changes they need in `@bieberkit/auth`, `@bieberkit/server` and `bieberkit` (CLI).
 - Layer: plugins, with the platform changes in the product and tools layers. Imports keep pointing downward (PKG-01).
 - Spec sections: 11, 12, 14, 15, OBS-05, AUTH-01 to AUTH-06, AUTHZ-01, AUTHZ-05, S-01 to S-06, DATA-13, DATA-25, IO-04.
-- Status: **Approved in outline by the maintainer on 2026-11-25** (approach 2, and the recommendations of the open questions, which are now decisions below). The maintainer asked for a result that serves a single person and an enterprise equally. Section "Who it is for" and section "Enterprise controls" carry that. S0 implements BPL-01 to BPL-04 and IDN-01, S1 implements USR-01 to USR-12 and ROL-01 to ROL-08 (tests approved by the maintainer on 2026-11-26), S2 implements SET-01 to SET-07 (ADR 0030), and S3 implements NTF-01 to NTF-07, with the normative requirements in `docs/spec/SPEC.md` sections 12.1 to 12.4 and milestone M1.11 in the roadmap. The remaining IDs are proposals for S4 to S6; the full milestone remains open.
+- Status: **Approved in outline by the maintainer on 2026-11-25** (approach 2, and the recommendations of the open questions, which are now decisions below). The maintainer asked for a result that serves a single person and an enterprise equally. Section "Who it is for" and section "Enterprise controls" carry that. S0 implements BPL-01 to BPL-04 and IDN-01, S1 implements USR-01 to USR-12 and ROL-01 to ROL-08 (tests approved by the maintainer on 2026-11-26), S2 implements SET-01 to SET-07 (ADR 0030), S3 implements NTF-01 to NTF-07, and S4 implements MED-01 to MED-08, with the normative requirements in `docs/spec/SPEC.md` sections 12.1 to 12.5 and milestone M1.11 in the roadmap. The remaining IDs are proposals for S5 and S6; the full milestone remains open.
 - Builds on: `docs/modules/plugins.md` (the thin slice of M1.8). This file replaces its "what a plugin does" tables slice by slice; `plugins.md` is updated as each slice lands.
 
 ## Purpose
@@ -154,7 +154,7 @@ Permissions: `settings.read`, `settings.manage`.
 
 - **MED-01** `visibility` (`private` or `public`, default `private`) is fixed when the record is made, and is the key prefix of S-05. Changing it is a new upload (see the open question).
 - **MED-02** `GET .../media/:id/url` returns a signed URL for a private file and the public URL for a public one. On the `local` disk, where there are no signed URLs, `GET .../media/:id/content` streams the file after the permission check.
-- **MED-03** Deleting a record deletes its object after commit (BPL-04). A record that is still `pending` after `MEDIA_PENDING_TTL` (default 24 hours) is deleted with its object by a scheduled job.
+- **MED-03** Deleting a record deletes its object after commit (BPL-04). A record that is still `pending` after `MEDIA_PENDING_TTL_HOURS` (default 24) is deleted with its object by a scheduled job.
 - **MED-04** Metadata: `alt`, `description`, `folderId` and `checksum` (SHA-256, computed on confirm when the disk can read the object). `PATCH` changes `alt`, `description` and `folderId` only, never the file.
 - **MED-05** Folders: `bk_media_folders` with a parent, a name unique inside its parent and a depth of at most 8. A folder with files or children cannot be deleted (`MEDIA_FOLDER_NOT_EMPTY`, 409). Tags use the `tags` feature (MOD-13).
 - **MED-06** List filters: `q` (a prefix of the filename), `kind` (`image`, `video`, `audio`, `document`, `other`, from the sniffed type), `folderId`, `status`, `visibility`, a size range and a `createdAt` range.
@@ -218,7 +218,7 @@ New stable codes (MOD-17), each with a one-line fix in the message: `AUTH_USER_D
 
 ## Configuration
 
-New keys, declared by the plugins and validated at boot (CFG-01): `NOTIFICATIONS_RETENTION_DAYS` (90), `MEDIA_PENDING_TTL` (24h), `MEDIA_MAX_SIZE_MB`, `MEDIA_ALLOWED_TYPES`, `MEDIA_TENANT_QUOTA_MB` (optional), `AUDIT_EXPORT_MAX_ROWS` (100000), `USERS_INVITE_TTL` (7d), `AUDIT_LOG_MIRROR` (false), `MEDIA_AUDIT_DOWNLOADS` (false). The `security.*` policies are settings, not env keys, and the table of defaults is in `docs/modules/plugins.md` when S6 lands. New permissions of S6: `users.override-external`, `audit-log.hold`.
+New keys, declared by the plugins and validated at boot (CFG-01): `NOTIFICATIONS_RETENTION_DAYS` (90), `MEDIA_PENDING_TTL_HOURS` (24), `MEDIA_MAX_SIZE_MB`, `MEDIA_ALLOWED_TYPES`, `MEDIA_TENANT_QUOTA_MB` (optional), `AUDIT_EXPORT_MAX_ROWS` (100000), `USERS_INVITE_TTL` (7d), `AUDIT_LOG_MIRROR` (false), `MEDIA_AUDIT_DOWNLOADS` (false). The `security.*` policies are settings, not env keys, and the table of defaults is in `docs/modules/plugins.md` when S6 lands. New permissions of S6: `users.override-external`, `audit-log.hold`.
 
 ## Slices and order
 
@@ -270,6 +270,18 @@ Taken by the maintainer on 2026-11-26, with the tests of S1:
 6. The list sorts and filters by creation on the UUIDv7 id, because SQLite keeps the dates of Better Auth as text and those of MikroORM as numbers.
 7. `ROLES_IN_USE` and `USERS_RATE_LIMITED` are `HttpError`s, so `memberCount` and `Retry-After` reach the answer. New codes besides the list above: `USERS_EMAIL_TAKEN`, `USERS_NOT_INVITED`, `USERS_RATE_LIMITED`, `USERS_MAIL_UNAVAILABLE`, `USERS_QUERY_INVALID`.
 8. `/api/v1/users/me` is a public route that refuses an anonymous caller itself (API-02 asks for a permission or `public`).
+
+## Decisions of slice S4
+
+Taken by the builder on 2026-11-27, within "Left to the builder":
+
+1. `media.Media` and `media.Folder` are tenant entities with no generated routes; the routes are thin over a `media` service (MOD-16), as in `users`.
+2. The object path is `<tenant>/media/<id>/<filename>` on the root storage, so the key already has the layout of OPS-04. The download audit of OPS-04 stays in S6.
+3. The TTL of a pending file is `MEDIA_PENDING_TTL_HOURS`, as `USERS_INVITE_TTL_DAYS`. The prune job compares `createdAt`, which MikroORM writes on the three dialects alike; the list filters creation on the UUIDv7 id, as the users list does.
+4. A pending record keeps the declared type only to sign the upload; confirm replaces it with the verified type (S-06 now says so).
+5. Moving a folder is not in S4: a file moves through `folderId`, a folder is renamed.
+6. New codes besides the list above: `MEDIA_NOT_READY`, `MEDIA_NOT_PENDING`, `MEDIA_FOLDER_NOT_FOUND`, `MEDIA_FOLDER_NAME_TAKEN`, `MEDIA_FOLDER_TOO_DEEP`; `MEDIA_ALREADY_READY` is kept.
+7. `createTestApp` takes `disk`, the options of its memory disk, to test a public URL and a disk that cannot sign.
 
 ## Left to the builder
 
