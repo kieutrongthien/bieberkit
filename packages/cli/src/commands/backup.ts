@@ -190,7 +190,7 @@ export function backupVerifyCommand(deps: BackupDeps = {}): Command {
       const passphrase =
         typeof passphraseFile === 'string'
           ? readFileSync(resolve(context.cwd, passphraseFile), 'utf8').trim()
-          : await context.ask?.('Passphrase of the backup');
+          : await context.prompts?.password('Passphrase of the backup');
       if (passphrase === undefined || passphrase === '') {
         throw usageError(
           'BK_USAGE_PASSPHRASE',

@@ -25,7 +25,7 @@
 import { execFileSync } from 'node:child_process';
 import type { Dialect } from '@bieberkit/core';
 import { CliError, usageError } from '../kit/errors.ts';
-import type { Ask } from '../kit/command.ts';
+import type { Prompts } from '../kit/command.ts';
 import type { ParsedArgs } from '../kit/args.ts';
 import { checkProjectName } from './names.ts';
 import type { ProjectName } from './names.ts';
@@ -48,7 +48,7 @@ export interface Choices {
 
 export interface ChoiceDeps {
   readonly templates: Readonly<Record<string, Template>>;
-  readonly ask: Ask | undefined;
+  readonly prompts: Prompts | undefined;
   /** `user.name` and `user.email` of git, when it knows them. */
   readonly gitUser: () => { readonly name?: string; readonly email?: string };
 }
@@ -100,7 +100,12 @@ export async function resolveChoices(args: ParsedArgs, deps: ChoiceDeps): Promis
   ): Promise<string> => {
     const given = text(args, flag);
     if (given !== undefined) return given;
-    if (deps.ask !== undefined) return deps.ask(question, options, fallback);
+    if (deps.prompts !== undefined)
+      return deps.prompts.select(
+        question,
+        options.map((value) => ({ value, label: value })),
+        fallback,
+      );
     if (yes) return fallback;
     missing.push(`--${flag} <${options.join('|')}>`);
     return fallback;
@@ -129,7 +134,7 @@ export async function resolveChoices(args: ParsedArgs, deps: ChoiceDeps): Promis
   if (author === undefined) {
     const git = deps.gitUser();
     if (git.name !== undefined && git.email !== undefined) author = `${git.name} <${git.email}>`;
-    else if (deps.ask !== undefined) author = await deps.ask('Author (Name <email>)?', undefined, undefined);
+    else if (deps.prompts !== undefined) author = await deps.prompts.text('Author (Name <email>)?');
     else missing.push('--author "Name <email>"');
   }
   if (author !== undefined && !AUTHOR.test(author)) {

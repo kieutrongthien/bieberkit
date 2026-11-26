@@ -32,7 +32,8 @@ import { definePlugin, env, parseEnvFile, readCoreEnv, toManifest } from '@biebe
 import { createCommand } from './commands/create.ts';
 import type { CreateDeps } from './commands/create.ts';
 import { createRunner } from './kit/run.ts';
-import type { Ask } from './kit/command.ts';
+import type { Prompts } from './kit/command.ts';
+import { scriptedPrompts } from './kit/scripted.ts';
 import type { Exec } from './scaffold/run.ts';
 import type { PluginIndex, Template } from './scaffold/templates.ts';
 
@@ -56,7 +57,7 @@ function counter(): () => string {
 
 interface RunOptions {
   readonly deps?: CreateDeps;
-  readonly ask?: Ask;
+  readonly prompts?: Prompts;
 }
 
 async function create(cwd: string, argv: string[], options: RunOptions = {}) {
@@ -85,7 +86,7 @@ async function create(cwd: string, argv: string[], options: RunOptions = {}) {
     stdout: (text) => out.push(text),
     stderr: (text) => err.push(text),
     cwd,
-    ...(options.ask === undefined ? {} : { ask: options.ask }),
+    ...(options.prompts === undefined ? {} : { prompts: options.prompts }),
   });
   const parsed: unknown = argv.includes('--json') ? JSON.parse(out[0] ?? '{}') : undefined;
   const json = typeof parsed === 'object' && parsed !== null ? Object.fromEntries(Object.entries(parsed)) : {};
@@ -311,23 +312,16 @@ describe('section 5.1 the choices', () => {
   });
 
   it('5.1 a person at the terminal is asked for what the flags did not say, and --yes or --json never asks', async () => {
-    const questions: string[] = [];
-    const ask: Ask = async (question, choices, fallback) => {
-      questions.push(question);
-      return choices?.includes('mysql') === true ? 'mysql' : (fallback ?? 'x');
-    };
-    const asked = workdir();
-    const { data } = await create(asked, ['demo', '--no-install', '--no-git', '--json'], { ask });
-    expect(questions).toEqual([]);
+    const json = scriptedPrompts([]);
+    const { data } = await create(workdir(), ['demo', '--no-install', '--no-git', '--json'], { prompts: json });
+    expect(json.asked).toEqual([]);
     expect(data.dialect).toBeUndefined();
-    const cwd = workdir();
-    const { out } = await create(cwd, ['demo', '--no-install', '--no-git'], { ask });
-    expect(questions).toEqual(['Which database?', 'Which template?']);
-    expect(out).toContain('mysql');
-    const yes = workdir();
-    questions.length = 0;
-    await create(yes, ['demo', '--yes', '--no-install', '--no-git'], { ask });
-    expect(questions).toEqual([]);
+    const person = scriptedPrompts(['mysql', 'blank']);
+    await create(workdir(), ['demo', '--no-install', '--no-git'], { prompts: person });
+    expect(person.asked).toEqual(['Which database?', 'Which template?']);
+    const yes = scriptedPrompts([]);
+    await create(workdir(), ['demo', '--yes', '--no-install', '--no-git'], { prompts: yes });
+    expect(yes.asked).toEqual([]);
   });
 
   it('5.1 the author comes from the flag, then from git config', async () => {

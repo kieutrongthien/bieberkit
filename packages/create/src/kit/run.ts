@@ -26,7 +26,7 @@ import { resolve } from 'node:path';
 import type { EnvSource } from '@bieberkit/core';
 import { GLOBAL_FLAGS, parseArgs, splitCommand } from './args.ts';
 import type { FlagDef } from './args.ts';
-import type { Ask, Command } from './command.ts';
+import type { Command, Prompts } from './command.ts';
 import { failureOf, usageError } from './errors.ts';
 import type { ExitCode, Failure } from './errors.ts';
 
@@ -38,7 +38,7 @@ export interface Io {
   /** The variables that the command reads. Without it the command reads the real environment (P8: only core does). */
   readonly env?: EnvSource;
   /** Set when a person is at the terminal. A command asks through it, and without it never prompts. */
-  readonly ask?: Ask;
+  readonly prompts?: Prompts;
 }
 
 export interface RunnerOptions {
@@ -175,13 +175,15 @@ export function createRunner(options: RunnerOptions): (argv: readonly string[], 
       const outcome = await command.run({
         cwd,
         ...(io.env === undefined ? {} : { env: io.env }),
-        ...(io.ask === undefined || args.flags['yes'] === true || json ? {} : { ask: io.ask }),
+        ...(io.prompts === undefined || args.flags['yes'] === true || json ? {} : { prompts: io.prompts }),
         args,
         json,
         log: (line) => io.stderr(`${line}\n`),
       });
       const exit = outcome.exit ?? 0;
-      answer({ ok: exit === 0, command: command.name, data: outcome.data }, outcome.text, 'stdout');
+      // A command that talked to the person through the prompts has already said everything, and answers no text.
+      if (json || outcome.text !== '')
+        answer({ ok: exit === 0, command: command.name, data: outcome.data }, outcome.text, 'stdout');
       return exit;
     } catch (error) {
       return fail(error);

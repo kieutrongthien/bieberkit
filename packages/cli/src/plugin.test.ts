@@ -25,7 +25,8 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { createRunner } from 'create-bieberkit/kit';
+import { createRunner, scriptedPrompts } from 'create-bieberkit/kit';
+import type { Prompts } from 'create-bieberkit/kit';
 import { checkCommand } from './commands/check.ts';
 import { addCommand, removeCommand } from './commands/plugin.ts';
 import type { Spawn } from './processes.ts';
@@ -81,7 +82,7 @@ function pnpmFor(root: string, options: { fail?: boolean } = {}): { spawn: Spawn
   return { spawn, calls };
 }
 
-async function run(root: string, spawn: Spawn, argv: string[], ask?: (question: string) => Promise<string>) {
+async function run(root: string, spawn: Spawn, argv: string[], prompts?: Prompts) {
   const runner = createRunner({
     name: 'bieberkit',
     version: '0.0.0',
@@ -97,7 +98,7 @@ async function run(root: string, spawn: Spawn, argv: string[], ask?: (question: 
     stdout: (text) => out.push(text),
     stderr: (text) => err.push(text),
     cwd: root,
-    ...(ask === undefined ? {} : { ask }),
+    ...(prompts === undefined ? {} : { prompts }),
   });
   const parsed: unknown = argv.includes('--json') ? JSON.parse(out[0] ?? '{}') : undefined;
   const json = typeof parsed === 'object' && parsed !== null ? Object.fromEntries(Object.entries(parsed)) : {};
@@ -193,8 +194,8 @@ describe('section 5.2 remove', () => {
 
   it('PLG-03 a person at the terminal is asked, and a no is the same as no answer', async () => {
     const { root, spawn } = await withPages();
-    expect((await run(root, spawn, ['remove', PAGES], async () => 'no')).code).toBe(2);
-    const yes = await run(root, spawn, ['remove', PAGES], async () => 'yes');
+    expect((await run(root, spawn, ['remove', PAGES], scriptedPrompts([false]))).code).toBe(2);
+    const yes = await run(root, spawn, ['remove', PAGES], scriptedPrompts([true]));
     expect(yes.code).toBe(0);
   });
 

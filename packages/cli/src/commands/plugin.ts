@@ -198,11 +198,9 @@ export function removeCommand(deps: PluginDeps = {}): Command {
       }
       const tables = tablesOf(found);
       if (tables.length > 0 && context.args.flags['yes'] !== true) {
-        const answer =
-          context.ask === undefined
-            ? undefined
-            : await context.ask(`${name} owns ${tables.join(', ')}. Drop that data?`, ['yes', 'no'], 'no');
-        if (answer !== 'yes') {
+        const drop =
+          (await context.prompts?.confirm(`${name} owns ${tables.join(', ')}. Drop that data?`, false)) ?? false;
+        if (!drop) {
           throw new CliError(`${name} owns the tables ${tables.join(', ')}, and removing it drops them.`, {
             code: 'BK_REMOVE_CONFIRM_NEEDED',
             exit: 2,

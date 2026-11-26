@@ -70,7 +70,7 @@ export function createCommand(deps: CreateDeps = {}): Command {
     async run(context) {
       const choices = await resolveChoices(context.args, {
         templates: deps.templates ?? BUILTIN_TEMPLATES,
-        ask: context.ask,
+        prompts: context.prompts,
         gitUser: deps.gitUser ?? gitAuthor,
       });
       const planned = planProject(choices, context.cwd, {

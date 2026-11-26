@@ -26,8 +26,40 @@ import type { EnvSource } from '@bieberkit/core';
 import type { ExitCode } from './errors.ts';
 import type { FlagDef, ParsedArgs, Positional } from './args.ts';
 
-/** Asks `question`, with the choices to pick from when there are some, and answers the choice, or `fallback` for an empty answer. */
-export type Ask = (question: string, choices?: readonly string[], fallback?: string) => Promise<string>;
+/** One choice of a select or a multiselect: its value, what the person reads, and a hint beside it. */
+export interface PromptOption<T extends string> {
+  readonly value: T;
+  readonly label: string;
+  readonly hint?: string;
+}
+
+export interface TextOptions {
+  readonly initial?: string;
+  readonly placeholder?: string;
+  /** Answers the problem to show, or undefined when the value is good. */
+  readonly validate?: (value: string) => string | undefined;
+}
+
+/**
+ * How a command talks to a person at the terminal (ADR 0029). A cancel (Ctrl+C or Esc) throws `BK_CANCELLED`. Everything is written to
+ * stderr, so that stdout stays the answer of the command.
+ */
+export interface Prompts {
+  intro(title: string): void;
+  note(text: string, title: string): void;
+  outro(text: string): void;
+  select<T extends string>(message: string, options: readonly PromptOption<T>[], initial: T): Promise<T>;
+  multiselect<T extends string>(
+    message: string,
+    options: readonly PromptOption<T>[],
+    initial: readonly T[],
+  ): Promise<T[]>;
+  confirm(message: string, initial: boolean): Promise<boolean>;
+  text(message: string, options?: TextOptions): Promise<string>;
+  password(message: string): Promise<string>;
+  /** Runs `work` under a spinner: `title` while it runs, `done` or the first line of its error when it ends. An error is thrown again. */
+  task<T>(title: string, done: string, work: () => Promise<T>): Promise<T>;
+}
 
 /** What a command is given. */
 export interface CommandContext {
@@ -36,8 +68,8 @@ export interface CommandContext {
   readonly env?: EnvSource;
   readonly args: ParsedArgs;
   readonly json: boolean;
-  /** Asks the person a question and answers what they chose. Set only when a person is at the terminal and `--yes` was not given. */
-  readonly ask?: Ask;
+  /** Asks the person. Set only when a person is at the terminal and neither `--yes` nor `--json` was given. */
+  readonly prompts?: Prompts;
   /** A line of progress. It goes to stderr, so that stdout stays the answer (section 5.3). */
   log(line: string): void;
 }

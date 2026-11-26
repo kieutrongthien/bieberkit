@@ -24,7 +24,10 @@
 
 export { GLOBAL_FLAGS, parseArgs, splitCommand } from './args.ts';
 export type { FlagDef, ParsedArgs, Positional } from './args.ts';
-export type { Ask, Command, CommandContext, Outcome } from './command.ts';
+export type { Command, CommandContext, Outcome, PromptOption, Prompts, TextOptions } from './command.ts';
+export { CANCEL, scriptedPrompts } from './scripted.ts';
+export type { ScriptedAnswer, ScriptedPrompts } from './scripted.ts';
+export { terminalPrompts } from './terminal.ts';
 export { CliError, DOCS_BASE, docsLink, failureOf, usageError } from './errors.ts';
 export type { CliErrorOptions, ExitCode, Failure } from './errors.ts';
 export { createRunner } from './run.ts';
