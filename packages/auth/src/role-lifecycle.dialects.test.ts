@@ -56,9 +56,13 @@ async function world(open: Parameters<typeof authServer>[0]) {
   return { app, adminRole, admin };
 }
 
+/** Users who exist and hold nothing. Only signed up, not signed in: each password hash is the slow part, and these need no session. */
 async function people(app: AuthServer, count: number): Promise<string[]> {
   const ids: string[] = [];
-  for (let index = 0; index < count; index += 1) ids.push((await app.login(`p${String(index)}@example.test`)).id);
+  for (let index = 0; index < count; index += 1) {
+    const user = (await app.signUp(`p${String(index)}@example.test`)).body['user'];
+    ids.push(String(Reflect.get(Object(user), 'id')));
+  }
   return ids;
 }
 

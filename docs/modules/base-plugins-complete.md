@@ -27,7 +27,7 @@
 - Packages: `@bieberkit/plugin-users`, `-roles`, `-settings`, `-audit-log`, `-notifications`, `-media`, and the changes they need in `@bieberkit/auth`, `@bieberkit/server` and `bieberkit` (CLI).
 - Layer: plugins, with the platform changes in the product and tools layers. Imports keep pointing downward (PKG-01).
 - Spec sections: 11, 12, 14, 15, OBS-05, AUTH-01 to AUTH-06, AUTHZ-01, AUTHZ-05, S-01 to S-06, DATA-13, DATA-25, IO-04.
-- Status: **Approved in outline by the maintainer on 2026-11-25** (approach 2, and the recommendations of the open questions, which are now decisions below). The maintainer asked for a result that serves a single person and an enterprise equally. Section "Who it is for" and section "Enterprise controls" carry that. S0 implements BPL-01 to BPL-04 and IDN-01, and S1 implements USR-01 to USR-12 and ROL-01 to ROL-08 (tests approved by the maintainer on 2026-11-26), with the normative requirements in `docs/spec/SPEC.md` sections 12.1 and 12.2 and milestone M1.11 in the roadmap. The remaining IDs are proposals for S2 to S6; the full milestone remains open.
+- Status: **Approved in outline by the maintainer on 2026-11-25** (approach 2, and the recommendations of the open questions, which are now decisions below). The maintainer asked for a result that serves a single person and an enterprise equally. Section "Who it is for" and section "Enterprise controls" carry that. S0 implements BPL-01 to BPL-04 and IDN-01, S1 implements USR-01 to USR-12 and ROL-01 to ROL-08 (tests approved by the maintainer on 2026-11-26), and S2 implements SET-01 to SET-07 (ADR 0030), with the normative requirements in `docs/spec/SPEC.md` sections 12.1 to 12.3 and milestone M1.11 in the roadmap. The remaining IDs are proposals for S3 to S6; the full milestone remains open.
 - Builds on: `docs/modules/plugins.md` (the thin slice of M1.8). This file replaces its "what a plugin does" tables slice by slice; `plugins.md` is updated as each slice lands.
 
 ## Purpose
@@ -251,12 +251,12 @@ One test per requirement ID, named after it (`it('USR-07 refuses to disable the 
 Taken on 2026-11-25 by accepting the recommendations of the first draft. Each is a decision of this design, and the two marked ADR need one before their code.
 
 1. **BPL-01 and IDN-01 columns:** added to `bk_auth_users` through Better Auth's `additionalFields`. The S0 spike passed all 69 profile/table/drift cases and all 788 auth cases on three dialects, proving both the fields and drift checks work. The side-table fallback was not needed.
-2. **SET-01 declaration:** a new manifest key on `definePlugin` (`settings`). It changes a public API, so it needs an **ADR** (`[D]`) before S2.
+2. **SET-01 declaration:** a `settings` contribution key with `defineSetting` in `@bieberkit/core`, a `Parser` for `json` values and a typed read by the declaration object. Decided in [ADR 0030](../adr/0030-setting-declarations.md), accepted on 2026-11-26.
 3. **Users and tenants:** in a tenant the list shows only the holders of a role in that tenant. A system administrator without a tenant sees all users.
 4. **USR-06:** deleting a user **anonymizes** the row (`deleted-<id>@invalid`, name removed, `source` cleared) and removes the sessions, memberships and second factors, so foreign keys stay valid and the email is free again.
 5. **MED-01:** visibility is fixed when the record is made.
 6. **ROL-06:** deleting a role in use is refused, unless the call names a `reassignTo` role.
-7. **Policy store (POL):** BieberKit enforces session, MFA and network policy in its own authenticator and reads it from `settings`, so no restart is needed. Rate limits and password rules stay in the boot config. This is an **ADR** line in the same ADR as decision 2, because it makes `@bieberkit/auth` read `settings` through a port and not through the plugin.
+7. **Policy store (POL):** BieberKit enforces session, MFA and network policy in its own authenticator and reads it from `settings`, so no restart is needed. Rate limits and password rules stay in the boot config. It needs its **own ADR** in slice S6 (one decision for each ADR), because it makes `@bieberkit/auth` read `settings` through a port and not through the plugin.
 
 ## Decisions of slice S1
 
