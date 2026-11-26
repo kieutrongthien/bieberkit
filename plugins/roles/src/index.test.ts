@@ -2,7 +2,7 @@
  * BieberKit
  *
  * @file        plugins/roles/src/index.test.ts
- * @description Tests of the roles plugin: the seed makes the base roles and is idempotent, a role is created, changed, assigned and deleted through the API, and a system role is protected (AUTHZ-01, AUTHZ-05).
+ * @description Tests of the roles plugin: the seed, create, change, assign and revoke in batches, delete with reassignment, duplicate, member counts and pages, the permission catalogue, effective permissions, the MFA warning and the escalation guard (AUTHZ-01, AUTHZ-05, ROL-01 to ROL-08).
  * @author      Bieber Kieu <kieutrongthien@gmail.com>
  * @copyright   Copyright (c) 2026 Bieber Kieu
  * @license     Apache-2.0
@@ -24,6 +24,7 @@
 
 import { expect, it } from 'vitest';
 import { createTestApp } from '@bieberkit/testing';
+import type { TestApp } from '@bieberkit/testing';
 import plugin, { ADMIN_ROLE, STAFF_ROLE } from './index.ts';
 
 const ROLES = '/api/v1/roles/roles';
@@ -42,6 +43,17 @@ function rolesOf(body: Readonly<Record<string, unknown>>): Role[] {
 
 /** The nil tenant, which is the tenant of a project that has none, so that the seed and the API look at the same roles. */
 const NIL = '00000000-0000-0000-0000-000000000000';
+
+let counter = 0;
+
+/** Makes a real account, so that assignments find the user. */
+async function make(app: TestApp): Promise<string> {
+  counter += 1;
+  const made = await app.services.auth.api.signUpEmail({
+    body: { email: `person-${String(counter)}@example.test`, password: 'correct horse battery staple', name: 'Person' },
+  });
+  return made.user.id;
+}
 
 async function world() {
   const app = await createTestApp({
@@ -72,8 +84,12 @@ it('AUTHZ-01 a role is created with permissions, changed, given to a user and de
   const created = await admin.post(ROLES, { name: 'editor', permissions: ['roles.read'] });
   expect(created.status).toBe(201);
   const id = String(created.body['id']);
-  const changed = await admin.post(`${ROLES}/${id}/assign`, { userId: app.newUser().id });
-  expect(changed.body).toEqual({ changed: true });
+  const userId = await make(app);
+  const changed = await admin.post(`${ROLES}/${id}/assign`, { userIds: [userId] });
+  expect(changed.body).toEqual({ results: [{ userId, result: 'assigned' }] });
+  expect((await admin.post(`${ROLES}/${id}/revoke`, { userIds: [userId] })).body).toEqual({
+    results: [{ userId, result: 'revoked' }],
+  });
   const patched = await (async () => {
     const response = await admin.patch(`${ROLES}/${id}`, { permissions: ['roles.read', 'roles.manage'] }, 0);
     return response;
@@ -87,10 +103,15 @@ it('AUTHZ-01 a role is created with permissions, changed, given to a user and de
   await app.close();
 });
 
-it('AUTHZ-01 the catalogue lists the permissions of the project, and a caller without roles.read gets 403', async () => {
+it('ROL-04 the catalogue lists each permission with its module, resource and action, and a caller without roles.read gets 403', async () => {
   const { app, admin } = await world();
   const catalogue = await admin.get('/api/v1/roles/permissions');
-  expect(catalogue.body['data']).toEqual(expect.arrayContaining(['roles.read', 'roles.manage']));
+  expect(catalogue.body['data']).toEqual(
+    expect.arrayContaining([
+      { name: 'roles.read', module: 'roles', resource: null, action: 'read' },
+      { name: 'roles.manage', module: 'roles', resource: null, action: 'manage' },
+    ]),
+  );
   expect((await (await app.actingAs(app.newUser())).get(ROLES)).status).toBe(403);
   await app.close();
 });
@@ -102,5 +123,66 @@ it('AUTHZ-05 the system role cannot be deleted or given other permissions, and i
   expect(system).toBeDefined();
   expect((await admin.delete(`${ROLES}/${String(system?.id)}`, 0)).status).toBe(409);
   expect((await admin.post(ROLES, { name: 'staff' })).status).toBe(409);
+  await app.close();
+});
+
+it('ROL-01 a role has its member count, and its members are paged', async () => {
+  const { app, admin } = await world();
+  const id = String((await admin.post(ROLES, { name: 'sales', permissions: ['roles.read'] })).body['id']);
+  const userIds = [await make(app), await make(app), await make(app)];
+  await admin.post(`${ROLES}/${id}/assign`, { userIds });
+  expect((await admin.get(`${ROLES}/${id}`)).body).toMatchObject({ id, name: 'sales', memberCount: 3 });
+  const page = await admin.get(`${ROLES}/${id}/members?pageSize=2`);
+  expect(rolesOf(page.body)).toHaveLength(2);
+  expect(page.body['meta']).toMatchObject({ pageSize: 2, nextCursor: expect.any(String) });
+  expect((await admin.get(`${ROLES}/00000000-0000-7000-8000-000000000000`)).status).toBe(404);
+  await app.close();
+});
+
+it('ROL-02 assign takes at most 100 users', async () => {
+  const { app, admin } = await world();
+  const id = String((await admin.post(ROLES, { name: 'sales' })).body['id']);
+  const many = Array.from({ length: 101 }, () => app.newUser().id);
+  expect((await admin.post(`${ROLES}/${id}/assign`, { userIds: many })).status).toBe(400);
+  expect((await admin.post(`${ROLES}/${id}/assign`, { userIds: [] })).status).toBe(400);
+  const one = await admin.post(`${ROLES}/${id}/assign`, { userIds: [await make(app)] });
+  expect([one.status, Array.isArray(one.body['results'])]).toEqual([200, true]);
+  await app.close();
+});
+
+it('ROL-03 duplicate copies the permissions under a new name', async () => {
+  const { app, admin } = await world();
+  const id = String((await admin.post(ROLES, { name: 'sales', permissions: ['roles.read'] })).body['id']);
+  const copy = await admin.post(`${ROLES}/${id}/duplicate`, { name: 'sales 2' });
+  expect(copy.status).toBe(201);
+  expect(copy.body).toMatchObject({ name: 'sales 2', system: false, permissions: ['roles.read'] });
+  await app.close();
+});
+
+it('ROL-06 a role in use is deleted only with reassignTo', async () => {
+  const { app, admin } = await world();
+  const old = String((await admin.post(ROLES, { name: 'old' })).body['id']);
+  const target = String((await admin.post(ROLES, { name: 'new' })).body['id']);
+  await admin.post(`${ROLES}/${old}/assign`, { userIds: [await make(app)] });
+  const refused = await admin.delete(`${ROLES}/${old}`, 0);
+  expect([refused.status, refused.body['code']]).toEqual([409, 'ROLES_IN_USE']);
+  expect((await admin.delete(`${ROLES}/${old}?reassignTo=${target}`, 0)).status).toBe(204);
+  expect((await admin.get(`${ROLES}/${target}`)).body['memberCount']).toBe(1);
+  await app.close();
+});
+
+it('ROL-07 assigning a role that needs MFA warns about a user without a second factor', async () => {
+  const { app, admin } = await world();
+  const id = String((await admin.post(ROLES, { name: 'strict', requireMfa: true })).body['id']);
+  const userId = await make(app);
+  const given = await admin.post(`${ROLES}/${id}/assign`, { userIds: [userId] });
+  expect(given.body).toEqual({ results: [{ userId, result: 'assigned', warning: 'AUTH_MFA_ENROL_REQUIRED' }] });
+  await app.close();
+});
+
+it('ROL-08 a manager cannot make a role with a permission that they do not hold', async () => {
+  const { app, admin } = await world();
+  const refused = await admin.post(ROLES, { name: 'wide', permissions: ['users.delete-everything'] });
+  expect([refused.status, refused.body['code']]).toEqual([403, 'ROLES_ESCALATION']);
   await app.close();
 });

@@ -27,7 +27,7 @@ import { requestContext } from '@bieberkit/core';
 import { uuid7 } from '@bieberkit/data';
 import { AuditLog, runInUnitOfWork } from '@bieberkit/data/orm';
 import type { Database } from '@bieberkit/data/orm';
-import { loadGrants, NIL_TENANT } from './roles.ts';
+import { AuthRole, AuthUserRole, loadGrants, NIL_TENANT } from './roles.ts';
 import { assignRole, createRole, deleteRole, revokeRole, setRolePermissions, updateRole } from './role-service.ts';
 import { describeDialects } from './testing/dialects.ts';
 
@@ -35,9 +35,25 @@ const TENANT = uuid7();
 const OTHER = uuid7();
 const ACTOR = uuid7();
 
-/** Runs a change as the user `ACTOR`, the way a request does. */
-const asActor = <T>(run: () => Promise<T>): Promise<T> =>
-  requestContext.run({ requestId: uuid7(), userId: ACTOR, tenantId: TENANT }, run);
+const administrators = new WeakSet<Database>();
+
+/**
+ * Runs a change as the user `ACTOR`, the way a request does. The actor holds the administrator system role, written straight into the
+ * tables so that it leaves no audit entry, because a role change by anybody else must not grant more than they hold (ROL-08).
+ */
+async function asActor<T>(db: Database, run: () => Promise<T>): Promise<T> {
+  if (!administrators.has(db)) {
+    administrators.add(db);
+    const roleId = uuid7();
+    await runInUnitOfWork(db, async (em) => {
+      em.create(AuthRole, { id: roleId, tenant: NIL_TENANT, name: 'admin', system: true, requireMfa: false });
+      await em.flush();
+      em.create(AuthUserRole, { tenant: NIL_TENANT, userId: ACTOR, roleId });
+      await em.flush();
+    });
+  }
+  return requestContext.run({ requestId: uuid7(), userId: ACTOR, tenantId: TENANT }, run);
+}
 
 async function entries(db: Database) {
   return runInUnitOfWork(db, async (em) => {
@@ -62,7 +78,7 @@ const events = async (db: Database): Promise<string[]> =>
 describeDialects('AUTHZ-05 the service of roles', ({ open }) => {
   it('AUTHZ-05 a new role has its permissions, an audit entry with the actor and the tenant, and an outbox event, together', async () => {
     const db = await open([]);
-    const id = await asActor(() =>
+    const id = await asActor(db, () =>
       createRole(db, { tenantId: TENANT, name: 'sales', permissions: ['crm.deal.read', 'crm.deal.update'] }),
     );
     const user = uuid7();
@@ -119,7 +135,7 @@ describeDialects('AUTHZ-05 the service of roles', ({ open }) => {
   it('AUTHZ-05 a change of the permissions says what was added and what was removed, and a change that changes nothing leaves nothing', async () => {
     const db = await open([]);
     const id = await createRole(db, { tenantId: TENANT, name: 'sales', permissions: ['a.read', 'a.update'] });
-    expect(await asActor(() => setRolePermissions(db, id, ['a.update', 'a.delete']))).toBe(true);
+    expect(await asActor(db, () => setRolePermissions(db, id, ['a.update', 'a.delete']))).toBe(true);
     expect(await setRolePermissions(db, id, ['a.delete', 'a.update'])).toBe(false);
     const changes = (await entries(db)).filter((entry) => entry.action === 'auth.role.updated');
     expect(changes).toHaveLength(1);
@@ -146,17 +162,19 @@ describeDialects('AUTHZ-05 the service of roles', ({ open }) => {
     expect((await loadGrants(db, TENANT, user)).requireMfa).toBe(true);
   });
 
-  it('AUTHZ-05 deleting a role takes its permissions and assignments with it, and says how many users lost it', async () => {
+  it('AUTHZ-05 deleting a role takes its permissions with it, moves its members to reassignTo, and says how many moved (ROL-06)', async () => {
     const db = await open([]);
     const id = await createRole(db, { tenantId: TENANT, name: 'sales', permissions: ['a.read'] });
+    const target = await createRole(db, { tenantId: TENANT, name: 'reader', permissions: [] });
     const [one, two] = [uuid7(), uuid7()];
     await assignRole(db, { tenantId: TENANT, userId: one, roleId: id });
     await assignRole(db, { tenantId: TENANT, userId: two, roleId: id });
-    await asActor(() => deleteRole(db, id));
+    await asActor(db, () => deleteRole(db, id, { reassignTo: target }));
     expect((await loadGrants(db, TENANT, one)).permissions.size).toBe(0);
+    expect((await loadGrants(db, TENANT, one)).roles).toEqual(['reader']);
     expect(await db.orm.em.getConnection().execute('select * from bk_auth_role_permissions')).toEqual([]);
     const gone = (await entries(db)).find((entry) => entry.action === 'auth.role.deleted');
-    expect(gone?.data).toMatchObject({ name: 'sales', users: 2 });
+    expect(gone?.data).toMatchObject({ name: 'sales', users: 2, reassignTo: target });
     await expect(deleteRole(db, id)).rejects.toMatchObject({ code: 'AUTH_ROLE_NOT_FOUND', status: 404 });
   });
 
@@ -182,10 +200,10 @@ describeDialects('AUTHZ-05 the service of roles', ({ open }) => {
     const db = await open([]);
     const id = await createRole(db, { tenantId: TENANT, name: 'sales' });
     const user = uuid7();
-    expect(await asActor(() => assignRole(db, { tenantId: TENANT, userId: user, roleId: id }))).toBe(true);
+    expect(await asActor(db, () => assignRole(db, { tenantId: TENANT, userId: user, roleId: id }))).toBe(true);
     expect(await assignRole(db, { tenantId: TENANT, userId: user, roleId: id })).toBe(false);
     expect(await revokeRole(db, { tenantId: TENANT, userId: uuid7(), roleId: id })).toBe(false);
-    expect(await asActor(() => revokeRole(db, { tenantId: TENANT, userId: user, roleId: id }))).toBe(true);
+    expect(await asActor(db, () => revokeRole(db, { tenantId: TENANT, userId: user, roleId: id }))).toBe(true);
     const actions = (await entries(db)).map((entry) => entry.action);
     expect(actions).toEqual(['auth.role.created', 'auth.role.assigned', 'auth.role.revoked']);
     const assigned = (await entries(db))[1];

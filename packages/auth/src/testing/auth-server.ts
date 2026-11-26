@@ -64,7 +64,7 @@ export interface SendOptions {
 }
 
 export interface MailRecord extends AuthMail {
-  readonly kind: 'verify' | 'reset' | 'magic';
+  readonly kind: 'verify' | 'reset' | 'magic' | 'invite' | 'mfa-reset';
 }
 
 export interface AuthServer {
@@ -184,6 +184,9 @@ export async function authServer(
     mail: {
       sendVerification: async (mail) => void mails.push({ kind: 'verify', ...mail }),
       sendResetPassword: async (mail) => void mails.push({ kind: 'reset', ...mail }),
+      sendInvite: async (mail: AuthMail) => void mails.push({ kind: 'invite', ...mail }),
+      sendMfaReset: async ({ to }: { readonly to: string }) =>
+        void mails.push({ kind: 'mfa-reset', to, url: '', token: '' }),
     },
   });
   const authorizer = createAuthorizer({ db, entities: [Deal], schemas, scoped: SCOPED });

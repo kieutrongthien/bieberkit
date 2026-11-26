@@ -75,6 +75,39 @@ describeDialects('BPL-01 and IDN-01 the user profile', ({ open }) => {
     expect(ledger.every((row) => row.kind === 'expand')).toBe(true);
   });
 
+  it('USR-01 the steps at 0.6.0 add last_sign_in_at, deleted_at and the index on lower(name)', async () => {
+    const db = await open([]);
+    await expect(
+      db.orm.em.getConnection().execute('select last_sign_in_at, deleted_at from bk_auth_users where 1 = 0'),
+    ).resolves.toEqual([]);
+    const ledger: { step_id: string; kind: string }[] = await db.orm.em
+      .getConnection()
+      .execute('select step_id, kind from bk_plugin_migrations where plugin = ? and version = ?', [
+        AUTH_PLUGIN,
+        '0.6.0',
+      ]);
+    expect(ledger.map((row) => row.step_id).toSorted()).toEqual([
+      'users-deleted-at',
+      'users-last-sign-in-at',
+      'users-name-lower-index',
+    ]);
+    expect(ledger.every((row) => row.kind === 'expand')).toBe(true);
+  });
+
+  it('USR-01 a sign in sets lastSignInAt, and a new user has none', async () => {
+    const db = await open([]);
+    const auth = createAuth({ db, dialect: db.dialect, secret: 'x'.repeat(40), baseUrl: 'https://app.test' });
+    const id = await makeUser(db, 'no-sign-in@example.test');
+    expect((await runInUnitOfWork(db, (em) => em.findOneOrFail(AuthUser, { id }))).lastSignInAt ?? null).toBeNull();
+    const before = Date.now();
+    const made = await auth.api.signUpEmail({
+      body: { name: 'An', email: 'signed-in@example.test', password: 'correct-test-password' },
+      headers: new Headers({ origin: 'https://app.test' }),
+    });
+    const user = await runInUnitOfWork(db, (em) => em.findOneOrFail(AuthUser, { id: made.user.id }));
+    expect(user.lastSignInAt?.getTime()).toBeGreaterThanOrEqual(before - 1000);
+  });
+
   it('IDN-01 a new user has source "local" and no external id', async () => {
     const db = await open([]);
     const id = await makeUser(db, 'local@example.test');
