@@ -27,7 +27,7 @@
 - Packages: `@bieberkit/plugin-users`, `-roles`, `-settings`, `-audit-log`, `-notifications`, `-media`, and the changes they need in `@bieberkit/auth`, `@bieberkit/server` and `bieberkit` (CLI).
 - Layer: plugins, with the platform changes in the product and tools layers. Imports keep pointing downward (PKG-01).
 - Spec sections: 11, 12, 14, 15, OBS-05, AUTH-01 to AUTH-06, AUTHZ-01, AUTHZ-05, S-01 to S-06, DATA-13, DATA-25, IO-04.
-- Status: **Approved in outline by the maintainer on 2026-11-25** (approach 2, and the recommendations of the open questions, which are now decisions below). The maintainer asked for a result that serves a single person and an enterprise equally. Section "Who it is for" and section "Enterprise controls" carry that. S0 implements BPL-01 to BPL-04 and IDN-01, S1 implements USR-01 to USR-12 and ROL-01 to ROL-08 (tests approved by the maintainer on 2026-11-26), and S2 implements SET-01 to SET-07 (ADR 0030), with the normative requirements in `docs/spec/SPEC.md` sections 12.1 to 12.3 and milestone M1.11 in the roadmap. The remaining IDs are proposals for S3 to S6; the full milestone remains open.
+- Status: **Approved in outline by the maintainer on 2026-11-25** (approach 2, and the recommendations of the open questions, which are now decisions below). The maintainer asked for a result that serves a single person and an enterprise equally. Section "Who it is for" and section "Enterprise controls" carry that. S0 implements BPL-01 to BPL-04 and IDN-01, S1 implements USR-01 to USR-12 and ROL-01 to ROL-08 (tests approved by the maintainer on 2026-11-26), S2 implements SET-01 to SET-07 (ADR 0030), and S3 implements NTF-01 to NTF-07, with the normative requirements in `docs/spec/SPEC.md` sections 12.1 to 12.4 and milestone M1.11 in the roadmap. The remaining IDs are proposals for S4 to S6; the full milestone remains open.
 - Builds on: `docs/modules/plugins.md` (the thin slice of M1.8). This file replaces its "what a plugin does" tables slice by slice; `plugins.md` is updated as each slice lands.
 
 ## Purpose
@@ -148,7 +148,7 @@ Permissions: `settings.read`, `settings.manage`.
 - **NTF-04** Preferences: `GET` and `PUT .../me/preferences` for each `category` and `channel` (`in-app`, `mail`). A table `bk_notification_preferences`. The default is on. A `mail` channel is sent through the queue (M-01) and only if the preference allows it.
 - **NTF-05** A scheduled job deletes read notifications older than `NOTIFICATIONS_RETENTION_DAYS` (default 90) and every expired one.
 - **NTF-06** Each send emits the event `notifications.created` on the bus, so the realtime layer of M2.4 can push it. Until then clients poll `unread-count` (RT-02).
-- **NTF-07** The entity routes keep only `list`, `get` and `delete` for `notifications.manage` (support). Creating goes through the service route `POST .../notifications/send` with `notifications.manage` (P1).
+- **NTF-07** The entity routes keep only `list`, `get` and `delete` for `notifications.manage` (support). Creating goes through the service route `POST .../notifications/send` with its own permission `notifications.send` (P1): at the level of a route, a scoped permission of the same entity action (`delete-own`) would cover `notifications.manage`.
 
 ## `media` (slice S4)
 

@@ -314,7 +314,7 @@ Depends on the M1.8 baseline. This milestone hardens the shared base for domain-
 - [x] **S0 / BPL-04 mechanism** Contributed outbox-to-job mappings, commit/rollback behavior and duplicate-event rejection across drivers. Evidence: `queue/src/subscriptions.test.ts`, the shared contract case and `BPL-04` boot/test-app cases. Media deletion remains S4
 - [x] **S1 [D]** Complete users and roles: USR-01 to USR-12, ROL-01 to ROL-08 (spec 12.2). Evidence: `auth/src/user-lifecycle.dialects.test.ts`, `role-lifecycle.dialects.test.ts`, the plugin tests of `users` and `roles`; BPL-05/BPL-06 proven for these two plugins
 - [x] **S2** Complete settings, with maintainer review of its declaration: SET-01 to SET-07 (spec 12.3, ADR 0030). Evidence: `core/src/settings/define-setting.test.ts`, the `SET-01` cases of `define-plugin.test.ts`, `plugins/settings/src/index.test.ts` on three dialects; BPL-05/BPL-06 proven for settings
-- [ ] **S3** Complete notifications
+- [x] **S3** Complete notifications: NTF-01 to NTF-07 (spec 12.4). Evidence: `plugins/notifications/src/index.test.ts` on three dialects, `queue/src/schedules.test.ts`, the sync-driver case of `queue/src/subscriptions.test.ts`; BPL-05/BPL-06 proven for notifications
 - [ ] **S4** Complete media, including deletion after commit
 - [ ] **S5** Complete audit-log and pruning
 - [ ] **S6 [D]** Enterprise policies, managed identities, retention and operational controls
