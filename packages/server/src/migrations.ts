@@ -27,8 +27,15 @@ import { AUTH_PLUGIN, authMigrationSteps } from '@bieberkit/auth';
 import { createLogger, loadEnv } from '@bieberkit/core';
 import type { CoreEnv, EnvSource } from '@bieberkit/core';
 import type { EntityDef, PluginMigrationStep } from '@bieberkit/data';
-import { compileEntities, DATA_PLUGIN, dataMigrationSteps, openMigrator } from '@bieberkit/data/orm';
-import type { MadeMigration, Migrator, PluginRun } from '@bieberkit/data/orm';
+import {
+  compileEntities,
+  createDatabase,
+  DATA_PLUGIN,
+  dataMigrationSteps,
+  openMigrator,
+  pruneAuditLog,
+} from '@bieberkit/data/orm';
+import type { AuditPrune, MadeMigration, Migrator, PluginRun } from '@bieberkit/data/orm';
 import { QUEUE_PLUGIN, queueMigrationSteps } from '@bieberkit/queue';
 import { ServerError } from './errors.ts';
 import { allModules, contributed } from './modules.ts';
@@ -154,4 +161,38 @@ export function migrationStatus(options: MigrationsOptions = {}): Promise<Migrat
     ...(await migrator.status()),
     steps: await migrator.pluginStatus(steps, order),
   }));
+}
+
+export interface PruneAuditOptions extends MigrationsOptions {
+  readonly before: Date;
+  /** Deletes when true; otherwise only counts. */
+  readonly apply: boolean;
+}
+
+/**
+ * The retention of the audit log (AUD-06): counts, or deletes, the entries before a date on `MIGRATE_DATABASE_URL`. The application role
+ * cannot delete audit rows (DATA-25), so this runs only from the CLI, never from a route or a job.
+ */
+export async function pruneAudit(options: PruneAuditOptions): Promise<AuditPrune> {
+  const project = await loadProject(options.cwd ?? process.cwd());
+  const { env } = loadEnv({
+    ...(options.env === undefined ? {} : { source: options.env }),
+    envFile: join(project.root, '.env'),
+    extra: envOwnersOf(project),
+  });
+  if (env.MIGRATE_DATABASE_URL === undefined || env.MIGRATE_DATABASE_URL === '') {
+    throw new ServerError('MIGRATE_DATABASE_URL is not set.', {
+      code: 'BK_MIGRATE_CONNECTION_MISSING',
+      fix: 'Set MIGRATE_DATABASE_URL to the role that owns the schema. The application role cannot delete audit rows (DATA-25).',
+    });
+  }
+  const db = await createDatabase(
+    { ...env, DATABASE_URL: env.MIGRATE_DATABASE_URL, DATABASE_READ_URLS: [], DB_POOL_MAX: 1 },
+    { entities: [] },
+  );
+  try {
+    return await pruneAuditLog(db, { before: options.before, apply: options.apply });
+  } finally {
+    await db.close();
+  }
 }

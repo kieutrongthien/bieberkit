@@ -24,8 +24,8 @@
 
 export { aggregate } from './aggregate.ts';
 export type { AggregateOptions, AggregateResult, AggregateRow } from './aggregate.ts';
-export { auditTableSink, recordAudit } from './audit.ts';
-export type { AuditEntry } from './audit.ts';
+export { auditTableSink, pruneAuditLog, recordAudit } from './audit.ts';
+export type { AuditEntry, AuditPrune, AuditPruneOptions } from './audit.ts';
 export {
   Attachment,
   AuditLog,

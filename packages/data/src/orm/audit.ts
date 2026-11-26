@@ -23,11 +23,12 @@
  */
 
 import type { EntityManager } from '@mikro-orm/core';
+import { SqlEntityManager } from '@mikro-orm/sql';
 import { requestContext } from '@bieberkit/core';
 import { dataError } from '../errors.ts';
 import { redactPii } from '../schema/pii.ts';
 import type { EntityDef } from '../schema/define-entity.ts';
-import type { Orm } from './connect.ts';
+import type { Database, Orm } from './connect.ts';
 import { AuditLog } from './framework.ts';
 import type { AuditSink, SystemScopeEntry } from './tenant.ts';
 
@@ -106,4 +107,52 @@ export function auditTableSink(orm: Orm): AuditSink {
       await em.flush();
     },
   };
+}
+
+export interface AuditPruneOptions {
+  /** Entries written before this instant are deleted. */
+  readonly before: Date;
+  /** Deletes when true. When false, only counts (AUD-06). */
+  readonly apply: boolean;
+}
+
+export interface AuditPrune {
+  /** The entries before the date: counted, or deleted when `pruned`. */
+  readonly count: number;
+  readonly pruned: boolean;
+}
+
+const NO_DELETE_TRIGGER =
+  "create trigger bk_audit_log_no_delete before delete on bk_audit_log begin select raise(abort, 'bk_audit_log is append-only'); end";
+
+/**
+ * The retention of the audit log (AUD-06). Give it a database opened on `MIGRATE_DATABASE_URL`: the application role may not delete
+ * audit rows (DATA-25). It deletes the entries before `before` and writes `audit.pruned` in one transaction. On SQLite, where a trigger is
+ * the append-only rule, the trigger is lifted and made again inside that transaction, so no other writer ever sees the table without it.
+ */
+export async function pruneAuditLog(db: Database, options: AuditPruneOptions): Promise<AuditPrune> {
+  const { before } = options;
+  if (!(before instanceof Date) || Number.isNaN(before.getTime())) {
+    throw dataError(
+      'DATA_AUDIT_PRUNE_INVALID',
+      400,
+      'The date to prune before is not a date.',
+      'Give an ISO 8601 date, for example 2026-01-01.',
+    );
+  }
+  const older = { at: { $lt: before } };
+  if (!options.apply) return { count: await db.fork().count(AuditLog, older), pruned: false };
+  const em = db.fork();
+  if (!(em instanceof SqlEntityManager)) {
+    throw dataError('DATA_DRIVER_UNSUPPORTED', 500, 'This database has no SQL.', 'Use PostgreSQL, MySQL or SQLite.');
+  }
+  return em.transactional(async (trx) => {
+    const sqlite = db.dialect === 'sqlite';
+    if (sqlite) await trx.execute('drop trigger if exists bk_audit_log_no_delete');
+    const count = await trx.nativeDelete(AuditLog, older);
+    if (sqlite) await trx.execute(NO_DELETE_TRIGGER);
+    recordAudit(trx, { action: 'audit.pruned', data: { before: before.toISOString(), count } });
+    await trx.flush();
+    return { count, pruned: true };
+  });
 }

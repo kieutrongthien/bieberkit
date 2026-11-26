@@ -2,7 +2,7 @@
  * BieberKit
  *
  * @file        plugins/audit-log/src/index.test.ts
- * @description Tests of the audit-log plugin: the list is newest first, filtered, paged by a cursor, and closed to a caller without audit-log.read (OBS-05).
+ * @description Tests of the audit-log plugin: filters, one entry with its actor, the export, the list of actions and the tenant of reads (AUD-01 to AUD-06).
  * @author      Bieber Kieu <kieutrongthien@gmail.com>
  * @copyright   Copyright (c) 2026 Bieber Kieu
  * @license     Apache-2.0
@@ -23,61 +23,245 @@
  */
 
 import { expect, it } from 'vitest';
-import { recordAudit, runInTransaction } from '@bieberkit/data/orm';
-import { createTestApp } from '@bieberkit/testing';
+import { requestContext } from '@bieberkit/core';
+import { AuditLog, recordAudit, runInTransaction, runInUnitOfWork } from '@bieberkit/data/orm';
+import { createTestApp, describeDialects, TENANT_HEADER, USER_HEADER } from '@bieberkit/testing';
+import type { TestApp } from '@bieberkit/testing';
 import plugin from './index.ts';
 
-const URL_OF = '/api/v1/audit-log/entries';
+const BASE = '/api/v1/audit-log';
+const ENTRIES = `${BASE}/entries`;
+const NIL = '00000000-0000-0000-0000-000000000000';
+const OTHER = '0190a0a0-0000-7000-8000-000000000003';
+const RECORD = '0190a0a0-0000-7000-8000-0000000000aa';
+const PASSWORD = 'correct horse battery staple';
+/** The actions that the cases write. The test app writes others, such as the roles that it makes. */
+const SEEDED = /^(crm|sales)\./;
 
 interface Entry {
-  action: string;
-  entity: string | null;
-  data: unknown;
+  readonly id: string;
+  readonly action: string;
+  readonly entity: string | null;
+  readonly data: unknown;
+  readonly actor: { readonly id: string; readonly name: string; readonly email: string } | null;
 }
 
-function entriesOf(body: Readonly<Record<string, unknown>>): Entry[] {
+const entriesOf = (body: Readonly<Record<string, unknown>>): Entry[] => {
   const data = body['data'];
   return Array.isArray(data) ? data : [];
+};
+
+interface Seed {
+  readonly action: string;
+  readonly entity?: string;
+  readonly recordId?: string;
+  readonly data?: unknown;
+  readonly reason?: string;
+  readonly tenantId?: string;
+  readonly userId?: string;
+  readonly requestId?: string;
 }
 
-async function world() {
-  const app = await createTestApp({ modules: [plugin.module], roles: { auditor: ['audit-log.read'] } });
-  for (const action of ['a.one', 'a.two', 'b.three']) {
-    await runInTransaction(app.db, async (em) => {
-      recordAudit(em, { action, entity: action.startsWith('a') ? 'x.A' : 'x.B', data: { action } });
-      await em.flush();
+/** Writes one entry as a request of `seed.userId` in `seed.tenantId` would. */
+async function seed(app: TestApp, entry: Seed): Promise<void> {
+  await requestContext.run(
+    {
+      requestId: entry.requestId ?? 'req-seed',
+      tenantId: entry.tenantId ?? app.tenant,
+      ...(entry.userId === undefined ? {} : { userId: entry.userId }),
+    },
+    () =>
+      runInTransaction(app.db, async (em) => {
+        recordAudit(em, {
+          action: entry.action,
+          ...(entry.entity === undefined ? {} : { entity: entry.entity }),
+          ...(entry.recordId === undefined ? {} : { recordId: entry.recordId }),
+          ...(entry.data === undefined ? {} : { data: entry.data }),
+          ...(entry.reason === undefined ? {} : { reason: entry.reason }),
+        });
+        await em.flush();
+      }),
+  );
+}
+
+const actions = (body: Readonly<Record<string, unknown>>): string[] =>
+  entriesOf(body)
+    .map((entry) => entry.action)
+    .filter((action) => SEEDED.test(action));
+
+describeDialects('AUD the audit-log plugin', ({ open }) => {
+  async function world(pluginEnv: Record<string, unknown> = {}) {
+    const app = await createTestApp({
+      modules: [plugin.module],
+      open,
+      pluginEnv,
+      roles: { auditor: ['audit-log.read'], exporter: ['audit-log.read', 'audit-log.export'] },
     });
+    const actorId = app.newUser().id;
+    await seed(app, {
+      action: 'crm.deal.won',
+      entity: 'crm.Deal',
+      recordId: RECORD,
+      userId: actorId,
+      requestId: 'req-1',
+    });
+    await seed(app, { action: 'crm.deal.lost', entity: 'crm.Deal', data: { why: 'price' }, reason: '=HYPERLINK("x")' });
+    await seed(app, { action: 'crm.note.added', entity: 'crm.Note', requestId: 'req-2' });
+    await seed(app, { action: 'sales.quote.sent', entity: 'sales.Quote' });
+    await seed(app, { action: 'crm.deal.won', entity: 'crm.Deal', tenantId: OTHER });
+    const auditor = await app.actingAs(app.newUser(), ['auditor']);
+    return { app, auditor, actorId };
   }
-  return app;
-}
 
-it('OBS-05 lists the entries newest first, with their data as JSON', async () => {
-  const app = await world();
-  const auditor = await app.actingAs(app.newUser(), ['auditor']);
-  const reply = await auditor.get(URL_OF);
-  expect(reply.status).toBe(200);
-  const found = entriesOf(reply.body).filter((entry) => ['a.one', 'a.two', 'b.three'].includes(entry.action));
-  expect(found.map((entry) => entry.action)).toEqual(['b.three', 'a.two', 'a.one']);
-  expect(found[0]?.data).toEqual({ action: 'b.three' });
-  await app.close();
-});
+  it('AUD-01 filters by action, a prefix of actions, entity, record, actor, request and time', async () => {
+    const { app, auditor, actorId } = await world();
+    const list = async (query: string) => actions((await auditor.get(`${ENTRIES}?${query}`)).body);
+    expect(await list('')).toEqual(['sales.quote.sent', 'crm.note.added', 'crm.deal.lost', 'crm.deal.won']);
+    expect(await list('action=crm.deal.won')).toEqual(['crm.deal.won']);
+    expect(await list('action=crm.deal.*')).toEqual(['crm.deal.lost', 'crm.deal.won']);
+    expect(await list('action=crm.*')).toHaveLength(3);
+    expect(await list('action=crm.deal')).toEqual([]);
+    expect(await list('action=%25*')).toEqual([]);
+    expect(await list('entity=crm.Note')).toEqual(['crm.note.added']);
+    expect(await list(`recordId=${RECORD}`)).toEqual(['crm.deal.won']);
+    expect(await list(`actorId=${actorId}`)).toEqual(['crm.deal.won']);
+    expect(await list('requestId=req-2')).toEqual(['crm.note.added']);
+    const hour = 3_600_000;
+    expect(await list(`from=${new Date(Date.now() - hour).toISOString()}`)).toHaveLength(4);
+    expect(await list(`to=${new Date(Date.now() - hour).toISOString()}`)).toEqual([]);
+    expect((await auditor.get(`${ENTRIES}?actorId=nope`)).status).toBe(400);
+    await app.close();
+  });
 
-it('OBS-05 filters by entity and by action, and pages with the cursor without repeating a row', async () => {
-  const app = await world();
-  const auditor = await app.actingAs(app.newUser(), ['auditor']);
-  const onlyA = entriesOf((await auditor.get(`${URL_OF}?entity=x.A`)).body);
-  expect(onlyA.map((entry) => entry.action)).toEqual(['a.two', 'a.one']);
-  const first = await auditor.get(`${URL_OF}?limit=2`);
-  const cursor = String(first.body['nextCursor']);
-  const second = await auditor.get(`${URL_OF}?limit=2&cursor=${cursor}`);
-  const seen = [...entriesOf(first.body), ...entriesOf(second.body)].map((entry) => entry.action);
-  expect(new Set(seen).size).toBe(seen.length);
-  await app.close();
-});
+  it('BPL-06 the list pages newest first with a keyset cursor and counts with withTotal', async () => {
+    const { app, auditor } = await world();
+    const first = await auditor.get(`${ENTRIES}?pageSize=2&withTotal=true&entity=crm.Deal`);
+    expect(actions(first.body)).toEqual(['crm.deal.lost', 'crm.deal.won']);
+    expect(first.body['meta']).toMatchObject({ pageSize: 2, total: 2, nextCursor: null });
+    const page = await auditor.get(`${ENTRIES}?pageSize=1&entity=crm.Deal`);
+    const meta: Record<string, unknown> = Object(page.body['meta']);
+    const next = await auditor.get(`${ENTRIES}?pageSize=1&entity=crm.Deal&cursor=${String(meta['nextCursor'])}`);
+    expect(actions(next.body)).toEqual(['crm.deal.won']);
+    expect((await auditor.get(`${ENTRIES}?pageSize=500`)).body['meta']).toMatchObject({ pageSize: 100 });
+    await app.close();
+  });
 
-it('AUTHZ-01 a caller without audit-log.read gets 403, and one who is not signed in gets 401', async () => {
-  const app = await world();
-  expect((await (await app.actingAs(app.newUser())).get(URL_OF)).status).toBe(403);
-  expect((await app.anonymous().get(URL_OF)).status).toBe(401);
-  await app.close();
+  it('AUD-02 one entry carries its actor from the auth tables, the system has none, and an unknown id is 404', async () => {
+    const { app, auditor } = await world();
+    const signed = await app.services.auth.api.signUpEmail({
+      body: { email: 'ada@example.test', password: PASSWORD, name: 'Ada' },
+    });
+    await seed(app, { action: 'crm.deal.reopened', userId: signed.user.id });
+    const [mine] = entriesOf((await auditor.get(`${ENTRIES}?action=crm.deal.reopened`)).body);
+    expect(mine?.actor).toEqual({ id: signed.user.id, name: 'Ada', email: 'ada@example.test' });
+    const one = await auditor.get(`${ENTRIES}/${String(mine?.id)}`);
+    expect(one.status).toBe(200);
+    expect(one.body['data']).toMatchObject({ action: 'crm.deal.reopened', actor: { email: 'ada@example.test' } });
+    const [system] = entriesOf((await auditor.get(`${ENTRIES}?action=sales.quote.sent`)).body);
+    expect(system?.actor).toBeNull();
+    const missing = await auditor.get(`${ENTRIES}/0190a0a0-0000-7000-8000-0000000000ff`);
+    expect(missing.status).toBe(404);
+    expect(missing.body['code']).toBe('AUDIT_NOT_FOUND');
+    await app.close();
+  });
+
+  it('AUD-03 the export streams CSV or NDJSON with the filters, escapes formulas and is itself audited', async () => {
+    const { app, auditor } = await world();
+    const exporter = app.newUser();
+    await app.actingAs(exporter, ['exporter']);
+    const get = (query: string) =>
+      app.server.inject({
+        method: 'GET',
+        url: `${BASE}/export?${query}`,
+        headers: { [USER_HEADER]: exporter.id, [TENANT_HEADER]: app.tenant },
+      });
+    const csv = await get('format=csv&entity=crm.Deal');
+    expect(csv.statusCode).toBe(200);
+    expect(String(csv.headers['content-type'])).toMatch(/^text\/csv/);
+    expect(String(csv.headers['content-disposition'])).toMatch(/^attachment; filename="audit-log-.*\.csv"$/);
+    expect(csv.headers['x-export-truncated']).toBeUndefined();
+    const lines = csv.body.trim().split('\n');
+    expect(lines[0]).toBe('id,at,tenant,actorId,actorEmail,requestId,action,entity,recordId,reason,data');
+    expect(lines).toHaveLength(3);
+    expect(lines[1]).toContain('crm.deal.lost');
+    expect(lines[1]).toContain(`"'=HYPERLINK(""x"")"`);
+    expect(lines[1]).toContain(`"{""why"":""price""}"`);
+    const ndjson = await get('format=ndjson&action=crm.note.added');
+    expect(String(ndjson.headers['content-type'])).toMatch(/^application\/x-ndjson/);
+    const rows = ndjson.body
+      .trim()
+      .split('\n')
+      .map((line) => JSON.parse(line));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ action: 'crm.note.added', entity: 'crm.Note', requestId: 'req-2' });
+    const audited = entriesOf((await auditor.get(`${ENTRIES}?action=audit-log.entries.exported`)).body);
+    expect(audited).toHaveLength(2);
+    expect(audited[0]?.data).toMatchObject({ format: 'ndjson', filters: { action: 'crm.note.added' } });
+    expect((await auditor.get(`${BASE}/export?format=csv`)).status).toBe(403);
+    expect((await get('format=xml')).statusCode).toBe(400);
+    await app.close();
+  });
+
+  it('AUD-03 the export stops at AUDIT_LOG_EXPORT_MAX_ROWS and says that it was cut', async () => {
+    const { app } = await world({ AUDIT_LOG_EXPORT_MAX_ROWS: 2 });
+    const exporter = app.newUser();
+    await app.actingAs(exporter, ['exporter']);
+    const reply = await app.server.inject({
+      method: 'GET',
+      url: `${BASE}/export?format=ndjson&action=crm.*`,
+      headers: { [USER_HEADER]: exporter.id, [TENANT_HEADER]: app.tenant },
+    });
+    expect(reply.headers['x-export-truncated']).toBe('true');
+    expect(reply.body.trim().split('\n')).toHaveLength(2);
+    await app.close();
+  });
+
+  it('AUD-04 the actions are distinct, in order, and kept for 60 seconds', async () => {
+    const { app, auditor } = await world();
+    const listed = async (): Promise<string[]> => {
+      const data = (await auditor.get(`${BASE}/actions`)).body['data'];
+      return (Array.isArray(data) ? data : []).filter((action: string) => SEEDED.test(action));
+    };
+    expect(await listed()).toEqual(['crm.deal.lost', 'crm.deal.won', 'crm.note.added', 'sales.quote.sent']);
+    await seed(app, { action: 'crm.deal.split' });
+    expect(await listed()).toEqual(['crm.deal.lost', 'crm.deal.won', 'crm.note.added', 'sales.quote.sent']);
+    await app.close();
+  });
+
+  it('AUD-05 a reader in a tenant sees that tenant only; a reader in the nil tenant sees every tenant', async () => {
+    const { app, auditor } = await world();
+    const mine = entriesOf((await auditor.get(`${ENTRIES}?action=crm.deal.won`)).body);
+    expect(mine).toHaveLength(1);
+    const other = app.withTenant(OTHER);
+    const theirs = await other.actingAs(other.newUser(), ['auditor']);
+    const seen = entriesOf((await theirs.get(`${ENTRIES}?action=crm.deal.won`)).body);
+    expect(seen).toHaveLength(1);
+    expect(seen[0]?.id).not.toBe(mine[0]?.id);
+    expect((await theirs.get(`${ENTRIES}/${String(mine[0]?.id)}`)).status).toBe(404);
+    const data = (await theirs.get(`${BASE}/actions`)).body['data'];
+    expect((Array.isArray(data) ? data : []).filter((action: string) => SEEDED.test(action))).toEqual(['crm.deal.won']);
+    const system = app.withTenant(NIL);
+    const admin = await system.actingAs(system.newUser(), ['auditor']);
+    expect(entriesOf((await admin.get(`${ENTRIES}?action=crm.deal.won`)).body)).toHaveLength(2);
+    await app.close();
+  });
+
+  it('AUD-06 no route of the plugin changes or deletes an audit row', async () => {
+    const { app, auditor } = await world();
+    const routes = plugin.module.contributions['routes'];
+    const methods = (Array.isArray(routes) ? routes : []).map((route) => String(Reflect.get(Object(route), 'method')));
+    expect(methods.every((method) => method === 'GET')).toBe(true);
+    const before = await runInUnitOfWork(app.db, (em) => em.count(AuditLog, {}));
+    await auditor.get(ENTRIES);
+    expect(await runInUnitOfWork(app.db, (em) => em.count(AuditLog, {}))).toBe(before);
+    expect(plugin.permissions).toEqual(['audit-log.read', 'audit-log.export']);
+    await app.close();
+  });
+
+  it('AUTHZ-01 a caller without audit-log.read gets 403, and one who is not signed in gets 401', async () => {
+    const { app } = await world();
+    expect((await (await app.actingAs(app.newUser())).get(ENTRIES)).status).toBe(403);
+    expect((await app.anonymous().get(ENTRIES)).status).toBe(401);
+    await app.close();
+  });
 });

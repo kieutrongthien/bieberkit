@@ -581,6 +581,12 @@ importers:
 
   plugins/audit-log:
     dependencies:
+      '@bieberkit/auth':
+        specifier: workspace:*
+        version: link:../../packages/auth
+      '@bieberkit/cache':
+        specifier: workspace:*
+        version: link:../../packages/cache
       '@bieberkit/core':
         specifier: workspace:*
         version: link:../../packages/core
@@ -590,6 +596,12 @@ importers:
       '@bieberkit/http':
         specifier: workspace:*
         version: link:../../packages/http
+      '@mikro-orm/core':
+        specifier: 7.2.9
+        version: 7.2.9
+      '@mikro-orm/sql':
+        specifier: 7.2.9
+        version: 7.2.9(@mikro-orm/core@7.2.9)
     devDependencies:
       '@bieberkit/testing':
         specifier: workspace:*

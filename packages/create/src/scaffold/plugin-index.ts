@@ -33,12 +33,28 @@ export const BUILTIN_PLUGIN_INDEX: PluginIndex = {
       dialects: ['mysql', 'postgres', 'sqlite'],
       requires: {},
       conflicts: [],
-      env: [],
+      env: ['AUDIT_LOG_EXPORT_MAX_ROWS'],
       tables: [],
-      routes: ['GET /api/v1/audit-log/entries'],
-      permissions: ['audit-log.read'],
+      routes: [
+        'GET /api/v1/audit-log/actions',
+        'GET /api/v1/audit-log/entries',
+        'GET /api/v1/audit-log/entries/:id',
+        'GET /api/v1/audit-log/export',
+      ],
+      permissions: ['audit-log.export', 'audit-log.read'],
       admin: [],
     },
+    envRows: [
+      {
+        key: 'AUDIT_LOG_EXPORT_MAX_ROWS',
+        type: 'int',
+        required: false,
+        default: '100000',
+        secret: false,
+        description:
+          'The most entries that one export of the audit log holds; a longer one is cut and says so (AUD-03)',
+      },
+    ],
   },
   '@bieberkit/plugin-media': {
     version: '0.2.0',

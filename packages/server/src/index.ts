@@ -37,11 +37,18 @@ export {
   makeMigration,
   MIGRATIONS_DIR,
   migrationStatus,
+  pruneAudit,
   rollbackMigration,
   runMigrations,
   stepsOf,
 } from './migrations.ts';
-export type { MigrationsOptions, MigrationsRun, MigrationsStatus, RunMigrationsOptions } from './migrations.ts';
+export type {
+  MigrationsOptions,
+  MigrationsRun,
+  MigrationsStatus,
+  PruneAuditOptions,
+  RunMigrationsOptions,
+} from './migrations.ts';
 export type { Migrated } from './migrate.ts';
 export { seed } from './seed.ts';
 export type { SeedOptions, Seeded } from './seed.ts';
