@@ -70,13 +70,33 @@ interface ParsedArgs {
 }
 declare function splitCommand(argv: readonly string[], known: (flag: string) => FlagDef | undefined): string | undefined;
 declare function parseArgs(argv: readonly string[], flags: readonly FlagDef[], positionals?: readonly Positional[]): ParsedArgs;
-type Ask = (question: string, choices?: readonly string[], fallback?: string) => Promise<string>;
+interface PromptOption<T extends string> {
+  readonly value: T;
+  readonly label: string;
+  readonly hint?: string;
+}
+interface TextOptions {
+  readonly initial?: string;
+  readonly placeholder?: string;
+  readonly validate?: (value: string) => string | undefined;
+}
+interface Prompts {
+  intro(title: string): void;
+  note(text: string, title: string): void;
+  outro(text: string): void;
+  select<T extends string>(message: string, options: readonly PromptOption<T>[], initial: T): Promise<T>;
+  multiselect<T extends string>(message: string, options: readonly PromptOption<T>[], initial: readonly T[]): Promise<T[]>;
+  confirm(message: string, initial: boolean): Promise<boolean>;
+  text(message: string, options?: TextOptions): Promise<string>;
+  password(message: string): Promise<string>;
+  task<T>(title: string, done: string, work: () => Promise<T>): Promise<T>;
+}
 interface CommandContext {
   readonly cwd: string;
   readonly env?: EnvSource;
   readonly args: ParsedArgs;
   readonly json: boolean;
-  readonly ask?: Ask;
+  readonly prompts?: Prompts;
   log(line: string): void;
 }
 interface Outcome {
@@ -91,5 +111,5 @@ interface Command {
   readonly positionals?: readonly Positional[];
   run(context: CommandContext): Promise<Outcome>;
 }
-export { failureOf as _, FlagDef as a, Positional as c, CliError as d, CliErrorOptions as f, docsLink as g, Failure as h, Outcome as i, parseArgs as l, ExitCode as m, Command as n, GLOBAL_FLAGS as o, DOCS_BASE as p, CommandContext as r, ParsedArgs as s, Ask as t, splitCommand as u, usageError as v };
+export { Failure as _, Prompts as a, usageError as b, GLOBAL_FLAGS as c, parseArgs as d, splitCommand as f, ExitCode as g, DOCS_BASE as h, PromptOption as i, ParsedArgs as l, CliErrorOptions as m, CommandContext as n, TextOptions as o, CliError as p, Outcome as r, FlagDef as s, Command as t, Positional as u, docsLink as v, failureOf as y };
 ```

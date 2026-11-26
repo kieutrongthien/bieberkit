@@ -22,11 +22,39 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { readdirSync, readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { packageName } from './index.ts';
 
 describe('create-bieberkit', () => {
   it('exposes its npm name', () => {
     expect(packageName).toBe('create-bieberkit');
+  });
+});
+
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+const BUNDLED = [
+  '@clack/prompts',
+  '@clack/core',
+  'sisteransi',
+  'fast-wrap-ansi',
+  'fast-string-width',
+  'fast-string-truncated-width',
+];
+
+describe('ADR-0029 clack is bundled', () => {
+  it('ADR-0029 the published dist imports no @clack package, and NOTICE names each bundled one', () => {
+    const dist = join(ROOT, 'dist');
+    const files = readdirSync(dist);
+    for (const file of files.filter((name) => name.endsWith('.js')))
+      expect(`${file}: ${readFileSync(join(dist, file), 'utf8')}`).not.toMatch(/from\s*["'](?:@clack\/|sisteransi|fast-)/);
+    for (const file of files.filter((name) => name.endsWith('.d.ts')))
+      expect(`${file}: ${readFileSync(join(dist, file), 'utf8')}`).not.toContain('@clack');
+    const manifest: unknown = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'));
+    expect(Object.keys(Object(Reflect.get(Object(manifest), 'dependencies')))).not.toContain('@clack/prompts');
+    const notice = readFileSync(join(ROOT, 'NOTICE'), 'utf8');
+    for (const name of BUNDLED) expect(notice).toContain(name);
   });
 });

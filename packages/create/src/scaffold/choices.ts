@@ -124,7 +124,7 @@ export function summaryOf(choices: Choices): string {
     ['Install', choices.install ? 'yes' : 'no'],
     ['Git', choices.git ? 'yes' : 'no'],
   ];
-  return rows.map(([key, value]) => `${key.padEnd(9)}${value}`).join('\n');
+  return rows.map(([key, value]) => `${key.padEnd(10)}${value}`).join('\n');
 }
 
 /**

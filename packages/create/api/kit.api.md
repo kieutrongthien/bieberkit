@@ -29,13 +29,22 @@ Generated from the built declaration files by `pnpm api:update`. Do not edit by 
 
 ```ts
 import { EnvSource } from "@bieberkit/core";
-import { _ as failureOf, a as FlagDef, c as Positional, d as CliError, f as CliErrorOptions, g as docsLink, h as Failure, i as Outcome, l as parseArgs, m as ExitCode, n as Command, o as GLOBAL_FLAGS, p as DOCS_BASE, r as CommandContext, s as ParsedArgs, t as Ask, u as splitCommand, v as usageError } from "./command-DqM9OTzA.js";
+import { _ as Failure, a as Prompts, b as usageError, c as GLOBAL_FLAGS, d as parseArgs, f as splitCommand, g as ExitCode, h as DOCS_BASE, i as PromptOption, l as ParsedArgs, m as CliErrorOptions, n as CommandContext, o as TextOptions, p as CliError, r as Outcome, s as FlagDef, t as Command, u as Positional, v as docsLink, y as failureOf } from "./command-C8PBaD1_.js";
+export declare const CANCEL: unique symbol;
+type ScriptedAnswer = string | boolean | readonly string[] | typeof CANCEL;
+interface ScriptedPrompts extends Prompts {
+  readonly asked: string[];
+  readonly shown: string[];
+  readonly notes: Record<string, string>;
+}
+export declare function scriptedPrompts(answers: readonly ScriptedAnswer[]): ScriptedPrompts;
+export declare function terminalPrompts(): Prompts;
 interface Io {
   stdout(text: string): void;
   stderr(text: string): void;
   readonly cwd: string;
   readonly env?: EnvSource;
-  readonly ask?: Ask;
+  readonly prompts?: Prompts;
 }
 interface RunnerOptions {
   readonly name: string;
@@ -44,5 +53,5 @@ interface RunnerOptions {
   readonly single?: string;
 }
 export declare function createRunner(options: RunnerOptions): (argv: readonly string[], io: Io) => Promise<ExitCode>;
-export { type Ask, CliError, type CliErrorOptions, type Command, type CommandContext, DOCS_BASE, type ExitCode, type Failure, type FlagDef, GLOBAL_FLAGS, type Io, type Outcome, type ParsedArgs, type Positional, type RunnerOptions, docsLink, failureOf, parseArgs, splitCommand, usageError };
+export { CliError, type CliErrorOptions, type Command, type CommandContext, DOCS_BASE, type ExitCode, type Failure, type FlagDef, GLOBAL_FLAGS, type Io, type Outcome, type ParsedArgs, type Positional, type PromptOption, type Prompts, type RunnerOptions, type ScriptedAnswer, type ScriptedPrompts, type TextOptions, docsLink, failureOf, parseArgs, splitCommand, usageError };
 ```

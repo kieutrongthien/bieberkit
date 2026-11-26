@@ -259,7 +259,7 @@ pnpm create bieberkit@latest example-project
 | --site / --no-site | flag | --site for cms, otherwise --no-site | Include the server-rendered public site app |
 | `--license` | an SPDX identifier or `UNLICENSED` | `UNLICENSED` | License written into `bieberkit.config.ts`, file headers and the `LICENSE` file (ADR 0007) |
 
-Every prompt MUST have an equivalent flag, so CI and AI agents can run the scaffolder without interaction. With nobody to ask and no `--yes`, the command lists every flag that is missing (`BK_CREATE_CHOICE_NEEDED`, exit code 2), so that an agent repairs its command in one go.
+A person at the terminal is asked for every choice that no flag gave, the name included, with arrow keys, then sees a summary and confirms it before anything is written (ADR 0029). A cancel writes nothing (`BK_CANCELLED`). Every prompt MUST have an equivalent flag, so CI and AI agents can run the scaffolder without interaction. With nobody to ask and no `--yes`, the command lists every flag that is missing (`BK_CREATE_CHOICE_NEEDED`, exit code 2), so that an agent repairs its command in one go.
 
 ### 5.2 Project commands
 
@@ -313,10 +313,10 @@ Every prompt MUST have an equivalent flag, so CI and AI agents can run the scaff
 
 The scaffolder resolves every choice into a valid plugin graph before it writes a single file. A failed check leaves the target directory untouched.
 
-1. **Name.** Validate the project name as an npm package name and check that the target directory is empty.
+1. **Name.** Ask for it when it is missing. Validate it as an npm package name and check that the target directory is empty, at the prompt, so that a wrong name is typed again.
 2. **Database.** Ask for `postgres`, `mysql` or `sqlite`. Choosing `sqlite` with the `saas` template prints a warning that SQLite is meant for development and single-server deployments.
-3. **Template.** Ask for `blank`, `cms`, `crm` or `saas`.
-4. **Extra plugins.** Offer only plugins that support the chosen dialect and do not conflict with the template.
+3. **Template.** Ask for `blank`, `cms`, `crm` or `saas`, among those that ship. With one template the question is not asked.
+4. **Extra plugins.** Offer only plugins that support the chosen dialect and do not conflict with the template. With none to offer the question is not asked. Then ask for the admin, the license, the install and git, show a summary of every choice, and write nothing until the person confirms it.
 5. **Resolve.** Build the plugin dependency graph, sort it topologically, and stop on a missing dependency, a cycle, a version mismatch, or two plugins claiming the same table, route, permission or env key.
 6. **Write files.** Copy the template, render `bieberkit.config.ts`, and write file headers with the project author (section 23).
 7. **Environment.** Merge the env schemas of core and all plugins, then write `.env` with development defaults and freshly generated secrets, plus `.env.example` without secrets.
@@ -324,7 +324,7 @@ The scaffolder resolves every choice into a valid plugin graph before it writes 
 9. **Services.** Generate `compose.yaml` with the chosen database and Valkey, so `bieberkit dev` can start them.
 10. **Database setup.** On the first `bieberkit dev`, generate the initial migration, apply it, and seed one administrator account with credentials asked for interactively or printed once.
 11. **Git.** Initialize a repository and create the first commit.
-12. **Next steps.** Print the URLs of the API, the admin UI and the docs.
+12. **Next steps.** Print the commands to run next and the URLs of the API, the admin UI and the docs. A person sees steps 6, 8 and 11 under a spinner, and the output of a step only when it fails.
 
 Development defaults written to `.env`:
 

@@ -29,7 +29,7 @@ Generated from the built declaration files by `pnpm api:update`. Do not edit by 
 
 ```ts
 import { Dialect, EnvDescription, Manifest } from "@bieberkit/core";
-import { n as Command, s as ParsedArgs, t as Ask } from "./command-DqM9OTzA.js";
+import { a as Prompts, l as ParsedArgs, t as Command } from "./command-C8PBaD1_.js";
 interface ProjectName {
   readonly name: string;
   readonly folder: string;
@@ -69,7 +69,9 @@ interface Choices {
 }
 interface ChoiceDeps {
   readonly templates: Readonly<Record<string, Template>>;
-  readonly ask: Ask | undefined;
+  readonly prompts: Prompts | undefined;
+  readonly cwd: string;
+  readonly index: PluginIndex;
   readonly gitUser: () => {
     readonly name?: string;
     readonly email?: string;
@@ -113,7 +115,7 @@ interface Scaffolded {
   readonly git: "committed" | "initialized" | "skipped" | "failed";
   readonly problems: readonly string[];
 }
-export declare function scaffold(choices: Choices, planned: Planned, exec?: Exec): Promise<Scaffolded>;
+export declare function scaffold(choices: Choices, planned: Planned, exec?: Exec, prompts?: Prompts): Promise<Scaffolded>;
 interface CreateDeps {
   readonly templates?: Readonly<Record<string, Template>>;
   readonly index?: PluginIndex;
