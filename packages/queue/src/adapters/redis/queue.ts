@@ -405,6 +405,9 @@ export async function createRedisQueue(options: RedisQueueOptions): Promise<Queu
       }
       return removed;
     },
+    async settle() {
+      // A job of the outbox is in Valkey, run by a worker: there is nothing to wait for here.
+    },
     async close() {
       await Promise.all([...workers].map((worker) => worker.stop()));
       workers.clear();

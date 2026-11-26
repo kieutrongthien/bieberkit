@@ -288,7 +288,12 @@ export async function createTestApp(options: TestAppOptions = {}): Promise<TestA
         server,
         queue,
         mailbox: memory.sent,
-        runOutbox: async () => (await dispatcher.dispatchOnce()).claimed,
+        runOutbox: async () => {
+          const { claimed } = await dispatcher.dispatchOnce();
+          // The sync queue runs the jobs of the batch after the transaction of the dispatcher; the batch is done when they are.
+          await queue.settle();
+          return claimed;
+        },
         schemas,
         entities,
         authorizer,

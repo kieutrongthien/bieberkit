@@ -257,6 +257,9 @@ export async function createDatabaseQueue(db: Database, shared: Shared): Promise
         .executeTakeFirst();
       return Number(result.numDeletedRows);
     },
+    async settle() {
+      // A job of the outbox is a row of the queue table, run by a worker: there is nothing to wait for here.
+    },
     async close() {
       await Promise.all([...workers].map((worker) => worker.stop()));
       workers.clear();

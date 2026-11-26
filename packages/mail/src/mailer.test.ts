@@ -193,6 +193,18 @@ describe('M-01 the mailer', () => {
     expect([verified, closed]).toEqual([1, 1]);
   });
 
+  it('M-01 prepare checks a message and fills the sender without sending it, for an outbox intent', async () => {
+    const transport = createMemoryTransport();
+    const mailer = createMailer({ transport, from: FROM, logger });
+    const queue = await createQueue({ driver: 'sync', jobs: [mailer.job], logger });
+    const prepared = mailer.over(queue).prepare(message);
+    expect(prepared.from).toEqual(expect.objectContaining({ address: expect.any(String) }));
+    expect(transport.sent).toEqual([]);
+    expect(() => mailer.over(queue).prepare({ ...message, to: 'not an address' })).toThrowError(
+      expect.objectContaining({ code: expect.stringMatching(/^MAIL_/) }),
+    );
+  });
+
   it('M-01 a mailer with no sender and a message with none is MAIL_FROM_REQUIRED', async () => {
     const mailer = createMailer({ transport: createMemoryTransport(), logger });
     const queue = await createQueue({ driver: 'sync', jobs: [mailer.job], logger });

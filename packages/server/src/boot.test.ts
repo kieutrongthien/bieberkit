@@ -419,6 +419,7 @@ async function publishEvent(services) {
     id: '0190f6b2-7c4e-7000-8000-0000000000a1', jobId: 'ob-events-probe',
     name: 'events.probe', version: 8, payload: { value: 999 }, createdAt: new Date(),
   }, trx));
+  await services.queue.settle();
 }
 const route = {
   method: 'GET', url: '/api/v1/events/probe', public: true,

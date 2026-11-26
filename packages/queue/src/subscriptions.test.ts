@@ -25,7 +25,7 @@
 import { expect, it, onTestFinished } from 'vitest';
 import { z } from 'zod';
 import type { OutboxMessage } from '@bieberkit/data/orm';
-import { createDatabase, rawKysely } from '@bieberkit/data/orm';
+import { createDatabase, rawKysely, runInTransaction } from '@bieberkit/data/orm';
 import { applySubscriptions, createQueue, defineJob } from './index.ts';
 
 async function setup() {
@@ -56,7 +56,7 @@ async function setup() {
     await queue.close();
     await db.close();
   });
-  return { queue, job, other, seen, publish };
+  return { queue, job, other, seen, publish, db, sql };
 }
 
 function message(name: string, payload: unknown): OutboxMessage {
@@ -78,7 +78,33 @@ it('BPL-04 applySubscriptions subscribes each event to its job with payload and 
   ]);
   await publish(message('thing.done', { value: 42 }));
   await publish(message('thing.mapped', { value: 999 }));
+  await queue.settle();
   expect(seen).toEqual([42, 7]);
+});
+
+it('BPL-04 the sync driver runs a subscribed job after the transaction that published it, so the job may use the database', async () => {
+  const { queue, db, sql } = await setup();
+  const done: string[] = [];
+  const writer = defineJob<{ value: number }>({
+    name: 'subscription.writer',
+    input: z.object({ value: z.number() }),
+    // SQLite has one connection, held by the transaction of the publish: run inside it, this would wait for ever.
+    handler: async () => {
+      await runInTransaction(db, async (em) => {
+        await em.getConnection().execute('select 1', [], 'all', em.getTransactionContext());
+      });
+      done.push('wrote');
+    },
+  });
+  const own = await createQueue({ driver: 'sync', jobs: [writer] });
+  onTestFinished(() => own.close());
+  own.subscribe('thing.write', writer);
+  await sql.transaction().execute((trx) => own.publisher.publish(message('thing.write', { value: 1 }), trx));
+  expect(done).toEqual([]);
+  await own.settle();
+  expect(done).toEqual(['wrote']);
+  // A queue with nothing deferred settles at once.
+  await queue.settle();
 });
 
 it.each(['same job', 'another job'])('BPL-04 a second contribution for one event is refused (%s)', async (kind) => {
@@ -98,5 +124,6 @@ it('BPL-04 Queue.subscribe refuses to overwrite an existing event subscription',
     expect.objectContaining({ code: 'QUEUE_SUBSCRIPTION_DUPLICATE' }),
   );
   await publish(message('thing.done', { value: 42 }));
+  await queue.settle();
   expect(seen).toEqual([42]);
 });

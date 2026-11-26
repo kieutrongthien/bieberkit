@@ -48,6 +48,11 @@ export interface Mail {
   send(message: Message, options?: DispatchOptions): Promise<Dispatched>;
   /** Sends at once, without the queue, and waits for the server. For a caller that needs the answer, and for tests. */
   sendNow(message: Message): Promise<MailReceipt>;
+  /**
+   * Checks the message and fills the sender, without sending it: the payload of a `mail.send` outbox intent, which a write inside a
+   * transaction uses instead of `send`, so the mail leaves only after commit (M-01).
+   */
+  prepare(message: Message): PreparedMessage;
   verify(): Promise<void>;
 }
 
@@ -115,6 +120,7 @@ export function createMailer(options: MailerOptions): Mailer {
         send: async (message, dispatchOptions) =>
           queue.dispatch(job, prepareMessage(message, options.from), dispatchOptions),
         sendNow: async (message) => options.transport.send(prepareMessage(message, options.from)),
+        prepare: (message) => prepareMessage(message, options.from),
         verify: () => options.transport.verify(),
       };
     },

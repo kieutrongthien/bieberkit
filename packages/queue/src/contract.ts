@@ -196,6 +196,11 @@ export interface Queue {
   stats(): Promise<QueueStats>;
   /** Removes finished jobs older than `olderThanMs` (7 days by default). Dead jobs stay until they are discarded. */
   purge(options?: { olderThanMs?: number }): Promise<number>;
+  /**
+   * Resolves when the jobs that this process started from the outbox have finished. The sync driver runs such a job after the
+   * transaction that published it, as the other drivers do, so the job may use the database; they have nothing to wait for (BPL-04).
+   */
+  settle(): Promise<void>;
   close(): Promise<void>;
 }
 

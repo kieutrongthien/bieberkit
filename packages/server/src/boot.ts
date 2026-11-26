@@ -38,7 +38,7 @@ import { compileEntities, createDatabase, createOutboxDispatcher } from '@bieber
 import type { Database } from '@bieberkit/data/orm';
 import { createHttpServer, registerEntityRoutes, registerMeta, registerOpenApi } from '@bieberkit/http';
 import type { HttpServer, RouteDef } from '@bieberkit/http';
-import { createScheduler } from '@bieberkit/queue';
+import { createScheduler, schedulesOf } from '@bieberkit/queue';
 import type { JobDef, QueueSubscription } from '@bieberkit/queue';
 import { ServerError } from './errors.ts';
 import { adminLocation, registerAdmin } from './admin.ts';
@@ -221,9 +221,8 @@ export async function boot(options: BootOptions): Promise<Running> {
     }
 
     if (roles.includes('scheduler')) {
-      // No module declares a schedule yet, so the scheduler has nothing to tick. It still runs, so that a schedule that a plugin adds
-      // later is ticked under the lock of Q-07 with no change here.
-      const scheduler = await createScheduler(queue, [], { db });
+      // The schedules of the modules, ticked under the lock of Q-07, so only one scheduler runs each tick.
+      const scheduler = await createScheduler(queue, schedulesOf(modules), { db });
       lifecycle.onBoot('scheduler', () => scheduler.start());
       lifecycle.onShutdown('scheduler', () => scheduler.stop());
     }

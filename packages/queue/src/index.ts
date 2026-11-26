@@ -53,10 +53,14 @@ export type { PoolStats, RunOptions, WorkerPool, WorkerPoolOptions } from './poo
 export { createQueue } from './queue.ts';
 export type { CreateQueueOptions } from './queue.ts';
 export { createScheduler } from './scheduler.ts';
+export { schedulesOf } from './schedules.ts';
+export type { ScheduleContribution } from './schedules.ts';
 export type { Schedule, Scheduler, SchedulerOptions } from './scheduler.ts';
 export { JOBS_TABLE, LOCKS_TABLE, QUEUE_PLUGIN, queueMigrationSteps } from './tables.ts';
 
 import type { JobDef } from './contract.ts';
+
+import type { ScheduleContribution } from './schedules.ts';
 
 declare module '@bieberkit/core' {
   interface ModuleContributions {
@@ -64,6 +68,8 @@ declare module '@bieberkit/core' {
     jobs?: readonly JobDef[];
     /** Outbox events mapped to the jobs contributed by the module (BPL-04). */
     subscriptions?: readonly QueueSubscription[];
+    /** Jobs that the scheduler role runs on a clock (Q-07). */
+    schedules?: readonly ScheduleContribution[];
   }
 }
 import type { Queue as ServiceQueue } from './contract.ts';

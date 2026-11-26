@@ -127,6 +127,14 @@ export function createSyncQueue(shared: Shared): Queue {
     return { id: prepared.jobId, duplicate: false };
   }
 
+  // The jobs started from the outbox. They run after the transaction of the dispatcher, which holds a connection and the claimed rows:
+  // run inside it, a job that writes would wait for that transaction, and on SQLite, with one connection, for ever.
+  const deferred = new Set<Promise<unknown>>();
+
+  const settle = async (): Promise<void> => {
+    while (deferred.size > 0) await Promise.allSettled(deferred);
+  };
+
   const publisher: OutboxPublisher = {
     async publish(message) {
       const subscription = shared.subscriptions.get(message.name);
@@ -138,7 +146,10 @@ export function createSyncQueue(shared: Shared): Queue {
         { jobId: message.jobId },
         carry(message),
       );
-      await start(prepared);
+      // A failure is the record of the job (its status and the reporter), as for a dispatch.
+      const run = new Promise((resolve) => setImmediate(resolve)).then(() => start(prepared)).catch(() => undefined);
+      deferred.add(run);
+      void run.finally(() => deferred.delete(run));
     },
   };
 
@@ -226,7 +237,9 @@ export function createSyncQueue(shared: Shared): Queue {
       }
       return removed;
     },
+    settle,
     async close() {
+      await settle();
       records.clear();
     },
   };
