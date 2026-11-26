@@ -72,16 +72,33 @@
     "conflicts": [],
     "env": [
       "USERS_ADMIN_EMAIL",
-      "USERS_ADMIN_PASSWORD"
+      "USERS_ADMIN_PASSWORD",
+      "USERS_INVITE_TTL_DAYS"
     ],
     "tables": [],
     "routes": [
+      "DELETE /api/v1/users/users/:id",
+      "DELETE /api/v1/users/users/:id/sessions",
+      "DELETE /api/v1/users/users/:id/sessions/:sessionId",
+      "GET /api/v1/users/me",
       "GET /api/v1/users/users",
-      "POST /api/v1/users/users"
+      "GET /api/v1/users/users/:id",
+      "GET /api/v1/users/users/:id/permissions",
+      "GET /api/v1/users/users/:id/sessions",
+      "PATCH /api/v1/users/me",
+      "PATCH /api/v1/users/users/:id",
+      "POST /api/v1/users/users",
+      "POST /api/v1/users/users/:id/disable",
+      "POST /api/v1/users/users/:id/enable",
+      "POST /api/v1/users/users/:id/mfa/reset",
+      "POST /api/v1/users/users/:id/resend-invite",
+      "POST /api/v1/users/users/:id/reset-password"
     ],
     "permissions": [
       "users.manage",
-      "users.read"
+      "users.read",
+      "users.reset-mfa",
+      "users.revoke-sessions"
     ],
     "admin": []
   }

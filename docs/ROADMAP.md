@@ -312,7 +312,7 @@ Depends on the M1.8 baseline. This milestone hardens the shared base for domain-
 - [x] **S0 / BPL-02** Typed mail/queue/cache in process roles, seeders and the memory test app; auth mail, `mailbox`, `runOutbox()`. Evidence: the `BPL-02` boot, seed, auth-mail and test-app cases; the `AUTH-06` unknown-address reset case
 - [x] **S0 / BPL-03** Prove existing plugin service contribution and duplicate-name rejection. Evidence: the two `BPL-03` cases in `testing/src/app.test.ts`
 - [x] **S0 / BPL-04 mechanism** Contributed outbox-to-job mappings, commit/rollback behavior and duplicate-event rejection across drivers. Evidence: `queue/src/subscriptions.test.ts`, the shared contract case and `BPL-04` boot/test-app cases. Media deletion remains S4
-- [ ] **S1 [D]** Complete users and roles
+- [x] **S1 [D]** Complete users and roles: USR-01 to USR-12, ROL-01 to ROL-08 (spec 12.2). Evidence: `auth/src/user-lifecycle.dialects.test.ts`, `role-lifecycle.dialects.test.ts`, the plugin tests of `users` and `roles`; BPL-05/BPL-06 proven for these two plugins
 - [ ] **S2** Complete settings, with maintainer review of its declaration
 - [ ] **S3** Complete notifications
 - [ ] **S4** Complete media, including deletion after commit

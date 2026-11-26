@@ -95,12 +95,12 @@ export interface CreateAuthOptions {
 
 /** How the project sends the mails of authentication. Inside a transaction a callback writes an outbox intent and sends nothing (BPL-02). */
 export interface AuthMailOptions {
-  sendVerification?(mail: AuthMail): Promise<void>;
-  sendResetPassword?(mail: AuthMail): Promise<void>;
+  readonly sendVerification?: (mail: AuthMail) => Promise<void>;
+  readonly sendResetPassword?: (mail: AuthMail) => Promise<void>;
   /** The invitation of USR-10: the link sets the first password through the reset page. */
-  sendInvite?(mail: AuthMail): Promise<void>;
+  readonly sendInvite?: (mail: AuthMail) => Promise<void>;
   /** Tells a user that an administrator removed their second factors (USR-11). */
-  sendMfaReset?(notice: { readonly to: string }): Promise<void>;
+  readonly sendMfaReset?: (notice: { readonly to: string }) => Promise<void>;
 }
 
 export type AuthInstance = Auth;

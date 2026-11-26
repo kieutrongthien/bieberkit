@@ -465,7 +465,9 @@ describeDialects('USR-01 the list of users', ({ open }) => {
       ['Bea', 'bea@example.test'],
       ['Carl', 'carl@example.test'],
     ] as const) {
-      await users.create({ name, email, password: PASSWORD, roles: name === 'Bea' ? [sales] : [], actorId: admin.id });
+      // Only Carl signs in, so only he gets a password: hashing one is the slow part of making a user.
+      const access = name === 'Carl' ? { password: PASSWORD } : { invite: true };
+      await users.create({ name, email, ...access, roles: name === 'Bea' ? [sales] : [], actorId: admin.id });
     }
     return { ...made, sales };
   }

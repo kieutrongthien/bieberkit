@@ -447,7 +447,7 @@ export function createUserService(options: UserServiceOptions): UserService {
           const pattern = likePrefix(query.q.trim().toLowerCase());
           where.push({
             [raw("(lower(name) like ? escape '!' or email like ? escape '!')", [pattern, pattern])]: [],
-          } as FilterQuery<AuthUserRow>);
+          });
         }
         if (query.role !== undefined) {
           if (!isUuid(query.role))
@@ -473,9 +473,7 @@ export function createUserService(options: UserServiceOptions): UserService {
           page.push(
             field === 'id'
               ? { id: { [op]: id } }
-              : ({
-                  $or: [{ [field]: { [op]: value } }, { [field]: value, id: { [op]: id } }],
-                } as FilterQuery<AuthUserRow>),
+              : { $or: [{ [field]: { [op]: value } }, { [field]: value, id: { [op]: id } }] },
           );
         }
         const rows = await em.find(AuthUser, { $and: page }, { orderBy: { [field]: dir, id: dir }, limit: size + 1 });

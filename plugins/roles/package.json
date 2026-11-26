@@ -73,9 +73,12 @@
       "DELETE /api/v1/roles/roles/:id",
       "GET /api/v1/roles/permissions",
       "GET /api/v1/roles/roles",
+      "GET /api/v1/roles/roles/:id",
+      "GET /api/v1/roles/roles/:id/members",
       "PATCH /api/v1/roles/roles/:id",
       "POST /api/v1/roles/roles",
       "POST /api/v1/roles/roles/:id/assign",
+      "POST /api/v1/roles/roles/:id/duplicate",
       "POST /api/v1/roles/roles/:id/revoke"
     ],
     "permissions": [

@@ -27,7 +27,7 @@
 - Packages: `@bieberkit/plugin-users`, `-roles`, `-settings`, `-audit-log`, `-notifications`, `-media`, and the changes they need in `@bieberkit/auth`, `@bieberkit/server` and `bieberkit` (CLI).
 - Layer: plugins, with the platform changes in the product and tools layers. Imports keep pointing downward (PKG-01).
 - Spec sections: 11, 12, 14, 15, OBS-05, AUTH-01 to AUTH-06, AUTHZ-01, AUTHZ-05, S-01 to S-06, DATA-13, DATA-25, IO-04.
-- Status: **Approved in outline by the maintainer on 2026-11-25** (approach 2, and the recommendations of the open questions, which are now decisions below). The maintainer asked for a result that serves a single person and an enterprise equally. Section "Who it is for" and section "Enterprise controls" carry that. S0 implements BPL-01 to BPL-04 and IDN-01 in this slice, with the normative requirements in `docs/spec/SPEC.md` and milestone M1.11 in the roadmap. The remaining IDs are proposals for S1 to S6; the full milestone remains open.
+- Status: **Approved in outline by the maintainer on 2026-11-25** (approach 2, and the recommendations of the open questions, which are now decisions below). The maintainer asked for a result that serves a single person and an enterprise equally. Section "Who it is for" and section "Enterprise controls" carry that. S0 implements BPL-01 to BPL-04 and IDN-01, and S1 implements USR-01 to USR-12 and ROL-01 to ROL-08 (tests approved by the maintainer on 2026-11-26), with the normative requirements in `docs/spec/SPEC.md` sections 12.1 and 12.2 and milestone M1.11 in the roadmap. The remaining IDs are proposals for S2 to S6; the full milestone remains open.
 - Builds on: `docs/modules/plugins.md` (the thin slice of M1.8). This file replaces its "what a plugin does" tables slice by slice; `plugins.md` is updated as each slice lands.
 
 ## Purpose
@@ -257,6 +257,19 @@ Taken on 2026-11-25 by accepting the recommendations of the first draft. Each is
 5. **MED-01:** visibility is fixed when the record is made.
 6. **ROL-06:** deleting a role in use is refused, unless the call names a `reassignTo` role.
 7. **Policy store (POL):** BieberKit enforces session, MFA and network policy in its own authenticator and reads it from `settings`, so no restart is needed. Rate limits and password rules stay in the boot config. This is an **ADR** line in the same ADR as decision 2, because it makes `@bieberkit/auth` read `settings` through a port and not through the plugin.
+
+## Decisions of slice S1
+
+Taken by the maintainer on 2026-11-26, with the tests of S1:
+
+1. `bk_auth_users` gains `last_sign_in_at` and `deleted_at` (auth 0.6.0). Sessions are deleted on revoke and expiry, so they cannot tell the last sign in.
+2. The administrator role of USR-07 is the system role `admin`, counted in each tenant that has it.
+3. `q` is a prefix of `lower(name)` or of the email, with an expression index on `lower(name)` on the three dialects.
+4. The invitation is a link of Better Auth's own reset page, so there is one way to set a password (P1); using it verifies the email.
+5. In role-service the actor comes from the request context; without one it is the system. In user-service the actor is an explicit `actorId`, as in S0.
+6. The list sorts and filters by creation on the UUIDv7 id, because SQLite keeps the dates of Better Auth as text and those of MikroORM as numbers.
+7. `ROLES_IN_USE` and `USERS_RATE_LIMITED` are `HttpError`s, so `memberCount` and `Retry-After` reach the answer. New codes besides the list above: `USERS_EMAIL_TAKEN`, `USERS_NOT_INVITED`, `USERS_RATE_LIMITED`, `USERS_MAIL_UNAVAILABLE`, `USERS_QUERY_INVALID`.
+8. `/api/v1/users/me` is a public route that refuses an anonymous caller itself (API-02 asks for a permission or `public`).
 
 ## Left to the builder
 

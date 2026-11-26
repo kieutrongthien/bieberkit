@@ -830,6 +830,33 @@ The base plugins use the framework services below. Full users/roles, settings, n
 
 BPL-05/BPL-06 and IDN-02/IDN-03 remain proposals in the design for the slices that implement them; S0 does not claim their acceptance tests.
 
+### 12.2 Users and roles (slice S1)
+
+The logic is in `@bieberkit/auth` (`createUserService` and the role service); the `users` and `roles` plugins are thin routes over it. Every mutation below writes its audit entry in the same transaction (BPL-05), with the action `users.user.<verb>` or `auth.role.<verb>`, and every list uses a keyset cursor with a page of at most 100 and `withTotal` (BPL-06).
+
+- **USR-01** `GET /api/v1/users/users` MUST filter by `q` (a prefix of `lower(name)` or of the email, served by an index), `role`, `status` (`active`, `disabled`, `invited`), `emailVerified` and a `createdFrom`/`createdTo` range, and sort by `createdAt`, `name` or `email`, ascending or descending (`-`). Order and range of creation use the UUIDv7 id. The answer has the meta of the entity routes (`pageSize`, `nextCursor`, `total` with `withTotal`). A row carries `status`, `source`, `roles` (id and name), `mfaEnabled` and `lastSignInAt`. The auth user row carries `lastSignInAt`, written when a session is made, and `deletedAt` (auth migration 0.6.0).
+- **USR-02** `GET .../users/:id` MUST return the row and `activeSessions`, the number of unexpired sessions.
+- **USR-03** `POST .../users` takes a password or `invite: true` (one of the two) and `roles`, given in the same transaction. A password outside 8 to 128 characters is `USERS_CREATE_REFUSED` (400) with that policy (AUTH-04); a taken email is `USERS_EMAIL_TAKEN` (409).
+- **USR-04** `PATCH .../users/:id` changes the name and the email only. A changed email MUST become unverified and a verification mail is sent through the outbox.
+- **USR-05** `POST .../:id/disable` (with a `reason`) and `.../enable` change the state of BPL-01. `status` is `invited` for an account that has never signed in and has no verified email.
+- **USR-06** `DELETE .../users/:id` MUST, in one transaction, anonymize the row (`deleted-<id>@invalid`, empty name, `source` local, no external id, `deletedAt` set) and remove its sessions, accounts, role memberships, second factors, passkeys, API keys and links. Audit rows stay. A deleted user is never listed, found or given a session, and the email is free again.
+- **USR-07** Nobody disables, deletes, resets the MFA of, or takes the administrator role (the system role `admin`) from themselves: `USERS_SELF_ACTION` (409). The last active holder of the administrator role in a tenant cannot be disabled, deleted or lose the role, also when the system asks: `USERS_LAST_ADMIN` (409). The check locks the role first, so two changes at the same time leave one administrator.
+- **USR-08** `GET .../:id/sessions` lists the unexpired sessions (id, IP, user agent, created, last used) without tokens; `DELETE .../:id/sessions/:sessionId` and `DELETE .../:id/sessions` revoke them. Permission `users.revoke-sessions`.
+- **USR-09** `POST .../:id/reset-password` (202) sends a reset link through the outbox. The answer never holds a token. It is limited per target user and per administrator (AUTH-06): `USERS_RATE_LIMITED` (429) with `Retry-After`.
+- **USR-10** An invited user has no credential account. The invitation is a link of Better Auth's `/reset-password`, valid for `USERS_INVITE_TTL_DAYS` (default 7); using it sets the first password and verifies the email. `POST .../:id/resend-invite` (202) replaces the old link and is `USERS_NOT_INVITED` (409) for a user who is not invited. This is the only invitation path.
+- **USR-11** `POST .../:id/mfa/reset` (204, permission `users.reset-mfa`) removes the TOTP secret and the passkeys and revokes the sessions; the user is told by mail.
+- **USR-12** `GET` and `PATCH /api/v1/users/me` read and rename the signed-in person; anything else of one's own account stays on the Better Auth endpoints.
+- **ROL-01** `GET /api/v1/roles/roles/:id` returns the role with `memberCount`; `GET .../:id/members` pages its holders.
+- **ROL-02** `POST .../roles/:id/assign` and `.../revoke` take 1 to 100 `userIds` and answer a result for each (`assigned`, `revoked`, `unchanged`, `not_found`, `refused` with a code), in one transaction; a refused user does not undo the others.
+- **ROL-03** `POST .../roles/:id/duplicate` makes a non-system role with the permissions of the source and the given name.
+- **ROL-04** `GET /api/v1/roles/permissions` returns each permission with `module`, `resource` (or null) and `action`, split from its name.
+- **ROL-05** `GET /api/v1/users/users/:id/permissions` returns the effective permissions of a user in the tenant, each with the roles that grant it; the service adds the condition of a scoped permission when it is given the scoped permissions.
+- **ROL-06** Deleting a role with members MUST be refused with `ROLES_IN_USE` (409) and `memberCount`, unless `reassignTo` names a role of the same tenant that the members move to. System roles stay unchangeable.
+- **ROL-07** Giving a role with `requireMfa` to a user without a second factor succeeds with the warning `AUTH_MFA_ENROL_REQUIRED`.
+- **ROL-08** A person creates, changes, copies, reassigns into or gives a role only with permissions that they hold in the tenant; a holder of the administrator role, in the tenant or the nil tenant, may grant anything, and a system role is given only by one of its holders. A refusal is `ROLES_ESCALATION` (403) and is audited as `authz.denied`. The system (a seeder, the CLI) is not limited.
+
+In a tenant, the users routes see only the holders of a role in that tenant; without a tenant or in the nil tenant they see every user. A user outside the scope is `USERS_NOT_FOUND`.
+
 ## 13. HTTP API
 
 The API is REST over JSON on Fastify 5, described by an OpenAPI 3.1 document generated at build time. Entity routes are generated from `api` settings, and custom routes use the same validation and permission helpers.
@@ -1612,6 +1639,7 @@ Open questions:
 
 | Version | Date | Changes |
 | --- | --- | --- |
+| 0.8.13 | 2026-11-26 | Base plugins S1: section 12.2, USR-01 to USR-12 and ROL-01 to ROL-08; the user service, auth migration 0.6.0 (`lastSignInAt`, `deletedAt`, the `lower(name)` index), invitations, deletion by anonymizing, the self and last-administrator guards and the escalation guard |
 | 0.8.12 | 2026-11-25 | Base-plugin platform S0: BPL-01 to BPL-04 and IDN-01; disabled users, identity columns, typed mail/queue/cache services, authentication mail, outbox subscriptions and test-app mailbox/outbox helpers. Other base-plugin slices remain open |
 | 0.8.11 | 2026-11-24 | UI-14: the address of the admin is `ADMIN_URL`, a path or a host of its own, and the build does not know it |
 | 0.8.10 | 2026-11-24 | DATA-28: every table of the framework and of first-party plugins starts with `bk_` (ADR 0027) |
