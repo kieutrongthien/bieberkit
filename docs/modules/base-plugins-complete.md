@@ -27,7 +27,7 @@
 - Packages: `@bieberkit/plugin-users`, `-roles`, `-settings`, `-audit-log`, `-notifications`, `-media`, and the changes they need in `@bieberkit/auth`, `@bieberkit/server` and `bieberkit` (CLI).
 - Layer: plugins, with the platform changes in the product and tools layers. Imports keep pointing downward (PKG-01).
 - Spec sections: 11, 12, 14, 15, OBS-05, AUTH-01 to AUTH-06, AUTHZ-01, AUTHZ-05, S-01 to S-06, DATA-13, DATA-25, IO-04.
-- Status: **Approved in outline by the maintainer on 2026-11-25** (approach 2, and the recommendations of the open questions, which are now decisions below). The maintainer asked for a result that serves a single person and an enterprise equally. Section "Who it is for" and section "Enterprise controls" carry that. S0 implements BPL-01 to BPL-04 and IDN-01, S1 implements USR-01 to USR-12 and ROL-01 to ROL-08 (tests approved by the maintainer on 2026-11-26), S2 implements SET-01 to SET-07 (ADR 0030), S3 implements NTF-01 to NTF-07, and S4 implements MED-01 to MED-08, with the normative requirements in `docs/spec/SPEC.md` sections 12.1 to 12.5 and milestone M1.11 in the roadmap. The remaining IDs are proposals for S5 and S6; the full milestone remains open.
+- Status: **Approved in outline by the maintainer on 2026-11-25** (approach 2, and the recommendations of the open questions, which are now decisions below). The maintainer asked for a result that serves a single person and an enterprise equally. Section "Who it is for" and section "Enterprise controls" carry that. S0 implements BPL-01 to BPL-04 and IDN-01, S1 implements USR-01 to USR-12 and ROL-01 to ROL-08 (tests approved by the maintainer on 2026-11-26), S2 implements SET-01 to SET-07 (ADR 0030), S3 implements NTF-01 to NTF-07, S4 implements MED-01 to MED-08, and S5 implements AUD-01 to AUD-06, with the normative requirements in `docs/spec/SPEC.md` sections 12.1 to 12.6 and milestone M1.11 in the roadmap. The remaining IDs are proposals for S6; the full milestone remains open.
 - Builds on: `docs/modules/plugins.md` (the thin slice of M1.8). This file replaces its "what a plugin does" tables slice by slice; `plugins.md` is updated as each slice lands.
 
 ## Purpose
@@ -167,9 +167,9 @@ Permissions: `media.read`, `media.upload`, `media.manage`.
 
 - **AUD-01** Filters: `from` and `to`, `action` (exact or a prefix ending in `*`), `entity`, `recordId`, `actorId`, `requestId`. The list stays newest first with a keyset cursor.
 - **AUD-02** `GET .../entries/:id` returns one entry. The list and the entry carry `actor` (`id`, `name`, `email`, or `null` for the system) read from the auth tables.
-- **AUD-03** `GET /api/v1/audit-log/export?format=csv|ndjson` takes the same filters, streams the result by keyset pages and stops at `AUDIT_EXPORT_MAX_ROWS` (default 100 000) with a header that says it was cut. Permission `audit-log.export`. Cells that start with `=`, `+`, `-` or `@` are escaped (IO-04). The export is itself an audit entry.
+- **AUD-03** `GET /api/v1/audit-log/export?format=csv|ndjson` takes the same filters, streams the result by keyset pages and stops at `AUDIT_LOG_EXPORT_MAX_ROWS` (default 100 000) with a header that says it was cut. Permission `audit-log.export`. Cells that start with `=`, `+`, `-` or `@` are escaped (IO-04). The export is itself an audit entry.
 - **AUD-04** `GET .../audit-log/actions` returns the distinct actions, cached for 60 seconds, for a filter control.
-- **AUD-05** Reads follow the tenant of the request. A system administrator without a tenant sees every tenant. _To verify: the thin slice has no tenant filter._
+- **AUD-05** Reads follow the tenant of the request. A system administrator without a tenant sees every tenant.
 - **AUD-06** Retention is the command `bieberkit audit:prune --before <date>` in the CLI, which runs with `MIGRATE_DATABASE_URL` (DATA-25), prints the count first, needs `--yes`, and writes its own entry. No route and no job of the application role deletes audit rows.
 
 Permissions: `audit-log.read`, `audit-log.export`.
@@ -218,7 +218,7 @@ New stable codes (MOD-17), each with a one-line fix in the message: `AUTH_USER_D
 
 ## Configuration
 
-New keys, declared by the plugins and validated at boot (CFG-01): `NOTIFICATIONS_RETENTION_DAYS` (90), `MEDIA_PENDING_TTL_HOURS` (24), `MEDIA_MAX_SIZE_MB`, `MEDIA_ALLOWED_TYPES`, `MEDIA_TENANT_QUOTA_MB` (optional), `AUDIT_EXPORT_MAX_ROWS` (100000), `USERS_INVITE_TTL` (7d), `AUDIT_LOG_MIRROR` (false), `MEDIA_AUDIT_DOWNLOADS` (false). The `security.*` policies are settings, not env keys, and the table of defaults is in `docs/modules/plugins.md` when S6 lands. New permissions of S6: `users.override-external`, `audit-log.hold`.
+New keys, declared by the plugins and validated at boot (CFG-01): `NOTIFICATIONS_RETENTION_DAYS` (90), `MEDIA_PENDING_TTL_HOURS` (24), `MEDIA_MAX_SIZE_MB`, `MEDIA_ALLOWED_TYPES`, `MEDIA_TENANT_QUOTA_MB` (optional), `AUDIT_LOG_EXPORT_MAX_ROWS` (100000), `USERS_INVITE_TTL` (7d), `AUDIT_LOG_MIRROR` (false), `MEDIA_AUDIT_DOWNLOADS` (false). The `security.*` policies are settings, not env keys, and the table of defaults is in `docs/modules/plugins.md` when S6 lands. New permissions of S6: `users.override-external`, `audit-log.hold`.
 
 ## Slices and order
 
@@ -282,6 +282,17 @@ Taken by the builder on 2026-11-27, within "Left to the builder":
 5. Moving a folder is not in S4: a file moves through `folderId`, a folder is renamed.
 6. New codes besides the list above: `MEDIA_NOT_READY`, `MEDIA_NOT_PENDING`, `MEDIA_FOLDER_NOT_FOUND`, `MEDIA_FOLDER_NAME_TAKEN`, `MEDIA_FOLDER_TOO_DEEP`; `MEDIA_ALREADY_READY` is kept.
 7. `createTestApp` takes `disk`, the options of its memory disk, to test a public URL and a disk that cannot sign.
+
+## Decisions of slice S5
+
+Taken by the builder on 2026-11-27, within "Left to the builder":
+
+1. The env key is `AUDIT_LOG_EXPORT_MAX_ROWS`: a key of a plugin starts with its prefix (`AUDIT_LOG_`, ADR 0011), as `AUDIT_LOG_MIRROR` does.
+2. The list takes the page shape of the other base plugins (`pageSize`, `cursor`, `withTotal`, `meta`); `limit` and the top-level `nextCursor` of the thin slice are gone.
+3. The export knows whether it is cut before its first byte, from one row past the limit, and says so in `X-Export-Truncated`.
+4. In the nil tenant a reader sees every tenant, as the users list and SET-04.
+5. `pruneAuditLog` is in `@bieberkit/data/orm`, next to the trigger it lifts; `@bieberkit/server` opens `MIGRATE_DATABASE_URL` for it.
+6. Indexes for the filters other than time stay with OPS-05 in S6.
 
 ## Left to the builder
 

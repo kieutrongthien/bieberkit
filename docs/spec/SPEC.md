@@ -272,6 +272,7 @@ A person at the terminal is asked for every choice that no flag gave, the name i
 | `bieberkit migrate` | Apply pending plugin steps and migrations under a lock (`--status`, `--rollback`, `--allow-destructive`) |
 | `bieberkit db:seed` | Run seeders |
 | `bieberkit backup:verify` | Restore the newest backup into a throwaway database and check that nothing is left to migrate (DEP-09) |
+| `bieberkit audit:prune --before <date> [--yes]` | Count the audit entries before a date and, with `--yes`, delete them on `MIGRATE_DATABASE_URL` (AUD-06) |
 | `bieberkit make:entity`, `make:module`, `make:plugin`, `make:job` | Generate code from the official recipes |
 | `bieberkit add <plugin>` / `remove <plugin>` | Install or uninstall a plugin and update config, env schema and migrations |
 | `bieberkit plugins` | List installed plugins, versions and dependency graph |
@@ -892,6 +893,17 @@ The logic is in the `media` service of the plugin; the routes under `/api/v1/med
 - **MED-06** `GET /api/v1/media/media` filters by `q` (a prefix of the filename in any case), `kind` (`image`, `video`, `audio`, `document`, `other`, from the type), `folderId`, `status`, `visibility`, `sizeMin`/`sizeMax` and `createdFrom`/`createdTo` (on the UUIDv7 id), newest first, with `withTotal`.
 - **MED-07** `MEDIA_MAX_SIZE_MB` (default 25), `MEDIA_ALLOWED_TYPES` (MIME types; default the images, PDF, text, CSV and Office types) and an optional `MEDIA_TENANT_QUOTA_MB` are checked when the record is made and again before a signed upload URL is given: `MEDIA_TOO_LARGE` (413), `MEDIA_TYPE_REFUSED` (422), `MEDIA_QUOTA_EXCEEDED` (422). The quota counts the `pending` and `ready` files of the tenant. The storage policy (S-02) applies on top.
 - **MED-08** A file is `pending`, `ready` or `rejected`. Confirm makes it `ready` with the size and the type that the storage verified, and emits `media.file.confirmed` with `{ id, path }` for a scanner (S-02). Bytes that the storage refuses leave the record `rejected` (audited, kept) with no object, and answer `STORAGE_UPLOAD_REJECTED` (422). Confirming a file that is not `pending` is `MEDIA_NOT_PENDING` (409), and a ready file gets no second upload URL (`MEDIA_ALREADY_READY`, 409).
+
+### 12.6 Audit log (slice S5)
+
+The `audit-log` plugin only reads: its four routes are `GET`, and the application role cannot change or delete an audit row (DATA-25). Every list uses a keyset cursor with a page of at most 100 and `withTotal` (BPL-06).
+
+- **AUD-01** `GET /api/v1/audit-log/entries` filters by `from` and `to` (on `at`), `action` (exact, or a prefix when it ends in `*`), `entity`, `recordId`, `actorId` and `requestId`, newest first.
+- **AUD-02** `GET .../entries/:id` returns one entry. An entry carries `actor` (`id`, `name`, `email` from the auth tables), or `null` when the system wrote it. An unknown entry, or one of another tenant, is `AUDIT_NOT_FOUND` (404).
+- **AUD-03** `GET /api/v1/audit-log/export?format=csv|ndjson` takes the filters of AUD-01 and streams the entries by keyset pages, at most `AUDIT_LOG_EXPORT_MAX_ROWS` (default 100 000). When more match, the answer carries `X-Export-Truncated: true`. A CSV cell that starts with `=`, `+`, `-`, `@`, a tab or a carriage return starts with `'` (IO-04). The export writes `audit-log.entries.exported` with its format and filters before the first byte. Permission `audit-log.export`.
+- **AUD-04** `GET .../audit-log/actions` returns the distinct actions in order, cached for 60 seconds.
+- **AUD-05** In a tenant, every read sees the entries of that tenant only. Without a tenant, or in the nil tenant, a reader sees every tenant.
+- **AUD-06** Retention is `bieberkit audit:prune --before <date>`, on `MIGRATE_DATABASE_URL` only. It prints the count of entries before the date and deletes them only with `--yes`, in one transaction that also writes `audit.pruned` with the date and the count. On SQLite the append-only trigger is lifted and made again inside that transaction. No route and no job of the application deletes audit rows.
 
 ## 13. HTTP API
 
@@ -1675,6 +1687,7 @@ Open questions:
 
 | Version | Date | Changes |
 | --- | --- | --- |
+| 0.8.17 | 2026-11-27 | Base plugins S5: section 12.6, AUD-01 to AUD-06; audit-log filters, one entry with its actor, the export, the actions, tenant reads, and `bieberkit audit:prune` in section 5.2 |
 | 0.8.16 | 2026-11-27 | Base plugins S4: section 12.5, MED-01 to MED-08; media files of a tenant with fixed visibility, read URLs, deletion after commit, folders, filters and limits; S-06 names the type that a ready file keeps |
 | 0.8.15 | 2026-11-26 | Base plugins S3: section 12.4, NTF-01 to NTF-07; the notifier, preferences, retention and module schedules; the sync queue runs an outbox job after the transaction of the dispatcher (BPL-04) |
 | 0.8.14 | 2026-11-26 | Base plugins S2: section 12.3, SET-01 to SET-07; settings are declared with `defineSetting` and contributed under `settings` (ADR 0030) |

@@ -316,7 +316,7 @@ Depends on the M1.8 baseline. This milestone hardens the shared base for domain-
 - [x] **S2** Complete settings, with maintainer review of its declaration: SET-01 to SET-07 (spec 12.3, ADR 0030). Evidence: `core/src/settings/define-setting.test.ts`, the `SET-01` cases of `define-plugin.test.ts`, `plugins/settings/src/index.test.ts` on three dialects; BPL-05/BPL-06 proven for settings
 - [x] **S3** Complete notifications: NTF-01 to NTF-07 (spec 12.4). Evidence: `plugins/notifications/src/index.test.ts` on three dialects, `queue/src/schedules.test.ts`, the sync-driver case of `queue/src/subscriptions.test.ts`; BPL-05/BPL-06 proven for notifications
 - [x] **S4** Complete media, including deletion after commit: MED-01 to MED-08 (spec 12.5). Evidence: `plugins/media/src/index.test.ts` on three dialects (MED-02 private-URL invariant and deletion after commit included); BPL-05/BPL-06 proven for media
-- [ ] **S5** Complete audit-log and pruning
+- [x] **S5** Complete audit-log and pruning: AUD-01 to AUD-06 (spec 12.6). Evidence: `plugins/audit-log/src/index.test.ts` and `data/src/orm/audit-prune.dialects.test.ts` on three dialects, `cli/src/audit.test.ts`; AUD-05 and AUD-06 security cases included; BPL-05/BPL-06 proven for audit-log (BPL-05: the export is audited)
 - [ ] **S6 [D]** Enterprise policies, managed identities, retention and operational controls
 - [ ] Cross-slice acceptance BPL-05/BPL-06: each mutation audits atomically and each list proves cursor/limit rules in its own slice
 
