@@ -89,14 +89,15 @@ export async function scaffold(
       );
     }
   }
-  let git: Scaffolded['git'] = 'skipped';
+  // An object, so that the step below can record how far git got before it failed.
+  const state: { git: Scaffolded['git'] } = { git: 'skipped' };
   if (choices.git) {
     const name = choices.author.replace(/\s*<[^>]*>\s*$/, '');
     const email = /<([^>]*)>/.exec(choices.author)?.[1] ?? '';
     try {
       await step('Creating the git repository', 'Git repository created', async () => {
         await exec('git', ['init', '-b', 'main'], planned.target);
-        git = 'initialized';
+        state.git = 'initialized';
         await exec('git', ['add', '-A'], planned.target);
         // The author of the project signs the first commit, so that it works on a machine with no git identity.
         await exec(
@@ -114,11 +115,11 @@ export async function scaffold(
           planned.target,
         );
       });
-      git = 'committed';
+      state.git = 'committed';
     } catch (error) {
-      git = git === 'initialized' ? 'initialized' : 'failed';
+      state.git = state.git === 'initialized' ? 'initialized' : 'failed';
       problems.push(`git: ${error instanceof Error ? error.message.split('\n')[0] : String(error)}`);
     }
   }
-  return { root: planned.target, files: planned.files.length, installed, git, problems };
+  return { root: planned.target, files: planned.files.length, installed, git: state.git, problems };
 }

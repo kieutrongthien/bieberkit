@@ -389,13 +389,10 @@ describe('section 5.1 the choices', () => {
 
   it('6 a failing install stops its spinner, and the problem is reported, exit 1', async () => {
     const cwd = workdir();
-    const exec: Exec = async (file) => {
-      if (file === 'pnpm') throw new Error('ERR_PNPM_NO_MATURE_MATCHING_VERSION too young\nmore');
-    };
     const prompts = scriptedPrompts(['sqlite', true, 'UNLICENSED', true, false, true]);
-    const { code } = await create(cwd, ['demo'], { prompts, deps: { exec } });
+    const { code } = await create(cwd, ['demo'], { prompts, deps: { exec: failingInstall } });
     expect(code).toBe(1);
-    expect(prompts.notes['Problems']).toMatch(/^pnpm install failed: ERR_PNPM_NO_MATURE_MATCHING_VERSION/);
+    expect(prompts.notes['Problems']).toMatch(/^pnpm install failed: network is down\./);
   });
 
   it('5.1 the author comes from the flag, then from git config', async () => {
