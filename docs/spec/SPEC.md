@@ -786,6 +786,7 @@ The resolver is one pure function that reports every problem together, each with
 | Add admin screens | `admin.menu`, `admin.pages`, `admin.fieldPanels` |
 | Add background work | `jobs`, `schedules` |
 | Change HTTP behavior | Fastify plugin scoped to the plugin's own routes |
+| Declare a setting that the admin can change | `settings: [defineSetting(...)]`; each key of a plugin starts with its short name and a dot (`PLG_PREFIX_SETTING`, ADR 0030, SET-01) |
 
 ### 11.4 Rules
 
@@ -856,6 +857,18 @@ The logic is in `@bieberkit/auth` (`createUserService` and the role service); th
 - **ROL-08** A person creates, changes, copies, reassigns into or gives a role only with permissions that they hold in the tenant; a holder of the administrator role, in the tenant or the nil tenant, may grant anything, and a system role is given only by one of its holders. A refusal is `ROLES_ESCALATION` (403) and is audited as `authz.denied`. The system (a seeder, the CLI) is not limited.
 
 In a tenant, the users routes see only the holders of a role in that tenant; without a tenant or in the nil tenant they see every user. A user outside the scope is `USERS_NOT_FOUND`.
+
+### 12.3 Settings (slice S2)
+
+A setting is declared in code with `defineSetting` of `@bieberkit/core` and contributed under `settings` by a plugin or a module (ADR 0030). The `settings` plugin stores values, serves them through its `settings` service and its routes, and owns nothing else.
+
+- **SET-01** A setting MUST be declared before it is used: `key` (dotted, lower case, at most 120 characters, starting with the plugin's short name for a plugin), `type` (`string`, `number`, `boolean`, `enum` with `values`, or `json` with a `parser`), `default` (which MUST pass the setting's own check), `label`, and optionally `description`, `group`, `scope` (`global` by default, or `tenant`), `public` and `secret` (never both). A bad declaration is `CORE_SETTING_INVALID`. A key declared twice is `SETTINGS_DUPLICATE_KEY` at boot. Any route or service call with an undeclared key is `SETTINGS_UNKNOWN_KEY` (404).
+- **SET-02** There is one way to write a value: `GET /api/v1/settings/settings`, `GET .../settings/:key`, `PUT .../settings/:key` with `{ value }`, validated against the declaration (`SETTINGS_INVALID_VALUE`, 422), and `DELETE .../settings/:key`, which goes back to the default. The entity `settings.Setting` has no generated routes.
+- **SET-03** A `secret` value MUST be encrypted at rest (SEC-08). It MUST never be returned: a read shows `"********"` and `hasValue`. It MUST never appear in audit data. Writing one needs `settings.manage`.
+- **SET-04** A `tenant` setting has a value for each tenant. A read falls back to the global value, then to the default. A tenant never sees another tenant's value.
+- **SET-05** Services read through `settings.get(def, { tenantId })`, typed by the declaration. Reads are cached under the tag `settings` and invalidated after commit (DATA-13). When the cache fails, a read falls back to the database, and then to the default.
+- **SET-06** A change or a reset writes `settings.setting.updated` or `settings.setting.reset` with the key, the old value and the new value (the key only, for a secret) in the transaction of the change.
+- **SET-07** `GET /api/v1/settings/public` returns the `public` settings without a session, with the cache headers of a public GET (API-09).
 
 ## 13. HTTP API
 
@@ -1639,6 +1652,7 @@ Open questions:
 
 | Version | Date | Changes |
 | --- | --- | --- |
+| 0.8.14 | 2026-11-26 | Base plugins S2: section 12.3, SET-01 to SET-07; settings are declared with `defineSetting` and contributed under `settings` (ADR 0030, proposed) |
 | 0.8.13 | 2026-11-26 | Base plugins S1: section 12.2, USR-01 to USR-12 and ROL-01 to ROL-08; the user service, auth migration 0.6.0 (`lastSignInAt`, `deletedAt`, the `lower(name)` index), invitations, deletion by anonymizing, the self and last-administrator guards and the escalation guard |
 | 0.8.12 | 2026-11-25 | Base-plugin platform S0: BPL-01 to BPL-04 and IDN-01; disabled users, identity columns, typed mail/queue/cache services, authentication mail, outbox subscriptions and test-app mailbox/outbox helpers. Other base-plugin slices remain open |
 | 0.8.11 | 2026-11-24 | UI-14: the address of the admin is `ADMIN_URL`, a path or a host of its own, and the build does not know it |

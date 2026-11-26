@@ -30,6 +30,7 @@ import { checkManifest, toManifest } from './manifest.ts';
 import type { KeyCollector } from './manifest.ts';
 import { definePlugin, parsePluginOptions } from './define-plugin.ts';
 import { registerModule } from '../module/define-module.ts';
+import { defineSetting } from '../settings/define-setting.ts';
 
 const base = {
   name: '@bieberkit/plugin-seo',
@@ -260,5 +261,32 @@ describe('PLG-07 checkManifest', () => {
     const collectors: readonly KeyCollector[] = [{ field: 'tables', collect: () => ['seo_meta'] }];
     expect(checkManifest(pkg, def, collectors)).toMatchObject({ ok: false, code: 'PLG_MANIFEST_STALE' });
     expect(checkManifest({ ...pkg, bieberkit: toManifest(def, collectors) }, def, collectors)).toEqual({ ok: true });
+  });
+});
+
+describe('SET-01 the settings of a plugin', () => {
+  const label = { en: 'Title' } as const;
+
+  it('SET-01 a plugin contributes its settings to its module', () => {
+    const title = defineSetting({ key: 'seo.title', type: 'string', default: '', label });
+    const def = definePlugin({ ...base, settings: [title] });
+    expect(def.module.contributions['settings']).toEqual([title]);
+  });
+
+  it('SET-01 a setting of a plugin starts with its short name and a dot (PLG_PREFIX_SETTING)', () => {
+    const stray = defineSetting({ key: 'site.title', type: 'string', default: '', label });
+    expect(() => definePlugin({ ...base, settings: [stray] })).toThrowError(
+      expect.objectContaining({
+        problems: [expect.objectContaining({ code: 'PLG_PREFIX_SETTING', message: expect.stringContaining('seo.') })],
+      }),
+    );
+  });
+
+  it('SET-01 the same key twice in one plugin is refused at once', () => {
+    const one = defineSetting({ key: 'seo.title', type: 'string', default: '', label });
+    const two = defineSetting({ key: 'seo.title', type: 'string', default: 'x', label });
+    expect(() => definePlugin({ ...base, settings: [one, two] })).toThrowError(
+      expect.objectContaining({ problems: [expect.objectContaining({ code: 'PLG_SETTING_DUPLICATE' })] }),
+    );
   });
 });
