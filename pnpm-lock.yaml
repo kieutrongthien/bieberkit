@@ -345,6 +345,10 @@ importers:
       '@bieberkit/core':
         specifier: workspace:*
         version: link:../core
+    devDependencies:
+      '@clack/prompts':
+        specifier: 1.9.0
+        version: 1.9.0
 
   packages/data:
     dependencies:

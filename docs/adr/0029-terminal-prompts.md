@@ -39,18 +39,18 @@ Constraints: every prompt keeps its flag, and `--yes`, `--json` and a terminal t
 
 ## Options
 
-| Option                                           | For                                                                                                                                                                              | Against                                                                                                                     |
-| ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| A. `@clack/prompts` behind the kit's port        | The exact look of create-vite and create-t3-app. Select, multiselect, confirm, text, password, spinner, notes, and Ctrl+C handled and tested on many terminals, Windows included | Six packages in the install of `pnpm create bieberkit`, each one more to trust                                              |
-| B. Own prompts on `node:readline` and ANSI codes | No dependency                                                                                                                                                                    | 400 to 600 lines of raw mode, redraw, narrow terminals, Windows and Ctrl+C to write and keep. Hard to reach the same polish |
-| C. `@inquirer/prompts`                           | Mature, many prompt types                                                                                                                                                        | Heavier, and does not look like the two tools the maintainer named                                                          |
-| D. Do nothing                                    | No work                                                                                                                                                                          | The first impression stays as it is                                                                                         |
+| Option                                                         | For                                                                                                                                                                              | Against                                                                                                                     |
+| -------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| A. `@clack/prompts` behind the kit's port, bundled into `dist` | The exact look of create-vite and create-t3-app. Select, multiselect, confirm, text, password, spinner, notes, and Ctrl+C handled and tested on many terminals, Windows included | Six packages of code to trust, even inlined. Their notices must ship, and a fix in clack waits for our release              |
+| B. Own prompts on `node:readline` and ANSI codes               | No dependency                                                                                                                                                                    | 400 to 600 lines of raw mode, redraw, narrow terminals, Windows and Ctrl+C to write and keep. Hard to reach the same polish |
+| C. `@inquirer/prompts`                                         | Mature, many prompt types                                                                                                                                                        | Heavier, and does not look like the two tools the maintainer named                                                          |
+| D. Do nothing                                                  | No work                                                                                                                                                                          | The first impression stays as it is                                                                                         |
 
 ## Decision
 
-Option A. `create-bieberkit` depends on `@clack/prompts`, and only one file of the kit imports it. Commands keep talking to a port, so tests answer with a script, and the CLI gets the same prompts through `create-bieberkit/kit`.
+Option A, bundled. `@clack/prompts` is a development dependency of `create-bieberkit`, and tsdown inlines it into `dist`, as create-vite does. Only one file of the kit imports it. Commands keep talking to a port, so tests answer with a script, and the CLI gets the same prompts through `create-bieberkit/kit`.
 
-Runtime dependencies added (P9):
+Bundled into `dist`, so the published package has no new dependency (P9):
 
 | Package                       | Version | Used by                     | License | Maintainers (npm)                        | Reason                        |
 | ----------------------------- | ------- | --------------------------- | ------- | ---------------------------------------- | ----------------------------- |
@@ -61,7 +61,7 @@ Runtime dependencies added (P9):
 | `fast-string-width`           | 3.0.2   | through `fast-wrap-ansi`    | MIT     | fabiospampinato                          | The printed width of a string |
 | `fast-string-truncated-width` | 3.0.3   | through `fast-string-width` | MIT     | fabiospampinato                          | Its core                      |
 
-None has an install script. Colours come from `node:util` `styleText`, which honours `NO_COLOR`, so `picocolors` is not needed. 1.9.0 was published on 2026-11-09, past `minimumReleaseAge`. MIT is compatible with Apache-2.0.
+None has an install script. Their license texts go in `NOTICE`, as MIT requires for a copy. A fix in clack reaches people with the next release of the framework, not on their own install. Colours come from `node:util` `styleText`, which honours `NO_COLOR`, so `picocolors` is not needed. 1.9.0 was published on 2026-11-09, past `minimumReleaseAge`. MIT is compatible with Apache-2.0.
 
 ### The port
 
@@ -90,7 +90,8 @@ create-vite 9.4.0 bundles `@clack/prompts` ^1.9.0 (a development dependency, inl
 
 - The scaffolder looks like the tools people know, and every choice is reachable without knowing its flag.
 - Agents and CI see no change: the flags, `--yes`, `--json` and `BK_CREATE_CHOICE_NEEDED` stay as they are.
-- Six packages join the install of `pnpm create bieberkit`. A new version of clack waits for `minimumReleaseAge` like every dependency.
+- The install of `pnpm create bieberkit` gains no package: clack ships inside `dist` (about 95 kB unpacked before tree-shaking). An update of clack waits for `minimumReleaseAge` in this repository, and reaches people with a release.
+- `NOTICE` carries the MIT notices of the six packages.
 - A second prompt library is ruled out (P1). New prompts go through the port.
 
 ## Spec changes
