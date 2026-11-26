@@ -286,7 +286,13 @@ export function renderProject(choices: Choices, plan: Plan): ProjectFile[] {
           check: 'bieberkit check',
           test: 'bieberkit test',
         },
-        devDependencies: { ...pins(['bieberkit', '@bieberkit/testing']), typescript: '7.0.2', vitest: '4.1.12' },
+        // bieberkit.config.ts sits at the root and imports core, so the root declares it: pnpm resolves nothing it does not declare.
+        devDependencies: {
+          ...pins(['bieberkit', '@bieberkit/core', '@bieberkit/testing']),
+          '@types/node': '24.19.2',
+          typescript: '7.0.2',
+          vitest: '4.1.12',
+        },
         engines: { node: '>=24.12' },
       }),
     },
@@ -316,6 +322,7 @@ export function renderProject(choices: Choices, plan: Plan): ProjectFile[] {
           module: 'esnext',
           moduleResolution: 'bundler',
           lib: ['esnext'],
+          types: ['node'],
           strict: true,
           noUncheckedIndexedAccess: true,
           exactOptionalPropertyTypes: true,

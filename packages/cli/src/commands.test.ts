@@ -93,6 +93,26 @@ describe('section 5.2 plugins', () => {
     });
   });
 
+  it('4.2 a plugin is found among the dependencies of apps/server, where pnpm installs it', async () => {
+    const folder = 'apps/server/node_modules/@bieberkit/plugin-pages';
+    const { root } = project({
+      entries: ['"@bieberkit/plugin-pages"'],
+      files: {
+        [`${folder}/package.json`]: JSON.stringify({
+          name: '@bieberkit/plugin-pages',
+          type: 'module',
+          exports: './index.mjs',
+        }),
+        [`${folder}/index.mjs`]: [
+          "import { definePlugin } from '@bieberkit/core';",
+          "export default definePlugin({ name: '@bieberkit/plugin-pages', version: '1.0.0', core: '*', dialects: ['sqlite', 'postgres', 'mysql'], requires: {}, env: {} });",
+        ].join('\n'),
+      },
+    });
+    const { code, json } = await run(root, ['plugins', '--json']);
+    expect([code, json]).toMatchObject([0, { ok: true, data: { order: ['@bieberkit/plugin-pages'] } }]);
+  });
+
   it('PLG-04 a package that does not export a plugin by default is BK_PLUGIN_NOT_EXPORTED', async () => {
     const { root } = project({ plugins: [{ name: '@bieberkit/plugin-odd', noDefault: true }] });
     expect((await run(root, ['plugins', '--json'])).json).toMatchObject({ error: { code: 'BK_PLUGIN_NOT_EXPORTED' } });

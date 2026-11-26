@@ -267,6 +267,15 @@ describe('section 6 the files of a new project', () => {
     });
   });
 
+  it('4.2 the root declares what bieberkit.config.ts and the editor need: core, and the types of Node.js', async () => {
+    const cwd = workdir();
+    await create(cwd, ['demo', '--yes', '--no-install', '--no-git']);
+    const root = JSON.parse(read(cwd, 'demo/package.json'));
+    expect(root.devDependencies['@bieberkit/core']).toBe('1.2.3');
+    expect(root.devDependencies['@types/node']).toMatch(/^\d+\.\d+\.\d+$/);
+    expect(JSON.parse(read(cwd, 'demo/tsconfig.json')).compilerOptions.types).toEqual(['node']);
+  });
+
   it('23.7 a known license writes its LICENSE with the year and the holder, UNLICENSED and an unknown one write none', async () => {
     const mit = workdir();
     await create(mit, ['demo', '--yes', '--license', 'MIT', '--author', AUTHOR, '--no-install', '--no-git']);

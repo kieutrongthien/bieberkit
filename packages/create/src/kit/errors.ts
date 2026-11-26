@@ -92,12 +92,14 @@ function problemsOf(error: unknown): readonly Readonly<Record<string, unknown>>[
  */
 /**
  * A framework error, also when it comes from another copy of core than this one (a plugin that was installed with its own): it has a
- * stable code, and `instanceof` cannot tell two copies apart.
+ * stable code and a fix, and `instanceof` cannot tell two copies apart. An error of Node.js (`ERR_MODULE_NOT_FOUND`) has a code of the
+ * same shape and no fix, so the fix is what tells them apart.
  */
 function isBkError(error: unknown): error is BkError {
   return (
     error instanceof BkError ||
     (error instanceof Error &&
+      typeof Reflect.get(error, 'fix') === 'string' &&
       typeof Reflect.get(error, 'code') === 'string' &&
       /^[A-Z][A-Z0-9]*_[A-Z0-9_]+$/.test(String(Reflect.get(error, 'code'))))
   );

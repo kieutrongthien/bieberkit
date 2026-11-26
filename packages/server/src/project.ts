@@ -136,7 +136,9 @@ export async function loadConfig(cwd: string): Promise<ProjectConfig> {
  */
 export async function loadProject(cwd: string): Promise<Project> {
   const { root, configPath, config } = await loadConfig(cwd);
-  const rooted = createRequire(configPath);
+  // The plugins are dependencies of apps/server (section 4.2), where `bieberkit plugin add` installs them. With pnpm the root sees
+  // only what it declares, so they are resolved from there. The file need not exist: it is the place that resolving starts from.
+  const rooted = createRequire(join(root, 'apps/server/package.json'));
   const entries = config.plugins.map((entry) => (typeof entry === 'string' ? ([entry, undefined] as const) : entry));
   const loaded = new Map<string, LoadedPlugin>();
   for (const [name, given] of entries) {

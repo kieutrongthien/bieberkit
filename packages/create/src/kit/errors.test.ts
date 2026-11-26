@@ -51,6 +51,13 @@ describe('AI-02 failures', () => {
     expect(failureOf(Object.assign(new Error('x'), { code: 'ENOENT' })).code).toBe('BK_UNEXPECTED');
   });
 
+  it('AI-02 an error of Node.js with a code like ours and no fix is unexpected, and still has a fix to show', () => {
+    const missing = Object.assign(new Error("Cannot find package '@bieberkit/core'"), { code: 'ERR_MODULE_NOT_FOUND' });
+    const failure = failureOf(missing);
+    expect(failure).toMatchObject({ code: 'BK_UNEXPECTED', message: "Cannot find package '@bieberkit/core'" });
+    expect(typeof failure.fix).toBe('string');
+  });
+
   it('AI-02 an error with no fix still says where to look', () => {
     expect(failureOf(new BkError('bad', { code: 'X_Y' })).fix).not.toBe('');
   });
