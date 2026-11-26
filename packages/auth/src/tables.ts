@@ -28,6 +28,7 @@ import { uuid7 } from '@bieberkit/data';
 import type { PluginMigrationStep } from '@bieberkit/data';
 import { Uuid7Type, uuidType } from '@bieberkit/data/orm';
 import { authStep } from './plugin.ts';
+import { sql } from 'kysely';
 
 export interface AuthUserRow {
   [OptionalProps]?: 'source';
@@ -44,6 +45,10 @@ export interface AuthUserRow {
   /** The identity provider; defaults to local when a row is created. */
   source: string;
   externalId?: string | null;
+  /** Written by the session-create hook. Sessions are deleted on revoke and expiry, so they cannot tell this. */
+  lastSignInAt?: Date | null;
+  /** Set when the user is deleted: the row stays, anonymized, so foreign keys and audit actors stay valid (USR-06). */
+  deletedAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -174,6 +179,8 @@ export const AuthUser: EntitySchema<AuthUserRow> = new EntitySchema<AuthUserRow>
     disabledBy: { type: Uuid7Type, fieldName: 'disabled_by', nullable: true },
     source: { type: 'string', length: 60, onCreate: () => 'local', default: 'local' },
     externalId: { type: 'string', length: 255, fieldName: 'external_id', nullable: true },
+    lastSignInAt: { ...instant('last_sign_in_at'), nullable: true },
+    deletedAt: { ...instant('deleted_at'), nullable: true },
     createdAt: instant('created_at'),
     updatedAt: instant('updated_at'),
   },
@@ -338,6 +345,7 @@ const VERSION = '0.2.0';
 const STRONG = '0.3.0';
 const KEYS = '0.4.0';
 const PROFILE = '0.5.0';
+const LIFECYCLE = '0.6.0';
 const instantType = (dialect: string): 'timestamptz' | 'datetime' =>
   dialect === 'postgres' ? 'timestamptz' : 'datetime';
 
@@ -546,5 +554,17 @@ export const authTableSteps: readonly PluginMigrationStep[] = [
       .columns(['source', 'external_id'])
       .unique()
       .execute();
+  }),
+  // Version 0.6.0: the life of an account (USR-01, USR-06). Each step is one additive statement.
+  authStep(LIFECYCLE, 'users-last-sign-in-at', async (trx, dialect) => {
+    await trx.schema.alterTable('bk_auth_users').addColumn('last_sign_in_at', instantType(dialect)).execute();
+  }),
+  authStep(LIFECYCLE, 'users-deleted-at', async (trx, dialect) => {
+    await trx.schema.alterTable('bk_auth_users').addColumn('deleted_at', instantType(dialect)).execute();
+  }),
+  // The prefix search of the list on the name, in any case. The double parentheses are what MySQL needs for an index on an expression,
+  // and PostgreSQL and SQLite read them as one expression.
+  authStep(LIFECYCLE, 'users-name-lower-index', async (trx) => {
+    await sql`create index bk_auth_users_name_lower_index on bk_auth_users ((lower(name)))`.execute(trx);
   }),
 ];

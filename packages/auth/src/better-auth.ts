@@ -32,13 +32,14 @@ import { passkey } from '@better-auth/passkey';
 import { createHash } from 'node:crypto';
 import type { Dialect } from '@bieberkit/core';
 import { uuid7 } from '@bieberkit/data';
-import { requestKysely } from '@bieberkit/data/orm';
+import { currentEntityManager, requestKysely } from '@bieberkit/data/orm';
 import type { Database } from '@bieberkit/data/orm';
 import { authError } from './errors.ts';
 import { accountKey, createRateLimiter, rulesOf } from './limits.ts';
 import type { AuthLimits, RateLimiter } from './limits.ts';
 import { isDisabledUser, userDisabledError } from './user-status.ts';
 import { withEnabledSession } from './user-service.ts';
+import { AuthUser } from './tables.ts';
 
 export type { AuthLimits, Limit, Limit2 } from './limits.ts';
 export type { BetterAuthOptions };
@@ -90,10 +91,17 @@ export interface CreateAuthOptions {
   /** The sign in methods besides email and password. A method that is not here is not loaded, and needs no table. */
   readonly methods?: AuthMethods;
   /** The mail contract is M1.5, so the project says how to send. Without it the flows that need a mail answer with an error. */
-  readonly mail?: {
-    sendVerification?(mail: AuthMail): Promise<void>;
-    sendResetPassword?(mail: AuthMail): Promise<void>;
-  };
+  readonly mail?: AuthMailOptions;
+}
+
+/** How the project sends the mails of authentication. Inside a transaction a callback writes an outbox intent and sends nothing (BPL-02). */
+export interface AuthMailOptions {
+  sendVerification?(mail: AuthMail): Promise<void>;
+  sendResetPassword?(mail: AuthMail): Promise<void>;
+  /** The invitation of USR-10: the link sets the first password through the reset page. */
+  sendInvite?(mail: AuthMail): Promise<void>;
+  /** Tells a user that an administrator removed their second factors (USR-11). */
+  sendMfaReset?(notice: { readonly to: string }): Promise<void>;
 }
 
 export type AuthInstance = Auth;
@@ -102,6 +110,12 @@ export type AuthInstance = Auth;
 export type AuthSecondaryStorage = NonNullable<BetterAuthOptions['secondaryStorage']>;
 
 const limiters = new WeakMap<object, RateLimiter>();
+const mails = new WeakMap<object, AuthMailOptions>();
+
+/** The mail callbacks that an auth instance was made with, for the user service. */
+export function mailOf(auth: AuthInstance): AuthMailOptions {
+  return mails.get(auth) ?? {};
+}
 
 const COOKIE_ATTRIBUTES = { httpOnly: true, secure: true, sameSite: 'lax', path: '/' } as const;
 
@@ -183,6 +197,8 @@ export function createAuth(options: CreateAuthOptions): AuthInstance {
         disabledBy: { type: 'string', required: false, input: false },
         source: { type: 'string', required: true, defaultValue: 'local', input: false },
         externalId: { type: 'string', required: false, input: false },
+        lastSignInAt: { type: 'date', required: false, input: false },
+        deletedAt: { type: 'date', required: false, input: false },
       },
     },
     session: {
@@ -191,12 +207,25 @@ export function createAuth(options: CreateAuthOptions): AuthInstance {
     },
     ...(options.secondaryStorage === undefined ? {} : { secondaryStorage: options.secondaryStorage }),
     account: { modelName: 'authAccount', fields: { accountId: 'externalId' } },
-    verification: { modelName: 'authVerification' },
+    // With Valkey the verifications are kept in the database too, so the user service can find and revoke the links of a user (USR-10).
+    verification: {
+      modelName: 'authVerification',
+      ...(options.secondaryStorage === undefined ? {} : { storeInDatabase: true }),
+    },
     emailAndPassword: {
       enabled: true,
       minPasswordLength: 8,
       maxPasswordLength: 128,
       requireEmailVerification: false,
+      // A reset link went to the mailbox, so using it proves the address, also for the first password of an invitation (USR-10).
+      // The ORM writes the flag, because SQLite binds no boolean through the Kysely of the request.
+      onPasswordReset: async ({ user }: { user: { id: string } }) => {
+        await (currentEntityManager() ?? options.db.fork()).nativeUpdate(
+          AuthUser,
+          { id: user.id },
+          { emailVerified: true },
+        );
+      },
       ...(mail?.sendResetPassword === undefined
         ? {}
         : {
@@ -289,10 +318,20 @@ export function createAuth(options: CreateAuthOptions): AuthInstance {
           before: async (session) => {
             const user = await requestKysely(options.db)
               .selectFrom('authUser')
-              .select('disabledAt')
+              .select(['disabledAt', 'deletedAt'])
               .where('id', '=', session.userId)
               .executeTakeFirst();
-            if (isDisabledUser(user)) throw new APIError('FORBIDDEN', userDisabledError().toJSON());
+            if (isDisabledUser(user) || (user?.deletedAt ?? null) !== null)
+              throw new APIError('FORBIDDEN', userDisabledError().toJSON());
+          },
+          // Sessions are deleted on revoke and expiry, so the user row keeps the last sign in (USR-01). Sign up writes the session in
+          // a transaction of Better Auth that skips the adapter above, and this hook runs on every path.
+          after: async (session) => {
+            await requestKysely(options.db)
+              .updateTable('authUser')
+              .set({ lastSignInAt: new Date() })
+              .where('id', '=', session.userId)
+              .execute();
           },
         },
       },
@@ -337,5 +376,6 @@ export function createAuth(options: CreateAuthOptions): AuthInstance {
   };
   const auth: AuthInstance = betterAuth(config);
   limiters.set(auth, limiter);
+  if (mail !== undefined) mails.set(auth, mail);
   return auth;
 }
