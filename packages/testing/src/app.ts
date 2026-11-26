@@ -202,6 +202,12 @@ export async function createTestApp(options: TestAppOptions = {}): Promise<TestA
             sendVerification: async ({ to, url }) => {
               await sendAuthMessage({ to, subject: 'Verify your email address', text: url });
             },
+            sendInvite: async ({ to, url }) => {
+              await sendAuthMessage({ to, subject: 'You are invited', text: url });
+            },
+            sendMfaReset: async ({ to }) => {
+              await sendAuthMessage({ to, subject: 'Your second factor was removed', text: 'Set it up again.' });
+            },
           },
         }),
     });

@@ -2,7 +2,7 @@
  * BieberKit
  *
  * @file        packages/server/src/auth-mail.ts
- * @description Plain-text password reset and verification callbacks using the queued mail contract (BPL-02, M-01).
+ * @description Plain-text password reset, verification, invitation and MFA-reset callbacks using the queued mail contract (BPL-02, M-01, USR-10, USR-11).
  * @author      Bieber Kieu <kieutrongthien@gmail.com>
  * @copyright   Copyright (c) 2026 Bieber Kieu
  * @license     Apache-2.0
@@ -22,19 +22,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { AuthMail } from '@bieberkit/auth';
+import type { AuthMailOptions } from '@bieberkit/auth';
 import { MAIL_JOB, prepareMessage } from '@bieberkit/mail';
 import type { Mail, Mailbox, Message } from '@bieberkit/mail';
 import { currentEntityManager, emitEvent } from '@bieberkit/data/orm';
 
 /** Human-facing messages for the authentication callbacks; delivery goes through the queue. */
-export function authMessages(
-  mail: Mail,
-  from?: Mailbox,
-): {
-  sendResetPassword(message: AuthMail): Promise<void>;
-  sendVerification(message: AuthMail): Promise<void>;
-} {
+export function authMessages(mail: Mail, from?: Mailbox): Required<AuthMailOptions> {
   const send = async (message: Message): Promise<void> => {
     const em = currentEntityManager();
     if (em?.isInTransaction() === true) {
@@ -52,6 +46,22 @@ export function authMessages(
         to,
         subject: 'Verify your email address',
         text: 'Verify your email address using this link:\n\n' + url,
+      });
+    },
+    sendInvite: async ({ to, url }) => {
+      await send({
+        to,
+        subject: 'You are invited',
+        text: 'An account was made for you. Choose your password using this link, within 7 days:\n\n' + url,
+      });
+    },
+    sendMfaReset: async ({ to }) => {
+      await send({
+        to,
+        subject: 'Your second factor was removed',
+        text:
+          'An administrator removed the second factor of your account and signed you out everywhere. ' +
+          'Set it up again at your next sign in. If you did not ask for this, tell your administrator.',
       });
     },
   };

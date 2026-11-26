@@ -2,7 +2,7 @@
  * BieberKit
  *
  * @file        plugins/roles/src/routes.ts
- * @description The routes of the roles plugin: the list of roles with their permissions, the catalogue of permissions, create, change, delete, assign and revoke, over the role service of auth (AUTHZ-01, AUTHZ-05).
+ * @description The routes of the roles plugin over the role service of auth: the list and the detail of roles, members, the catalogue of permissions, create, change, duplicate, delete with reassignment, and assign and revoke in batches (AUTHZ-01, AUTHZ-05, ROL-01 to ROL-08).
  * @author      Bieber Kieu <kieutrongthien@gmail.com>
  * @copyright   Copyright (c) 2026 Bieber Kieu
  * @license     Apache-2.0
@@ -23,13 +23,16 @@
  */
 
 import {
-  assignRole,
+  assignRoles,
   AuthRole,
   AuthRolePermission,
   createRole,
   deleteRole,
+  duplicateRole,
+  getRole,
+  listMembers,
   NIL_TENANT,
-  revokeRole,
+  revokeRoles,
   setRolePermissions,
   updateRole,
 } from '@bieberkit/auth';
@@ -53,11 +56,42 @@ const role = {
   required: ['id', 'name', 'system', 'requireMfa', 'permissions'],
 } as const;
 
-const done = {
+const results = {
   type: 'object',
-  properties: { changed: { type: 'boolean' } },
-  required: ['changed'],
+  properties: {
+    results: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          userId: { type: 'string' },
+          result: { type: 'string', enum: ['assigned', 'revoked', 'unchanged', 'not_found', 'refused'] },
+          code: { type: 'string' },
+          warning: { type: 'string' },
+        },
+        required: ['userId', 'result'],
+      },
+    },
+  },
+  required: ['results'],
 } as const;
+
+const detail = {
+  type: 'object',
+  properties: { ...role.properties, memberCount: { type: 'integer' } },
+  required: [...role.required, 'memberCount'],
+} as const;
+
+const byId = { type: 'object', properties: { id: uuid }, required: ['id'] } as const;
+
+/** A permission split into the parts that a client groups by: `crm.deal.read` is module crm, resource deal, action read (ROL-04). */
+function partsOf(name: string): { name: string; module: string; resource: string | null; action: string } {
+  const parts = name.split('.');
+  const module = parts[0] ?? name;
+  const action = parts.length > 1 ? (parts.at(-1) ?? name) : name;
+  const resource = parts.length > 2 ? parts.slice(1, -1).join('.') : null;
+  return { name, module, resource, action };
+}
 
 const tenantOf = (ctx: RouteContext): string => ctx.tenantId ?? NIL_TENANT;
 const field = (value: unknown, name: string): unknown => Reflect.get(Object(value), name);
@@ -95,14 +129,82 @@ export const routes: readonly RouteDef[] = [
   }),
   defineRoute({
     method: 'GET',
+    url: `${BASE}/roles/:id`,
+    permission: 'roles.read',
+    schema: { params: byId, response: { 200: detail } },
+    handler: (ctx) => getRole(ctx.services.database, String(ctx.params['id']), { tenantId: tenantOf(ctx) }),
+  }),
+  defineRoute({
+    method: 'GET',
+    url: `${BASE}/roles/:id/members`,
+    permission: 'roles.read',
+    schema: {
+      params: byId,
+      query: {
+        type: 'object',
+        properties: { pageSize: { type: 'integer', minimum: 1 }, cursor: { type: 'string', maxLength: 1024 } },
+        additionalProperties: false,
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: { id: { type: 'string' }, name: { type: 'string' }, email: { type: 'string' } },
+                required: ['id', 'name', 'email'],
+              },
+            },
+            meta: {
+              type: 'object',
+              properties: { pageSize: { type: 'integer' }, nextCursor: { type: ['string', 'null'] } },
+              required: ['pageSize', 'nextCursor'],
+            },
+          },
+          required: ['data', 'meta'],
+        },
+      },
+    },
+    async handler(ctx) {
+      const cursor = ctx.query['cursor'];
+      const page = await listMembers(ctx.services.database, String(ctx.params['id']), {
+        tenantId: tenantOf(ctx),
+        ...(ctx.query['pageSize'] === undefined ? {} : { pageSize: ctx.query['pageSize'] }),
+        ...(typeof cursor === 'string' ? { cursor } : {}),
+      });
+      return { data: page.data, meta: { pageSize: page.pageSize, nextCursor: page.nextCursor } };
+    },
+  }),
+  defineRoute({
+    method: 'GET',
     url: `${BASE}/permissions`,
     permission: 'roles.read',
     schema: {
       response: {
-        200: { type: 'object', properties: { data: { type: 'array', items: { type: 'string' } } }, required: ['data'] },
+        200: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  name: { type: 'string' },
+                  module: { type: 'string' },
+                  resource: { type: ['string', 'null'] },
+                  action: { type: 'string' },
+                },
+                required: ['name', 'module', 'resource', 'action'],
+              },
+            },
+          },
+          required: ['data'],
+        },
       },
     },
-    handler: (ctx) => ({ data: [...ctx.services.permissions] }),
+    handler: (ctx) => ({ data: ctx.services.permissions.map(partsOf) }),
   }),
   defineRoute({
     method: 'POST',
@@ -166,15 +268,44 @@ export const routes: readonly RouteDef[] = [
     },
   }),
   defineRoute({
+    method: 'POST',
+    url: `${BASE}/roles/:id/duplicate`,
+    permission: 'roles.manage',
+    schema: {
+      params: byId,
+      body: {
+        type: 'object',
+        properties: { name: { type: 'string', minLength: 1, maxLength: 120 } },
+        required: ['name'],
+        additionalProperties: false,
+      },
+      response: { 201: role },
+    },
+    async handler(ctx) {
+      const source = await getRole(ctx.services.database, String(ctx.params['id']), { tenantId: tenantOf(ctx) });
+      const id = await duplicateRole(ctx.services.database, source.id, { name: String(field(ctx.body, 'name')) });
+      ctx.status(201);
+      return (await rolesOf(ctx, id))[0];
+    },
+  }),
+  defineRoute({
     method: 'DELETE',
     url: `${BASE}/roles/:id`,
     permission: 'roles.manage',
     schema: {
-      params: { type: 'object', properties: { id: uuid }, required: ['id'] },
+      params: byId,
+      query: {
+        type: 'object',
+        properties: { reassignTo: uuid },
+        additionalProperties: false,
+      },
       response: { 204: { type: 'null' } },
     },
     async handler(ctx) {
-      await deleteRole(ctx.services.database, String(ctx.params['id']));
+      const id = String(ctx.params['id']);
+      await getRole(ctx.services.database, id, { tenantId: tenantOf(ctx) });
+      const reassignTo = ctx.query['reassignTo'];
+      await deleteRole(ctx.services.database, id, typeof reassignTo === 'string' ? { reassignTo } : {});
       ctx.status(204);
       return undefined;
     },
@@ -185,26 +316,24 @@ export const routes: readonly RouteDef[] = [
       url: `${BASE}/roles/:id/${verb}`,
       permission: 'roles.manage',
       schema: {
-        params: { type: 'object', properties: { id: uuid }, required: ['id'] },
+        params: byId,
         body: {
           type: 'object',
-          properties: { userId: uuid },
-          required: ['userId'],
+          properties: { userIds: { type: 'array', items: uuid, minItems: 1, maxItems: 100 } },
+          required: ['userIds'],
           additionalProperties: false,
         },
-        response: { 200: done },
+        response: { 200: results },
       },
-      async handler(ctx) {
+      handler(ctx) {
         const input = {
           tenantId: tenantOf(ctx),
           roleId: String(ctx.params['id']),
-          userId: String(field(ctx.body, 'userId')),
+          userIds: toList(field(ctx.body, 'userIds')),
         };
-        const changed =
-          verb === 'assign'
-            ? await assignRole(ctx.services.database, input)
-            : await revokeRole(ctx.services.database, input);
-        return { changed };
+        return verb === 'assign'
+          ? assignRoles(ctx.services.database, input)
+          : revokeRoles(ctx.services.database, input);
       },
     }),
   ),
