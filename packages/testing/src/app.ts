@@ -25,7 +25,7 @@
 import { createAuth, createAuthorizer, assignRole, buildPermissionRegistry, createRole } from '@bieberkit/auth';
 import type { AccessAuthorizer, ScopedPermission } from '@bieberkit/auth';
 import { createContainer, loadEnv, registerModule } from '@bieberkit/core';
-import type { ModuleDef, ServiceRegistry } from '@bieberkit/core';
+import type { ModuleDef, ServiceRegistry, SettingDef } from '@bieberkit/core';
 import { uuid7 } from '@bieberkit/data';
 import type { EntityDef } from '@bieberkit/data';
 import { compileEntities, createOutboxDispatcher, currentEntityManager, emitEvent } from '@bieberkit/data/orm';
@@ -185,6 +185,10 @@ export async function createTestApp(options: TestAppOptions = {}): Promise<TestA
     const disk = createMemoryDisk({ signing: true });
     container.register('storage', { scope: 'singleton', create: () => createStorage({ disk }) });
     container.register('permissions', { scope: 'singleton', create: () => everything });
+    container.register('settingDeclarations', {
+      scope: 'singleton',
+      create: () => contributed<SettingDef>(modules, 'settings'),
+    });
     container.register('database', { scope: 'singleton', create: () => db });
     container.register('auth', {
       scope: 'singleton',

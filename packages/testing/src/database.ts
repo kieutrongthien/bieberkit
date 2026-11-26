@@ -65,6 +65,8 @@ const env = (url: string, dialect: Dialect) =>
 const STEP_TABLES =
   /\bbk_(?:auth_|audit_log|migration|plugin_migrations|outbox|sequences|comments|attachments|timeline|tags|jobs|locks)/;
 
+const TEST_APP_KEY = Buffer.alloc(32, 7).toString('base64');
+
 /** Opens the database at `url` and makes its tables: the steps of the framework and of auth, then the tables of the entities. */
 async function prepare(
   url: string,
@@ -75,6 +77,8 @@ async function prepare(
   const database = await createDatabase(env(url, dialect), {
     entities: [...entities, ...authEntities],
     audit: 'table',
+    // A fixed key of the test app, so that encrypted fields, such as secret settings, open (SEC-08).
+    encryption: { current: TEST_APP_KEY },
     ...options,
   });
   await applyPluginMigrations(database, [...dataMigrationSteps, ...authMigrationSteps], {

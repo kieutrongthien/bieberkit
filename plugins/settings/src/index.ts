@@ -2,7 +2,7 @@
  * BieberKit
  *
  * @file        plugins/settings/src/index.ts
- * @description The settings plugin: a key and a value stored in the database, read and changed through the API and the admin, with their own permissions.
+ * @description The settings plugin: the table of stored values, the settings service that other plugins read with a type, the routes, and the settings of the site that it declares (SET-01 to SET-07, ADR 0030).
  * @author      Bieber Kieu <kieutrongthien@gmail.com>
  * @copyright   Copyright (c) 2026 Bieber Kieu
  * @license     Apache-2.0
@@ -24,30 +24,22 @@
 
 import { definePlugin } from '@bieberkit/core';
 import type { PluginDef } from '@bieberkit/core';
-import { defineEntity, f } from '@bieberkit/data';
-import type { EntityDef } from '@bieberkit/data';
+import { declarations } from './declarations.ts';
+import { Setting } from './entity.ts';
+import { routes } from './routes.ts';
+import { createSettingsService } from './service.ts';
+import type { SettingsService } from './service.ts';
 
-/** One setting of the application: a key that is unique and a value as text (JSON when it holds more than a word). */
-export const Setting: EntityDef<'settings.Setting'> = defineEntity({
-  name: 'settings.Setting',
-  table: 'bk_settings',
-  fields: {
-    id: f.id(),
-    key: f.string({ min: 1, max: 120 }).unique(),
-    value: f.text({ max: 10_000 }),
-    createdAt: f.createdAt(),
-    updatedAt: f.updatedAt(),
-  },
-  permissions: {
-    read: 'settings.read',
-    create: 'settings.manage',
-    update: 'settings.manage',
-    delete: 'settings.manage',
-  },
-  api: { list: true, get: true, create: true, update: true, delete: true },
-  label: { en: 'Setting' },
-  admin: { title: 'key', list: ['key', 'value', 'updatedAt'], icon: 'setting' },
-});
+export { siteLocale, siteLogo, siteName } from './declarations.ts';
+export { Setting } from './entity.ts';
+export type { Change, SettingsPage, SettingsService, SettingView, Where } from './service.ts';
+
+declare module '@bieberkit/core' {
+  interface ServiceRegistry {
+    /** Typed reads and audited writes of the declared settings (SET-05). */
+    settings: SettingsService;
+  }
+}
 
 import pkg from '../package.json' with { type: 'json' };
 
@@ -58,6 +50,20 @@ const plugin: PluginDef = definePlugin({
   dialects: ['postgres', 'mysql', 'sqlite'],
   permissions: ['settings.read', 'settings.manage'],
   entities: [Setting],
+  routes,
+  settings: declarations,
+  services: {
+    settings: {
+      scope: 'singleton',
+      deps: ['database', 'cache', 'settingDeclarations'],
+      create: (services) =>
+        createSettingsService({
+          db: services.database,
+          cache: services.cache,
+          declarations: services.settingDeclarations,
+        }),
+    },
+  },
 });
 
 export default plugin;

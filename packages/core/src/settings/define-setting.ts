@@ -124,6 +124,8 @@ function checker(input: SettingInput<unknown>): (value: unknown) => unknown {
         }
       };
     }
+    default:
+      return invalid(key, 'the type is not known', `Use one of ${TYPES.join(', ')}.`);
   }
 }
 
@@ -132,9 +134,9 @@ function validate(input: SettingInput<unknown>): void {
   if (!KEY.test(key) || key.length > MAX_KEY)
     invalid(key, 'the key is not dotted lower case of at most 120 characters', 'Name it like seo.title.');
   if (!TYPES.includes(input.type))
-    invalid(key, `the type "${String(input.type)}" is not known`, `Use one of ${TYPES.join(', ')}.`);
+    invalid(key, `the type "${input.type}" is not known`, `Use one of ${TYPES.join(', ')}.`);
   if (input.scope !== undefined && !SCOPES.includes(input.scope))
-    invalid(key, `the scope "${String(input.scope)}" is not known`, 'Use global or tenant.');
+    invalid(key, `the scope "${input.scope}" is not known`, 'Use global or tenant.');
   if (typeof input.label !== 'object' || input.label === null || typeof input.label.en !== 'string')
     invalid(key, 'the label has no English text', 'Give the label as { en: "..." }.');
   if (input.public === true && input.secret === true)
@@ -164,7 +166,7 @@ export function defineSetting(
 export function defineSetting(
   input: Common & { readonly type: 'boolean'; readonly default: boolean },
 ): SettingDef<boolean>;
-export function defineSetting(input: SettingInput<unknown>): SettingDef<unknown> {
+export function defineSetting(input: SettingInput<unknown>): SettingDef {
   validate(input);
   const check = checker(input);
   try {

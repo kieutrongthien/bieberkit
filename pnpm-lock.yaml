@@ -651,12 +651,18 @@ importers:
 
   plugins/settings:
     dependencies:
+      '@bieberkit/cache':
+        specifier: workspace:*
+        version: link:../../packages/cache
       '@bieberkit/core':
         specifier: workspace:*
         version: link:../../packages/core
       '@bieberkit/data':
         specifier: workspace:*
         version: link:../../packages/data
+      '@bieberkit/http':
+        specifier: workspace:*
+        version: link:../../packages/http
     devDependencies:
       '@bieberkit/testing':
         specifier: workspace:*

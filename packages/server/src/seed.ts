@@ -26,7 +26,7 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { createContainer, createLogger, loadEnv, registerModule } from '@bieberkit/core';
 import type { JobDef, QueueSubscription } from '@bieberkit/queue';
-import type { EnvSource, ServiceRegistry } from '@bieberkit/core';
+import type { EnvSource, ServiceRegistry, SettingDef } from '@bieberkit/core';
 import { createDatabase, compileEntities } from '@bieberkit/data/orm';
 import type { EntityDef } from '@bieberkit/data';
 import { authEntities } from '@bieberkit/auth';
@@ -61,7 +61,14 @@ export async function seed(options: SeedOptions = {}): Promise<Seeded> {
     extra: envOwnersOf(project),
   });
   const entities = contributed<EntityDef<string>>(modules, 'entities');
-  const db = await createDatabase(env, { entities: [...compileEntities(entities), ...authEntities], audit: 'table' });
+  const db = await createDatabase(env, {
+    entities: [...compileEntities(entities), ...authEntities],
+    audit: 'table',
+    encryption: {
+      current: env.APP_KEY,
+      ...(env.APP_KEY_PREVIOUS === undefined ? {} : { previous: [env.APP_KEY_PREVIOUS] }),
+    },
+  });
   let platform: Awaited<ReturnType<typeof createRuntimePlatform>> | undefined;
   let result: Seeded;
   try {
@@ -78,6 +85,7 @@ export async function seed(options: SeedOptions = {}): Promise<Seeded> {
       db,
       ...platform,
       permissions: permissionCatalog(project, modules),
+      settings: contributed<SettingDef>(modules, 'settings'),
     });
     for (const module of modules) registerModule(container, module);
     await container.boot();

@@ -32,7 +32,7 @@ import {
 } from '@bieberkit/auth';
 import type { ScopedPermission } from '@bieberkit/auth';
 import { createContainer, createLifecycle, exitCode, loadEnv, parseRole, registerModule } from '@bieberkit/core';
-import type { EnvSource, Role } from '@bieberkit/core';
+import type { EnvSource, Role, SettingDef } from '@bieberkit/core';
 import type { EntityDef } from '@bieberkit/data';
 import { compileEntities, createDatabase, createOutboxDispatcher } from '@bieberkit/data/orm';
 import type { Database } from '@bieberkit/data/orm';
@@ -119,6 +119,11 @@ export async function boot(options: BootOptions): Promise<Running> {
     const db = await createDatabase(env, {
       entities: [...schemas, ...authEntities],
       audit: 'table',
+      // The key ring of encrypted fields, such as secret settings (SEC-08, SET-03).
+      encryption: {
+        current: env.APP_KEY,
+        ...(env.APP_KEY_PREVIOUS === undefined ? {} : { previous: [env.APP_KEY_PREVIOUS] }),
+      },
       logger,
       tracer,
       metrics,
@@ -157,6 +162,7 @@ export async function boot(options: BootOptions): Promise<Running> {
       db,
       ...platform,
       permissions: permissionCatalog(project, modules),
+      settings: contributed<SettingDef>(modules, 'settings'),
     });
     for (const module of modules) registerModule(container, module);
     await container.boot();

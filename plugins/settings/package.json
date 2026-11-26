@@ -47,8 +47,10 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
+    "@bieberkit/cache": "workspace:*",
     "@bieberkit/core": "workspace:*",
-    "@bieberkit/data": "workspace:*"
+    "@bieberkit/data": "workspace:*",
+    "@bieberkit/http": "workspace:*"
   },
   "devDependencies": {
     "@bieberkit/testing": "workspace:*"
@@ -69,7 +71,13 @@
     "tables": [
       "bk_settings"
     ],
-    "routes": [],
+    "routes": [
+      "DELETE /api/v1/settings/settings/:key",
+      "GET /api/v1/settings/public",
+      "GET /api/v1/settings/settings",
+      "GET /api/v1/settings/settings/:key",
+      "PUT /api/v1/settings/settings/:key"
+    ],
     "permissions": [
       "settings.manage",
       "settings.read"

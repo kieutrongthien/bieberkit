@@ -22,6 +22,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { randomBytes } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { ModuleDef } from '@bieberkit/core';
@@ -58,7 +59,8 @@ export async function loadApp(cwd: string): Promise<App> {
   const schemas = compileEntities(entities);
   const db = await createDatabase(
     { DB_CONNECTION: 'sqlite', DATABASE_URL: ':memory:', DATABASE_READ_URLS: [], DB_POOL_MAX: 1 },
-    { entities: schemas },
+    // The database only lists routes and holds no data, so a key made here is enough for encrypted fields to open it.
+    { entities: schemas, encryption: { current: randomBytes(32).toString('base64') } },
   );
   try {
     const routes = [

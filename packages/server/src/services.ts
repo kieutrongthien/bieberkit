@@ -23,7 +23,7 @@
  */
 
 import { buildPermissionRegistry, createAuth } from '@bieberkit/auth';
-import type { Container, CoreEnv, Logger, ModuleDef } from '@bieberkit/core';
+import type { Container, CoreEnv, Logger, ModuleDef, SettingDef } from '@bieberkit/core';
 import type { Cache } from '@bieberkit/cache';
 import { createCacheFromConfig } from '@bieberkit/cache/bentocache';
 import { MAIL_JOB, parseSender } from '@bieberkit/mail';
@@ -103,12 +103,14 @@ export function registerRuntimeServices(
     extra: Readonly<Record<string, unknown>>;
     db: Database;
     permissions: readonly string[];
+    /** The `settings` contributions of the modules (SET-01). */
+    settings: readonly SettingDef[];
     mail: Mail;
     queue: Queue;
     cache: Cache;
   },
 ): void {
-  const { env, extra, db, permissions, mail, queue, cache } = input;
+  const { env, extra, db, permissions, settings, mail, queue, cache } = input;
   container.register('mail', { scope: 'singleton', create: () => mail });
   container.register('queue', { scope: 'singleton', create: () => queue });
   container.register('cache', { scope: 'singleton', create: () => cache });
@@ -116,6 +118,7 @@ export function registerRuntimeServices(
   container.register('pluginEnv', { scope: 'singleton', create: () => extra });
   container.register('storage', { scope: 'singleton', create: (): Storage => createStorageFromConfig(env) });
   container.register('permissions', { scope: 'singleton', create: () => permissions });
+  container.register('settingDeclarations', { scope: 'singleton', create: () => settings });
   container.register('database', { scope: 'singleton', create: () => db });
   container.register('auth', {
     scope: 'singleton',

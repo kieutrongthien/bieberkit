@@ -116,8 +116,13 @@ describe('SET-01 defineSetting', () => {
     expectTypeOf(
       defineSetting({ key: 'site.locale', type: 'enum', values: ['en', 'vi'] as const, default: 'vi', label }).default,
     ).toEqualTypeOf<'en' | 'vi'>();
-    expectTypeOf(
-      defineSetting({ key: 'site.theme', type: 'json', parser: colors, default: { primary: '#123456' }, label }).check,
-    ).returns.toEqualTypeOf<{ primary: string }>();
+    const theme = defineSetting({
+      key: 'site.theme',
+      type: 'json',
+      parser: colors,
+      default: { primary: '#123456' },
+      label,
+    });
+    expectTypeOf(theme).toEqualTypeOf<SettingDef<{ primary: string }>>();
   });
 });

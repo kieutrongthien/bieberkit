@@ -24,6 +24,7 @@
 
 import type { CoreEnv } from '../config/core-env.ts';
 import { BkError, ContainerError } from '../errors/errors.ts';
+import type { SettingDef } from '../settings/define-setting.ts';
 
 /**
  * Names and types of the services. Packages and modules add theirs by declaration merging:
@@ -34,6 +35,8 @@ export interface ServiceRegistry {
   config: CoreEnv;
   /** The validated values of the env keys that plugins declare, by key (`USERS_ADMIN_EMAIL`). */
   pluginEnv: Readonly<Record<string, unknown>>;
+  /** Every setting that the modules declare, in module order (SET-01). The settings plugin checks and serves them. */
+  settingDeclarations: readonly SettingDef[];
 }
 
 export type ServiceName = Extract<keyof ServiceRegistry, string>;

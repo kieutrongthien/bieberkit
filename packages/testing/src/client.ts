@@ -37,6 +37,8 @@ export interface Client {
   get(url: string, headers?: Record<string, string>): Promise<Reply>;
   post(url: string, payload?: object, headers?: Record<string, string>): Promise<Reply>;
   /** `version` is the version that the caller read, sent as `If-Match` (API-13). */
+  /** Replaces the resource at `url`, as a settings value is written (SET-02). */
+  put(url: string, payload: object, headers?: Record<string, string>): Promise<Reply>;
   patch(url: string, payload: object, version: number, headers?: Record<string, string>): Promise<Reply>;
   delete(url: string, version: number, headers?: Record<string, string>): Promise<Reply>;
 }
@@ -54,7 +56,7 @@ function bodyOf(text: string): Record<string, unknown> {
 /** A client of `server` that calls as `userId` in `tenant`. Without a user the request has no principal. */
 export function createClient(server: HttpServer, userId: string | undefined, tenant: () => string): Client {
   const send = async (
-    method: 'GET' | 'POST' | 'PATCH' | 'DELETE',
+    method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
     url: string,
     payload: object | undefined,
     headers: Record<string, string>,
@@ -70,6 +72,7 @@ export function createClient(server: HttpServer, userId: string | undefined, ten
   return {
     get: (url, headers = {}) => send('GET', url, undefined, headers),
     post: (url, payload, headers = {}) => send('POST', url, payload ?? {}, headers),
+    put: (url, payload, headers = {}) => send('PUT', url, payload, headers),
     patch: (url, payload, version, headers = {}) =>
       send('PATCH', url, payload, { 'if-match': String(version), ...headers }),
     delete: (url, version, headers = {}) => send('DELETE', url, undefined, { 'if-match': String(version), ...headers }),
