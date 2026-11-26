@@ -49,7 +49,11 @@
   "dependencies": {
     "@bieberkit/auth": "workspace:*",
     "@bieberkit/core": "workspace:*",
-    "@bieberkit/data": "workspace:*"
+    "@bieberkit/data": "workspace:*",
+    "@bieberkit/http": "workspace:*",
+    "@bieberkit/mail": "workspace:*",
+    "@bieberkit/queue": "workspace:*",
+    "zod": "4.6.7"
   },
   "devDependencies": {
     "@bieberkit/testing": "workspace:*"
@@ -66,15 +70,27 @@
     ],
     "requires": {},
     "conflicts": [],
-    "env": [],
+    "env": [
+      "NOTIFICATIONS_RETENTION_DAYS"
+    ],
     "tables": [
+      "bk_notification_preferences",
       "bk_notifications"
     ],
-    "routes": [],
+    "routes": [
+      "DELETE /api/v1/notifications/me/:id",
+      "GET /api/v1/notifications/me",
+      "GET /api/v1/notifications/me/preferences",
+      "GET /api/v1/notifications/me/unread-count",
+      "POST /api/v1/notifications/me/:id/read",
+      "POST /api/v1/notifications/me/read-all",
+      "POST /api/v1/notifications/send",
+      "PUT /api/v1/notifications/me/preferences"
+    ],
     "permissions": [
       "notifications.manage",
       "notifications.read",
-      "notifications.update"
+      "notifications.send"
     ],
     "admin": []
   }

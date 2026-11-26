@@ -625,6 +625,18 @@ importers:
       '@bieberkit/data':
         specifier: workspace:*
         version: link:../../packages/data
+      '@bieberkit/http':
+        specifier: workspace:*
+        version: link:../../packages/http
+      '@bieberkit/mail':
+        specifier: workspace:*
+        version: link:../../packages/mail
+      '@bieberkit/queue':
+        specifier: workspace:*
+        version: link:../../packages/queue
+      zod:
+        specifier: 4.6.7
+        version: 4.6.7
     devDependencies:
       '@bieberkit/testing':
         specifier: workspace:*

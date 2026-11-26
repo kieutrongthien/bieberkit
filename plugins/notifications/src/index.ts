@@ -2,7 +2,7 @@
  * BieberKit
  *
  * @file        plugins/notifications/src/index.ts
- * @description The notifications plugin: a title, a text and a read time for a user, read and marked as read by the user alone (read-own and update-own), and managed by an administrator.
+ * @description The notifications plugin: the tables, the notifier service that other plugins send with, the routes of the signed-in person and of support, preferences, and the jobs that expand a role and prune old notifications (NTF-01 to NTF-07).
  * @author      Bieber Kieu <kieutrongthien@gmail.com>
  * @copyright   Copyright (c) 2026 Bieber Kieu
  * @license     Apache-2.0
@@ -22,37 +22,26 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { definePlugin } from '@bieberkit/core';
+import { definePlugin, env } from '@bieberkit/core';
 import type { PluginDef } from '@bieberkit/core';
 import type { ScopedPermission } from '@bieberkit/auth';
-import { defineEntity, f } from '@bieberkit/data';
-import type { EntityDef } from '@bieberkit/data';
+import { Notification, Preference } from './entity.ts';
+import { createNotifier, expandJob, pruneJob, subscriptions } from './notifier.ts';
+import type { Notifier } from './notifier.ts';
+import { routes } from './routes.ts';
 
-/** A notification for one user. `userId` is the id of the user in `bk_auth_users`. */
-export const Notification: EntityDef<'notifications.Notification'> = defineEntity({
-  name: 'notifications.Notification',
-  table: 'bk_notifications',
-  fields: {
-    id: f.id(),
-    userId: f.string({ min: 36, max: 36 }).index(),
-    title: f.string({ min: 1, max: 200 }),
-    body: f.text({ max: 5000 }).optional(),
-    readAt: f.dateTime().optional(),
-    createdAt: f.createdAt(),
-    updatedAt: f.updatedAt(),
-  },
-  permissions: {
-    read: 'notifications.read',
-    create: 'notifications.manage',
-    update: 'notifications.update',
-    delete: 'notifications.manage',
-  },
-  api: { list: true, get: true, create: true, update: true, delete: true },
-  label: { en: 'Notification' },
-  admin: { title: 'title', list: ['title', 'userId', 'readAt', 'createdAt'], icon: 'bell' },
-});
+export { Notification, Preference } from './entity.ts';
+export { expandJob, pruneJob } from './notifier.ts';
+export type { Channel, Level, Notifier, SendInput, SendResult } from './notifier.ts';
 
-/** What a user may do with his own notifications: read them and mark them as read. The condition is the user of the request. */
+declare module '@bieberkit/core' {
+  interface ServiceRegistry {
+    /** Sends a notification in the transaction of the caller (NTF-01). */
+    notifier: Notifier;
+  }
+}
+
+/** What a user may do with their own notifications. The routes of the person also filter by the user of the request. */
 export const scopedPermissions: Readonly<Record<string, ScopedPermission>> = {
   'notifications.read-own': {
     subject: 'notifications.Notification',
@@ -64,6 +53,11 @@ export const scopedPermissions: Readonly<Record<string, ScopedPermission>> = {
     action: 'update',
     when: (user) => ({ userId: user.id }),
   },
+  'notifications.delete-own': {
+    subject: 'notifications.Notification',
+    action: 'delete',
+    when: (user) => ({ userId: user.id }),
+  },
 };
 
 import pkg from '../package.json' with { type: 'json' };
@@ -73,9 +67,33 @@ const plugin: PluginDef = definePlugin({
   version: pkg.version,
   core: '*',
   dialects: ['postgres', 'mysql', 'sqlite'],
-  permissions: ['notifications.read', 'notifications.manage', 'notifications.update'],
-  entities: [Notification],
+  env: {
+    NOTIFICATIONS_RETENTION_DAYS: env
+      .int({ min: 1, max: 3650 })
+      .default(90)
+      .describe('Days that a read notification is kept before the prune job deletes it (NTF-05)'),
+  },
+  permissions: ['notifications.read', 'notifications.manage', 'notifications.send'],
+  entities: [Notification, Preference],
+  routes,
+  jobs: [expandJob, pruneJob],
+  subscriptions,
+  schedules: [{ job: pruneJob, cron: '17 3 * * *' }],
   scopedPermissions,
+  services: {
+    notifier: {
+      scope: 'singleton',
+      deps: ['database', 'mail', 'pluginEnv'],
+      create: (services) => {
+        const days = services.pluginEnv['NOTIFICATIONS_RETENTION_DAYS'];
+        return createNotifier({
+          db: services.database,
+          mail: services.mail,
+          retentionDays: typeof days === 'number' ? days : 90,
+        });
+      },
+    },
+  },
 });
 
 export default plugin;
