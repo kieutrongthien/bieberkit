@@ -2,7 +2,7 @@
  * BieberKit
  *
  * @file        plugins/media/src/index.ts
- * @description The media plugin: a record for each file in the storage, with a signed upload URL and a confirmation that checks what the browser sent (S-01, S-02, spec section 12).
+ * @description The media plugin: files of a tenant in the storage, with signed uploads, read URLs, folders, limits and deletion after commit (S-01, S-02, MED-01 to MED-08).
  * @author      Bieber Kieu <kieutrongthien@gmail.com>
  * @copyright   Copyright (c) 2026 Bieber Kieu
  * @license     Apache-2.0
@@ -22,125 +22,47 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { definePlugin } from '@bieberkit/core';
+import { definePlugin, env } from '@bieberkit/core';
 import type { PluginDef } from '@bieberkit/core';
-import { defineEntity, f } from '@bieberkit/data';
-import type { EntityDef } from '@bieberkit/data';
-import { runInTransaction, runInUnitOfWork } from '@bieberkit/data/orm';
-import { defineRoute, HttpError } from '@bieberkit/http';
-import type { RouteContext, RouteDef } from '@bieberkit/http';
+import { Folder, Media } from './entity.ts';
+import { routes } from './routes.ts';
+import {
+  createMediaService,
+  DEFAULT_ALLOWED_TYPES,
+  deleteObjectJob,
+  prunePendingJob,
+  subscriptions,
+} from './service.ts';
+import type { MediaService } from './service.ts';
 
-const ENTITY = 'media.Media';
+export { Folder, Media } from './entity.ts';
+export { DEFAULT_ALLOWED_TYPES, deleteObjectJob, kindOf, pathOf, prunePendingJob } from './service.ts';
+export type { FolderView, MediaLimits, MediaService, MediaView } from './service.ts';
 
-/** One file: its name, its type and its size as the person said them, and whether the bytes arrived (`ready`) or not (`pending`). */
-export const Media: EntityDef<'media.Media'> = defineEntity({
-  name: ENTITY,
-  table: 'bk_media',
-  fields: {
-    id: f.id(),
-    filename: f.string({ min: 1, max: 200 }),
-    contentType: f.string({ min: 3, max: 120 }),
-    size: f.int({ min: 1 }),
-    status: f.oneOf(['pending', 'ready']).default('pending'),
-    createdAt: f.createdAt(),
-    updatedAt: f.updatedAt(),
-  },
-  permissions: { read: 'media.read', create: 'media.upload', update: 'media.manage', delete: 'media.manage' },
-  api: { list: true, get: true, create: true, delete: true },
-  label: { en: 'Media' },
-  admin: { title: 'filename', list: ['filename', 'contentType', 'size', 'status', 'createdAt'], icon: 'picture' },
-});
-
-/** Where the file lives in the storage. The path comes from the id, so two files with one name never meet. */
-export const pathOf = (row: { readonly id: string; readonly filename: string }): string =>
-  `media/${row.id}/${row.filename}`;
-
-interface MediaRow {
-  id: string;
-  filename: string;
-  contentType: string;
-  size: number;
-  status: string;
+declare module '@bieberkit/core' {
+  interface ServiceRegistry {
+    /** The files of the tenant of the request (MED-01 to MED-08). */
+    media: MediaService;
+  }
 }
 
-const isRow = (value: unknown): value is MediaRow =>
-  typeof value === 'object' && value !== null && typeof Reflect.get(value, 'id') === 'string';
+const MB = 1024 * 1024;
 
-async function findRow(ctx: RouteContext): Promise<MediaRow> {
-  const id = String(ctx.params['id']);
-  const row: unknown = await runInUnitOfWork(ctx.services.database, (em) =>
-    em.findOne(em.getMetadata().getByClassName(ENTITY).class, { id }),
-  );
-  if (!isRow(row)) throw new HttpError('MEDIA_NOT_FOUND', 404, 'The file does not exist.', 'Check the id of the file.');
-  return row;
-}
+/** A whole number from the env, or the default. The test app hands values over as they were given. */
+const numberOf = (value: unknown, fallback: number | undefined): number | undefined =>
+  typeof value === 'number' ? value : typeof value === 'string' && /^\d+$/.test(value) ? Number(value) : fallback;
 
-const params = { type: 'object', properties: { id: { type: 'string', format: 'uuid' } }, required: ['id'] } as const;
+const typesOf = (value: unknown): readonly string[] =>
+  Array.isArray(value)
+    ? value.map(String)
+    : typeof value === 'string' && value.trim() !== ''
+      ? value
+          .split(',')
+          .map((type) => type.trim().toLowerCase())
+          .filter((type) => type !== '')
+      : DEFAULT_ALLOWED_TYPES;
 
-const uploadUrl: RouteDef = defineRoute({
-  method: 'POST',
-  url: '/api/v1/media/media/:id/upload-url',
-  permission: 'media.upload',
-  schema: {
-    params,
-    response: {
-      200: {
-        type: 'object',
-        properties: {
-          url: { type: 'string' },
-          method: { type: 'string' },
-          headers: { type: 'object', additionalProperties: { type: 'string' } },
-          expiresAt: { type: 'number' },
-        },
-        required: ['url', 'method', 'headers', 'expiresAt'],
-      },
-    },
-  },
-  async handler(ctx) {
-    const row = await findRow(ctx);
-    if (row.status === 'ready')
-      throw new HttpError(
-        'MEDIA_ALREADY_READY',
-        409,
-        'The file was uploaded already.',
-        'Make a new record for a new file.',
-      );
-    const signed = await ctx.services.storage.signedUploadUrl(pathOf(row), {
-      contentType: row.contentType,
-      size: row.size,
-    });
-    return { url: signed.url, method: signed.method, headers: signed.headers, expiresAt: signed.expiresAt };
-  },
-});
-
-const confirm: RouteDef = defineRoute({
-  method: 'POST',
-  url: '/api/v1/media/media/:id/confirm',
-  permission: 'media.upload',
-  schema: {
-    params,
-    response: {
-      200: {
-        type: 'object',
-        properties: { id: { type: 'string' }, status: { type: 'string' }, size: { type: 'number' } },
-        required: ['id', 'status', 'size'],
-      },
-    },
-  },
-  async handler(ctx) {
-    const row = await findRow(ctx);
-    // The storage checks the size, the type that the bytes really are, and the policy. It deletes a file that fails (S-02).
-    const stored = await ctx.services.storage.confirmUpload(pathOf(row));
-    await runInTransaction(ctx.services.database, async (em) => {
-      const current: unknown = await em.findOneOrFail(em.getMetadata().getByClassName(ENTITY).class, { id: row.id });
-      if (!isRow(current)) throw new Error('The media row is not a row.');
-      current.status = 'ready';
-      current.size = stored.size;
-      await em.flush();
-    });
-    return { id: row.id, status: 'ready', size: stored.size };
-  },
-});
+const MIME = /^[a-z0-9][a-z0-9!#$&^_.+-]*\/[a-z0-9][a-z0-9!#$&^_.+-]*$/;
 
 import pkg from '../package.json' with { type: 'json' };
 
@@ -149,9 +71,53 @@ const plugin: PluginDef = definePlugin({
   version: pkg.version,
   core: '*',
   dialects: ['postgres', 'mysql', 'sqlite'],
+  env: {
+    MEDIA_MAX_SIZE_MB: env
+      .int({ min: 1, max: 5120 })
+      .default(25)
+      .describe('The largest file, in MB, checked before a signed upload URL is given (MED-07)'),
+    MEDIA_ALLOWED_TYPES: env
+      .custom<readonly string[]>('a comma-separated list of MIME types', (text) => {
+        const types = typesOf(text);
+        return types.length > 0 && types.every((type) => MIME.test(type)) ? { value: types } : undefined;
+      })
+      .default(DEFAULT_ALLOWED_TYPES)
+      .describe('The MIME types that may be uploaded (MED-07). Defaults to images, PDF, text, CSV and Office files'),
+    MEDIA_TENANT_QUOTA_MB: env
+      .int({ min: 1 })
+      .optional()
+      .describe('The MB of files that one tenant may hold. No quota when unset (MED-07)'),
+    MEDIA_PENDING_TTL_HOURS: env
+      .int({ min: 1, max: 8760 })
+      .default(24)
+      .describe('Hours that a file may wait for its upload before the prune job deletes it (MED-03)'),
+  },
   permissions: ['media.read', 'media.upload', 'media.manage'],
-  entities: [Media],
-  routes: [uploadUrl, confirm],
+  entities: [Media, Folder],
+  routes,
+  jobs: [deleteObjectJob, prunePendingJob],
+  subscriptions,
+  schedules: [{ job: prunePendingJob, cron: '41 * * * *' }],
+  services: {
+    media: {
+      scope: 'singleton',
+      deps: ['database', 'storage', 'pluginEnv'],
+      create: (services) => {
+        const values = services.pluginEnv;
+        const quota = numberOf(values['MEDIA_TENANT_QUOTA_MB'], undefined);
+        return createMediaService({
+          db: services.database,
+          storage: services.storage,
+          limits: {
+            maxBytes: (numberOf(values['MEDIA_MAX_SIZE_MB'], 25) ?? 25) * MB,
+            allowedTypes: typesOf(values['MEDIA_ALLOWED_TYPES']),
+            ...(quota === undefined ? {} : { quotaBytes: quota * MB }),
+          },
+          pendingTtlHours: numberOf(values['MEDIA_PENDING_TTL_HOURS'], 24) ?? 24,
+        });
+      },
+    },
+  },
 });
 
 export default plugin;

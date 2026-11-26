@@ -606,9 +606,18 @@ importers:
       '@bieberkit/http':
         specifier: workspace:*
         version: link:../../packages/http
+      '@bieberkit/queue':
+        specifier: workspace:*
+        version: link:../../packages/queue
       '@bieberkit/storage':
         specifier: workspace:*
         version: link:../../packages/storage
+      '@mikro-orm/core':
+        specifier: 7.2.9
+        version: 7.2.9
+      zod:
+        specifier: 4.6.7
+        version: 4.6.7
     devDependencies:
       '@bieberkit/testing':
         specifier: workspace:*

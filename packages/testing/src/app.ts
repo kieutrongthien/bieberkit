@@ -37,7 +37,7 @@ import { createHttpServer, registerEntityRoutes } from '@bieberkit/http';
 import type { HttpServer, Principal, RouteDef } from '@bieberkit/http';
 import { applySubscriptions, createQueue } from '@bieberkit/queue';
 import { createMemoryDisk, createStorage } from '@bieberkit/storage';
-import type { MemoryDisk } from '@bieberkit/storage';
+import type { MemoryDisk, MemoryDiskOptions } from '@bieberkit/storage';
 import type { JobDef, Queue, QueueSubscription } from '@bieberkit/queue';
 import { createClient, TENANT_HEADER, USER_HEADER } from './client.ts';
 import type { Client } from './client.ts';
@@ -70,6 +70,8 @@ export interface TestAppOptions {
   readonly tenant?: string;
   /** The values of the env keys that plugins declare, for the services of the app. */
   readonly pluginEnv?: Readonly<Record<string, unknown>>;
+  /** The options of the memory disk behind `storage`. Defaults to a disk that signs URLs and has no public URL. */
+  readonly disk?: MemoryDiskOptions;
 }
 
 export interface TestApp {
@@ -182,7 +184,7 @@ export async function createTestApp(options: TestAppOptions = {}): Promise<TestA
     container.register('cache', { scope: 'singleton', create: () => cache });
     container.register('config', { scope: 'singleton', create: () => env });
     container.register('pluginEnv', { scope: 'singleton', create: () => options.pluginEnv ?? {} });
-    const disk = createMemoryDisk({ signing: true });
+    const disk = createMemoryDisk({ signing: true, ...options.disk });
     container.register('storage', { scope: 'singleton', create: () => createStorage({ disk }) });
     container.register('permissions', { scope: 'singleton', create: () => everything });
     container.register('settingDeclarations', {

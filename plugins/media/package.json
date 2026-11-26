@@ -50,7 +50,10 @@
     "@bieberkit/core": "workspace:*",
     "@bieberkit/data": "workspace:*",
     "@bieberkit/http": "workspace:*",
-    "@bieberkit/storage": "workspace:*"
+    "@bieberkit/queue": "workspace:*",
+    "@bieberkit/storage": "workspace:*",
+    "@mikro-orm/core": "7.2.9",
+    "zod": "4.6.7"
   },
   "devDependencies": {
     "@bieberkit/testing": "workspace:*"
@@ -67,11 +70,28 @@
     ],
     "requires": {},
     "conflicts": [],
-    "env": [],
+    "env": [
+      "MEDIA_ALLOWED_TYPES",
+      "MEDIA_MAX_SIZE_MB",
+      "MEDIA_PENDING_TTL_HOURS",
+      "MEDIA_TENANT_QUOTA_MB"
+    ],
     "tables": [
-      "bk_media"
+      "bk_media",
+      "bk_media_folders"
     ],
     "routes": [
+      "DELETE /api/v1/media/folders/:id",
+      "DELETE /api/v1/media/media/:id",
+      "GET /api/v1/media/folders",
+      "GET /api/v1/media/media",
+      "GET /api/v1/media/media/:id",
+      "GET /api/v1/media/media/:id/content",
+      "GET /api/v1/media/media/:id/url",
+      "PATCH /api/v1/media/folders/:id",
+      "PATCH /api/v1/media/media/:id",
+      "POST /api/v1/media/folders",
+      "POST /api/v1/media/media",
       "POST /api/v1/media/media/:id/confirm",
       "POST /api/v1/media/media/:id/upload-url"
     ],
