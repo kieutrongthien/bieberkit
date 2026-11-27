@@ -29,5 +29,16 @@ export const packageName = '@bieberkit/admin-core';
 
 export { AdminApiError, createAdminClient } from './client.ts';
 export type { AdminClient, AdminClientOptions, FieldProblem } from './client.ts';
+export {
+  formatDate,
+  formatDateTime,
+  formatMoney,
+  formatNumber,
+  LOCALES,
+  localeOf,
+  MESSAGES,
+  translator,
+} from './i18n.ts';
+export type { Locale, MessageKey } from './i18n.ts';
 export { allows, bodyOf, columnsOf, formFieldsOf, initialValues, labelOf, listFields } from './screens.ts';
 export type { ListParams, Meta, MetaEntity, MetaField, MetaMenuItem, Page, Row, SessionUser } from './types.ts';

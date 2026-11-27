@@ -345,7 +345,7 @@ Execution order: M2.1 through M2.7, then the reviewed npm release, then M1.10 Pi
 - [ ] Generic list with filters, saved views, bulk actions, export; form with `visibleWhen`, `requiredWhen`, inline child tables, relation pickers, file fields; detail with tabs (UI-03, UI-11)
 - [ ] Lazy chunks per route, per-language translations, virtualized lists, prefetch, optimistic updates (UI-12, UI-13, UI-15)
 - [ ] Mobile layout to 360 px, unsaved-change guard, local drafts, shortcuts, 412 conflict view, error boundaries, offline banner (UI-16 to UI-19)
-- [ ] Languages en, vi, zh; font stack; theme tokens (UI-05, UI-06, TOK-01 to TOK-03)
+- [x] Languages en, vi, zh; font stack; theme tokens (UI-05, UI-06, TOK-01 to TOK-03). Evidence: `admin-core/src/i18n.test.ts`, `tokens/src/theme.test.ts`, the `UI-06` cases of `server/src/admin.test.ts`; the screens are typechecked and built, and the Playwright run needs the browser of the pinned version, which this machine does not have
 - [ ] Hashed assets kept 24 hours after deploy; reload on chunk error (UI-22)
 - [ ] Custom widgets, replacement pages, plugin pages and dashboard widgets (UI-04)
 - [x] `@bieberkit/tokens` compiling to Ant Design theme and CSS variables. Also a Tailwind theme and the `theme` key of the config; evidence: `tokens/src/theme.test.ts`, the `UI-06` cases of `server/src/admin.test.ts`

@@ -31,12 +31,13 @@ import type { TableColumnsType } from 'antd';
 import { useState } from 'react';
 import type { JSX } from 'react';
 import { useClient, useEntity } from './context.ts';
+import { useLanguage, useT } from './language.tsx';
 
 const PAGE_SIZE = 25;
 
-const show = (value: unknown): string => {
+const show = (value: unknown, t: (key: 'common.yes' | 'common.no') => string): string => {
   if (value === null || value === undefined) return '';
-  if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+  if (typeof value === 'boolean') return value ? t('common.yes') : t('common.no');
   if (typeof value === 'object') return JSON.stringify(value);
   return typeof value === 'string' || typeof value === 'number' || typeof value === 'bigint' ? String(value) : '';
 };
@@ -46,6 +47,8 @@ function Rows(props: { readonly entity: MetaEntity }): JSX.Element {
   const client = useClient();
   const queries = useQueryClient();
   const { message } = App.useApp();
+  const t = useT();
+  const { locale } = useLanguage();
   const [page, setPage] = useState(1);
   const [sort, setSort] = useState<string | undefined>();
   const where = entity.path.replace('/api/v1/', '');
@@ -63,10 +66,10 @@ function Rows(props: { readonly entity: MetaEntity }): JSX.Element {
   const remove = async (row: Row): Promise<void> => {
     try {
       await client.remove(entity, String(row['id']), Number(row['version']));
-      void message.success('Deleted');
+      void message.success(t('list.deleted'));
       await queries.invalidateQueries({ queryKey: ['list', entity.name] });
     } catch (error) {
-      void message.error(error instanceof Error ? error.message : 'The row was not deleted');
+      void message.error(error instanceof Error ? error.message : t('list.notDeleted'));
     }
   };
 
@@ -77,9 +80,9 @@ function Rows(props: { readonly entity: MetaEntity }): JSX.Element {
     ...(field.sortable ? { sorter: true } : {}),
     render: (value: unknown, row: Row) =>
       index === 0 && entity.operations.get ? (
-        <Link to={`/${where}/${String(row['id'])}`}>{show(value) || String(row['id'])}</Link>
+        <Link to={`/${where}/${String(row['id'])}`}>{show(value, t) || String(row['id'])}</Link>
       ) : (
-        show(value)
+        show(value, t)
       ),
   }));
   if (allows(entity, 'delete')) {
@@ -87,9 +90,9 @@ function Rows(props: { readonly entity: MetaEntity }): JSX.Element {
       title: '',
       key: '_actions',
       render: (_value: unknown, row: Row) => (
-        <Popconfirm title="Delete this row?" okText="Delete" onConfirm={() => void remove(row)}>
+        <Popconfirm title={t('list.confirmDelete')} okText={t('common.delete')} onConfirm={() => void remove(row)}>
           <Button danger size="small">
-            Delete
+            {t('common.delete')}
           </Button>
         </Popconfirm>
       ),
@@ -98,17 +101,17 @@ function Rows(props: { readonly entity: MetaEntity }): JSX.Element {
 
   return (
     <Card
-      title={labelOf(entity, 'en')}
+      title={labelOf(entity, locale)}
       extra={
         allows(entity, 'create') ? (
           <Link to={`/${where}/new`}>
-            <Button type="primary">New</Button>
+            <Button type="primary">{t('list.new')}</Button>
           </Link>
         ) : null
       }
     >
       {list.isError ? (
-        <Result status="error" title="The list could not be loaded" subTitle={list.error.message} />
+        <Result status="error" title={t('list.loadError')} subTitle={list.error.message} />
       ) : (
         <Table<Row>
           rowKey={(row) => String(row['id'])}
@@ -135,8 +138,8 @@ function Rows(props: { readonly entity: MetaEntity }): JSX.Element {
 
 export function ListScreen(): JSX.Element {
   const { entity, loading } = useEntity();
+  const t = useT();
   if (loading) return <Card loading />;
-  if (entity === undefined || !entity.can.read)
-    return <Result status="404" title="This screen does not exist, or it is not open to you." />;
+  if (entity === undefined || !entity.can.read) return <Result status="404" title={t('list.missing')} />;
   return <Rows entity={entity} />;
 }

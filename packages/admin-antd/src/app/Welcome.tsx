@@ -27,21 +27,24 @@ import { Link } from '@tanstack/react-router';
 import { Card, Empty, List, Typography } from 'antd';
 import type { JSX } from 'react';
 import { useMeta } from './context.ts';
+import { useLanguage, useT } from './language.tsx';
 
 export function Welcome(): JSX.Element {
   const meta = useMeta();
+  const t = useT();
+  const { locale } = useLanguage();
   const entities = (meta.data?.entities ?? []).filter((entity) => entity.operations.list && entity.can.read);
   return (
     <Card loading={meta.isPending}>
-      <Typography.Title level={3}>Welcome</Typography.Title>
+      <Typography.Title level={3}>{t('welcome.title')}</Typography.Title>
       {entities.length === 0 ? (
-        <Empty description="Nothing here is open to you yet. Ask an administrator for a role." />
+        <Empty description={t('welcome.empty')} />
       ) : (
         <List
           dataSource={entities}
           renderItem={(entity) => (
             <List.Item>
-              <Link to={`/${entity.path.replace('/api/v1/', '')}`}>{labelOf(entity, 'en')}</Link>
+              <Link to={`/${entity.path.replace('/api/v1/', '')}`}>{labelOf(entity, locale)}</Link>
             </List.Item>
           )}
         />

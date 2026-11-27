@@ -28,6 +28,7 @@ import { Alert, Button, Card, Form, Input, Typography } from 'antd';
 import { useState } from 'react';
 import type { JSX } from 'react';
 import { useClient } from './context.ts';
+import { useT } from './language.tsx';
 
 interface Values {
   readonly email: string;
@@ -35,6 +36,7 @@ interface Values {
 }
 
 export function Login(): JSX.Element {
+  const t = useT();
   const client = useClient();
   const queries = useQueryClient();
   const [failure, setFailure] = useState<string | undefined>();
@@ -47,7 +49,7 @@ export function Login(): JSX.Element {
       await client.signIn(values.email, values.password);
       await queries.invalidateQueries();
     } catch (error) {
-      setFailure(error instanceof AdminApiError ? error.message : 'The server did not answer. Try again.');
+      setFailure(error instanceof AdminApiError ? error.message : t('auth.noAnswer'));
     } finally {
       setBusy(false);
     }
@@ -56,17 +58,17 @@ export function Login(): JSX.Element {
   return (
     <main style={{ display: 'grid', placeItems: 'center', minHeight: '100vh', padding: 16 }}>
       <Card style={{ width: 360, maxWidth: '100%' }}>
-        <Typography.Title level={3}>Sign in</Typography.Title>
+        <Typography.Title level={3}>{t('auth.signIn.title')}</Typography.Title>
         {failure === undefined ? null : <Alert type="error" showIcon message={failure} style={{ marginBottom: 16 }} />}
         <Form<Values> layout="vertical" onFinish={(values) => void submit(values)} requiredMark={false}>
-          <Form.Item label="Email" name="email" rules={[{ required: true, type: 'email' }]}>
+          <Form.Item label={t('auth.email')} name="email" rules={[{ required: true, type: 'email' }]}>
             <Input autoComplete="username" autoFocus />
           </Form.Item>
-          <Form.Item label="Password" name="password" rules={[{ required: true }]}>
+          <Form.Item label={t('auth.password')} name="password" rules={[{ required: true }]}>
             <Input.Password autoComplete="current-password" />
           </Form.Item>
           <Button type="primary" htmlType="submit" loading={busy} block>
-            Sign in
+            {t('auth.signIn')}
           </Button>
         </Form>
       </Card>

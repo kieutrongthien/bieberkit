@@ -28,6 +28,7 @@ import { createRootRoute, createRoute, createRouter, RouterProvider } from '@tan
 import { compileAntdTheme, modeOf, readTheme } from '@bieberkit/tokens';
 import { App as AntApp, ConfigProvider, theme as antTheme } from 'antd';
 import { useEffect, useState } from 'react';
+import { antdLocaleOf, initialLocale, LanguageContext } from './language.tsx';
 import type { JSX } from 'react';
 import { Welcome } from './Welcome.tsx';
 import { FormScreen } from './FormScreen.tsx';
@@ -73,20 +74,27 @@ function useSystemDark(): boolean {
 
 export function App(): JSX.Element {
   const mode = modeOf(brand, useSystemDark());
+  const [locale, setLocale] = useState(initialLocale);
+  useEffect(() => {
+    document.documentElement.lang = locale;
+  }, [locale]);
   const compiled = compileAntdTheme(brand, mode);
   return (
     <ConfigProvider
+      locale={antdLocaleOf(locale)}
       theme={{
         token: compiled.token,
         algorithm: compiled.algorithm === 'dark' ? antTheme.darkAlgorithm : antTheme.defaultAlgorithm,
       }}
     >
       <AntApp>
-        <ClientContext.Provider value={client}>
-          <QueryClientProvider client={queries}>
-            <RouterProvider router={router} />
-          </QueryClientProvider>
-        </ClientContext.Provider>
+        <LanguageContext.Provider value={{ locale, setLocale }}>
+          <ClientContext.Provider value={client}>
+            <QueryClientProvider client={queries}>
+              <RouterProvider router={router} />
+            </QueryClientProvider>
+          </ClientContext.Provider>
+        </LanguageContext.Provider>
       </AntApp>
     </ConfigProvider>
   );

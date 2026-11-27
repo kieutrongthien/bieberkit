@@ -30,6 +30,7 @@ import { Alert, App, Button, Card, Form, Input, InputNumber, Result, Select, Spa
 import { useState } from 'react';
 import type { ChangeEvent, JSX } from 'react';
 import { useClient, useEntity } from './context.ts';
+import { useLanguage, useT } from './language.tsx';
 
 /** The value of a field as its control holds it: a `datetime-local` input wants `YYYY-MM-DDTHH:mm`. */
 function toControl(field: MetaField, value: unknown): unknown {
@@ -97,6 +98,8 @@ function Editor(props: { readonly entity: MetaEntity; readonly row?: Row | undef
   const queries = useQueryClient();
   const navigate = useNavigate();
   const { message } = App.useApp();
+  const t = useT();
+  const { locale } = useLanguage();
   const [form] = Form.useForm<Record<string, unknown>>();
   const [stale, setStale] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -116,7 +119,7 @@ function Editor(props: { readonly entity: MetaEntity; readonly row?: Row | undef
       if (row === undefined) await client.create(entity, body);
       else await client.update(entity, String(row['id']), body, Number(row['version']));
       await queries.invalidateQueries({ queryKey: ['list', entity.name] });
-      void message.success('Saved');
+      void message.success(t('form.saved'));
       await navigate({ to: `/${where}` });
     } catch (error) {
       if (error instanceof AdminApiError && error.status === 412) {
@@ -129,7 +132,7 @@ function Editor(props: { readonly entity: MetaEntity; readonly row?: Row | undef
           })),
         );
       } else {
-        void message.error(error instanceof Error ? error.message : 'The row was not saved');
+        void message.error(error instanceof Error ? error.message : t('form.notSaved'));
       }
     } finally {
       setBusy(false);
@@ -137,14 +140,14 @@ function Editor(props: { readonly entity: MetaEntity; readonly row?: Row | undef
   };
 
   return (
-    <Card title={`${updating ? 'Edit' : 'New'} ${labelOf(entity, 'en')}`}>
+    <Card title={t(updating ? 'form.edit' : 'form.new', { name: labelOf(entity, locale) })}>
       {stale ? (
         <Alert
           type="warning"
           showIcon
           style={{ marginBottom: 16 }}
-          message="Someone else changed this row"
-          description="Reload the page to see the new version, then make your change again."
+          message={t('form.conflictTitle')}
+          description={t('form.conflictBody')}
         />
       ) : null}
       <Form<Record<string, unknown>>
@@ -167,10 +170,10 @@ function Editor(props: { readonly entity: MetaEntity; readonly row?: Row | undef
         <Space>
           {canSave ? (
             <Button type="primary" htmlType="submit" loading={busy}>
-              Save
+              {t('form.save')}
             </Button>
           ) : null}
-          <Button onClick={() => void navigate({ to: `/${where}` })}>Cancel</Button>
+          <Button onClick={() => void navigate({ to: `/${where}` })}>{t('common.cancel')}</Button>
         </Space>
       </Form>
     </Card>
@@ -179,6 +182,7 @@ function Editor(props: { readonly entity: MetaEntity; readonly row?: Row | undef
 
 export function FormScreen(): JSX.Element {
   const { entity, loading } = useEntity();
+  const t = useT();
   const params = useParams({ strict: false });
   const client = useClient();
   const id = params.id;
@@ -189,7 +193,7 @@ export function FormScreen(): JSX.Element {
   });
   // A query that is not enabled stays pending, so only a row that is being read is waited for.
   if (loading || (id !== undefined && row.isPending)) return <Card loading />;
-  if (entity === undefined || !entity.can.read) return <Result status="404" title="This screen does not exist." />;
-  if (row.isError) return <Result status="error" title="The row could not be loaded" subTitle={row.error.message} />;
+  if (entity === undefined || !entity.can.read) return <Result status="404" title={t('form.missing')} />;
+  if (row.isError) return <Result status="error" title={t('form.rowLoadError')} subTitle={row.error.message} />;
   return <Editor key={id ?? 'new'} entity={entity} {...(id === undefined ? {} : { row: row.data })} />;
 }

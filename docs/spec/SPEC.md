@@ -1168,7 +1168,7 @@ The admin UI is a React single-page app that renders most screens from entity me
 - **UI-02** The shell loads `/api/v1/_meta`, which returns the entities, fields, permissions and menu entries the current user may see.
 - **UI-03** Generic screens: list (filters, sorting, saved views, bulk actions, export), form (validation from the same schemas as the API), detail (tabs for related records, activity, audit history).
 - **UI-04** Escape hatches: a field can use a custom widget, a screen can be replaced by a custom page, and plugins add pages and dashboard widgets.
-- **UI-05** Languages en, vi and zh are bundled. Dates, numbers and currency follow the user's locale. Vietnamese and Chinese labels come from the entity `label` and plugin translation files.
+- **UI-05** Languages en, vi and zh are bundled. Dates, numbers and currency follow the user's locale. Vietnamese and Chinese labels come from the entity `label` and plugin translation files. The language is the one that the person chose in the header (kept in the browser), then the first language of the browser that is bundled, then English; the three dictionaries have the same keys and the same placeholders, which a test enforces. Money is formatted from the text that the API sends, so its digits are never rounded by a number.
 - **UI-06** Theme tokens (colors, radius, spacing, fonts, dark mode) are set in the `theme` key of `bieberkit.config.ts`, and every one of them is optional. The key is validated at build and at boot with every problem reported together (a color is a hex of 3 or 6 digits, the radius is 0 to 24 px, the spacing 2 to 8 px, `darkMode` is `auto`, `light` or `dark`). The server writes the resolved theme into the page of the admin as data and as CSS variables, so a change is a restart and not a build (UI-14). The default font stack covers Latin, Vietnamese and Chinese scripts.
 - **UI-07** Accessibility target: WCAG 2.2 level AA for all generic screens.
 - **UI-08** Built assets are static files with content hashes, served from a CDN or from the web role.
@@ -1724,6 +1724,7 @@ Open questions:
 
 | Version | Date | Changes |
 | --- | --- | --- |
+| 0.8.27 | 2026-11-27 | M2.2 languages: the dictionaries of en, vi and zh, the translator, the choice of a language, the formats of numbers, dates and money, and the language switch of the admin (UI-05) |
 | 0.8.26 | 2026-11-27 | M2.2 tokens: the `theme` key of the config, `@bieberkit/tokens` with the defaults, the validation, the Ant Design, CSS variable and Tailwind compilers, and the theme in the page of the admin (UI-06, TOK-01 to TOK-03) |
 | 0.8.25 | 2026-11-27 | M2.1 H2 (ADR 0033, ADR 0034): entity extensions, `extends` with `defineExtension` and a table of the extending plugin with one row for each row of the target (PLG-06); the example of 11.1 and the text of 11.3 |
 | 0.8.24 | 2026-11-27 | M2.1 H3: `bieberkit plugins` shows the graph with its edges and what each plugin owns, `make:plugin`, and `remove` that changes nothing when pnpm fails or the question is cancelled (PLG-03) |

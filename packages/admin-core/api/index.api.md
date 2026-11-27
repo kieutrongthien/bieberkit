@@ -113,6 +113,50 @@ interface AdminClient {
   remove(entity: MetaEntity, id: string, version: number): Promise<void>;
 }
 export declare function createAdminClient(options?: AdminClientOptions): AdminClient;
+type Locale = "en" | "vi" | "zh";
+export declare const LOCALES: readonly Locale[];
+declare const en: {
+  readonly "app.name": "Admin";
+  readonly "language.label": "Language";
+  readonly "auth.signIn.title": "Sign in";
+  readonly "auth.email": "Email";
+  readonly "auth.password": "Password";
+  readonly "auth.signIn": "Sign in";
+  readonly "auth.signOut": "Sign out";
+  readonly "auth.noAnswer": "The server did not answer. Try again.";
+  readonly "welcome.title": "Welcome";
+  readonly "welcome.empty": "Nothing here is open to you yet. Ask an administrator for a role.";
+  readonly "gate.menuError": "The menu could not be loaded";
+  readonly "gate.noAnswer": "The server did not answer";
+  readonly "common.yes": "Yes";
+  readonly "common.no": "No";
+  readonly "common.cancel": "Cancel";
+  readonly "common.delete": "Delete";
+  readonly "list.new": "New";
+  readonly "list.deleted": "Deleted";
+  readonly "list.notDeleted": "The row was not deleted";
+  readonly "list.confirmDelete": "Delete this row?";
+  readonly "list.loadError": "The list could not be loaded";
+  readonly "list.missing": "This screen does not exist, or it is not open to you.";
+  readonly "form.saved": "Saved";
+  readonly "form.notSaved": "The row was not saved";
+  readonly "form.edit": "Edit {name}";
+  readonly "form.new": "New {name}";
+  readonly "form.save": "Save";
+  readonly "form.conflictTitle": "Someone else changed this row";
+  readonly "form.conflictBody": "Reload the page to see the new version, then make your change again.";
+  readonly "form.rowLoadError": "The row could not be loaded";
+  readonly "form.missing": "This screen does not exist.";
+};
+type MessageKey = keyof typeof en;
+type Dictionary = Readonly<Record<MessageKey, string>>;
+export declare const MESSAGES: Readonly<Record<Locale, Dictionary>>;
+export declare function translator(locale: Locale): (key: MessageKey, values?: Readonly<Record<string, string | number>>) => string;
+export declare function localeOf(languages: readonly string[], saved: string | undefined, supported?: readonly Locale[]): Locale;
+export declare function formatNumber(locale: Locale, value: number | string): string;
+export declare function formatDate(locale: Locale, day: string): string;
+export declare function formatDateTime(locale: Locale, instant: string, timeZone?: string): string;
+export declare function formatMoney(locale: Locale, amount: string, currency: string): string;
 export declare function labelOf(entity: MetaEntity, language: string): string;
 export declare function columnsOf(entity: MetaEntity): readonly MetaField[];
 export declare function formFieldsOf(entity: MetaEntity): readonly MetaField[];
@@ -121,5 +165,5 @@ export declare function initialValues(entity: MetaEntity, row?: Row): Record<str
 export declare function bodyOf(entity: MetaEntity, values: Readonly<Record<string, unknown>>, updating: boolean): Row;
 export declare function allows(entity: MetaEntity, action: "create" | "update" | "delete"): boolean;
 export declare const packageName = "@bieberkit/admin-core";
-export type { AdminClient, AdminClientOptions, FieldProblem, ListParams, Meta, MetaEntity, MetaField, MetaMenuItem, Page, Row, SessionUser };
+export type { AdminClient, AdminClientOptions, FieldProblem, ListParams, Locale, MessageKey, Meta, MetaEntity, MetaField, MetaMenuItem, Page, Row, SessionUser };
 ```
