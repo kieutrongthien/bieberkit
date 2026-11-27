@@ -200,7 +200,14 @@ export async function boot(options: BootOptions): Promise<Running> {
       registerMeta(server, entities);
       for (const route of contributed<RouteDef>(modules, 'routes')) server.route(route);
       registerOpenApi(server, { title: project.config.name, version: '0.0.0' });
-      registerAdmin(server, project.root, adminLocation(env.APP_URL, env.ADMIN_URL), parseTheme(project.config.theme));
+      registerAdmin(
+        server,
+        project.root,
+        adminLocation(env.APP_URL, env.ADMIN_URL),
+        parseTheme(project.config.theme),
+        // The hashed files of the releases before stay for a day, so a tab that is open at a deploy keeps working (UI-22).
+        env.ADMIN_ASSETS_DIR ?? join(project.root, 'data', 'admin-assets'),
+      );
       const web = server;
       lifecycle.onBoot('http', async () => {
         port = (await web.listen({ port: env.APP_PORT })).port;

@@ -49,6 +49,41 @@ function app() {
   return { server, root };
 }
 
+function withRetained() {
+  const { root } = app();
+  const kept = mkdtempSync(join(tmpdir(), 'bk-static-kept-'));
+  folders.push(kept);
+  mkdirSync(join(kept, 'assets'));
+  writeFileSync(join(kept, 'assets', 'old-111.js'), 'console.log("old")');
+  writeFileSync(join(kept, 'assets', 'main-abc123.js'), 'console.log("kept copy")');
+  writeFileSync(join(kept, 'index.html'), 'not the page');
+  const server = createHttpServer({ APP_ENV: 'test', APP_PORT: 0, TRUST_PROXY: false, API_DOCS_PUBLIC: false });
+  serveStatic(server, { prefix: '/admin', directory: root, policy: POLICY, retained: kept });
+  return server;
+}
+
+describe('UI-22 the hashed files of the release before', () => {
+  it('UI-22 a hashed file that the build does not have is served from the folder of the retained ones, with the cache of any hashed file', async () => {
+    const server = withRetained();
+    const old = await server.inject({ method: 'GET', url: '/admin/assets/old-111.js' });
+    expect(old.statusCode).toBe(200);
+    expect(old.body).toBe('console.log("old")');
+    expect(old.headers['cache-control']).toBe('public, max-age=31536000, immutable');
+  });
+
+  it('UI-22 the build comes first: a file that it has is its own, and the retained folder never gives the page or a path outside assets', async () => {
+    const server = withRetained();
+    expect((await server.inject({ method: 'GET', url: '/admin/assets/main-abc123.js' })).body).toBe('console.log(1)');
+    expect((await server.inject({ method: 'GET', url: '/admin/' })).body).toContain('<title>app</title>');
+    expect((await server.inject({ method: 'GET', url: '/admin/assets/../index.html' })).body).not.toBe('not the page');
+  });
+
+  it('UI-22 a file that no release has is a 404, so the admin knows to reload', async () => {
+    const server = withRetained();
+    expect((await server.inject({ method: 'GET', url: '/admin/assets/gone-999.js' })).statusCode).toBe(404);
+  });
+});
+
 describe('UI-14 static files under a prefix', () => {
   it('UI-08 serves a file with its type, and a file with a hash in a folder of assets is cached for a year', async () => {
     const { server } = app();

@@ -28,6 +28,7 @@ import { serveStatic } from '@bieberkit/http';
 import { cssVariables, DEFAULT_THEME } from '@bieberkit/tokens';
 import type { Theme } from '@bieberkit/tokens';
 import type { HttpServer } from '@bieberkit/http';
+import { retainAssets } from './admin-assets.ts';
 import { ServerError } from './errors.ts';
 
 /** The adapter that the framework maintains (UI-10). A project that installs another one sets its name in `admin.adapter` later. */
@@ -136,10 +137,14 @@ export function registerAdmin(
   root: string,
   location: AdminLocation,
   theme: Theme = DEFAULT_THEME,
+  /** Where the hashed files of the releases before are kept for a day (UI-22). Without it the admin serves its own build only. */
+  retained?: string,
 ): boolean {
   const directory = adminDirectory(root);
   if (directory === undefined) return false;
+  if (retained !== undefined) retainAssets({ source: directory, retained, now: Date.now() });
   serveStatic(server, {
+    ...(retained === undefined ? {} : { retained }),
     prefix: location.prefix,
     directory,
     policy: ADMIN_POLICY,

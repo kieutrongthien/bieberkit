@@ -38,6 +38,11 @@ export interface StaticOptions {
   readonly directory: string;
   /** The `Content-Security-Policy` of the page and of every file (SEC-01). */
   readonly policy: string;
+  /**
+   * A second folder for the hashed files of `assets/`: a file that the build does not have is looked for in it. It holds the files of
+   * the releases that went before, so that a tab that was open at a deploy still finds its chunks (UI-22).
+   */
+  readonly retained?: string;
   /** The page that answers a path with no file and no extension. Defaults to `index.html`. */
   readonly fallback?: string;
   /** Changes a page (a file of type html) before it is sent, for what only the server knows, such as the place that it is served at. */
@@ -118,6 +123,9 @@ export function serveStatic(server: HttpServer, options: StaticOptions): void {
     const wanted = relative === '' ? fallback : relative;
     let file = wanted;
     let bytes = await read(join(options.directory, wanted));
+    if (bytes === undefined && options.retained !== undefined && wanted.startsWith(`assets${sep}`)) {
+      bytes = await read(join(options.retained, wanted));
+    }
     if (bytes === undefined && extname(wanted) === '') {
       file = fallback;
       bytes = await read(join(options.directory, fallback));

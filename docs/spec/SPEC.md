@@ -435,6 +435,7 @@ All runtime configuration comes from environment variables, validated once at bo
 | `APP_ENV` | `development`, `test`, `production` | `development` |  |
 | `APP_URL` | URL | `http://localhost:3000` | Used for links, CORS and cookies |
 | `ADMIN_URL` | URL | `APP_URL` and `/admin` | Where the admin is: a path of the application (`https://example.com/panel`), a host of its own (`https://admin.example.com`), or a path of that host. Never a path of the API (`/api`, `/health`, `/metrics`) |
+| `ADMIN_ASSETS_DIR` | path | `data/admin-assets` | Where the hashed files of the previous releases of the admin are kept for 24 hours (UI-22). The instances of a rolling deploy share it |
 | `APP_PORT` | integer | `3000` |  |
 | `APP_KEY` | 32+ random bytes, base64 | generated | Secret. Encryption and signing. Rotation supported through `APP_KEY_PREVIOUS` |
 | `AUTH_SECRET` | 32+ random bytes | generated | Secret. Session signing |
@@ -1190,7 +1191,7 @@ Admin architecture, forms and performance:
 * **UI-20** Supported browsers: the last two versions of Chrome, Edge, Firefox and Safari, including Safari on iOS. The same policy applies to the site.
 * **UI-21** Client errors and Core Web Vitals from real users are sent to the error-reporter contract (OBS-06), sampled and without personal data.
 
-- **UI-22** Hashed admin assets from the previous release stay available (CDN or a retained folder) for at least 24 hours after a deploy, and the admin reloads itself on a chunk-load error, so open tabs survive rolling deploys.
+- **UI-22** Hashed admin assets from the previous release stay available (CDN or a retained folder) for at least 24 hours after a deploy, and the admin reloads itself on a chunk-load error, so open tabs survive rolling deploys. The web role keeps them: at start it copies the hashed files of its build into `ADMIN_ASSETS_DIR`, marks the ones that the release before used and this one does not, serves a hashed file that its build lacks from there, and removes a file 24 hours after the release that replaced it. A CDN that keeps the files of past releases does the same without it.
 
 ### 16.2 Public site (server-side rendering)
 
@@ -1724,6 +1725,7 @@ Open questions:
 
 | Version | Date | Changes |
 | --- | --- | --- |
+| 0.8.29 | 2026-11-27 | M2.2: the list (filters, views, bulk changes, moves of a state field, CSV, phone cards, `n` and `/`), the input of a transition in `_meta`, the check of a form, lazy languages, and the hashed files of the release before kept for a day, with `ADMIN_ASSETS_DIR` (UI-03, UI-12, UI-13, UI-16, UI-17, UI-22) |
 | 0.8.28 | 2026-11-27 | M2.2 resilience: retry and backoff, the offline state, route error boundaries, lazy screens and the 400 kB budget check, the reload on a missing chunk, the unsaved-change guard, local drafts, Ctrl+S, the 412 view with a three-way merge, and the reports of UI-21 (UI-12, UI-17 to UI-19, UI-21, UI-22; parts) |
 | 0.8.27 | 2026-11-27 | M2.2 languages: the dictionaries of en, vi and zh, the translator, the choice of a language, the formats of numbers, dates and money, and the language switch of the admin (UI-05) |
 | 0.8.26 | 2026-11-27 | M2.2 tokens: the `theme` key of the config, `@bieberkit/tokens` with the defaults, the validation, the Ant Design, CSS variable and Tailwind compilers, and the theme in the page of the admin (UI-06, TOK-01 to TOK-03) |
