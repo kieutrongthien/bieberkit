@@ -299,6 +299,7 @@ export const routes: readonly RouteDef[] = [
     method: 'DELETE',
     url: `${BASE}/roles/:id`,
     permission: 'roles.manage',
+    idempotent: true,
     schema: {
       params: byId,
       query: {
@@ -322,6 +323,7 @@ export const routes: readonly RouteDef[] = [
       method: 'POST',
       url: `${BASE}/roles/:id/${verb}`,
       permission: 'roles.manage',
+      idempotent: true,
       schema: {
         params: byId,
         body: {

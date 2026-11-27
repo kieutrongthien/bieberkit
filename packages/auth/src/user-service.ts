@@ -34,7 +34,7 @@ import { holdersQuery, keepLastAdmin, refuseSelf } from './admin-guard.ts';
 import { mailOf } from './better-auth.ts';
 import type { AuthInstance } from './better-auth.ts';
 import { authError } from './errors.ts';
-import { createRateLimiter } from './limits.ts';
+import { createRateLimiter, limitActor } from './limits.ts';
 import type { Limit, RateStorage } from './limits.ts';
 import { AuthRole, AuthUserGroup, AuthUserRole, NIL_TENANT } from './roles.ts';
 import { checkGrantable, grantRoles, groupOf } from './role-service.ts';
@@ -647,6 +647,8 @@ export function createUserService(options: UserServiceOptions): UserService {
         );
       }
       const groups = groupsOf(input.groups ?? [], input.groupIds === undefined ? undefined : input.groupIds);
+      // An invitation sends a mail, so the administrator who sends them is limited like the one who sends them again (OPS-02).
+      if (invite) await limitActor(db, { action: 'users:invite', actorId: input.actorId, rule: limits.perActor });
       const password = input.password === undefined ? undefined : passwordOf(input.password);
       const email = emailOf(input.email);
       const name = input.name.trim();

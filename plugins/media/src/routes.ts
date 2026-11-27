@@ -181,6 +181,7 @@ export const routes: readonly RouteDef[] = [
     method: 'DELETE',
     url: `${MEDIA}/:id`,
     permission: 'media.manage',
+    idempotent: true,
     schema: { params: byId, response: { 204: { type: 'null' } } },
     async handler(ctx) {
       await ctx.services.media.remove(idOf(ctx));
@@ -309,6 +310,7 @@ export const routes: readonly RouteDef[] = [
     method: 'DELETE',
     url: `${FOLDERS}/:id`,
     permission: 'media.manage',
+    idempotent: true,
     schema: { params: byId, response: { 204: { type: 'null' } } },
     async handler(ctx) {
       await ctx.services.media.removeFolder(idOf(ctx));

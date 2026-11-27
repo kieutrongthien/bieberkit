@@ -32,7 +32,17 @@ import type { SettingsService } from './service.ts';
 
 export { siteLocale, siteLogo, siteName } from './declarations.ts';
 export { Setting } from './entity.ts';
-export type { Change, SettingsPage, SettingsService, SettingView, Where } from './service.ts';
+export type {
+  Change,
+  ExportedSetting,
+  ImportEntry,
+  ImportReport,
+  SettingsExport,
+  SettingsPage,
+  SettingsService,
+  SettingView,
+  Where,
+} from './service.ts';
 
 declare module '@bieberkit/core' {
   interface ServiceRegistry {

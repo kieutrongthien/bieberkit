@@ -272,7 +272,7 @@ A person at the terminal is asked for every choice that no flag gave, the name i
 | `bieberkit migrate` | Apply pending plugin steps and migrations under a lock (`--status`, `--rollback`, `--allow-destructive`) |
 | `bieberkit db:seed` | Run seeders |
 | `bieberkit backup:verify` | Restore the newest backup into a throwaway database and check that nothing is left to migrate (DEP-09) |
-| `bieberkit audit:prune --before <date> [--yes]` | Count the audit entries before a date and, with `--yes`, delete them on `MIGRATE_DATABASE_URL` (AUD-06) |
+| `bieberkit audit:prune --before <date> [--yes]` | Count the audit entries before a date and, with `--yes`, delete them on `MIGRATE_DATABASE_URL`, except those under a legal hold, whose number it prints (AUD-06, AUD-09) |
 | `bieberkit make:entity`, `make:module`, `make:plugin`, `make:job` | Generate code from the official recipes |
 | `bieberkit add <plugin>` / `remove <plugin>` | Install or uninstall a plugin and update config, env schema and migrations |
 | `bieberkit plugins` | List installed plugins, versions and dependency graph |
@@ -928,6 +928,15 @@ The policies of sessions, second factors and networks are settings of the group 
 - **AUD-08** `GET /api/v1/audit-log/entries` and `GET .../export` take `after=<entry id>` and then read oldest first, each entry once. `meta.nextAfter` is the id to resume from. `after` and `cursor` together, or an `after` that is not an id, are `AUDIT_AFTER_INVALID` (400).
 - **AUD-09** `POST /api/v1/audit-log/holds` places a hold on an entity, a record or an actor, with a reason, `GET` lists the active ones (`status=released|all` for others) and `DELETE .../holds/:id` releases one by a mark, so its row stays. Permission `audit-log.hold` to place and release, `audit-log.read` to list. A hold covers the entries that match every field it sets, in its tenant, or every tenant when placed outside one. `audit:prune` never deletes an entry under an active hold and says how many it kept (`kept` in its data and in its text). Placing and releasing are audited (`audit-log.hold.placed`, `audit-log.hold.released`). At most 200 holds are active at once (`AUDIT_HOLD_LIMIT`, 409). The table `bk_audit_holds` is a framework table (data migration step 0.5.0, ADR 0032).
 
+### 12.10 Operations of the base plugins (slice S6, last part)
+
+- **OPS-01** The routes of the six plugins that send mail or remove data honor `Idempotency-Key` (§13.1). A `DELETE` route may declare `idempotent: true` as a `POST` route does, and an answer with no body, such as a 204, is replayed.
+- **OPS-02** Sensitive actions are limited per actor as well as per address (AUTH-06): invitations (20 in 15 minutes per administrator, with the limits of reset mail and MFA reset of USR-09 to USR-11) and the audit export (10 in 15 minutes per person). Over the limit the answer is 429 with `Retry-After`, `USERS_RATE_LIMITED` or `AUTH_ACTION_LIMITED`. `audit:prune` runs from the command line on the migrate role and has no actor to count.
+- **OPS-03** `GET /api/v1/settings/export` (permission `settings.read`) lists the values stored in the scope of the caller, with `{ key, secret: true }` for a secret and never its value. `POST /api/v1/settings/import` (permission `settings.manage`, `?dryRun=true` to only report) applies such a file. Each entry answers `created`, `updated`, `unchanged`, `skipped` (a secret) or `invalid`; any invalid entry refuses all of them with `SETTINGS_IMPORT_INVALID` (422) and the report.
+- **OPS-04** A media object has the key `<visibility>/<tenant>/media/<id>/<name>`, so a tenant's files are reached by prefix. `MEDIA_AUDIT_DOWNLOADS=true` (default off) writes `media.file.downloaded` when a private file is read through its URL or its content route.
+- **OPS-05** The lists of users, media and the audit log are tested with 100 000 rows on the three dialects: the plan of the list and of each filter does not read the whole table, the first page answers inside a bound, and no list runs `COUNT(*)` unless `withTotal` is asked for. The audit log has indexes for its filters (action, record, actor, request: data migration step 0.5.0), and the users list for the sort by name and, on PostgreSQL, for the prefix search (auth migration 0.7.0).
+- **OPS-06** Each plugin has an operations section in `docs/modules/plugins.md`: what to back up, what each policy does, the audit action names, the retention knobs and how to run `audit:prune`.
+
 ## 13. HTTP API
 
 The API is REST over JSON on Fastify 5, described by an OpenAPI 3.1 document generated at build time. Entity routes are generated from `api` settings, and custom routes use the same validation and permission helpers.
@@ -945,7 +954,7 @@ The API is REST over JSON on Fastify 5, described by an OpenAPI 3.1 document gen
 | Success body | `{ "data": ..., "meta": { "page", "pageSize" } }`, plus `total` only when `withTotal=true` (DATA-11) and `nextCursor` for cursor lists |
 | Errors | RFC 9457 `application/problem+json` with `type`, `title`, `status`, `detail`, a stable `code` and `traceId` |
 | Validation errors | Problem with `errors: [{ path, code, message }]` |
-| Idempotency | `Idempotency-Key` header honored on `POST` for routes that declare `idempotent: true` |
+| Idempotency | `Idempotency-Key` header honored on `POST` and `DELETE` for routes that declare `idempotent: true` |
 | Dates | ISO 8601 in UTC |
 | Naming | camelCase in JSON, snake\_case in the database |
 
@@ -1710,6 +1719,7 @@ Open questions:
 
 | Version | Date | Changes |
 | --- | --- | --- |
+| 0.8.21 | 2026-11-27 | Base plugins S6, operations: section 12.10, OPS-01 to OPS-06; `Idempotency-Key` on `DELETE`, per-actor limits, settings export and import, download audit of media, indexes and the tests at 100 000 rows |
 | 0.8.20 | 2026-11-27 | Base plugins S6, audit: section 12.9, AUD-07 to AUD-09; the audit mirror, `after=` for a SIEM, legal holds and `kept` in `audit:prune` (ADR 0032) |
 | 0.8.19 | 2026-11-27 | Base plugins S6, managed identities: section 12.8, IDN-02, IDN-03, ROL-08 and ROL-09; `USERS_MANAGED_EXTERNALLY`, `upsertExternalUser`, `setExternalDisabled`, groups and roles limited to a group |
 | 0.8.18 | 2026-11-27 | Base plugins S6, policies: section 12.7, POL-01 to POL-05; the `PolicyReader` port (ADR 0031), the `security.*` settings, `ipRestricted` roles, known devices and the `guard` of a setting declaration |

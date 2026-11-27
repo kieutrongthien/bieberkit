@@ -28,6 +28,7 @@ import { sql } from 'kysely';
 import { uuid7 } from '@bieberkit/data';
 import { requestKysely } from '@bieberkit/data/orm';
 import type { Database } from '@bieberkit/data/orm';
+import { HttpError } from '@bieberkit/http';
 
 /** At most `max` requests in `window` seconds. */
 export interface Limit {
@@ -176,4 +177,34 @@ export function createRateLimiter(db: Database): RateLimiter {
       for (const item of consumed) await storage.consume(item.key, item.rule);
     },
   };
+}
+
+const actorLimiters = new WeakMap<object, RateLimiter>();
+
+/**
+ * Counts one use of a sensitive `action` by `actor` and refuses the call over the limit with `AUTH_ACTION_LIMITED` (429), whatever
+ * the address that it comes from (OPS-02). A caller with no actor, such as a seeder, is not limited.
+ */
+export async function limitActor(
+  db: Database,
+  input: { readonly action: string; readonly actorId: string | null | undefined; readonly rule: Limit },
+): Promise<void> {
+  if (input.actorId === null || input.actorId === undefined) return;
+  let limiter = actorLimiters.get(db);
+  if (limiter === undefined) {
+    limiter = createRateLimiter(db);
+    actorLimiters.set(db, limiter);
+  }
+  const result = await limiter.storage.consume(`actor:${input.action}:${input.actorId.toLowerCase()}`, input.rule);
+  if (result.allowed) return;
+  const retry = String(result.retryAfter ?? input.rule.window);
+  throw new HttpError(
+    'AUTH_ACTION_LIMITED',
+    429,
+    `Too many ${input.action} in a short time.`,
+    `Try again in ${retry} seconds.`,
+    { 'Retry-After': retry },
+    undefined,
+    { retryAfter: Number(retry) },
+  );
 }

@@ -197,7 +197,14 @@ export const AuditLog: EntitySchema<AuditLogRow> = new EntitySchema<AuditLogRow>
     reason: { type: 'text', nullable: true },
     data: { type: 'text', nullable: true },
   },
-  indexes: [{ name: 'bk_audit_log_tenant_at_index', properties: ['tenant', 'at'] }],
+  indexes: [
+    { name: 'bk_audit_log_tenant_at_index', properties: ['tenant', 'at'] },
+    // The filters of the audit list and export (AUD-01, OPS-05): each lookup of an action, a record, an actor or a request.
+    { name: 'bk_audit_log_action_index', properties: ['action', 'id'] },
+    { name: 'bk_audit_log_record_index', properties: ['entity', 'recordId', 'id'] },
+    { name: 'bk_audit_log_actor_index', properties: ['actorId', 'id'] },
+    { name: 'bk_audit_log_request_index', properties: ['requestId', 'id'] },
+  ],
 });
 
 export const Sequence: EntitySchema<SequenceRow> = new EntitySchema<SequenceRow>({
@@ -545,6 +552,47 @@ export const dataMigrationSteps: readonly PluginMigrationStep[] = [
         .addColumn('released_at', instant(dialect))
         .addColumn('released_by', uuidType(dialect))
         .addPrimaryKeyConstraint(`${AUDIT_HOLD_TABLE}_pkey`, ['id'])
+        .execute();
+    },
+    '0.5.0',
+  ),
+  // The indexes of the filters of the audit list, each ending in the id that the list is ordered by (OPS-05).
+  step(
+    'audit-log-action-index',
+    'expand',
+    async (trx: Trx) => {
+      await trx.schema.createIndex('bk_audit_log_action_index').on(AUDIT_TABLE).columns(['action', 'id']).execute();
+    },
+    '0.5.0',
+  ),
+  step(
+    'audit-log-record-index',
+    'expand',
+    async (trx: Trx) => {
+      await trx.schema
+        .createIndex('bk_audit_log_record_index')
+        .on(AUDIT_TABLE)
+        .columns(['entity', 'record_id', 'id'])
+        .execute();
+    },
+    '0.5.0',
+  ),
+  step(
+    'audit-log-actor-index',
+    'expand',
+    async (trx: Trx) => {
+      await trx.schema.createIndex('bk_audit_log_actor_index').on(AUDIT_TABLE).columns(['actor_id', 'id']).execute();
+    },
+    '0.5.0',
+  ),
+  step(
+    'audit-log-request-index',
+    'expand',
+    async (trx: Trx) => {
+      await trx.schema
+        .createIndex('bk_audit_log_request_index')
+        .on(AUDIT_TABLE)
+        .columns(['request_id', 'id'])
         .execute();
     },
     '0.5.0',

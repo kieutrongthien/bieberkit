@@ -224,6 +224,7 @@ export const routes: readonly RouteDef[] = [
     method: 'POST',
     url: BASE,
     permission: 'users.manage',
+    idempotent: true,
     schema: {
       body: {
         type: 'object',
@@ -353,6 +354,7 @@ export const routes: readonly RouteDef[] = [
     method: 'DELETE',
     url: `${BASE}/:id`,
     permission: 'users.manage',
+    idempotent: true,
     schema: { params: byId, response: { 204: none } },
     async handler(ctx) {
       const users = usersOf(ctx);
@@ -401,6 +403,7 @@ export const routes: readonly RouteDef[] = [
     method: 'DELETE',
     url: `${BASE}/:id/sessions/:sessionId`,
     permission: 'users.revoke-sessions',
+    idempotent: true,
     schema: { params: params({ id: uuid, sessionId: uuid }), response: { 204: none } },
     async handler(ctx) {
       const users = usersOf(ctx);
@@ -418,6 +421,7 @@ export const routes: readonly RouteDef[] = [
     method: 'DELETE',
     url: `${BASE}/:id/sessions`,
     permission: 'users.revoke-sessions',
+    idempotent: true,
     schema: { params: byId, response: { 204: none } },
     async handler(ctx) {
       const users = usersOf(ctx);
@@ -437,6 +441,7 @@ export const routes: readonly RouteDef[] = [
       method: 'POST',
       url: `${BASE}/:id/${path}`,
       permission,
+      idempotent: true,
       schema: { params: byId, response: { 202: accepted } },
       async handler(ctx) {
         const users = usersOf(ctx);
@@ -451,6 +456,7 @@ export const routes: readonly RouteDef[] = [
     method: 'POST',
     url: `${BASE}/:id/mfa/reset`,
     permission: 'users.reset-mfa',
+    idempotent: true,
     schema: { params: byId, response: { 204: none } },
     async handler(ctx) {
       const users = usersOf(ctx);

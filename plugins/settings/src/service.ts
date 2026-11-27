@@ -72,6 +72,35 @@ export interface Change extends Where {
   readonly actor?: SettingActor;
 }
 
+/** One setting of an export: the key and its value, or only the key and `secret: true` for a secret. */
+export type ExportedSetting =
+  | { readonly key: string; readonly value: unknown }
+  | { readonly key: string; readonly secret: true };
+
+export interface SettingsExport {
+  readonly version: 1;
+  readonly scope: 'global' | 'tenant';
+  readonly settings: readonly ExportedSetting[];
+}
+
+export interface ImportEntry {
+  readonly key: string;
+  readonly value?: unknown;
+  readonly secret?: boolean;
+}
+
+export type ImportResult = 'created' | 'updated' | 'unchanged' | 'skipped' | 'invalid';
+
+export interface ImportReport {
+  readonly dryRun: boolean;
+  readonly results: readonly {
+    readonly key: string;
+    readonly result: ImportResult;
+    readonly code?: string;
+    readonly message?: string;
+  }[];
+}
+
 export interface SettingsService {
   /** Every declaration, sorted by key. */
   readonly declarations: readonly SettingDef[];
@@ -83,6 +112,14 @@ export interface SettingsService {
   reset(setting: SettingDef | string, change: Change): Promise<void>;
   view(setting: SettingDef | string, where?: Where): Promise<SettingView>;
   list(where: Where & { readonly pageSize?: unknown; readonly cursor?: string }): Promise<SettingsPage>;
+  /** The values stored in the scope of the caller, to carry them to another environment. A secret is a hole, never a value (OPS-03). */
+  exportStored(where?: Where): Promise<SettingsExport>;
+  /** Applies an export. With `dryRun` it only says what would change. An invalid entry refuses all of it (OPS-03). */
+  importStored(
+    entries: readonly ImportEntry[],
+    change: Change,
+    options?: { readonly dryRun?: boolean },
+  ): Promise<ImportReport>;
   /** The `public` settings, for the login screen and the site (SET-07). */
   publicValues(where?: Where): Promise<{ readonly key: string; readonly value: unknown }[]>;
 }
@@ -142,6 +179,13 @@ function writeScope(def: SettingDef, where: Where): string {
     'Change it without a tenant, as a system administrator.',
   );
 }
+/** The scope that a caller may write this setting in, or `undefined` when it is not changed from there (SET-04). */
+function writableScope(def: SettingDef, where: Where | undefined): string | undefined {
+  const tenant = tenantOf(where);
+  if (tenant === undefined) return NIL;
+  return def.scope === 'tenant' ? tenant : undefined;
+}
+
 function lockout(def: SettingDef): never {
   throw new HttpError(
     'SETTINGS_SELF_LOCKOUT',
@@ -309,6 +353,97 @@ export function createSettingsService(input: {
           cache.tags([TAG]).flushAfterCommit();
         }),
       );
+    },
+
+    async exportStored(where) {
+      const settings: ExportedSetting[] = [];
+      for (const def of declarations) {
+        const scope = writableScope(def, where);
+        if (scope === undefined) continue;
+        const found = await load(def, scope);
+        if (found === null) continue;
+        settings.push(def.secret ? { key: def.key, secret: true } : { key: def.key, value: found.value });
+      }
+      return { version: 1, scope: tenantOf(where) === undefined ? 'global' : 'tenant', settings };
+    },
+
+    async importStored(entries, change, options = {}) {
+      const dryRun = options.dryRun === true;
+      const results: ImportReport['results'][number][] = [];
+      const todo: { key: string; value: unknown }[] = [];
+      for (const entry of entries) {
+        const def = byKey.get(entry.key);
+        if (def === undefined) {
+          results.push({
+            key: entry.key,
+            result: 'invalid',
+            code: 'SETTINGS_UNKNOWN_KEY',
+            message: `No setting ${entry.key} is declared.`,
+          });
+          continue;
+        }
+        // A secret is never carried in a file, so an export has a hole where it was (OPS-03).
+        if (def.secret) {
+          results.push({
+            key: def.key,
+            result: 'skipped',
+            code: 'SETTINGS_SECRET_SKIPPED',
+            message: 'A secret is not imported.',
+          });
+          continue;
+        }
+        const scope = writableScope(def, change);
+        if (scope === undefined) {
+          results.push({
+            key: def.key,
+            result: 'invalid',
+            code: 'SETTINGS_SCOPE_REFUSED',
+            message: `${def.key} is not changed from here.`,
+          });
+          continue;
+        }
+        let next: unknown;
+        try {
+          next = def.check(entry.value);
+        } catch (error) {
+          results.push({
+            key: def.key,
+            result: 'invalid',
+            code: 'SETTINGS_INVALID_VALUE',
+            message: error instanceof Error ? error.message : String(error),
+          });
+          continue;
+        }
+        if (change.actor !== undefined && def.guard?.(next, change.actor) === true) {
+          results.push({
+            key: def.key,
+            result: 'invalid',
+            code: 'SETTINGS_SELF_LOCKOUT',
+            message: `This value of ${def.key} would lock you out.`,
+          });
+          continue;
+        }
+        const current = await load(def, scope);
+        if (current !== null && JSON.stringify(current.value) === JSON.stringify(next)) {
+          results.push({ key: def.key, result: 'unchanged' });
+          continue;
+        }
+        results.push({ key: def.key, result: current === null ? 'created' : 'updated' });
+        todo.push({ key: def.key, value: next });
+      }
+      if (results.some((item) => item.result === 'invalid')) {
+        throw new HttpError(
+          'SETTINGS_IMPORT_INVALID',
+          422,
+          'The file has settings that cannot be applied, so none was.',
+          'Fix the entries that say invalid, then send it again.',
+          undefined,
+          undefined,
+          { results },
+        );
+      }
+      if (!dryRun) for (const item of todo) await service.set(item.key, item.value, change);
+      return { dryRun, results };
     },
 
     async view(setting, where) {

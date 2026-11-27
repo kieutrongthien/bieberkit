@@ -128,6 +128,7 @@ export type {
 export { createTenantResolver } from './tenant.ts';
 export type { TenantResolverOptions } from './tenant.ts';
 export type { AccessAuthorizer, AuthorizerOptions } from './authorizer.ts';
+export { limitActor } from './limits.ts';
 export { AuthError, AuthzError, authError, authzError } from './errors.ts';
 export { buildPermissionRegistry } from './registry.ts';
 export type { Action, MaskedField, PermissionEntry, PermissionRegistry } from './registry.ts';

@@ -164,6 +164,31 @@ describeDialects('MED the media plugin', ({ open }) => {
     await app.close();
   });
 
+  it('OPS-04 a download of a private file is audited when MEDIA_AUDIT_DOWNLOADS is on, a public one never, and by default none', async () => {
+    const on = await world({
+      pluginEnv: { MEDIA_AUDIT_DOWNLOADS: true },
+      disk: { signing: true, publicBaseUrl: 'https://cdn.example.test' },
+    });
+    const secret = await uploaded(on.app, on.uploader, { filename: 'secret.png', contentType: 'image/png' }, PNG);
+    const shown = await uploaded(
+      on.app,
+      on.uploader,
+      { filename: 'open.png', contentType: 'image/png', visibility: 'public' },
+      PNG,
+    );
+    await on.uploader.get(`${MEDIA}/${secret}/url`);
+    await on.uploader.get(`${MEDIA}/${shown}/url`);
+    expect((await audits(on.app)).filter((action) => action === 'media.file.downloaded')).toHaveLength(1);
+    const [entry] = await runInUnitOfWork(on.app.db, (em) => em.find(AuditLog, { action: 'media.file.downloaded' }));
+    expect(JSON.parse(String(entry?.data))).toMatchObject({ filename: 'secret.png', via: 'url' });
+    await on.app.close();
+    const off = await world({ disk: { signing: true, publicBaseUrl: 'https://cdn.example.test' } });
+    const quiet = await uploaded(off.app, off.uploader, { filename: 'quiet.png', contentType: 'image/png' }, PNG);
+    await off.uploader.get(`${MEDIA}/${quiet}/url`);
+    expect((await audits(off.app)).filter((action) => action === 'media.file.downloaded')).toHaveLength(0);
+    await off.app.close();
+  });
+
   it('MED-02 a private file gets a signed URL and never a public one; a public file gets its public URL', async () => {
     const { app, uploader } = await world({ disk: { signing: true, publicBaseUrl: 'https://cdn.example.test' } });
     const secret = await uploaded(app, uploader, { filename: 'secret.png', contentType: 'image/png' }, PNG);

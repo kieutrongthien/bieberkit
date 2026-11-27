@@ -26,6 +26,7 @@ import { Readable } from 'node:stream';
 import * as z from 'zod/mini';
 import { definePlugin, env } from '@bieberkit/core';
 import type { PluginDef } from '@bieberkit/core';
+import { limitActor } from '@bieberkit/auth';
 import { pageSize } from '@bieberkit/data';
 import { AUDIT_RECORDED_EVENT, recordAudit, runInTransaction } from '@bieberkit/data/orm';
 import { defineRoute, HttpError } from '@bieberkit/http';
@@ -52,6 +53,8 @@ export type { Actor, EntryView, Filters } from './entries.ts';
 const BASE = '/api/v1/audit-log';
 const ACTIONS_TTL_MS = 60_000;
 const DEFAULT_EXPORT_MAX = 100_000;
+/** Exports that one person may start in 15 minutes (OPS-02). */
+const EXPORT_LIMIT = { window: 900, max: 10 } as const;
 
 const filterQuery = {
   from: { type: 'string', format: 'date-time' },
@@ -226,6 +229,8 @@ const exported: RouteDef = defineRoute({
     const filters = filtersOf(ctx);
     const where = whereOf(filters, scopeOf(ctx.tenantId));
     const max = exportMaxOf(ctx);
+    // A heavy read of the whole log, so one person may not run it over and over (OPS-02).
+    await limitActor(db, { action: 'audit-log:export', actorId: ctx.principal?.id, rule: EXPORT_LIMIT });
     // The export is itself an entry, written before the first byte, so even an export that breaks off is in the log (AUD-03).
     await runInTransaction(db, async (em) => {
       recordAudit(em, { action: 'audit-log.entries.exported', data: { format, filters } });
@@ -271,16 +276,37 @@ const holds: RouteDef = defineRoute({
   schema: {
     query: {
       type: 'object',
-      properties: { status: { type: 'string', enum: ['active', 'released', 'all'] } },
+      properties: {
+        status: { type: 'string', enum: ['active', 'released', 'all'] },
+        pageSize: { type: 'integer', minimum: 1 },
+        cursor: { type: 'string', maxLength: 1024 },
+      },
       additionalProperties: false,
     },
     response: {
-      200: { type: 'object', properties: { data: { type: 'array', items: hold } }, required: ['data'] },
+      200: {
+        type: 'object',
+        properties: {
+          data: { type: 'array', items: hold },
+          meta: {
+            type: 'object',
+            properties: { pageSize: { type: 'integer' }, nextCursor: { type: ['string', 'null'] } },
+            required: ['pageSize', 'nextCursor'],
+          },
+        },
+        required: ['data', 'meta'],
+      },
     },
   },
   async handler(ctx) {
     const status = ctx.query['status'] === 'released' || ctx.query['status'] === 'all' ? ctx.query['status'] : 'active';
-    return { data: await listHolds(ctx.services.database, { scope: scopeOf(ctx.tenantId), status }) };
+    const cursor = ctx.query['cursor'];
+    return listHolds(ctx.services.database, {
+      scope: scopeOf(ctx.tenantId),
+      status,
+      pageSize: ctx.query['pageSize'],
+      ...(typeof cursor === 'string' ? { cursor } : {}),
+    });
   },
 });
 
@@ -288,6 +314,7 @@ const placed: RouteDef = defineRoute({
   method: 'POST',
   url: `${BASE}/holds`,
   permission: 'audit-log.hold',
+  idempotent: true,
   schema: {
     body: {
       type: 'object',
@@ -323,6 +350,7 @@ const released: RouteDef = defineRoute({
   method: 'DELETE',
   url: `${BASE}/holds/:id`,
   permission: 'audit-log.hold',
+  idempotent: true,
   schema: {
     params: { type: 'object', properties: { id: { type: 'string', format: 'uuid' } }, required: ['id'] },
     response: { 204: { type: 'null' } },

@@ -236,6 +236,39 @@ describeDialects('USR the users plugin', ({ open }) => {
     await app.close();
   });
 
+  it('OPS-01 a mail route and a delete route replay the answer for the same Idempotency-Key and do the work once', async () => {
+    const { app, manager } = await world();
+    const id = await make(app, 'jo@example.test');
+    const key = { 'idempotency-key': 'reset-jo-1' };
+    const first = await manager.post(`${USERS}/${id}/reset-password`, undefined, key);
+    const second = await manager.post(`${USERS}/${id}/reset-password`, undefined, key);
+    expect([first.status, second.status]).toEqual([202, 202]);
+    expect(second.headers['idempotency-replayed']).toBe('true');
+    await app.runOutbox();
+    expect(app.mailbox.filter((message) => message.to.some((to) => to.address === 'jo@example.test'))).toHaveLength(1);
+    const gone = await make(app, 'gone@example.test');
+    const del = { 'idempotency-key': 'delete-gone-1' };
+    expect((await manager.delete(`${USERS}/${gone}`, 0, del)).status).toBe(204);
+    const again = await manager.delete(`${USERS}/${gone}`, 0, del);
+    expect([again.status, again.headers['idempotency-replayed']]).toEqual([204, 'true']);
+    expect((await manager.delete(`${USERS}/${gone}`, 0)).status).toBe(404);
+    expect((await manager.delete(`${USERS}/${gone}`, 0, { 'idempotency-key': '' })).status).not.toBe(500);
+    await app.close();
+  });
+
+  it('OPS-02 an administrator who sends many invitations is limited as a person, whatever the address', async () => {
+    const { app, manager } = await world();
+    let last = 0;
+    for (let n = 0; n < 21; n += 1) {
+      last = (await manager.post(USERS, { name: `U${String(n)}`, email: `u${String(n)}@example.test`, invite: true }))
+        .status;
+    }
+    expect(last).toBe(429);
+    const other = await app.actingAs(await make(app, 'other@example.test'), ['manager']);
+    expect((await other.post(USERS, { name: 'Z', email: 'z@example.test', invite: true })).status).toBe(201);
+    await app.close();
+  });
+
   it('USR-11 an MFA reset needs users.reset-mfa', async () => {
     const { app, manager } = await world();
     const id = await make(app, 'pam@example.test');

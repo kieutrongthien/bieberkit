@@ -250,6 +250,7 @@ export const routes: readonly RouteDef[] = [
     method: 'DELETE',
     url: `${ME}/:id`,
     permission: 'notifications.delete-own',
+    idempotent: true,
     schema: { params: byId, response: { 204: { type: 'null' } } },
     async handler(ctx) {
       await runInTransaction(ctx.services.database, async (em) => {
@@ -316,6 +317,7 @@ export const routes: readonly RouteDef[] = [
     // Its own permission, mapped to no action of the entity: a scoped permission of the person (delete-own) covers an entity
     // permission such as notifications.manage at the level of a route, where no condition applies.
     permission: 'notifications.send',
+    idempotent: true,
     schema: {
       body: {
         type: 'object',

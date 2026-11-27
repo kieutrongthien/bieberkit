@@ -372,4 +372,33 @@ describeDialects('AUD the audit-log plugin', ({ open }) => {
     expect(app.logger.lines.filter((line) => line.fields['audit'] === true)).toHaveLength(0);
     await app.close();
   });
+  it('OPS-02 one person may start only a few exports in a short time (AUTH_ACTION_LIMITED)', async () => {
+    const { app } = await world();
+    const exporter = app.newUser();
+    await app.actingAs(exporter, ['exporter']);
+    const get = () =>
+      app.server.inject({
+        method: 'GET',
+        url: `${BASE}/export?format=ndjson&entity=crm.Note`,
+        headers: { [USER_HEADER]: exporter.id, [TENANT_HEADER]: app.tenant },
+      });
+    const codes: number[] = [];
+    for (let n = 0; n < 11; n += 1) codes.push((await get()).statusCode);
+    expect(codes.slice(0, 10).every((code) => code === 200)).toBe(true);
+    expect(codes[10]).toBe(429);
+    await app.close();
+  });
+  it('BPL-06 the holds list pages with a keyset cursor and a page of at most 100', async () => {
+    const { app } = await world();
+    const keeper = await app.actingAs(app.newUser(), ['keeper']);
+    for (const name of ['a', 'b', 'c']) await keeper.post(`${BASE}/holds`, { entity: `crm.${name}`, reason: name });
+    const first = await keeper.get(`${BASE}/holds?pageSize=2`);
+    expect(entriesOf(first.body)).toHaveLength(2);
+    const cursor = String(metaOf(first.body)['nextCursor']);
+    const second = await keeper.get(`${BASE}/holds?pageSize=2&cursor=${encodeURIComponent(cursor)}`);
+    expect(entriesOf(second.body)).toHaveLength(1);
+    expect(metaOf(second.body)['nextCursor']).toBeNull();
+    expect(metaOf(await keeper.get(`${BASE}/holds?pageSize=100`).then((reply) => reply.body))['pageSize']).toBe(100);
+    await app.close();
+  });
 });

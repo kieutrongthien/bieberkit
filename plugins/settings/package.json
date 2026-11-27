@@ -73,9 +73,11 @@
     ],
     "routes": [
       "DELETE /api/v1/settings/settings/:key",
+      "GET /api/v1/settings/export",
       "GET /api/v1/settings/public",
       "GET /api/v1/settings/settings",
       "GET /api/v1/settings/settings/:key",
+      "POST /api/v1/settings/import",
       "PUT /api/v1/settings/settings/:key"
     ],
     "permissions": [

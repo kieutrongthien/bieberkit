@@ -23,7 +23,7 @@
  */
 
 import { requestContext } from '@bieberkit/core';
-import { isUuid } from '@bieberkit/data';
+import { decodeCursor, encodeCursor, isUuid, pageSize } from '@bieberkit/data';
 import { AuditHold, recordAudit, runInTransaction, runInUnitOfWork } from '@bieberkit/data/orm';
 import type { AuditHoldRow, Database } from '@bieberkit/data/orm';
 import { HttpError } from '@bieberkit/http';
@@ -123,12 +123,20 @@ export async function placeHold(db: Database, input: NewHold): Promise<HoldView>
 /** The holds of the reader's tenant, or of every tenant for a reader outside one. Active ones unless `all`. */
 export async function listHolds(
   db: Database,
-  input: { readonly scope: string | undefined; readonly status: 'active' | 'released' | 'all' },
-): Promise<HoldView[]> {
+  input: {
+    readonly scope: string | undefined;
+    readonly status: 'active' | 'released' | 'all';
+    readonly pageSize?: unknown;
+    readonly cursor?: string | undefined;
+  },
+): Promise<{ data: HoldView[]; meta: { pageSize: number; nextCursor: string | null } }> {
+  const size = pageSize(input.pageSize);
+  const after = input.cursor === undefined || input.cursor === '' ? undefined : String(decodeCursor(input.cursor)[0]);
   const rows = await runInUnitOfWork(db, (em) =>
     em.find(
       AuditHold,
       {
+        ...(after === undefined ? {} : { id: { $lt: after } }),
         ...(input.scope === undefined ? {} : { tenant: input.scope }),
         ...(input.status === 'active'
           ? { releasedAt: null }
@@ -136,10 +144,15 @@ export async function listHolds(
             ? { releasedAt: { $ne: null } }
             : {}),
       },
-      { orderBy: { id: 'desc' }, limit: 500 },
+      { orderBy: { id: 'desc' }, limit: size + 1 },
     ),
   );
-  return rows.map(viewOf);
+  const shown = rows.slice(0, size);
+  const last = shown.at(-1);
+  return {
+    data: shown.map(viewOf),
+    meta: { pageSize: size, nextCursor: rows.length > size && last !== undefined ? encodeCursor([last.id]) : null },
+  };
 }
 
 /** Releases a hold by a mark: the row stays. Releasing a hold that is released is not an error. */

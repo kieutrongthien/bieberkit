@@ -583,6 +583,22 @@ export const authTableSteps: readonly PluginMigrationStep[] = [
   authStep(LIFECYCLE, 'users-name-lower-index', async (trx) => {
     await sql`create index bk_auth_users_name_lower_index on bk_auth_users ((lower(name)))`.execute(trx);
   }),
+  // The sort of the users list by name (OPS-05), ending in the id that the list is ordered by.
+  authStep(NETWORK, 'users-name-index', async (trx) => {
+    await trx.schema.createIndex('bk_auth_users_name_index').on('bk_auth_users').columns(['name', 'id']).execute();
+  }),
+  // PostgreSQL reads a prefix search (`like 'an%'`) through an index only when the index has the pattern operator class (OPS-05).
+  // MySQL and SQLite use the indexes above for it.
+  authStep(NETWORK, 'users-name-lower-like-index', async (trx, dialect) => {
+    if (dialect !== 'postgres') return;
+    await sql`create index bk_auth_users_name_lower_like_index on bk_auth_users ((lower(name)) text_pattern_ops)`.execute(
+      trx,
+    );
+  }),
+  authStep(NETWORK, 'users-email-like-index', async (trx, dialect) => {
+    if (dialect !== 'postgres') return;
+    await sql`create index bk_auth_users_email_like_index on bk_auth_users (email varchar_pattern_ops)`.execute(trx);
+  }),
   // Version 0.7.0: the groups of a user and a role assignment that is limited to one group (ROL-09).
   authStep(NETWORK, 'user-roles-scope-group', async (trx) => {
     await trx.schema.alterTable('bk_auth_user_roles').addColumn('scope_group', 'varchar(120)').execute();
