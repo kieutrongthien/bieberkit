@@ -148,6 +148,9 @@ interface EntityContractOptions {
   readonly only?: readonly string[];
 }
 export declare function describeEntityContracts(options: EntityContractOptions): void;
+export declare function planOf(db: Database, logged: string): Promise<string[]>;
+export declare function fullScans(plan: readonly string[], dialect: Dialect): string[];
+export declare function analyze(db: Database, table: string): Promise<void>;
 export declare class TestingError extends BkError {}
 interface NetworkGuardOptions {
   readonly allow?: readonly string[];

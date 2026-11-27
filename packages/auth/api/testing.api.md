@@ -28,7 +28,7 @@
 Generated from the built declaration files by `pnpm api:update`. Do not edit by hand. A change here is a change to the public API and needs a changeset (spec section 22.3).
 
 ```ts
-import { C as ScopedPermission, n as AuthorizerOptions, t as AccessAuthorizer } from "./authorizer-B3QFV22q.js";
+import { D as ScopedPermission, n as AuthorizerOptions, t as AccessAuthorizer } from "./authorizer-CAQRsGSc.js";
 import { EntityDef } from "@bieberkit/data";
 type Row = Record<string, unknown>;
 interface MatrixReply {

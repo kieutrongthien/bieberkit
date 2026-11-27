@@ -30,15 +30,15 @@
 
 ## Slices of M1.7
 
-| Slice | Content                                                                                                                                                                     | State       |
-| ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
-| C1    | The framework of commands, the output, `--json` and the exit codes, the project loader, `plugins`, `env:check`, `env:example`                                               | this change |
-| C2    | `bieberkit check` and its rules (boundaries, headers, env access, route permissions, destructive migrations, WP-01, string SQL, stale generated files, ORM in entity files) |             |
-| C3    | Deterministic generators (`.bieberkit/*`, `packages/client`, `openapi`, `client:generate`, `routes`) and `make:entity`, `make:module`, `make:job`                           |             |
-| C4    | `create-bieberkit`: every flag and prompt, the plugin graph before any write, the files of section 6                                                                        |             |
-| C5    | The runtime commands: `start <role>` (the boot that wires the tracer, the metrics server and `redactKeys`), `dev`, `db:seed`, `doctor`, `test`                              |             |
-| C7    | `migrate:make`, `migrate` (`--status`, `--rollback`, `--allow-destructive`), `build`, and the rules `plugin-steps` and `scoped-permissions` of `check` (M1.8)               | this change |
-| C6    | `add` and `remove` with the data ownership prompt, and the Oxlint plugin                                                                                                    |             |
+| Slice | Content                                                                                                                                                                      | State       |
+| ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
+| C1    | The framework of commands, the output, `--json` and the exit codes, the project loader, `plugins`, `env:check`, `env:example`                                                | this change |
+| C2    | `bieberkit check` and its rules (boundaries, headers, env access, route permissions, destructive migrations, WP-01, string SQL, stale generated files, ORM in entity files)  |             |
+| C3    | Deterministic generators (`.bieberkit/*`, `packages/client`, `openapi`, `client:generate`, `routes`) and `make:entity`, `make:module`, `make:job`                            |             |
+| C4    | `create-bieberkit`: every flag and prompt, the plugin graph before any write, the files of section 6                                                                         |             |
+| C5    | The runtime commands: `start <role>` (the boot that wires the tracer, the metrics server and `redactKeys`), `dev`, `db:seed`, `doctor`, `test`                               |             |
+| C7    | `migrate:make`, `migrate` (`--status`, `--rollback`, `--allow-destructive`, `--deploy-id`), `build`, and the rules `plugin-steps` and `scoped-permissions` of `check` (M1.8) | this change |
+| C6    | `add` and `remove` with the data ownership prompt, and the Oxlint plugin                                                                                                     |             |
 
 ## Behavior of C1
 
@@ -113,7 +113,7 @@
 1. **`migrate:make [name]`** writes `migrations/Migration<timestamp>[_name].ts` for what the entities changed since `migrations/.snapshot-<dialect>.json`, and says its path. It never reads the live database (ADR 0008). A change that drops, renames or narrows something is written and reported as a warning, and the file is checked in `check`. Nothing to make is a success.
 2. **`migrate`** opens the migrator on `MIGRATE_DATABASE_URL` (DATA-25), under the lock, and runs the steps of the framework and of the plugins in boot order, then the files of the project. A refused step (`PLG_CONTRACT_SAME_DEPLOY`) is `BK_MIGRATE_REFUSED` and stops the run before the files. A file with a destructive statement stops the run with `DATA_MIGRATION_DESTRUCTIVE` until `--allow-destructive` is given in the contract release (DATA-08). `--status` lists the files and the steps that ran and that wait, and runs nothing. `--rollback` reverts the last file and never a plugin step (steps only go forward, DATA-24). The two flags together are `BK_USAGE_FLAGS_CONFLICT`. The migrate role of `bieberkit start migrate` does the same in production, and in development it keeps making the tables of the entities from the metadata, so the loop is fast.
 3. **`build`** regenerates everything (GEN-02), runs `pnpm exec tsc --noEmit` when the project has a `tsconfig.json` (`--no-typecheck` skips it; a failure is `BK_BUILD_TYPECHECK`), and writes the standalone Ajv validators and fast-json-stringify serializers to `apps/server/dist/standalone/` (SCH-06). The bundle of the server and the builds of the admin and of the site wait for M1.8's admin and for the image of M1.9.
-4. **`check plugin-steps`** reads the steps that plugins contribute: a drop or a rename in a step that is not a `contract` step is `BK_STEP_DESTRUCTIVE` (an error), and on MySQL a step with two or more DDL statements and one without `ifNotExists()` or `ifExists()` is `BK_STEP_MYSQL_UNGUARDED` (a warning, DATA-27). **`check scoped-permissions`** runs `checkScopedPermissions` of `@bieberkit/auth` on the conditions of every module (`BK_AUTHZ_SUBJECT_UNKNOWN`, `BK_AUTHZ_ACTION_INVALID`, `BK_AUTHZ_CONDITION_THROWS`, `BK_AUTHZ_CONDITION_NOT_ALLOWED`, AUTHZ-06). Both load the application, so the Oxlint plugin does not offer them.
+4. **`check plugin-steps`** reads the steps that plugins contribute: a drop or a rename in a step that is not a `contract` step is `BK_STEP_DESTRUCTIVE` (an error), a `contract` step with no `after` is `BK_STEP_CONTRACT_NO_AFTER` (a warning, because the migrate role cannot refuse it in the deploy of its expand step, DATA-08), and on MySQL a step with two or more DDL statements and one without `ifNotExists()` or `ifExists()` is `BK_STEP_MYSQL_UNGUARDED` (a warning, DATA-27). **`check scoped-permissions`** runs `checkScopedPermissions` of `@bieberkit/auth` on the conditions of every module (`BK_AUTHZ_SUBJECT_UNKNOWN`, `BK_AUTHZ_ACTION_INVALID`, `BK_AUTHZ_CONDITION_THROWS`, `BK_AUTHZ_CONDITION_NOT_ALLOWED`, AUTHZ-06). Both load the application, so the Oxlint plugin does not offer them.
 
 ## Tests
 

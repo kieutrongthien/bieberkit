@@ -121,6 +121,12 @@ Tests are written before the implementation and named after the requirement. The
 
 Each slice updates the relevant roadmap row only after its acceptance tests and the required checks pass. A changeset accompanies behavior or public API changes.
 
+## Slice H5: production guard for expand then contract (implemented)
+
+The guard of the runner already refused a contract step in the deploy of its expand step, but only a test of the runner proved it, and a **deploy was one run, not one release**: a retry, or a second migrate role that waited for the lock, got a new random id and finished the contract that the first had refused. Now `DEPLOY_ID` (a core env key) or `bieberkit migrate --deploy-id` names the deploy, and `runMigrations` uses it for the ledger. Without it the id stays random, which is right for a release that is run once.
+
+`packages/server/src/migrations.test.ts` proves it through the migrate role: refusal with `BK_MIGRATE_REFUSED` and the project files not run, the next deploy finishing the contract, the backfill of a row that the old version wrote between the two deploys (and the failure of a contract without one), a retry with the same id, `DEPLOY_ID` of the environment, and two migrate roles of one release. `plugin-migrate.dialects.test.ts` adds the retry case on the three dialects. `bieberkit check plugin-steps` warns about a contract step with no `after` (`BK_STEP_CONTRACT_NO_AFTER`), because the guard cannot protect it. The backfill stays a convention of the step: no code can tell whether a contract step repairs the rows that the old version wrote.
+
 ## Phase 2 integration and npm release
 
 M2.2 consumes the verified plugin metadata; M2.3 adds content and the public site; M2.4 supplies realtime, workflows, search and other shared features. M2.5 composes those capabilities into templates, M2.6 distributes editable source, and M2.7 proves the full matrix and upgrade paths. Keep integration coverage during development; do not postpone all dialect tests until M2.7.

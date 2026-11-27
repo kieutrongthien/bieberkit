@@ -124,7 +124,7 @@ export function validateSteps(steps: readonly PluginMigrationStep[], pluginOrder
 }
 
 export interface StepRisk {
-  readonly kind: 'mysql-unguarded-ddl' | 'destructive-before-contract';
+  readonly kind: 'mysql-unguarded-ddl' | 'destructive-before-contract' | 'contract-without-after';
   readonly step: string;
   readonly message: string;
 }
@@ -150,6 +150,13 @@ export function findStepRisks(steps: readonly PluginMigrationStep[]): StepRisk[]
         kind: 'mysql-unguarded-ddl',
         step: stepName(step),
         message: `${stepName(step)} has ${ddl.length} DDL statements and at least one without if not exists or if exists. MySQL cannot roll a failed step back.`,
+      });
+    }
+    if (step.kind === 'contract' && step.after === undefined) {
+      risks.push({
+        kind: 'contract-without-after',
+        step: stepName(step),
+        message: `${stepName(step)} is a contract step and does not say which step it finishes with after, so the migrate role cannot refuse it in the deploy of its expand step.`,
       });
     }
     if (step.kind !== 'contract' && DESTRUCTIVE.test(source)) {

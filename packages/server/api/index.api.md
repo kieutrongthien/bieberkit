@@ -76,7 +76,9 @@ interface Migrated {
   readonly applied: readonly string[];
   readonly statements: number;
 }
-export declare function migrate(db: Database, env: Pick<CoreEnv, "APP_ENV" | "QUEUE_DRIVER">): Promise<Migrated>;
+export declare function migrate(db: Database, env: Pick<CoreEnv, "APP_ENV" | "QUEUE_DRIVER"> & {
+  readonly DEPLOY_ID?: string | undefined;
+}): Promise<Migrated>;
 export declare const MIGRATIONS_DIR = "migrations";
 interface MigrationsOptions {
   readonly cwd?: string;

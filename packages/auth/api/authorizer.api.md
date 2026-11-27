@@ -31,7 +31,7 @@ Generated from the built declaration files by `pnpm api:update`. Do not edit by 
 import { AccessAnswer, AccessAnswer as AccessAnswer$1, Authorizer, HttpServer, Principal, RequestInfo } from "@bieberkit/http";
 import { Database, OrmSchema } from "@bieberkit/data/orm";
 import { EntityDef, PluginMigrationStep } from "@bieberkit/data";
-import { EntitySchema } from "@mikro-orm/core";
+import { EntitySchema, OptionalProps } from "@mikro-orm/core";
 type Action = "read" | "create" | "update" | "delete" | `transition:${string}`;
 interface PermissionEntry {
   readonly permission: string;
@@ -92,28 +92,43 @@ interface AuthRoleRow {
   name: string;
   system: boolean;
   requireMfa: boolean;
+  ipRestricted: boolean;
 }
 interface AuthRolePermissionRow {
   roleId: string;
   permission: string;
 }
 interface AuthUserRoleRow {
+  [OptionalProps]?: "scopeGroup";
   tenant: string;
   userId: string;
   roleId: string;
+  scopeGroup?: string | null;
+}
+interface AuthUserGroupRow {
+  userId: string;
+  groupId: string;
 }
 declare const AuthRole: EntitySchema<AuthRoleRow>;
 declare const AuthRolePermission: EntitySchema<AuthRolePermissionRow>;
 declare const AuthUserRole: EntitySchema<AuthUserRoleRow>;
+declare const AuthUserGroup: EntitySchema<AuthUserGroupRow>;
 declare const authEntities: readonly EntitySchema[];
 declare const authMigrationSteps: readonly PluginMigrationStep[];
 interface Grants {
   readonly permissions: Set<string>;
   readonly roles: string[];
   readonly requireMfa: boolean;
+  readonly ipRestricted: boolean;
 }
 type GrantLoader = (db: Database, tenantId: string | undefined, userId: string) => Promise<Grants>;
 declare const loadGrants: GrantLoader;
+declare function manageScope(db: Database, input: {
+  readonly userId: string;
+  readonly tenantId?: string | undefined;
+  readonly prefix: string;
+}): Promise<readonly string[] | undefined>;
+declare function restrictedRoleLookup(db: Database): (userId: string) => Promise<boolean>;
 interface AuthorizerOptions {
   readonly db: Database;
   readonly entities: readonly EntityDef<string>[];
@@ -127,5 +142,5 @@ interface AccessAuthorizer extends Authorizer {
   install(server: HttpServer): void;
 }
 declare function createAuthorizer(options: AuthorizerOptions): AccessAuthorizer;
-export { buildPermissionRegistry as A, ScopedPermission as C, MaskedField as D, Action as E, PermissionEntry as O, EntityShape as S, explainCondition as T, Ability as _, AuthRolePermission as a, AccessAnswer as b, AuthUserRole as c, Grants as d, NIL_TENANT as f, AUTH_PLUGIN as g, loadGrants as h, AuthRole as i, PermissionRegistry as k, AuthUserRoleRow as l, authMigrationSteps as m, AuthorizerOptions as n, AuthRolePermissionRow as o, authEntities as p, createAuthorizer as r, AuthRoleRow as s, AccessAuthorizer as t, GrantLoader as u, AbilityInput as v, buildAbility as w, Condition as x, AbilityUser as y };
+export { Action as A, AbilityUser as C, ScopedPermission as D, EntityShape as E, PermissionEntry as M, PermissionRegistry as N, buildAbility as O, buildPermissionRegistry as P, AbilityInput as S, Condition as T, loadGrants as _, AuthRolePermission as a, AUTH_PLUGIN as b, AuthUserGroup as c, AuthUserRoleRow as d, GrantLoader as f, authMigrationSteps as g, authEntities as h, AuthRole as i, MaskedField as j, explainCondition as k, AuthUserGroupRow as l, NIL_TENANT as m, AuthorizerOptions as n, AuthRolePermissionRow as o, Grants as p, createAuthorizer as r, AuthRoleRow as s, AccessAuthorizer as t, AuthUserRole as u, manageScope as v, AccessAnswer as w, Ability as x, restrictedRoleLookup as y };
 ```

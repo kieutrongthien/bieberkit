@@ -97,7 +97,8 @@ async function withMigrator<T>(options: MigrationsOptions, run: (opened: Opened)
       contributed<PluginMigrationStep>(modules, 'migrations'),
       project.plugins.map(({ def }) => def.name),
     );
-    return await run({ migrator, steps, order, deployId: options.deployId });
+    // One release is one deploy, however many times the migrate role runs for it: a retry must not finish what it refused (DATA-08).
+    return await run({ migrator, steps, order, deployId: options.deployId ?? env.DEPLOY_ID });
   } finally {
     await migrator.close();
   }
@@ -131,10 +132,10 @@ export function runMigrations(options: RunMigrationsOptions = {}): Promise<Migra
     });
     if (run.refused.length > 0) {
       throw new ServerError(
-        `${run.refused.length} migration step(s) were refused:\n${run.refused.map((item) => `${item.step}: ${item.message}`).join('\n')}`,
+        `${run.refused.length} migration step(s) were refused:\n${run.refused.map((item) => `${item.step}: ${item.message}`).join('\n')}${run.waiting.length === 0 ? '' : `\nWaiting behind them: ${run.waiting.join(', ')}`}`,
         {
           code: 'BK_MIGRATE_REFUSED',
-          fix: 'Split a destructive step from the release that adds the code that needs it, and run the contract step in a later deploy (DATA-08).',
+          fix: 'Run the contract step in the next deploy. Set DEPLOY_ID to the id of the release, so that every run of one release counts as one deploy (DATA-08).',
         },
       );
     }

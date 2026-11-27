@@ -107,7 +107,12 @@ export { openMigrator } from './migrate.ts';
 export type { MadeMigration, MigrationEnv, MigrationStatus, Migrator, MigratorOptions, UpOptions } from './migrate.ts';
 export { MIGRATION_LOCK_TABLE, withMigrationLock } from './migration-lock.ts';
 export type { MigrationLockOptions } from './migration-lock.ts';
-export { applyPluginMigrations, pluginMigrationStatus, runPluginMigrations } from './plugin-migrate.ts';
+export {
+  applyPluginMigrations,
+  CONTRACT_SAME_DEPLOY,
+  pluginMigrationStatus,
+  runPluginMigrations,
+} from './plugin-migrate.ts';
 export { useEncryptionKeys } from './encryption.ts';
 export type { EncryptionKeys } from './encryption.ts';
 export { reencryptAll } from './reencrypt.ts';

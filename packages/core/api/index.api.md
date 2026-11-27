@@ -161,6 +161,7 @@ interface CoreEnvValues {
   DATABASE_URL: string | undefined;
   DATABASE_READ_URLS: readonly string[];
   MIGRATE_DATABASE_URL: string | undefined;
+  DEPLOY_ID: string | undefined;
   DB_POOL_MAX: number;
   REDIS_URL: string | undefined;
   CACHE_REDIS_URL: string | undefined;
@@ -479,6 +480,10 @@ type LocalizedText = {
 } & Readonly<Record<string, string>>;
 type SettingType = "string" | "number" | "boolean" | "enum" | "json";
 type SettingScope = "global" | "tenant";
+interface SettingActor {
+  readonly ip: string;
+  readonly mfa: boolean;
+}
 interface Common {
   readonly key: string;
   readonly label: LocalizedText;
@@ -487,6 +492,7 @@ interface Common {
   readonly scope?: SettingScope;
   readonly public?: boolean;
   readonly secret?: boolean;
+  readonly guard?: (value: unknown, actor: SettingActor) => boolean;
 }
 type SettingInput<T> = (Common & {
   readonly type: "string";
@@ -518,6 +524,7 @@ interface SettingDef<T = unknown> {
   readonly secret: boolean;
   readonly values?: readonly string[];
   check(input: unknown): T;
+  readonly guard?: (value: unknown, actor: SettingActor) => boolean;
 }
 export declare function defineSetting<const T extends string>(input: Common & {
   readonly type: "enum";
@@ -751,5 +758,5 @@ export declare function defineConfig(input: ProjectConfigInput): ProjectConfigIn
 export declare function defineConfigSection<K extends keyof ConfigSections>(key: K, parser: Parser<ConfigSections[K]>): ConfigSection<K>;
 export declare function validateConfig(input: unknown, options?: ValidateConfigOptions): ProjectConfigInput;
 export declare const packageName = "@bieberkit/core";
-export type { AppEnv, AttributeValue, BkErrorOptions, CollectorOptions, ConfigProblem, ConfigSection, ConfigSections, Container, CoreEnv, CoreEnvResult, CoreEnvValues, Counter, Dialect, EmitResult, EnvCustomParse, EnvDescription, EnvKeyBuilder, EnvKeyDef, EnvKind, EnvOwner, EnvProblem, EnvSchema, EnvSource, EnvValues, ErrorBody, ErrorReportContext, ErrorReporter, EventBus, EventBusOptions, EventHandler, EventName, EventRegistry, FinishedSpan, Gauge, HandlerFailure, Histogram, HistogramOptions, Hook, HookFailure, Installed, IntOptions, KeyCollector, Lifecycle, LifecycleOptions, LoadEnvOptions, LocalizedText, LogFields, LogLevel, LogSanitizer, Logger, LoggerOptions, Manifest, ManifestCheck, MemoryReporter, MemorySpanExporter, MetricLabels, MetricOptions, MetricSample, Metrics, MetricsServer, MetricsServerOptions, ModuleContributions, ModuleDef, ModuleEmitter, ModuleInput, OnOptions, OpenSpan, OtlpExporterOptions, ParsedDsn, Parser, Phase, PluginDef, PluginEntry, PluginInput, PluginProblem, ProcessHandlerOptions, ProcessLike, ProjectConfigInput, ReadCoreEnvOptions, Registration, ReportLevel, ReportSource, ReporterConfig, ReporterFromConfigOptions, RequestContext, RequestScope, Resolution, ResolveContext, Role, SeedFn, SentryReporterOptions, ServiceDefs, ServiceName, ServiceRegistry, ServiceScope, SettingDef, SettingInput, SettingScope, SettingType, Span, SpanAttributes, SpanExporter, SpanKind, SpanOptions, StopResult, TraceParent, Tracer, TracerFromConfigOptions, TracerOptions, TracingConfig, ValidateConfigOptions };
+export type { AppEnv, AttributeValue, BkErrorOptions, CollectorOptions, ConfigProblem, ConfigSection, ConfigSections, Container, CoreEnv, CoreEnvResult, CoreEnvValues, Counter, Dialect, EmitResult, EnvCustomParse, EnvDescription, EnvKeyBuilder, EnvKeyDef, EnvKind, EnvOwner, EnvProblem, EnvSchema, EnvSource, EnvValues, ErrorBody, ErrorReportContext, ErrorReporter, EventBus, EventBusOptions, EventHandler, EventName, EventRegistry, FinishedSpan, Gauge, HandlerFailure, Histogram, HistogramOptions, Hook, HookFailure, Installed, IntOptions, KeyCollector, Lifecycle, LifecycleOptions, LoadEnvOptions, LocalizedText, LogFields, LogLevel, LogSanitizer, Logger, LoggerOptions, Manifest, ManifestCheck, MemoryReporter, MemorySpanExporter, MetricLabels, MetricOptions, MetricSample, Metrics, MetricsServer, MetricsServerOptions, ModuleContributions, ModuleDef, ModuleEmitter, ModuleInput, OnOptions, OpenSpan, OtlpExporterOptions, ParsedDsn, Parser, Phase, PluginDef, PluginEntry, PluginInput, PluginProblem, ProcessHandlerOptions, ProcessLike, ProjectConfigInput, ReadCoreEnvOptions, Registration, ReportLevel, ReportSource, ReporterConfig, ReporterFromConfigOptions, RequestContext, RequestScope, Resolution, ResolveContext, Role, SeedFn, SentryReporterOptions, ServiceDefs, ServiceName, ServiceRegistry, ServiceScope, SettingActor, SettingDef, SettingInput, SettingScope, SettingType, Span, SpanAttributes, SpanExporter, SpanKind, SpanOptions, StopResult, TraceParent, Tracer, TracerFromConfigOptions, TracerOptions, TracingConfig, ValidateConfigOptions };
 ```

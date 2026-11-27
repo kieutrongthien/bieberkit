@@ -338,7 +338,7 @@ Execution order: M2.1 through M2.7, then the reviewed npm release, then M1.10 Pi
 - [ ] Extension tables and `extends` for fields on other plugins' entities (PLG-06, §11.3)
 - [ ] `bieberkit plugins` graph, `make:plugin`, `remove` with migration prompt (PLG-03)
 - [ ] `check` rules for plugin imports and cross-plugin table queries (PLG-01, PLG-02)
-- [ ] Expand then contract guard in the migrate role (DATA-08)
+- [x] Expand then contract guard in the migrate role (DATA-08). H5: `DEPLOY_ID` / `bieberkit migrate --deploy-id` make every run of one release one deploy; the refusal is proven through the migrate role in `server/src/migrations.test.ts` (refusal, next deploy, backfill of rows from the old version, retry, two migrate roles) and on three dialects in `data/src/orm/plugin-migrate.dialects.test.ts`; `check plugin-steps` warns about a contract step with no `after`
 
 ### M2.2 Admin renderer
 

@@ -183,4 +183,13 @@ describe('findStepRisks', () => {
       expect.objectContaining({ kind: 'destructive-before-contract', step: 'a/rename' }),
     ]);
   });
+
+  it('DATA-08 flags a contract step that does not say which expand step it finishes, because the migrate role cannot guard it', () => {
+    const lone = step('a', '2.0.0', 'lone', { kind: 'contract', up: async () => undefined });
+    const named = step('a', '2.0.0', 'named', { kind: 'contract', after: 'first', up: async () => undefined });
+    const first = step('a', '1.0.0', 'first', { up: async () => undefined });
+    expect(findStepRisks([first, lone, named])).toEqual([
+      expect.objectContaining({ kind: 'contract-without-after', step: 'a/lone' }),
+    ]);
+  });
 });

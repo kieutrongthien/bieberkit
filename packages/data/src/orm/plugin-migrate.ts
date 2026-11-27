@@ -124,6 +124,9 @@ async function apply(
   }
 }
 
+/** The code of a refused contract step: its expand step ran in the same deploy (DATA-08). */
+export const CONTRACT_SAME_DEPLOY = 'PLG_CONTRACT_SAME_DEPLOY';
+
 /**
  * Runs the pending steps of the plugins (DATA-24). Each step runs in its own transaction together with its ledger row, so a failed
  * step leaves no row, and the run stops there with `DATA_MIGRATION_STEP_FAILED`. A contract step whose expand step ran in the
@@ -166,7 +169,7 @@ export async function runPluginMigrations(
     ) {
       run.refused.push({
         step: name,
-        code: 'PLG_CONTRACT_SAME_DEPLOY',
+        code: CONTRACT_SAME_DEPLOY,
         message: `${name} finishes ${step.plugin}/${step.after}, which ran in this deploy. Run it in the next deploy, so that the old version of the code is gone first.`,
       });
       blocked.add(step.plugin);

@@ -77,6 +77,16 @@ describe('section 5.2 migrate', () => {
     expect(Reflect.get(Object(second.data), 'steps')).toEqual([]);
   });
 
+  it('DATA-08 migrate --deploy-id names the deploy in the answer, and a bad one is refused', async () => {
+    const { root } = fresh();
+    await run(root, ['migrate:make']);
+    const named = await run(root, ['migrate', '--json', '--deploy-id', 'release-42']);
+    expect(named.code).toBe(0);
+    expect(Reflect.get(Object(named.data), 'deployId')).toBe('release-42');
+    const tooLong = await run(root, ['migrate', '--json', '--deploy-id', 'x'.repeat(41)]);
+    expect(tooLong.code).not.toBe(0);
+  });
+
   it('5.2 migrate --status lists what ran and what waits without running anything', async () => {
     const { root } = fresh();
     await run(root, ['migrate:make']);

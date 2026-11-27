@@ -69,6 +69,7 @@ interface Principal {
   readonly via?: "cookie" | "token";
   readonly sessionId?: string;
   readonly mfa?: boolean;
+  readonly mfaEnrolBy?: string;
   readonly grants?: readonly string[];
   readonly tenantId?: string;
 }

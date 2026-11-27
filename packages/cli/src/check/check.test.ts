@@ -372,10 +372,16 @@ describe('DATA-08 the migrations rule', () => {
 });
 
 const PLUGIN = '@bieberkit/plugin-p';
-const pluginWith = (kind: string, up: string): Record<string, string> => ({
+const pluginWith = (kind: string, up: string, after = true): Record<string, string> => ({
   [`node_modules/${PLUGIN}/index.mjs`]: `import { definePlugin } from '@bieberkit/core';
 export default definePlugin({ name: '${PLUGIN}', version: '1.0.0', core: '*', dialects: ['sqlite', 'mysql'],
-  migrations: [{ plugin: '${PLUGIN}', version: '1.0.0', id: 'one', kind: '${kind}', up: async (trx) => { ${up} } }] });
+  migrations: [${
+    kind === 'contract' && after
+      ? `{ plugin: '${PLUGIN}', version: '0.9.0', id: 'first', kind: 'expand', up: async () => undefined }, `
+      : ''
+  }{ plugin: '${PLUGIN}', version: '1.0.0', id: 'one', kind: '${kind}', ${
+    kind === 'contract' && after ? "after: 'first', " : ''
+  }up: async (trx) => { ${up} } }] });
 `,
 });
 
@@ -397,6 +403,13 @@ describe('DATA-08 and DATA-27 the plugin-steps rule', () => {
       { plugins: [{ name: PLUGIN }] },
     );
     expect([code, codes]).toEqual([0, []]);
+  });
+
+  it('DATA-08 a contract step with no after is a warning, because the migrate role cannot refuse it', async () => {
+    const { code, violations } = await check(pluginWith('contract', 'return;', false), ['plugin-steps'], {
+      plugins: [{ name: PLUGIN }],
+    });
+    expect([code, violations]).toMatchObject([0, [{ code: 'BK_STEP_CONTRACT_NO_AFTER', severity: 'warning' }]]);
   });
 
   it('DATA-27 on MySQL a step with two DDL statements and one without a guard is a warning, and on SQLite it is not reported', async () => {

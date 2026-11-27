@@ -30,7 +30,7 @@ import { describeDialects } from '../testing/dialects.ts';
 import type { PluginMigrationStep } from '../migrations/steps.ts';
 import { kyselyOf } from './internals.ts';
 import { setNotNull } from './portable.ts';
-import { runPluginMigrations } from './plugin-migrate.ts';
+import { CONTRACT_SAME_DEPLOY, runPluginMigrations } from './plugin-migrate.ts';
 
 type Db = Kysely<Record<string, Record<string, unknown>>>;
 
@@ -179,7 +179,7 @@ describeDialects('DATA-24 plugin migration runner', ({ dialect, open }) => {
     ];
     const run = await runPluginMigrations(db, dialect, steps, { pluginOrder: ['a', 'b'], deployId: 'deploy-1' });
     expect(run.applied).toEqual(['a/add', 'b/other']);
-    expect(run.refused).toEqual([expect.objectContaining({ step: 'a/drop', code: 'PLG_CONTRACT_SAME_DEPLOY' })]);
+    expect(run.refused).toEqual([expect.objectContaining({ step: 'a/drop', code: CONTRACT_SAME_DEPLOY })]);
     expect(run.refused[0]?.message).toContain('a/add');
     expect(run.waiting).toEqual(['a/later']);
     expect((await ledger(db)).map((row) => row.step_id)).toEqual(['add', 'other']);
@@ -198,6 +198,23 @@ describeDialects('DATA-24 plugin migration runner', ({ dialect, open }) => {
     await runPluginMigrations(db, dialect, steps, { pluginOrder: ['a'], deployId: 'deploy-1' });
     const second = await runPluginMigrations(db, dialect, steps, { pluginOrder: ['a'], deployId: 'deploy-2' });
     expect(second).toEqual({ deployId: 'deploy-2', applied: ['a/drop', 'a/later'], refused: [], waiting: [] });
+  });
+
+  it('DATA-08 a retry of the same deploy is refused again, and a run with another id finishes it', async () => {
+    const db = await connect();
+    const steps = [
+      step('a', '1.1.0', 'add', createTable('a_new')),
+      step('a', '1.2.0', 'drop', async (trx) => void (await sql`drop table a_new`.execute(trx)), {
+        kind: 'contract',
+        after: 'add',
+      }),
+    ];
+    await runPluginMigrations(db, dialect, steps, { pluginOrder: ['a'], deployId: 'release-5' });
+    const retry = await runPluginMigrations(db, dialect, steps, { pluginOrder: ['a'], deployId: 'release-5' });
+    expect(retry.applied).toEqual([]);
+    expect(retry.refused.map((item) => item.code)).toEqual([CONTRACT_SAME_DEPLOY]);
+    const next = await runPluginMigrations(db, dialect, steps, { pluginOrder: ['a'], deployId: 'release-6' });
+    expect(next.applied).toEqual(['a/drop']);
   });
 
   it('DATA-08 refuses a contract whose expand was skipped into the same deploy, even across several versions', async () => {

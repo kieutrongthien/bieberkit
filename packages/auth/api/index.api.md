@@ -29,10 +29,10 @@ Generated from the built declaration files by `pnpm api:update`. Do not edit by 
 
 ```ts
 import "@bieberkit/data";
-import { A as buildPermissionRegistry, C as ScopedPermission, D as MaskedField, E as Action, O as PermissionEntry, S as EntityShape, T as explainCondition, _ as Ability, a as AuthRolePermission, b as AccessAnswer, c as AuthUserRole, d as Grants, f as NIL_TENANT, g as AUTH_PLUGIN, h as loadGrants, i as AuthRole, k as PermissionRegistry, l as AuthUserRoleRow, m as authMigrationSteps, n as AuthorizerOptions, o as AuthRolePermissionRow, p as authEntities, r as createAuthorizer, s as AuthRoleRow, t as AccessAuthorizer, u as GrantLoader, v as AbilityInput, w as buildAbility, x as Condition, y as AbilityUser } from "./authorizer-B3QFV22q.js";
+import { A as Action, C as AbilityUser, D as ScopedPermission, E as EntityShape, M as PermissionEntry, N as PermissionRegistry, O as buildAbility, P as buildPermissionRegistry, S as AbilityInput, T as Condition, _ as loadGrants, a as AuthRolePermission, b as AUTH_PLUGIN, c as AuthUserGroup, d as AuthUserRoleRow, f as GrantLoader, g as authMigrationSteps, h as authEntities, i as AuthRole, j as MaskedField, k as explainCondition, l as AuthUserGroupRow, m as NIL_TENANT, n as AuthorizerOptions, o as AuthRolePermissionRow, p as Grants, r as createAuthorizer, s as AuthRoleRow, t as AccessAuthorizer, u as AuthUserRole, v as manageScope, w as AccessAnswer, x as Ability, y as restrictedRoleLookup } from "./authorizer-CAQRsGSc.js";
 import { Auth, BetterAuthOptions, BetterAuthOptions as BetterAuthOptions$1 } from "better-auth";
 import { Authenticator, HttpServer, TenantResolver } from "@bieberkit/http";
-import { BkError, Dialect } from "@bieberkit/core";
+import { BkError, Dialect, SettingDef } from "@bieberkit/core";
 import { Database } from "@bieberkit/data/orm";
 import { EntityDef as EntityDef$1 } from "@bieberkit/data/schema";
 import { EntityManager, EntitySchema, OptionalProps } from "@mikro-orm/core";
@@ -70,6 +70,63 @@ interface RateLimiter {
   }>;
   replay(consumed: readonly Consumption[]): Promise<void>;
 }
+export declare function limitActor(db: Database, input: {
+  readonly action: string;
+  readonly actorId: string | null | undefined;
+  readonly rule: Limit;
+}): Promise<void>;
+interface SessionPolicy {
+  readonly idleMinutes: number;
+  readonly absoluteHours: number;
+  readonly maxConcurrent: number;
+}
+interface MfaPolicy {
+  readonly requiredForAll: boolean;
+  readonly graceDays: number;
+  readonly since: Date | null;
+}
+interface NetworkPolicy {
+  readonly adminAllowlist: readonly string[];
+}
+interface SignInPolicy {
+  readonly notifyNewDevice: boolean;
+}
+interface SecurityPolicy {
+  readonly session: SessionPolicy;
+  readonly mfa: MfaPolicy;
+  readonly network: NetworkPolicy;
+  readonly signIn: SignInPolicy;
+}
+export declare const DEFAULT_POLICY: SecurityPolicy;
+interface PolicyReader {
+  read(context: {
+    readonly tenantId?: string;
+  }): Promise<SecurityPolicy>;
+}
+export declare const defaultPolicyReader: PolicyReader;
+export declare function isCidr(range: string): boolean;
+export declare function checkNetwork(allowlist: readonly string[], ip: string): boolean;
+type SessionVerdict = "ok" | "idle" | "absolute";
+export declare function checkSession(policy: SessionPolicy, session: {
+  readonly createdAt: Date;
+  readonly lastSeenAt: Date;
+  readonly now: Date;
+}): SessionVerdict;
+type MfaVerdict = {
+  readonly status: "ok";
+} | {
+  readonly status: "grace";
+  readonly enrolBy: Date;
+} | {
+  readonly status: "enrol";
+};
+export declare function checkMfa(policy: MfaPolicy, user: {
+  readonly mfa: boolean;
+  readonly createdAt: Date;
+  readonly now: Date;
+}): MfaVerdict;
+export declare const securitySettings: readonly SettingDef[];
+export declare function policyOf(read: (def: SettingDef) => unknown): SecurityPolicy;
 interface AuthMail {
   readonly to: string;
   readonly url: string;
@@ -98,6 +155,7 @@ interface AuthMethods {
 }
 interface CreateAuthOptions {
   readonly db: Database;
+  readonly policy?: PolicyReader;
   readonly dialect: Dialect;
   readonly secret: string;
   readonly baseUrl: string;
@@ -115,6 +173,12 @@ interface AuthMailOptions {
   readonly sendInvite?: (mail: AuthMail) => Promise<void>;
   readonly sendMfaReset?: (notice: {
     readonly to: string;
+  }) => Promise<void>;
+  readonly sendNewDevice?: (notice: {
+    readonly to: string;
+    readonly device: string;
+    readonly ip: string;
+    readonly at: Date;
   }) => Promise<void>;
 }
 type AuthInstance = Auth;
@@ -139,7 +203,17 @@ export declare function createApiKey(auth: AuthInstance, db: Database, input: Ap
 export declare function revokeApiKey(db: Database, input: {
   readonly id: string;
 }): Promise<void>;
-export declare function createAuthenticator(auth: AuthInstance): Authenticator;
+interface AuthenticatorOptions {
+  readonly policy?: PolicyReader;
+  readonly restricted?: (userId: string) => Promise<boolean>;
+  readonly onDenied?: (event: {
+    readonly userId: string;
+    readonly ip: string;
+  }) => void | Promise<void>;
+  readonly clock?: () => Date;
+}
+export declare function auditNetworkDenied(db: Database): NonNullable<AuthenticatorOptions["onDenied"]>;
+export declare function createAuthenticator(auth: AuthInstance, options?: AuthenticatorOptions): Authenticator;
 interface DriftProperty {
   nullable?: boolean;
   unique?: boolean;
@@ -170,16 +244,19 @@ interface NewRole {
   readonly name: string;
   readonly permissions?: readonly string[];
   readonly requireMfa?: boolean;
+  readonly ipRestricted?: boolean;
   readonly system?: boolean;
 }
 interface Assignment {
   readonly tenantId?: string;
   readonly userId: string;
   readonly roleId: string;
+  readonly groupId?: string;
 }
 interface BatchAssignment {
   readonly tenantId?: string;
   readonly roleId: string;
+  readonly groupId?: string;
   readonly userIds: readonly string[];
 }
 interface BatchResult {
@@ -193,6 +270,7 @@ interface RoleView {
   readonly name: string;
   readonly system: boolean;
   readonly requireMfa: boolean;
+  readonly ipRestricted: boolean;
   readonly permissions: readonly string[];
   readonly memberCount: number;
 }
@@ -222,6 +300,7 @@ export declare function setRolePermissions(db: Database, roleId: string, permiss
 export declare function updateRole(db: Database, roleId: string, changes: {
   readonly name?: string;
   readonly requireMfa?: boolean;
+  readonly ipRestricted?: boolean;
 }): Promise<boolean>;
 export declare function deleteRole(db: Database, roleId: string, options?: {
   readonly reassignTo?: string;
@@ -362,10 +441,12 @@ interface DisableUserInput {
   readonly userId: string;
   readonly reason: string;
   readonly actorId: string | null;
+  readonly overrideExternal?: boolean;
 }
 interface EnableUserInput {
   readonly userId: string;
   readonly actorId: string | null;
+  readonly overrideExternal?: boolean;
 }
 type UserStatus = "active" | "disabled" | "invited";
 type UserSort = "createdAt" | "-createdAt" | "name" | "-name" | "email" | "-email";
@@ -386,6 +467,7 @@ interface UserRecord {
 }
 interface UserDetail extends UserRecord {
   readonly activeSessions: number;
+  readonly groups: readonly string[];
 }
 interface UserListQuery {
   readonly tenantId?: string;
@@ -399,6 +481,7 @@ interface UserListQuery {
   readonly pageSize?: unknown;
   readonly cursor?: string;
   readonly withTotal?: boolean;
+  readonly groupIds?: readonly string[];
 }
 interface UserPage {
   readonly data: readonly UserRecord[];
@@ -419,6 +502,8 @@ interface NewUser {
   readonly password?: string;
   readonly invite?: boolean;
   readonly roles?: readonly string[];
+  readonly groups?: readonly string[];
+  readonly groupIds?: readonly string[];
   readonly tenantId?: string;
   readonly actorId: string | null;
 }
@@ -428,6 +513,7 @@ interface UserChange {
   readonly email?: string;
   readonly tenantId?: string;
   readonly actorId: string | null;
+  readonly overrideExternal?: boolean;
 }
 interface UserAction {
   readonly userId: string;
@@ -447,6 +533,11 @@ interface UserService {
   list(query: UserListQuery): Promise<UserPage>;
   get(userId: string, options?: {
     readonly tenantId?: string;
+    readonly groupIds?: readonly string[];
+  }): Promise<UserDetail>;
+  setGroups(input: UserAction & {
+    readonly groups: readonly string[];
+    readonly groupIds?: readonly string[];
   }): Promise<UserDetail>;
   create(input: NewUser): Promise<UserDetail>;
   update(input: UserChange): Promise<UserDetail>;
@@ -461,6 +552,22 @@ interface UserService {
   sendPasswordReset(input: UserAction): Promise<void>;
   resendInvite(input: UserAction): Promise<void>;
   resetMfa(input: UserAction): Promise<void>;
+  upsertExternalUser(input: ExternalUser): Promise<UserDetail>;
+  setExternalDisabled(input: ExternalDisabled): Promise<boolean>;
+}
+interface ExternalIdentity {
+  readonly source: string;
+  readonly externalId: string;
+}
+interface ExternalUser extends ExternalIdentity {
+  readonly name: string;
+  readonly email: string;
+  readonly disabled?: boolean;
+  readonly tenantId?: string;
+}
+interface ExternalDisabled extends ExternalIdentity {
+  readonly disabled: boolean;
+  readonly reason?: string;
 }
 export declare function disableUser(db: Database, input: DisableUserInput): Promise<boolean>;
 export declare function enableUser(db: Database, input: EnableUserInput): Promise<boolean>;
@@ -491,5 +598,5 @@ declare module "@bieberkit/core" {
     permissions: readonly string[];
   }
 }
-export { AUTH_PLUGIN, type Ability, type AbilityInput, type AbilityUser, type AccessAnswer, type AccessAuthorizer, type Action, type ApiKeyInput, type Assignment, type AuthAccountRow, type AuthApiKeyRow, type AuthApiKeys, type AuthInstance, type AuthLimits, type AuthMail, type AuthMailOptions, type AuthPasskeyRow, type AuthRateLimitRow, AuthRole, AuthRolePermission, type AuthRolePermissionRow, type AuthRoleRow, type AuthRoutesOptions, type AuthSecondaryStorage, type AuthSessionRow, type AuthTwoFactorRow, AuthUserRole, type AuthUserRoleRow, type AuthUserRow, type AuthVerificationRow, type AuthorizerOptions, type BatchAssignment, type BatchResult, type BetterAuthOptions, type Condition, type ConditionFinding, type CreateAuthOptions, type CreatedApiKey, type DisableUserInput, type DriftEntity, type DriftProperty, type EffectivePermission, type EnableUserInput, type EntityShape, type GrantLoader, type Grants, type ImpersonationEntry, type Limit, type Limit2, type MaskedField, type MemberPage, NIL_TENANT, type NewRole, type NewUser, type PermissionEntry, type PermissionRegistry, type RoleMember, type RoleView, type ScopedPermission, type TenantResolverOptions, type UserAction, type UserChange, type UserDetail, type UserListQuery, type UserPage, type UserRecord, type UserService, type UserServiceOptions, type UserSession, type UserSort, type UserStatus, authEntities, authMigrationSteps, buildAbility, buildPermissionRegistry, createAuthorizer, explainCondition, loadGrants };
+export { AUTH_PLUGIN, type Ability, type AbilityInput, type AbilityUser, type AccessAnswer, type AccessAuthorizer, type Action, type ApiKeyInput, type Assignment, type AuthAccountRow, type AuthApiKeyRow, type AuthApiKeys, type AuthInstance, type AuthLimits, type AuthMail, type AuthMailOptions, type AuthPasskeyRow, type AuthRateLimitRow, AuthRole, AuthRolePermission, type AuthRolePermissionRow, type AuthRoleRow, type AuthRoutesOptions, type AuthSecondaryStorage, type AuthSessionRow, type AuthTwoFactorRow, AuthUserGroup, type AuthUserGroupRow, AuthUserRole, type AuthUserRoleRow, type AuthUserRow, type AuthVerificationRow, type AuthenticatorOptions, type AuthorizerOptions, type BatchAssignment, type BatchResult, type BetterAuthOptions, type Condition, type ConditionFinding, type CreateAuthOptions, type CreatedApiKey, type DisableUserInput, type DriftEntity, type DriftProperty, type EffectivePermission, type EnableUserInput, type EntityShape, type ExternalDisabled, type ExternalIdentity, type ExternalUser, type GrantLoader, type Grants, type ImpersonationEntry, type Limit, type Limit2, type MaskedField, type MemberPage, type MfaPolicy, type MfaVerdict, NIL_TENANT, type NetworkPolicy, type NewRole, type NewUser, type PermissionEntry, type PermissionRegistry, type PolicyReader, type RoleMember, type RoleView, type ScopedPermission, type SecurityPolicy, type SessionPolicy, type SessionVerdict, type SignInPolicy, type TenantResolverOptions, type UserAction, type UserChange, type UserDetail, type UserListQuery, type UserPage, type UserRecord, type UserService, type UserServiceOptions, type UserSession, type UserSort, type UserStatus, authEntities, authMigrationSteps, buildAbility, buildPermissionRegistry, createAuthorizer, explainCondition, loadGrants, manageScope, restrictedRoleLookup };
 ```

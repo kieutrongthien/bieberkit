@@ -29,7 +29,7 @@ Generated from the built declaration files by `pnpm api:update`. Do not edit by 
 
 ```ts
 import { A as fold, C as ResetEvery, D as f, E as TransitionDef, O as Compare, S as FieldKind, T as StateOptions, _ as ColumnDef, a as EntityDef, b as FieldBuilders, c as FieldLike, d as StandardColumn, f as TableConstraints, g as tableConstraints, h as standardColumns, i as ConstraintDef, j as nfc, k as codePointLength, l as OrmOverride, m as snake, n as AdminOptions, o as EntityOptions, p as defineEntity, r as ApiOptions, s as Feature, t as ActionDef, u as Permissions, v as ComputedFn, w as SchemaValue, x as FieldDef, y as Field } from "./define-entity-CMoIdUz2.js";
-import { A as upStatementsOfMigration, C as findStepRisks, D as DestructiveFinding, E as validateSteps, M as dataError, O as DestructiveKind, S as compareVersions, T as stepName, b as StepKind, j as DataError, k as detectDestructive, t as Database, v as PluginMigrationStep, w as orderSteps, x as StepRisk, y as StepDatabase } from "./connect-q_meNF6W.js";
+import { A as upStatementsOfMigration, C as findStepRisks, D as DestructiveFinding, E as validateSteps, M as dataError, O as DestructiveKind, S as compareVersions, T as stepName, b as StepKind, j as DataError, k as detectDestructive, t as Database, v as PluginMigrationStep, w as orderSteps, x as StepRisk, y as StepDatabase } from "./connect-E7O4kGaH.js";
 import { a as UpdateInput, i as Row, n as EntityRegistry, t as CreateInput } from "./registry-CFbTH7iw.js";
 interface Uuid7Options {
   readonly now?: () => number;

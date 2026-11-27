@@ -46,19 +46,28 @@ export interface Migrated {
  * does nothing destructive (a column or a table is never dropped here). A production database gets its entity tables from the migrations
  * of the project, which the commands of the migrator run (M1.8).
  */
-export async function migrate(db: Database, env: Pick<CoreEnv, 'APP_ENV' | 'QUEUE_DRIVER'>): Promise<Migrated> {
+export async function migrate(
+  db: Database,
+  env: Pick<CoreEnv, 'APP_ENV' | 'QUEUE_DRIVER'> & { readonly DEPLOY_ID?: string | undefined },
+): Promise<Migrated> {
   const steps: PluginMigrationStep[] = [...dataMigrationSteps, ...authMigrationSteps];
   const order = [DATA_PLUGIN, AUTH_PLUGIN];
   if (env.QUEUE_DRIVER === 'database') {
     steps.push(...queueMigrationSteps);
     order.push(QUEUE_PLUGIN);
   }
-  const run = await applyPluginMigrations(db, steps, { pluginOrder: order });
+  const run = await applyPluginMigrations(db, steps, {
+    pluginOrder: order,
+    ...(env.DEPLOY_ID === undefined ? {} : { deployId: env.DEPLOY_ID }),
+  });
   if (run.refused.length > 0) {
-    throw new ServerError(`${run.refused.length} migration step(s) were refused.`, {
-      code: 'BK_MIGRATE_REFUSED',
-      fix: 'Run bieberkit check migrations, and split a destructive step from the release that adds the code that needs it (DATA-08).',
-    });
+    throw new ServerError(
+      `${run.refused.length} migration step(s) were refused: ${run.refused.map((item) => item.step).join(', ')}.`,
+      {
+        code: 'BK_MIGRATE_REFUSED',
+        fix: 'Run the contract step in the next deploy, and set DEPLOY_ID to the id of the release (DATA-08).',
+      },
+    );
   }
   let statements = 0;
   if (env.APP_ENV !== 'production') {

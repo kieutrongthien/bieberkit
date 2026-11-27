@@ -29,7 +29,7 @@ Generated from the built declaration files by `pnpm api:update`. Do not edit by 
 
 ```ts
 import { C as ResetEvery, E as TransitionDef, a as EntityDef } from "./define-entity-CMoIdUz2.js";
-import { D as DestructiveFinding, _ as EncryptionKeys, a as ResolvedConnection, c as currentEntityManager, d as runInUnitOfWork, f as AuditSink, g as ReferenceVisibility, h as runAsTenant, i as Orm, l as resolveConnection, m as currentTenantId, n as DatabaseEnv, o as afterCommit, p as SystemScopeEntry, r as DatabaseOptions, s as createDatabase, t as Database, u as runInTransaction, v as PluginMigrationStep, y as StepDatabase } from "./connect-q_meNF6W.js";
+import { D as DestructiveFinding, _ as EncryptionKeys, a as ResolvedConnection, c as currentEntityManager, d as runInUnitOfWork, f as AuditSink, g as ReferenceVisibility, h as runAsTenant, i as Orm, l as resolveConnection, m as currentTenantId, n as DatabaseEnv, o as afterCommit, p as SystemScopeEntry, r as DatabaseOptions, s as createDatabase, t as Database, u as runInTransaction, v as PluginMigrationStep, y as StepDatabase } from "./connect-E7O4kGaH.js";
 import { Dialect, Logger } from "@bieberkit/core";
 import { EntityData, EntityManager, EntityName, EntityProperty, EntitySchema, FilterOptions, FilterQuery, FindOneOptions, FindOptions, NativeInsertUpdateOptions, Platform, Primary, RequiredEntityData, Type, UpdateOptions } from "@mikro-orm/core";
 import { Kysely, RawBuilder, SqliteDialect, Transaction } from "kysely";
@@ -69,6 +69,8 @@ interface AuditEntry {
   readonly piiOf?: EntityDef<string>;
   readonly tenantId?: string;
 }
+export declare const AUDIT_RECORDED_EVENT = "audit.entry.recorded";
+export declare function mirrorAudit(orm: Orm): void;
 export declare function recordAudit(em: EntityManager, entry: AuditEntry): void;
 export declare function auditTableSink(orm: Orm): AuditSink;
 interface AuditPruneOptions {
@@ -78,6 +80,7 @@ interface AuditPruneOptions {
 interface AuditPrune {
   readonly count: number;
   readonly pruned: boolean;
+  readonly kept: number;
 }
 export declare function pruneAuditLog(db: Database, options: AuditPruneOptions): Promise<AuditPrune>;
 export declare const DATA_PLUGIN = "@bieberkit/data";
@@ -153,6 +156,18 @@ interface AuditLogRow {
   reason?: string | null;
   data?: string | null;
 }
+interface AuditHoldRow {
+  id: string;
+  tenant?: string | null;
+  entity?: string | null;
+  recordId?: string | null;
+  actorId?: string | null;
+  reason: string;
+  createdAt: Date;
+  createdBy?: string | null;
+  releasedAt?: Date | null;
+  releasedBy?: string | null;
+}
 export declare const OutboxEntry: EntitySchema<OutboxEntryRow>;
 export declare const OutboxProcessed: EntitySchema<OutboxProcessedRow>;
 export declare const AuditLog: EntitySchema<AuditLogRow>;
@@ -161,6 +176,7 @@ export declare const Comment: EntitySchema<CommentEntryRow>;
 export declare const Tag: EntitySchema<TagEntryRow>;
 export declare const Attachment: EntitySchema<AttachmentEntryRow>;
 export declare const TimelineEntry: EntitySchema<TimelineEntryRow>;
+export declare const AuditHold: EntitySchema<AuditHoldRow>;
 export declare const frameworkEntities: readonly EntitySchema[];
 type Trx = Kysely<StepDatabase>;
 export declare const dataMigrationSteps: readonly PluginMigrationStep[];
@@ -350,6 +366,7 @@ interface PluginRunOptions {
   readonly pluginOrder: readonly string[];
   readonly deployId?: string;
 }
+export declare const CONTRACT_SAME_DEPLOY = "PLG_CONTRACT_SAME_DEPLOY";
 export declare function runPluginMigrations(db: Kysely<StepDatabase>, dialect: Dialect, steps: readonly PluginMigrationStep[], options: PluginRunOptions): Promise<PluginRun>;
 export declare function applyPluginMigrations(db: Database, steps: readonly PluginMigrationStep[], options: PluginRunOptions): Promise<PluginRun>;
 interface PluginStatus {
@@ -471,5 +488,5 @@ export declare function setTranslation(em: EntityManager, schema: OrmSchema, rec
 type Row = Record<string, unknown>;
 export declare function toApiRow(schema: OrmSchema, row: Row): Row;
 export declare function toOrmData(schema: OrmSchema, input: Row, _mode: "create" | "update"): Row;
-export { type AggregateOptions, type AggregateResult, type AggregateRow, type AttachmentInput, type AttachmentRow, type AuditEntry, type AuditLogRow, type AuditPrune, type AuditPruneOptions, type AuditSink, type AvailableTransition, type CommentRow, type CompileOptions, type Database, type DatabaseEnv, type DatabaseOptions, type DispatchResult, type EncryptionKeys, type FeaturePage, type ListOptions, type MadeMigration, type MemoryReadYourWritesOptions, type MigrationEnv, type MigrationLockOptions, type MigrationStatus, type Migrator, type MigratorOptions, type Orm, type OrmSchema, type OutboxDispatcher, type OutboxDispatcherOptions, type OutboxEntryRow, type OutboxEvent, type OutboxLag, type OutboxMessage, type OutboxProcessedRow, type OutboxPublisher, type Page, type PageRequest, type PluginRefusal, type PluginRun, type PluginRunOptions, type PluginStatus, type PurgeOptions, type ReadYourWrites, type ReencryptOptions, type ReencryptResult, type ReferenceVisibility, type RequestKysely, type ResolvedConnection, type SequenceKey, type SequenceOptions, type SequenceRow, type SortOption, type SqliteOptions, type SystemScopeEntry, type TagRow, type TimelineInput, type TimelineRow, type TransitionResult, type UpOptions, afterCommit, createDatabase, currentEntityManager, currentTenantId, resolveConnection, runAsTenant, runInTransaction, runInUnitOfWork };
+export { type AggregateOptions, type AggregateResult, type AggregateRow, type AttachmentInput, type AttachmentRow, type AuditEntry, type AuditHoldRow, type AuditLogRow, type AuditPrune, type AuditPruneOptions, type AuditSink, type AvailableTransition, type CommentRow, type CompileOptions, type Database, type DatabaseEnv, type DatabaseOptions, type DispatchResult, type EncryptionKeys, type FeaturePage, type ListOptions, type MadeMigration, type MemoryReadYourWritesOptions, type MigrationEnv, type MigrationLockOptions, type MigrationStatus, type Migrator, type MigratorOptions, type Orm, type OrmSchema, type OutboxDispatcher, type OutboxDispatcherOptions, type OutboxEntryRow, type OutboxEvent, type OutboxLag, type OutboxMessage, type OutboxProcessedRow, type OutboxPublisher, type Page, type PageRequest, type PluginRefusal, type PluginRun, type PluginRunOptions, type PluginStatus, type PurgeOptions, type ReadYourWrites, type ReencryptOptions, type ReencryptResult, type ReferenceVisibility, type RequestKysely, type ResolvedConnection, type SequenceKey, type SequenceOptions, type SequenceRow, type SortOption, type SqliteOptions, type SystemScopeEntry, type TagRow, type TimelineInput, type TimelineRow, type TransitionResult, type UpOptions, afterCommit, createDatabase, currentEntityManager, currentTenantId, resolveConnection, runAsTenant, runInTransaction, runInUnitOfWork };
 ```
