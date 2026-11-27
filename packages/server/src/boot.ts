@@ -43,6 +43,7 @@ import type { HttpServer, RouteDef } from '@bieberkit/http';
 import { createScheduler, schedulesOf } from '@bieberkit/queue';
 import type { JobDef, QueueSubscription } from '@bieberkit/queue';
 import { ServerError } from './errors.ts';
+import { parseTheme } from '@bieberkit/tokens';
 import { adminLocation, registerAdmin } from './admin.ts';
 import { migrate } from './migrate.ts';
 import { settingsOf, settingsPolicyReader } from './policy.ts';
@@ -199,7 +200,7 @@ export async function boot(options: BootOptions): Promise<Running> {
       registerMeta(server, entities);
       for (const route of contributed<RouteDef>(modules, 'routes')) server.route(route);
       registerOpenApi(server, { title: project.config.name, version: '0.0.0' });
-      registerAdmin(server, project.root, adminLocation(env.APP_URL, env.ADMIN_URL));
+      registerAdmin(server, project.root, adminLocation(env.APP_URL, env.ADMIN_URL), parseTheme(project.config.theme));
       const web = server;
       lifecycle.onBoot('http', async () => {
         port = (await web.listen({ port: env.APP_PORT })).port;

@@ -25,7 +25,9 @@
 import { createAdminClient } from '@bieberkit/admin-core';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createRootRoute, createRoute, createRouter, RouterProvider } from '@tanstack/react-router';
-import { App as AntApp, ConfigProvider } from 'antd';
+import { compileAntdTheme, modeOf, readTheme } from '@bieberkit/tokens';
+import { App as AntApp, ConfigProvider, theme as antTheme } from 'antd';
+import { useEffect, useState } from 'react';
 import type { JSX } from 'react';
 import { Welcome } from './Welcome.tsx';
 import { FormScreen } from './FormScreen.tsx';
@@ -54,9 +56,31 @@ const router = createRouter({
   defaultPreload: 'intent',
 });
 
+/** The brand tokens that the server wrote in the page from `theme` of the config (UI-06, TOK-02). */
+const brand = readTheme(document.querySelector('meta[name="bk-theme"]')?.getAttribute('content'));
+const dark = window.matchMedia('(prefers-color-scheme: dark)');
+
+/** Whether the system asks for the dark palette, kept up to date while the page is open. */
+function useSystemDark(): boolean {
+  const [prefers, setPrefers] = useState(dark.matches);
+  useEffect(() => {
+    const change = (event: MediaQueryListEvent): void => setPrefers(event.matches);
+    dark.addEventListener('change', change);
+    return () => dark.removeEventListener('change', change);
+  }, []);
+  return prefers;
+}
+
 export function App(): JSX.Element {
+  const mode = modeOf(brand, useSystemDark());
+  const compiled = compileAntdTheme(brand, mode);
   return (
-    <ConfigProvider theme={{ token: { borderRadius: 6 } }}>
+    <ConfigProvider
+      theme={{
+        token: compiled.token,
+        algorithm: compiled.algorithm === 'dark' ? antTheme.darkAlgorithm : antTheme.defaultAlgorithm,
+      }}
+    >
       <AntApp>
         <ClientContext.Provider value={client}>
           <QueryClientProvider client={queries}>

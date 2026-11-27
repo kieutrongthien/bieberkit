@@ -27,6 +27,8 @@ import { createRequire } from 'node:module';
 import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { envPrefixOf, resolvePlugins, toManifest, validateConfig } from '@bieberkit/core';
+import { themeSection } from '@bieberkit/tokens';
+import type { ThemeInput } from '@bieberkit/tokens';
 import type { EnvOwner, PluginDef, ProjectConfigInput } from '@bieberkit/core';
 import { ServerError } from './errors.ts';
 import { COLLECTORS } from './manifest.ts';
@@ -47,6 +49,13 @@ export interface Project {
   /** In boot order: each plugin after the ones that it requires. */
   readonly plugins: readonly LoadedPlugin[];
   readonly coreVersion: string;
+}
+
+declare module '@bieberkit/core' {
+  interface ConfigSections {
+    /** The brand tokens of the admin and the site (TOK-01, UI-06). */
+    theme?: ThemeInput;
+  }
 }
 
 /** The nearest directory at or above `from` that has a config file. */
@@ -127,7 +136,7 @@ export async function loadConfig(cwd: string): Promise<ProjectConfig> {
     });
   }
   const configPath = join(root, CONFIG_FILE);
-  return { root, configPath, config: validateConfig(await importFile(configPath)) };
+  return { root, configPath, config: validateConfig(await importFile(configPath), { sections: [themeSection] }) };
 }
 
 /**

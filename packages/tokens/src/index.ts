@@ -22,7 +22,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-// Public API of @bieberkit/tokens. Implementation starts after the Phase 0 ADRs (docs/adr/README.md).
+export { compileAntdTheme, cssVariables, tailwindTheme } from './compile.ts';
+export type { AntdTheme } from './compile.ts';
+export { COLOR_KEYS, DEFAULT_THEME, FONT_STACK, modeOf, parseTheme, readTheme, themeSection } from './theme.ts';
+export type { DarkMode, Theme, ThemeColors, ThemeInput } from './theme.ts';
 
 /** npm name of this package. */
 export const packageName = '@bieberkit/tokens';

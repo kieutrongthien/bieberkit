@@ -25,6 +25,8 @@
 import { existsSync, realpathSync } from 'node:fs';
 import { join } from 'node:path';
 import { serveStatic } from '@bieberkit/http';
+import { cssVariables, DEFAULT_THEME } from '@bieberkit/tokens';
+import type { Theme } from '@bieberkit/tokens';
 import type { HttpServer } from '@bieberkit/http';
 import { ServerError } from './errors.ts';
 
@@ -110,24 +112,38 @@ export function adminDirectory(root: string): string | undefined {
   return undefined;
 }
 
-/** The page of the application, told where it lives: its files from the prefix, and the prefix for the router. */
-function pageAt(prefix: string): (html: string) => string {
+const escapeAttribute = (text: string): string =>
+  text.replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
+
+/**
+ * The page of the application, told where it lives and what it looks like: its files from the prefix, the prefix for the router, and
+ * the theme of the config as CSS variables (a style, which the policy allows) and as data for the adapter (UI-06, TOK-02). The theme
+ * is not in the build, so a change of the config is a restart and not a build (UI-14).
+ */
+export function pageAt(prefix: string, theme: Theme): (html: string) => string {
+  const style = `<style id="bk-theme">${cssVariables(theme)}</style>`;
+  const data = `<meta name="bk-theme" content="${escapeAttribute(JSON.stringify(theme))}" />`;
   return (html) =>
     html
       // The build writes the files as `./assets/...`, which is right at the root of a folder and wrong at a route under it.
       .replaceAll(/(["'(])\.\//g, `$1${prefix}/`)
-      .replace('</head>', `<meta name="bk-admin-base" content="${prefix}" /></head>`);
+      .replace('</head>', `<meta name="bk-admin-base" content="${prefix}" />${data}${style}</head>`);
 }
 
 /** Serves the admin where `location` says, when an adapter is installed. It answers whether it did. */
-export function registerAdmin(server: HttpServer, root: string, location: AdminLocation): boolean {
+export function registerAdmin(
+  server: HttpServer,
+  root: string,
+  location: AdminLocation,
+  theme: Theme = DEFAULT_THEME,
+): boolean {
   const directory = adminDirectory(root);
   if (directory === undefined) return false;
   serveStatic(server, {
     prefix: location.prefix,
     directory,
     policy: ADMIN_POLICY,
-    transformPage: pageAt(location.prefix),
+    transformPage: pageAt(location.prefix, theme),
     ...(location.host === undefined ? {} : { host: location.host }),
   });
   return true;

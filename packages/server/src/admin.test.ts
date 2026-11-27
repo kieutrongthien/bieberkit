@@ -23,7 +23,9 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { adminLocation } from './admin.ts';
+import { validateConfig } from '@bieberkit/core';
+import { parseTheme, themeSection } from '@bieberkit/tokens';
+import { adminLocation, pageAt } from './admin.ts';
 
 const APP = 'https://example.com';
 
@@ -77,5 +79,49 @@ describe('UI-14 where the admin is served', () => {
     ]) {
       expect(() => adminLocation(APP, bad)).toThrow(expect.objectContaining({ code: 'BK_ADMIN_URL_INVALID' }));
     }
+  });
+});
+
+describe('UI-06 the theme in the page of the admin', () => {
+  const html = '<html><head><script src="./assets/a.js"></script></head><body></body></html>';
+
+  it('UI-06 the page carries the theme as data for the adapter and as CSS variables, and the files are still those of the prefix', () => {
+    const theme = parseTheme({ colors: { primary: '#0a7' }, radius: 9 });
+    const page = pageAt('/panel', theme)(html);
+    expect(page).toContain('<meta name="bk-admin-base" content="/panel" />');
+    expect(page).toContain('<style id="bk-theme">:root {');
+    expect(page).toContain('--bk-color-primary: #0a7;');
+    expect(page).toContain('--bk-radius: 9px;');
+    expect(page).toContain('src="/panel/assets/a.js"');
+    const data = /<meta name="bk-theme" content="([^"]*)"/.exec(page)?.[1] ?? '';
+    expect(
+      JSON.parse(
+        data.replaceAll('&quot;', '"').replaceAll('&lt;', '<').replaceAll('&gt;', '>').replaceAll('&amp;', '&'),
+      ),
+    ).toEqual(theme);
+  });
+
+  it('UI-06 nothing in the theme can close the attribute or the style: the data is escaped and the values are checked first', () => {
+    const page = pageAt('', parseTheme(undefined))(html);
+    expect(page.match(/<meta name="bk-theme" content="([^"]*)"/)).not.toBeNull();
+    // Only the one style of the theme, which the page closes once.
+    expect(page.split('</style>')).toHaveLength(2);
+  });
+
+  it('UI-06 the config accepts a theme through the section of the tokens package, and refuses a bad one with the key', () => {
+    const base = {
+      name: 'demo',
+      author: 'A <a@example.com>',
+      license: 'MIT',
+      database: { dialect: 'sqlite' },
+      tenancy: { mode: 'single' },
+      locales: { default: 'en', supported: ['en'] },
+      plugins: [],
+    };
+    expect(validateConfig({ ...base, theme: { radius: 4 } }, { sections: [themeSection] }).theme).toEqual({
+      radius: 4,
+    });
+    expect(() => validateConfig({ ...base, theme: { radius: 99 } }, { sections: [themeSection] })).toThrow(/radius/);
+    expect(() => validateConfig({ ...base, theme: { radius: 4 } })).toThrow(/theme/);
   });
 });

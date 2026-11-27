@@ -63,7 +63,8 @@
     "@bieberkit/log": "workspace:*",
     "@bieberkit/mail": "workspace:*",
     "@bieberkit/queue": "workspace:*",
-    "@bieberkit/storage": "workspace:*"
+    "@bieberkit/storage": "workspace:*",
+    "@bieberkit/tokens": "workspace:*"
   },
   "engines": {
     "node": ">=24.12"

@@ -515,6 +515,9 @@ importers:
       '@bieberkit/storage':
         specifier: workspace:*
         version: link:../storage
+      '@bieberkit/tokens':
+        specifier: workspace:*
+        version: link:../tokens
 
   packages/site-kit:
     dependencies:

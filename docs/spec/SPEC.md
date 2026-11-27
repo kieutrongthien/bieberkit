@@ -1169,7 +1169,7 @@ The admin UI is a React single-page app that renders most screens from entity me
 - **UI-03** Generic screens: list (filters, sorting, saved views, bulk actions, export), form (validation from the same schemas as the API), detail (tabs for related records, activity, audit history).
 - **UI-04** Escape hatches: a field can use a custom widget, a screen can be replaced by a custom page, and plugins add pages and dashboard widgets.
 - **UI-05** Languages en, vi and zh are bundled. Dates, numbers and currency follow the user's locale. Vietnamese and Chinese labels come from the entity `label` and plugin translation files.
-- **UI-06** Theme tokens (colors, radius, font) are set in `bieberkit.config.ts`. The default font stack covers Latin, Vietnamese and Chinese scripts.
+- **UI-06** Theme tokens (colors, radius, spacing, fonts, dark mode) are set in the `theme` key of `bieberkit.config.ts`, and every one of them is optional. The key is validated at build and at boot with every problem reported together (a color is a hex of 3 or 6 digits, the radius is 0 to 24 px, the spacing 2 to 8 px, `darkMode` is `auto`, `light` or `dark`). The server writes the resolved theme into the page of the admin as data and as CSS variables, so a change is a restart and not a build (UI-14). The default font stack covers Latin, Vietnamese and Chinese scripts.
 - **UI-07** Accessibility target: WCAG 2.2 level AA for all generic screens.
 - **UI-08** Built assets are static files with content hashes, served from a CDN or from the web role.
 - **UI-09** Reusable blocks (dashboards, approval forms, import wizards) are installed from the registry as editable source.
@@ -1244,7 +1244,7 @@ Alternatives considered:
 ### 16.4 Design tokens
 
 - **TOK-01** Brand tokens (colors, fonts, radius, spacing, dark mode) are declared once in `bieberkit.config.ts`.
-- **TOK-02** `@bieberkit/tokens` compiles them into an Ant Design theme for the admin and CSS variables plus a Tailwind theme for the site, so both stay on brand without double configuration.
+- **TOK-02** `@bieberkit/tokens` compiles them into an Ant Design theme for the admin (`compileAntdTheme`) and CSS variables (`cssVariables`, `--bk-*`, with the dark palette under `data-theme="dark"` and the system setting) plus a Tailwind theme that points at those variables (`tailwindTheme`) for the site, so both stay on brand without double configuration. The package does not import core, because the admin imports it into the browser. The brand colors of the dark palette are those of the theme unless `dark.colors` says otherwise.
 - **TOK-03** The default font stack covers Latin, Vietnamese and Chinese.
 
 ### 16.5 Block content editor
@@ -1724,6 +1724,7 @@ Open questions:
 
 | Version | Date | Changes |
 | --- | --- | --- |
+| 0.8.26 | 2026-11-27 | M2.2 tokens: the `theme` key of the config, `@bieberkit/tokens` with the defaults, the validation, the Ant Design, CSS variable and Tailwind compilers, and the theme in the page of the admin (UI-06, TOK-01 to TOK-03) |
 | 0.8.25 | 2026-11-27 | M2.1 H2 (ADR 0033, ADR 0034): entity extensions, `extends` with `defineExtension` and a table of the extending plugin with one row for each row of the target (PLG-06); the example of 11.1 and the text of 11.3 |
 | 0.8.24 | 2026-11-27 | M2.1 H3: `bieberkit plugins` shows the graph with its edges and what each plugin owns, `make:plugin`, and `remove` that changes nothing when pnpm fails or the question is cancelled (PLG-03) |
 | 0.8.23 | 2026-11-27 | M2.1 H4: `check boundaries` for relative and `node_modules` paths into a plugin and for exports patterns (PLG-01), and the rule `plugin-tables` (PLG-02) |

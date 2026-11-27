@@ -348,7 +348,7 @@ Execution order: M2.1 through M2.7, then the reviewed npm release, then M1.10 Pi
 - [ ] Languages en, vi, zh; font stack; theme tokens (UI-05, UI-06, TOK-01 to TOK-03)
 - [ ] Hashed assets kept 24 hours after deploy; reload on chunk error (UI-22)
 - [ ] Custom widgets, replacement pages, plugin pages and dashboard widgets (UI-04)
-- [ ] `@bieberkit/tokens` compiling to Ant Design theme and CSS variables
+- [x] `@bieberkit/tokens` compiling to Ant Design theme and CSS variables. Also a Tailwind theme and the `theme` key of the config; evidence: `tokens/src/theme.test.ts`, the `UI-06` cases of `server/src/admin.test.ts`
 - [ ] Second small adapter as a test fixture to prove the contract (§26)
 - [ ] Axe checks on generic screens at WCAG 2.2 AA, admin initial JS under 400 KB (UI-07, §18.1)
 - [ ] Client errors and web vitals to the error-reporter contract (UI-21)
