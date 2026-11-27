@@ -165,6 +165,7 @@ export async function boot(options: BootOptions): Promise<Running> {
     lifecycle.onShutdown('platform', () => platform.close());
     const container = createContainer();
     registerRuntimeServices(container, {
+      project,
       env,
       extra,
       db,

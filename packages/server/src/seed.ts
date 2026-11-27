@@ -80,6 +80,7 @@ export async function seed(options: SeedOptions = {}): Promise<Seeded> {
     });
     const container = createContainer();
     registerRuntimeServices(container, {
+      project,
       env,
       extra,
       db,

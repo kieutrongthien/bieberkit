@@ -37,7 +37,7 @@ import type { Database } from '@bieberkit/data/orm';
 import type { RouteDef } from '@bieberkit/http';
 import type { Storage } from '@bieberkit/storage';
 import { createStorageFromConfig } from '@bieberkit/storage/flydrive';
-import { adminLocation } from './admin.ts';
+import { adminDirectory, adminLocation } from './admin.ts';
 import { authMessages } from './auth-mail.ts';
 import { settingsOf, settingsPolicyReader } from './policy.ts';
 import { contributed, contributedRecord, entitiesOf } from './modules.ts';
@@ -93,11 +93,29 @@ export async function createRuntimePlatform(
   }
 }
 
+/**
+ * What the authentication takes from the project: the name that an authenticator app shows, the one of the brand or the one of the
+ * config (AUTH-03), and when the admin is installed, its reset page for the password links (USR-10).
+ */
+function authOfProject(project: Pick<Project, 'root' | 'config'>, env: Pick<CoreEnv, 'APP_URL' | 'ADMIN_URL'>) {
+  const admin = adminLocation(env.APP_URL, env.ADMIN_URL);
+  return {
+    // The second factor is always there: a person who does not set it up sees no difference, and a role or a policy can ask for it.
+    methods: { totp: { issuer: project.config.admin?.brand?.name ?? project.config.name } },
+    // The admin may have a host of its own, and a sign in from there is not a cross site request (UI-14).
+    trustedOrigins: [admin.origin],
+    ...(adminDirectory(project.root) === undefined
+      ? {}
+      : { pages: { resetPassword: `${admin.origin}${admin.prefix}/reset-password` } }),
+  };
+}
+
 /** Registers framework services before the modules, including mail, queue and cache for every role. */
 
 export function registerRuntimeServices(
   container: Container,
   input: {
+    project: Pick<Project, 'root' | 'config'>;
     env: CoreEnv;
     extra: Readonly<Record<string, unknown>>;
     db: Database;
@@ -109,7 +127,7 @@ export function registerRuntimeServices(
     cache: Cache;
   },
 ): void {
-  const { env, extra, db, permissions, settings, mail, queue, cache } = input;
+  const { project, env, extra, db, permissions, settings, mail, queue, cache } = input;
   container.register('mail', { scope: 'singleton', create: () => mail });
   container.register('queue', { scope: 'singleton', create: () => queue });
   container.register('cache', { scope: 'singleton', create: () => cache });
@@ -130,8 +148,7 @@ export function registerRuntimeServices(
         secret: env.AUTH_SECRET,
         baseUrl: env.APP_URL,
         mail: authMessages(services.mail, parseSender(env.MAIL_FROM)),
-        // The admin may have a host of its own, and a sign in from there is not a cross site request (UI-14).
-        trustedOrigins: [adminLocation(env.APP_URL, env.ADMIN_URL).origin],
+        ...authOfProject(project, env),
         ...(env.APP_KEY_PREVIOUS === undefined ? {} : { previousSecrets: [env.APP_KEY_PREVIOUS] }),
       }),
   });
