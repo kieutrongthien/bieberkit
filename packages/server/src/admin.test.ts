@@ -126,6 +126,43 @@ describe('UI-06 the theme in the page of the admin', () => {
   });
 });
 
+const dataOf = (page: string): unknown =>
+  JSON.parse(
+    (/<meta name="bk-admin" content="([^"]*)"/.exec(page)?.[1] ?? '')
+      .replaceAll('&quot;', '"')
+      .replaceAll('&lt;', '<')
+      .replaceAll('&gt;', '>')
+      .replaceAll('&amp;', '&'),
+  );
+
+describe('UI-33 the brand and the menu of a project in the page of the admin', () => {
+  const html = '<html><head><title>BieberKit admin</title></head><body></body></html>';
+  const theme = parseTheme(undefined);
+  it('UI-33 UI-24 the settings are in the page as data, and the name of the brand is its title', () => {
+    const settings = {
+      brand: { name: 'Acme', logo: 'data:image/png;base64,AAAA' },
+      menu: [{ id: 'sales', label: 'Sales', items: ['shop'] }],
+    };
+    const page = pageAt('/admin', theme, settings)(html);
+    expect(dataOf(page)).toEqual(settings);
+    expect(page).toContain('<title>Acme</title>');
+  });
+
+  it('UI-33 without settings the page keeps its title, and the data is an empty object', () => {
+    const page = pageAt('/admin', theme)(html);
+    expect(dataOf(page)).toEqual({});
+    expect(page).toContain('<title>BieberKit admin</title>');
+  });
+
+  it('UI-33 a name cannot close the title or the attribute, and a dollar sign is a letter', () => {
+    const name = `</title><script>$&"x`;
+    const page = pageAt('/admin', theme, { brand: { name } })(html);
+    expect(page).not.toContain('<script>');
+    expect(page).toContain('<title>&lt;/title&gt;&lt;script&gt;$&amp;&quot;x</title>');
+    expect(dataOf(page)).toEqual({ brand: { name } });
+  });
+});
+
 describe('ADR 0036 the policy of the admin and the storage that it uploads to', () => {
   const s3 = {
     STORAGE_DISK: 's3',

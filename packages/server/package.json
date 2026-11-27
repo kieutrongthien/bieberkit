@@ -55,6 +55,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
+    "@bieberkit/admin-core": "workspace:*",
     "@bieberkit/auth": "workspace:*",
     "@bieberkit/cache": "workspace:*",
     "@bieberkit/core": "workspace:*",

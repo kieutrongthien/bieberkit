@@ -22,7 +22,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-export type Shortcut = 'save' | 'new' | 'search';
+export type Shortcut = 'save' | 'new' | 'search' | 'goto';
 
 export interface KeyPress {
   readonly key: string;
@@ -40,7 +40,12 @@ export interface KeyPress {
  */
 export function shortcutOf(press: KeyPress): Shortcut | undefined {
   const mod = press.ctrl || press.meta;
-  if (mod && !press.alt) return press.key.toLowerCase() === 's' ? 'save' : undefined;
+  if (mod && !press.alt) {
+    const key = press.key.toLowerCase();
+    // Ctrl+Shift+K is a command of a browser.
+    if (key === 'k') return press.shift ? undefined : 'goto';
+    return key === 's' ? 'save' : undefined;
+  }
   if (mod || press.alt || press.shift || press.typing) return undefined;
   if (press.key === 'n') return 'new';
   if (press.key === '/') return 'search';

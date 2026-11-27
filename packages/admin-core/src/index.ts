@@ -129,3 +129,7 @@ export { acceptAttribute, acceptsType, fileProblem, isPicture, sizeText, uploadN
 export type { MediaFile } from './files.ts';
 export { extensionsOf, fieldWidgetFor, labelText, moduleSrc, pageFor, screenFor, widgetsIn } from './extensions.ts';
 export type { AdminHost } from './extensions.ts';
+export { adminSection, BUILTIN_MENU_GROUPS, parseAdminSettings, readAdminSettings } from './settings.ts';
+export type { AdminSettings, BrandSettings, MenuGroupSettings } from './settings.ts';
+export { currentEntry, DEFAULT_MENU, menuOf, searchMenu } from './menu.ts';
+export type { MenuEntry, MenuGroup } from './menu.ts';

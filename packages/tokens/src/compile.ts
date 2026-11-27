@@ -24,6 +24,8 @@
 
 import { COLOR_KEYS } from './theme.ts';
 import { mixColors } from './contrast.ts';
+import { chromeOf } from './chrome.ts';
+import type { Chrome } from './chrome.ts';
 import type { Theme, ThemeColors } from './theme.ts';
 
 /** The tokens of an Ant Design `ConfigProvider` theme. The adapter turns `algorithm` into the algorithm of the library. */
@@ -44,6 +46,10 @@ export function compileAntdTheme(theme: Theme, mode: 'light' | 'dark'): AntdThem
       colorInfo: colors.info,
       colorBgBase: colors.background,
       colorBgLayout: colors.surface,
+      // Ant Design derives its surfaces from the base, which turns a tinted dark background into a bright blue. A card is the
+      // background of the theme, and in the dark what floats over it is a little lighter (UI-23).
+      colorBgContainer: colors.background,
+      colorBgElevated: mode === 'dark' ? mixColors(colors.text, colors.background, 0.05) : colors.background,
       colorTextBase: colors.text,
       // The text of a button that is filled with the brand color: the light tone of a dark palette carries dark text.
       ...(mode === 'dark' ? { colorTextLightSolid: colors.background } : {}),
@@ -61,8 +67,25 @@ export function compileAntdTheme(theme: Theme, mode: 'light' | 'dark'): AntdThem
   };
 }
 
-const colorLines = (colors: ThemeColors, indent: string): string[] =>
-  COLOR_KEYS.map((key) => `${indent}--bk-color-${key}: ${colors[key]};`);
+const CHROME_NAMES: Readonly<Record<keyof Chrome, string>> = {
+  frameStrong: 'frame-strong',
+  frameText: 'frame-text',
+  frameMuted: 'frame-muted',
+  frameRaised: 'frame-raised',
+  tint: 'tint',
+  ink: 'ink',
+};
+
+const colorLines = (colors: ThemeColors, indent: string): string[] => {
+  const chrome = chromeOf(colors);
+  return [
+    ...COLOR_KEYS.map((key) => `${indent}--bk-color-${key}: ${colors[key]};`),
+    // The derived colors change with the palette, so they are written in the same blocks (UI-23).
+    ...Object.entries(CHROME_NAMES).map(
+      ([key, name]) => `${indent}--bk-chrome-${name}: ${String(Reflect.get(chrome, key))};`,
+    ),
+  ];
+};
 
 const block = (selector: string, lines: readonly string[]): string => `${selector} {\n${lines.join('\n')}\n}`;
 

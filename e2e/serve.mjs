@@ -81,9 +81,14 @@ cpSync(join(REPOSITORY, 'e2e', 'fixtures', 'crm'), join(root, 'node_modules', '@
   recursive: true,
 });
 const configPath = join(root, 'bieberkit.config.ts');
+// The server of the host of its own has a brand of its own, so that the test sees it travel from the config to the page (UI-33).
+const brand =
+  process.env.E2E_ADMIN_URL === undefined
+    ? ''
+    : "admin: { brand: { name: 'Acme Works', tagline: 'Acme at work.' } },\n  ";
 writeFileSync(
   configPath,
-  readFileSync(configPath, 'utf8').replace('plugins: [', "plugins: [\n    '@bieberkit/plugin-crm',"),
+  readFileSync(configPath, 'utf8').replace('plugins: [', `${brand}plugins: [\n    '@bieberkit/plugin-crm',`),
 );
 
 run(root, ['migrate:make']);

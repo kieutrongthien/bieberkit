@@ -28,6 +28,8 @@ import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { envPrefixOf, resolvePlugins, toManifest, validateConfig } from '@bieberkit/core';
 import { themeSection } from '@bieberkit/tokens';
+import { adminSection } from '@bieberkit/admin-core';
+import type { AdminSettings } from '@bieberkit/admin-core';
 import type { ThemeInput } from '@bieberkit/tokens';
 import type { EnvOwner, PluginDef, ProjectConfigInput } from '@bieberkit/core';
 import { ServerError } from './errors.ts';
@@ -57,6 +59,8 @@ declare module '@bieberkit/core' {
   interface ConfigSections {
     /** The brand tokens of the admin and the site (TOK-01, UI-06). */
     theme?: ThemeInput;
+    /** The brand and the order of the menu of the admin (UI-24, UI-33). */
+    admin?: AdminSettings;
   }
 }
 
@@ -144,7 +148,11 @@ export async function loadConfig(cwd: string): Promise<ProjectConfig> {
     });
   }
   const configPath = join(root, CONFIG_FILE);
-  return { root, configPath, config: validateConfig(await importFile(configPath), { sections: [themeSection] }) };
+  return {
+    root,
+    configPath,
+    config: validateConfig(await importFile(configPath), { sections: [themeSection, adminSection] }),
+  };
 }
 
 /**

@@ -71,6 +71,7 @@ Status values: `Proposed`, `Accepted`, `Rejected`, `Superseded by NNNN`. Only th
 | [0036](0036-file-fields.md) | A file field holds the id of a media record, and the browser sends the file to the storage | Accepted |
 | [0037](0037-plugin-admin-code.md) | A plugin adds code to the admin as modules that the web role serves and the admin loads | Accepted |
 | [0038](0038-content-tree-and-block-format.md) | Content is versioned blocks, drawn through one element tree | Accepted |
+| [0039](0039-admin-font.md) | The admin bundles the font Be Vietnam Pro | Proposed |
 
 ## Needed for the Phase 0 gate
 

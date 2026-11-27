@@ -245,6 +245,9 @@ importers:
         specifier: 19.3.1
         version: 19.3.1(react@19.3.1)
     devDependencies:
+      '@fontsource/be-vietnam-pro':
+        specifier: 5.3.0
+        version: 5.3.0
       '@types/react':
         specifier: 19.3.0
         version: 19.3.0
@@ -511,6 +514,9 @@ importers:
 
   packages/server:
     dependencies:
+      '@bieberkit/admin-core':
+        specifier: workspace:*
+        version: link:../admin-core
       '@bieberkit/auth':
         specifier: workspace:*
         version: link:../auth
@@ -1137,6 +1143,9 @@ packages:
 
   '@fastify/proxy-addr@5.1.3':
     resolution: {integrity: sha512-ptgIgB+abBNTs5lsKNvFaKMCauPaTOE6ZIjxJr3FxCLehmYQQKYGg4srwwNICR9QQlFrYw59jWAo+i9GalVCaw==}
+
+  '@fontsource/be-vietnam-pro@5.3.0':
+    resolution: {integrity: sha512-xhAQBGHDxP5BF8IJxedy5MoWUmc1DlPCcZbMLhvnPkf8TaYCbbUVs3LjpuJ4BYdTrdiCLaewNaY8z+owq/FqFw==}
 
   '@hexagon/base64@1.1.28':
     resolution: {integrity: sha512-lhqDEAvWixy3bZ+UOYbPwUbBkwBq5C1LAJ/xPC8Oi+lL54oyakv/npbA0aU2hgCsx/1NUd4IBvV03+aUBWxerw==}
@@ -4349,6 +4358,8 @@ snapshots:
     dependencies:
       '@fastify/forwarded': 3.1.2
       ipaddr.js: 2.5.0
+
+  '@fontsource/be-vietnam-pro@5.3.0': {}
 
   '@hexagon/base64@1.1.28': {}
 

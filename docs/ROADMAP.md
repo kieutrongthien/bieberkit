@@ -355,6 +355,18 @@ Execution order: M2.1 through M2.7, then the reviewed npm release, then M1.10 Pi
 - [x] Axe checks on generic screens at WCAG 2.2 AA, admin initial JS under 400 KB (UI-07, §18.1). Evidence: `e2e/accessibility.spec.ts` (nine pages, light and dark, wide and 360 px), `pnpm check:admin-size` (320 kB compressed), ADR 0035 for the dev dependency
 - [x] Client errors and web vitals to the error-reporter contract (UI-21). Evidence: `admin-core/src/reporting.test.ts`, `server/src/client-reports.test.ts`, and the UI-21 cases of `e2e/screens.spec.ts`
 
+The admin screens of the base plugins, which M1.11 left to this milestone (`docs/modules/base-plugins-complete.md`, non-goals). Build them in this order: the identity and the frame come first, as every screen uses them. Each item ships with the rules of UI-25 (in `blank` by default, lazy chunks, three languages, permissions, browser tests with axe).
+
+- [ ] Identity of the admin: default tokens, typography, sign in, empty, loading and error states, light and dark; the `theme` key still changes it; contrast, 360 px and the size budget hold (UI-23)
+- [ ] Frame of the admin: grouped navigation with icons, menu order (`admin.menu`, without it the order of `blank`), breadcrumb, go to page, account menu, permissions, and the brand of a project (UI-24, UI-33)
+- [ ] **[D]** Account screens (`auth-ui`): sign in with a second factor, forgotten and reset password, invitation, enrolment, own profile and sessions (UI-26, UI-25)
+- [ ] **[D]** Users screens (UI-27, UI-25)
+- [ ] **[D]** Roles screens and permission editor (UI-28, UI-25)
+- [ ] Settings screens, with security policies, export and import (UI-29, UI-25)
+- [ ] Notification screens: inbox, unread count, preferences, sending and support list (UI-30, UI-25)
+- [ ] Media library (UI-31, UI-25)
+- [ ] Audit log screens, with export and holds (UI-32, UI-25)
+
 ### M2.3 Content and public site
 
 - [x] `@bieberkit/content`: block schema, shared React renderers, sanitization, framework-free HTML serializer (CNT-01 to CNT-03, CNT-05). Evidence: `content/src/{parse,safety,html,react}.test.ts`, the module spec `docs/modules/content.md` and ADR 0038. Open: the admin preview and the site do not use the renderers yet, no entity field stores a document, and a plugin cannot contribute a block through `definePlugin` (a project passes it to `createContent`)

@@ -420,6 +420,8 @@ function Editor(props: {
         details
       ) : (
         <Tabs
+          type="card"
+          className="bk-tabs"
           items={[
             { key: 'details', label: t('detail.details'), children: details },
             ...related.map((item) => ({

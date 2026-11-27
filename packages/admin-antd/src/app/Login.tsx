@@ -2,7 +2,7 @@
  * BieberKit
  *
  * @file        packages/admin-antd/src/app/Login.tsx
- * @description The login screen: an email and a password, the answer of the server as a message, and the session made on success (AUTH-01, UI-02).
+ * @description The sign in: the side of the brand with its sentence and the stack of folders, and the form of the email and the password over the session of Better Auth. A refusal is shown with its words (AUTH-01, AUTH-06, UI-23, UI-33).
  * @author      Bieber Kieu <kieutrongthien@gmail.com>
  * @copyright   Copyright (c) 2026 Bieber Kieu
  * @license     Apache-2.0
@@ -24,9 +24,10 @@
 
 import { AdminApiError } from '@bieberkit/admin-core';
 import { useQueryClient } from '@tanstack/react-query';
-import { Alert, Button, Card, Form, Input, Typography } from 'antd';
+import { Alert, Button, Form, Input, Typography } from 'antd';
 import { useState } from 'react';
 import type { JSX } from 'react';
+import { Brand, useTagline } from './Brand.tsx';
 import { useClient } from './context.ts';
 import { useT } from './language.tsx';
 
@@ -37,6 +38,7 @@ interface Values {
 
 export function Login(): JSX.Element {
   const t = useT();
+  const tagline = useTagline();
   const client = useClient();
   const queries = useQueryClient();
   const [failure, setFailure] = useState<string | undefined>();
@@ -56,22 +58,40 @@ export function Login(): JSX.Element {
   };
 
   return (
-    <main style={{ display: 'grid', placeItems: 'center', minHeight: '100vh', padding: 16 }}>
-      <Card style={{ width: 360, maxWidth: '100%' }}>
-        <Typography.Title level={3}>{t('auth.signIn.title')}</Typography.Title>
-        {failure === undefined ? null : <Alert type="error" showIcon message={failure} style={{ marginBottom: 16 }} />}
-        <Form<Values> layout="vertical" onFinish={(values) => void submit(values)} requiredMark={false}>
-          <Form.Item label={t('auth.email')} name="email" rules={[{ required: true, type: 'email' }]}>
-            <Input autoComplete="username" autoFocus />
-          </Form.Item>
-          <Form.Item label={t('auth.password')} name="password" rules={[{ required: true }]}>
-            <Input.Password autoComplete="current-password" />
-          </Form.Item>
-          <Button type="primary" htmlType="submit" loading={busy} block>
-            {t('auth.signIn')}
-          </Button>
-        </Form>
-      </Card>
-    </main>
+    <div className="bk-login">
+      <aside className="bk-login-brand">
+        <Brand />
+        <p className="bk-tagline">{tagline}</p>
+        <div className="bk-stack" aria-hidden="true">
+          <div />
+          <div />
+          <div>
+            <span />
+          </div>
+        </div>
+      </aside>
+      <main className="bk-login-form">
+        <div>
+          <Typography.Title level={1} className="bk-title">
+            {t('auth.signIn.title')}
+          </Typography.Title>
+          <Typography.Paragraph type="secondary">{t('auth.signIn.subtitle')}</Typography.Paragraph>
+          {failure === undefined ? null : (
+            <Alert type="error" showIcon message={failure} style={{ marginBottom: 16 }} />
+          )}
+          <Form<Values> layout="vertical" size="large" onFinish={(values) => void submit(values)} requiredMark={false}>
+            <Form.Item label={t('auth.email')} name="email" rules={[{ required: true, type: 'email' }]}>
+              <Input autoComplete="username" autoFocus />
+            </Form.Item>
+            <Form.Item label={t('auth.password')} name="password" rules={[{ required: true }]}>
+              <Input.Password autoComplete="current-password" />
+            </Form.Item>
+            <Button type="primary" htmlType="submit" loading={busy} block>
+              {t('auth.signIn')}
+            </Button>
+          </Form>
+        </div>
+      </main>
+    </div>
   );
 }

@@ -22,9 +22,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { mixColors } from './contrast.ts';
+
 /** The default font stacks. Latin, Vietnamese (letters with several marks) and Chinese each have a family that draws them (TOK-03). */
 export const FONT_STACK: { readonly sans: string; readonly mono: string } = {
   sans: [
+    // The adapter of the admin bundles it (ADR 0039). A surface that does not have it takes the next family.
+    '"Be Vietnam Pro"',
     '-apple-system',
     'BlinkMacSystemFont',
     '"Segoe UI"',
@@ -64,6 +68,10 @@ export interface ThemeColors {
   surface: string;
   text: string;
   border: string;
+  /** The navigation and the side of the sign in. Its texts are derived from it (`chromeOf`). */
+  frame: string;
+  /** Decoration only: it carries no text, and it is never the only sign of a state. */
+  accent: string;
 }
 
 export type DarkMode = 'auto' | 'light' | 'dark';
@@ -95,34 +103,38 @@ export interface Theme {
 
 // The brand colors read on the background and carry white text at level AA (4.5:1); `theme.test.ts` holds them to it (UI-07).
 const LIGHT: ThemeColors = {
-  primary: '#0958d9',
+  primary: '#4f46e5',
   success: '#237804',
   warning: '#ad4e00',
   danger: '#cf1322',
-  info: '#0958d9',
+  info: '#4f46e5',
   background: '#ffffff',
-  surface: '#f5f5f5',
-  text: '#1f1f1f',
-  border: '#d9d9d9',
+  surface: '#f4f5fb',
+  text: '#0b1020',
+  border: '#d8dbee',
+  frame: '#0b1020',
+  accent: '#22d3ee',
 };
 
 // On a dark background the brand colors are the light tones of the same hues, which carry the dark text of a button.
 const DARK: ThemeColors = {
-  primary: '#4096ff',
+  primary: '#8b93ff',
   success: '#73d13d',
   warning: '#ffc53d',
   danger: '#ff7875',
-  info: '#69b1ff',
-  background: '#141414',
-  surface: '#1f1f1f',
-  text: '#f0f0f0',
-  border: '#424242',
+  info: '#8b93ff',
+  background: '#151a2e',
+  surface: '#0e1222',
+  text: '#eceef9',
+  border: '#363d63',
+  frame: '#070a16',
+  accent: '#22d3ee',
 };
 
 export const DEFAULT_THEME: Theme = {
   colors: LIGHT,
   dark: DARK,
-  radius: 6,
+  radius: 10,
   spacing: 4,
   fonts: { sans: FONT_STACK.sans, mono: FONT_STACK.mono },
   darkMode: 'auto',
@@ -139,8 +151,12 @@ export const COLOR_KEYS: readonly (keyof ThemeColors)[] = [
   'surface',
   'text',
   'border',
+  'frame',
+  'accent',
 ];
-const BRAND_KEYS = ['primary', 'success', 'warning', 'danger', 'info'] as const;
+const BRAND_KEYS = ['primary', 'success', 'warning', 'danger', 'info', 'accent'] as const;
+/** How much of the brand color a frame that follows it keeps: the rest is black. */
+const FRAME_WEIGHT = { light: 0.3, dark: 0.18 } as const;
 const colorKeyOf = (key: string): keyof ThemeColors | undefined => COLOR_KEYS.find((name) => name === key);
 const HEX = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
 const FONT = /^[\w\s"',.-]+$/;
@@ -202,6 +218,13 @@ export function parseTheme(input: unknown): Theme {
   const configured = isRecord(input['colors']) ? input['colors'] : {};
   const darkBase: ThemeColors = { ...DEFAULT_THEME.dark };
   for (const key of BRAND_KEYS) if (key in configured) darkBase[key] = colors[key];
+  // One color makes a whole identity (UI-23): a frame that the config says is the frame of both palettes, and without one the frame is a
+  // dark tone of the primary that it says. A problem of a color keeps the default, and the list of problems stops the theme below.
+  if ('frame' in configured) darkBase.frame = colors.frame;
+  else if ('primary' in configured && HEX.test(colors.primary)) {
+    colors.frame = mixColors(colors.primary, '#000000', FRAME_WEIGHT.light);
+    darkBase.frame = mixColors(colors.primary, '#000000', FRAME_WEIGHT.dark);
+  }
   const dark = colorsOf(isRecord(darkInput) ? darkInput['colors'] : undefined, 'dark.colors', darkBase, problems);
   const radius = numberOf(input['radius'], 'radius', 0, 24, DEFAULT_THEME.radius, problems);
   const spacing = numberOf(input['spacing'], 'spacing', 2, 8, DEFAULT_THEME.spacing, problems);

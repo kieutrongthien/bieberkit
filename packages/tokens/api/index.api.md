@@ -42,6 +42,8 @@ interface ThemeColors {
   surface: string;
   text: string;
   border: string;
+  frame: string;
+  accent: string;
 }
 type DarkMode = "auto" | "light" | "dark";
 interface ThemeInput {
@@ -89,6 +91,15 @@ export declare function tailwindTheme(_theme: Theme): string;
 export declare function luminanceOf(hex: string): number;
 export declare function contrastRatio(a: string, b: string): number;
 export declare function mixColors(a: string, b: string, weight: number): string;
+interface Chrome {
+  readonly frameStrong: string;
+  readonly frameText: string;
+  readonly frameMuted: string;
+  readonly frameRaised: string;
+  readonly tint: string;
+  readonly ink: string;
+}
+export declare function chromeOf(colors: ThemeColors): Chrome;
 export declare const packageName = "@bieberkit/tokens";
-export type { AntdTheme, DarkMode, Theme, ThemeColors, ThemeInput };
+export type { AntdTheme, Chrome, DarkMode, Theme, ThemeColors, ThemeInput };
 ```

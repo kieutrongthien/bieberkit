@@ -23,3 +23,9 @@
  */
 
 declare module '*.css';
+
+/** Vite answers the address of the file. */
+declare module '*.svg' {
+  const address: string;
+  export default address;
+}

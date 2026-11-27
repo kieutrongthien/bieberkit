@@ -28,6 +28,8 @@
 - Spec sections: UI-01, UI-02, UI-03, UI-08, UI-10, UI-14, UI-15, UI-18, SEC-01, section 21. ADR 0025.
 - Status: **Done in M1.8.** The login is what the roadmap calls `auth-ui`.
 
+The look and the frame of the admin since M2.2 (the grouped menu, the box that goes to a page, the sign in, the brand of a project) are in [admin-identity.md](admin-identity.md).
+
 ## What it does
 
 A person opens the admin (`/admin/` unless `ADMIN_URL` says another address), signs in with the account of the seed, sees the entities that the roles let them read, and lists, makes, changes and deletes rows from screens that are drawn from the metadata of `/api/v1/_meta`. There is no screen to write for an entity: a plugin or a module that declares an entity with `api` and `admin` settings has its screens.

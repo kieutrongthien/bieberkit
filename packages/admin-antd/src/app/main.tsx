@@ -23,7 +23,16 @@
  */
 
 import { createRoot } from 'react-dom/client';
-// The stylesheet is imported for its effect: Vite bundles it.
+// The stylesheets are imported for their effect: Vite bundles them. The font comes with the admin and from no other origin
+// (UI-14, ADR 0039), and a browser reads only the files of the scripts that the page shows.
+// oxlint-disable-next-line import/no-unassigned-import
+import '@fontsource/be-vietnam-pro/400.css';
+// oxlint-disable-next-line import/no-unassigned-import
+import '@fontsource/be-vietnam-pro/500.css';
+// oxlint-disable-next-line import/no-unassigned-import
+import '@fontsource/be-vietnam-pro/600.css';
+// oxlint-disable-next-line import/no-unassigned-import
+import '@fontsource/be-vietnam-pro/700.css';
 // oxlint-disable-next-line import/no-unassigned-import
 import './app.css';
 import { App } from './App.tsx';

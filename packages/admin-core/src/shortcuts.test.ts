@@ -47,6 +47,14 @@ describe('UI-17 the shortcuts', () => {
     expect(press('n', { shift: true })).toBeUndefined();
   });
 
+  it('UI-24 Ctrl+K and Cmd+K go to a page, also when a field has the focus, and k alone is a letter', () => {
+    expect(press('k', { ctrl: true, typing: true })).toBe('goto');
+    expect(press('K', { meta: true })).toBe('goto');
+    expect(press('k')).toBeUndefined();
+    expect(press('k', { ctrl: true, alt: true })).toBeUndefined();
+    expect(press('k', { ctrl: true, shift: true })).toBeUndefined();
+  });
+
   it('UI-17 any other key is not a shortcut', () => {
     for (const key of ['a', 'Enter', 'Escape', 'ArrowDown']) expect(press(key)).toBeUndefined();
   });

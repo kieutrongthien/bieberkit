@@ -341,6 +341,21 @@ declare const en: {
   readonly "auth.signIn": "Sign in";
   readonly "auth.signOut": "Sign out";
   readonly "auth.noAnswer": "The server did not answer. Try again.";
+  readonly "brand.tagline": "One tidy kit. Every change on record.";
+  readonly "auth.signIn.subtitle": "Use the account of your organization.";
+  readonly "menu.label": "Main menu";
+  readonly "menu.group.app": "Application";
+  readonly "menu.group.people": "People";
+  readonly "menu.group.content": "Content";
+  readonly "menu.group.system": "System";
+  readonly "account.menu": "Account menu";
+  readonly "goto.button": "Go to a page…";
+  readonly "goto.title": "Go to a page";
+  readonly "goto.placeholder": "Name of a page";
+  readonly "goto.none": "No page has that name.";
+  readonly "breadcrumb.label": "Where you are";
+  readonly "gate.loading": "Loading…";
+  readonly "welcome.subtitle": "Choose where to start.";
   readonly "welcome.title": "Welcome";
   readonly "welcome.empty": "Nothing here is open to you yet. Ask an administrator for a role.";
   readonly "gate.menuError": "The menu could not be loaded";
@@ -479,7 +494,7 @@ type ConnectionEvent = "online" | "offline" | "request-failed" | "request-ok";
 export declare function connection(state: Connection, event: ConnectionEvent): Connection;
 export declare function isChunkError(error: unknown): boolean;
 export declare function chunkReload(now: number, lastReloadAt: number | undefined): "reload" | "show";
-type Shortcut = "save" | "new" | "search";
+type Shortcut = "save" | "new" | "search" | "goto";
 interface KeyPress {
   readonly key: string;
   readonly ctrl: boolean;
@@ -562,6 +577,48 @@ interface AdminHost<UI = unknown> {
   readonly navigate: (path: string) => void;
   readonly text: (label: MetaLabel | string) => string;
 }
+interface BrandSettings {
+  readonly name?: string;
+  readonly logo?: string;
+  readonly tagline?: string | MetaLabel;
+}
+interface MenuGroupSettings {
+  readonly id: string;
+  readonly label?: string | MetaLabel;
+  readonly items: readonly string[];
+}
+interface AdminSettings {
+  readonly brand?: BrandSettings;
+  readonly menu?: readonly MenuGroupSettings[];
+}
+export declare const BUILTIN_MENU_GROUPS: readonly string[];
+export declare function parseAdminSettings(input: unknown): AdminSettings;
+export declare const adminSection: {
+  readonly key: "admin";
+  readonly parser: {
+    parse(input: unknown): AdminSettings | undefined;
+  };
+};
+export declare function readAdminSettings(text: string | null | undefined): AdminSettings;
+interface MenuEntry {
+  readonly key: string;
+  readonly path: string;
+  readonly label: MetaLabel;
+  readonly name: string;
+  readonly icons: readonly string[];
+}
+interface MenuGroup {
+  readonly id: string;
+  readonly label?: string | MetaLabel;
+  readonly entries: readonly MenuEntry[];
+}
+export declare const DEFAULT_MENU: readonly MenuGroupSettings[];
+export declare function menuOf(meta: Meta, order?: readonly MenuGroupSettings[]): MenuGroup[];
+export declare function searchMenu(groups: readonly MenuGroup[], text: string, labelOfEntry: (entry: MenuEntry) => string): MenuEntry[];
+export declare function currentEntry(groups: readonly MenuGroup[], path: string): {
+  readonly group: MenuGroup;
+  readonly entry: MenuEntry;
+} | undefined;
 export declare const packageName = "@bieberkit/admin-core";
-export { type AdminClient, type AdminClientOptions, type AdminHost, type BulkOperation, type BulkOutcome, type BulkResult, type Conflict, type Connection, type ConnectionEvent, type CsvColumn, type Dictionary, type DraftStorage, en as ENGLISH, type ErrorReport, type FieldProblem, type FieldStates, type Filter, type FilterOperator, type HistoryEntry, type KeyPress, type Line, type ListParams, type Locale, type MediaFile, type MessageKey, type Meta, type MetaEntity, type MetaExtensions, type MetaField, type MetaInline, type MetaLabel, type MetaMenuItem, type MetaPage, type MetaScreen, type MetaTransition, type MetaWidget, type Page, type Related, type Row, type SavedView, type SessionUser, type Shortcut, type ValueProblem, type Vital, type VitalReport, type When };
+export { type AdminClient, type AdminClientOptions, type AdminHost, type AdminSettings, type BrandSettings, type BulkOperation, type BulkOutcome, type BulkResult, type Conflict, type Connection, type ConnectionEvent, type CsvColumn, type Dictionary, type DraftStorage, en as ENGLISH, type ErrorReport, type FieldProblem, type FieldStates, type Filter, type FilterOperator, type HistoryEntry, type KeyPress, type Line, type ListParams, type Locale, type MediaFile, type MenuEntry, type MenuGroup, type MenuGroupSettings, type MessageKey, type Meta, type MetaEntity, type MetaExtensions, type MetaField, type MetaInline, type MetaLabel, type MetaMenuItem, type MetaPage, type MetaScreen, type MetaTransition, type MetaWidget, type Page, type Related, type Row, type SavedView, type SessionUser, type Shortcut, type ValueProblem, type Vital, type VitalReport, type When };
 ```

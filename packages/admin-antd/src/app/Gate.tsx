@@ -2,7 +2,7 @@
  * BieberKit
  *
  * @file        packages/admin-antd/src/app/Gate.tsx
- * @description The gate and the frame of the admin: nobody is shown anything until the session says who signed in, then the menu of the entities that the user may read and the screen of the route (UI-02, AUTH-01).
+ * @description The gate and the frame of the admin: nobody is shown anything until the session says who signed in, then the brand, the grouped menu and the account on the frame, and the breadcrumb, the box that goes to a page and the screen of the route on the page (UI-02, UI-23, UI-24, AUTH-01).
  * @author      Bieber Kieu <kieutrongthien@gmail.com>
  * @copyright   Copyright (c) 2026 Bieber Kieu
  * @license     Apache-2.0
@@ -22,63 +22,145 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { labelOf, labelText } from '@bieberkit/admin-core';
+import { currentEntry, labelText, menuOf } from '@bieberkit/admin-core';
+import type { MenuGroup, MessageKey } from '@bieberkit/admin-core';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link, Outlet } from '@tanstack/react-router';
-import { Button, Grid, Layout, Menu, Result, Select, Skeleton, Space, Typography } from 'antd';
+import { Link, Outlet, useRouterState } from '@tanstack/react-router';
+import { Dropdown, Grid, Layout, Menu, Result, Select, Skeleton } from 'antd';
 import { Suspense } from 'react';
 import type { JSX } from 'react';
+import { Brand, firstLetter, SETTINGS } from './Brand.tsx';
 import { OfflineBanner } from './connection.tsx';
 import { useClient, useMeta } from './context.ts';
+import { GoTo } from './GoTo.tsx';
+import { FolderArt, Icon } from './icons.tsx';
 import { LANGUAGE_NAMES, LOCALES, useLanguage, useT } from './language.tsx';
 import { Login } from './Login.tsx';
 
 const { Header, Sider, Content } = Layout;
 
-function Frame(props: { readonly email: string }): JSX.Element {
+const GROUP_KEYS: Readonly<Record<string, MessageKey>> = {
+  app: 'menu.group.app',
+  people: 'menu.group.people',
+  content: 'menu.group.content',
+  system: 'menu.group.system',
+};
+
+/** The name of a group in the language of the person: the one of the config, or the one of the framework. */
+export function useGroupName(): (group: MenuGroup) => string {
+  const t = useT();
+  const { locale } = useLanguage();
+  return (group) => {
+    if (typeof group.label === 'string') return group.label;
+    if (group.label !== undefined) return labelText(group.label, locale, group.id);
+    const key = GROUP_KEYS[group.id];
+    return key === undefined ? group.id : t(key);
+  };
+}
+
+/** The initials of an account, from the name of its email. */
+const initialsOf = (email: string): string =>
+  (email.split('@')[0] ?? '')
+    .split(/[._-]+/)
+    .map(firstLetter)
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
+
+function Account(props: { readonly email: string }): JSX.Element {
   const client = useClient();
   const queries = useQueryClient();
+  const t = useT();
+  return (
+    <Dropdown
+      trigger={['click']}
+      placement="topLeft"
+      menu={{
+        items: [{ key: 'sign-out', label: t('auth.signOut') }],
+        // Everything that was read as this user is dropped, and the session is asked again.
+        onClick: () => void client.signOut().then(() => queries.resetQueries()),
+      }}
+    >
+      <button type="button" className="bk-account" aria-haspopup="menu">
+        <span className="bk-account-initials" aria-hidden="true">
+          {initialsOf(props.email)}
+        </span>
+        <span className="bk-account-email">{props.email}</span>
+        <span className="bk-sr-only">{t('account.menu')}</span>
+      </button>
+    </Dropdown>
+  );
+}
+
+function Frame(props: { readonly email: string }): JSX.Element {
   const meta = useMeta();
   const t = useT();
   const { locale, setLocale } = useLanguage();
+  const groupName = useGroupName();
   const compact = Grid.useBreakpoint().md === false;
-  const entities = (meta.data?.entities ?? []).filter((entity) => entity.operations.list && entity.can.read);
+  const groups = meta.data === undefined ? [] : menuOf(meta.data, SETTINGS.menu);
+  // The address from the parts of the route, so that it is the same wherever the admin is served.
+  const params = useRouterState({ select: (state) => state.matches.at(-1)?.params ?? {} });
+  const read = (name: string): string | undefined => {
+    const value: unknown = Reflect.get(params, name);
+    return typeof value === 'string' ? value : undefined;
+  };
+  const plugin = read('plugin');
+  const address =
+    plugin === undefined
+      ? `/${read('module') ?? ''}/${read('resource') ?? ''}`
+      : `/ext/${plugin}/${read('page') ?? ''}`;
+  const here = currentEntry(groups, address);
   return (
     <>
       <OfflineBanner />
-      <Layout style={{ minHeight: '100vh' }}>
-        <Sider breakpoint="md" collapsedWidth={0} theme="light" width={240}>
-          <div style={{ padding: 16 }}>
-            <Typography.Title level={4} style={{ margin: 0 }}>
-              <Link to="/">{t('app.name')}</Link>
-            </Typography.Title>
+      <Layout className="bk-shell">
+        <Sider className="bk-rail" breakpoint="md" collapsedWidth={0} theme="light" width={248}>
+          <div className="bk-rail-inner">
+            <div className="bk-rail-brand">
+              <Link to="/">
+                <Brand />
+              </Link>
+            </div>
+            <nav className="bk-rail-menu" aria-label={t('menu.label')}>
+              <Menu
+                mode="inline"
+                selectedKeys={here === undefined ? [] : [here.entry.key]}
+                items={groups.map((group) => ({
+                  type: 'group' as const,
+                  key: `group:${group.id}`,
+                  label: groupName(group),
+                  children: group.entries.map((entry) => ({
+                    key: entry.key,
+                    icon: <Icon names={entry.icons} />,
+                    label: <Link to={entry.path}>{labelText(entry.label, locale, entry.name)}</Link>,
+                  })),
+                }))}
+              />
+            </nav>
+            <Account email={props.email} />
           </div>
-          <Menu
-            mode="inline"
-            items={[
-              ...entities.map((entity) => ({
-                key: entity.path,
-                label: <Link to={`/${entity.path.replace('/api/v1/', '')}`}>{labelOf(entity, locale)}</Link>,
-              })),
-              // The menu entries that plugins add: the server leaves out those that the person may not use (UI-04).
-              ...(meta.data?.menu ?? []).map((item) => ({
-                key: item.path,
-                label: <Link to={item.path}>{labelText(item.label, locale, item.path)}</Link>,
-              })),
-            ]}
-          />
         </Sider>
         <Layout>
-          <Header
-            style={{
-              background: 'transparent',
-              textAlign: 'right',
-              height: 'auto',
-              lineHeight: 'normal',
-              padding: compact ? '12px 16px 12px 56px' : '12px 24px',
-            }}
-          >
-            <Space wrap style={{ justifyContent: 'flex-end' }}>
+          <Header className={compact ? 'bk-header bk-header-compact' : 'bk-header'}>
+            <nav className="bk-crumbs" aria-label={t('breadcrumb.label')}>
+              {here === undefined ? null : (
+                <ol>
+                  <li>{groupName(here.group)}</li>
+                  <li>
+                    {address === here.entry.path && read('id') === undefined ? (
+                      <Link to={here.entry.path} aria-current="page">
+                        {labelText(here.entry.label, locale, here.entry.name)}
+                      </Link>
+                    ) : (
+                      <Link to={here.entry.path}>{labelText(here.entry.label, locale, here.entry.name)}</Link>
+                    )}
+                  </li>
+                </ol>
+              )}
+            </nav>
+            <div className="bk-header-tools">
+              <GoTo groups={groups} />
               <Select
                 aria-label={t('language.label')}
                 value={locale}
@@ -86,18 +168,9 @@ function Frame(props: { readonly email: string }): JSX.Element {
                 options={LOCALES.map((value) => ({ value, label: LANGUAGE_NAMES[value] }))}
                 style={{ width: 130 }}
               />
-              {compact ? null : <Typography.Text>{props.email}</Typography.Text>}
-              <Button
-                onClick={() => {
-                  // Everything that was read as this user is dropped, and the session is asked again.
-                  void client.signOut().then(() => queries.resetQueries());
-                }}
-              >
-                {t('auth.signOut')}
-              </Button>
-            </Space>
+            </div>
           </Header>
-          <Content style={{ margin: compact ? 12 : 24 }}>
+          <Content className="bk-content">
             {meta.isError ? (
               <Result status="error" title={t('gate.menuError')} subTitle={meta.error.message} />
             ) : (
@@ -117,7 +190,14 @@ export function Gate(): JSX.Element {
   const t = useT();
   const client = useClient();
   const session = useQuery({ queryKey: ['session'], queryFn: async () => (await client.session()) ?? null });
-  if (session.isPending) return <Skeleton active style={{ padding: 24 }} />;
+  if (session.isPending) {
+    return (
+      <div className="bk-opening" role="status">
+        <FolderArt />
+        <span>{t('gate.loading')}</span>
+      </div>
+    );
+  }
   if (session.isError) {
     return <Result status="error" title={t('gate.noAnswer')} subTitle={session.error.message} />;
   }

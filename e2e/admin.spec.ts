@@ -86,7 +86,9 @@ test('the administrator signs in, manages a setting, and signs out', async ({ pa
   await expect(page).toHaveURL(/\/admin\/crm\/accounts$/);
   await expect(page.getByRole('button', { name: 'New' })).toBeVisible();
 
-  await page.getByRole('button', { name: 'Sign out' }).click();
+  // Signing out is in the menu of the account (UI-24).
+  await page.getByRole('button', { name: /Account menu/ }).click();
+  await page.getByRole('menuitem', { name: 'Sign out' }).click();
   await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible();
 
   expect(violations).toEqual([]);

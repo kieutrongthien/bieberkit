@@ -28,6 +28,7 @@
 Generated from the built declaration files by `pnpm api:update`. Do not edit by hand. A change here is a change to the public API and needs a changeset (spec section 22.3).
 
 ```ts
+import { AdminSettings } from "@bieberkit/admin-core";
 import { EnvOwner, KeyCollector, PluginDef, ProjectConfigInput } from "@bieberkit/core";
 import { ThemeInput } from "@bieberkit/tokens";
 declare const COLLECTORS: readonly KeyCollector[];
@@ -47,6 +48,7 @@ interface Project {
 declare module "@bieberkit/core" {
   interface ConfigSections {
     theme?: ThemeInput;
+    admin?: AdminSettings;
   }
 }
 declare function findProjectRoot(from: string): string | undefined;

@@ -39,6 +39,11 @@ test('the admin at the root of its own host signs in, reloads on a route, and is
 
   await page.goto('/');
   await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible();
+  // The brand of the config of this server: its name instead of the logo of BieberKit, its sentence and the title (UI-33).
+  await expect(page).toHaveTitle('Acme Works');
+  await expect(page.getByText('Acme Works')).toBeVisible();
+  await expect(page.getByText('Acme at work.')).toBeVisible();
+  await expect(page.getByRole('img', { name: 'BieberKit' })).toHaveCount(0);
   await page.getByLabel('Email').fill(EMAIL);
   await page.getByLabel('Password').fill(PASSWORD);
   await page.getByRole('button', { name: 'Sign in' }).click();
@@ -56,7 +61,9 @@ test('the admin at the root of its own host signs in, reloads on a route, and is
   expect((await request.get('http://127.0.0.1:4312/')).status()).toBe(404);
   expect((await request.get('http://127.0.0.1:4312/admin/')).status()).toBe(404);
 
-  await page.getByRole('button', { name: 'Sign out' }).click();
+  // Signing out is in the menu of the account (UI-24).
+  await page.getByRole('button', { name: /Account menu/ }).click();
+  await page.getByRole('menuitem', { name: 'Sign out' }).click();
   await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible();
   expect(violations).toEqual([]);
 });

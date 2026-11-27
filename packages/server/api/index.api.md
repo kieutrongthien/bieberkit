@@ -28,12 +28,13 @@
 Generated from the built declaration files by `pnpm api:update`. Do not edit by hand. A change here is a change to the public API and needs a changeset (spec section 22.3).
 
 ```ts
+import { AdminSettings } from "@bieberkit/admin-core";
 import { AuditPrune, Database, MadeMigration, PluginRun } from "@bieberkit/data/orm";
 import { BkError, CoreEnv, EnvSource, ModuleDef, Role } from "@bieberkit/core";
 import { ExtensionRef, PluginMigrationStep, ResolvedEntities } from "@bieberkit/data";
 import { HttpServer } from "@bieberkit/http";
 import { Theme } from "@bieberkit/tokens";
-import { a as envOwnersOf, c as loadConfig, i as ProjectConfig, l as loadProject, n as LoadedPlugin, o as findProjectRoot, r as Project, s as importFile, t as CONFIG_FILE, u as COLLECTORS } from "./project-BtnDZNX1.js";
+import { a as envOwnersOf, c as loadConfig, i as ProjectConfig, l as loadProject, n as LoadedPlugin, o as findProjectRoot, r as Project, s as importFile, t as CONFIG_FILE, u as COLLECTORS } from "./project-B9gIz_K7.js";
 export declare const ADMIN_PACKAGE = "@bieberkit/admin-antd";
 export declare const ADMIN_PREFIX = "/admin";
 interface AdminLocation {
@@ -47,7 +48,7 @@ export declare function adminDirectory(root: string): string | undefined;
 export declare function registerAdmin(server: HttpServer, root: string, location: AdminLocation, theme?: Theme, retained?: string, storage?: string, folders?: readonly {
   readonly plugin: string;
   readonly directory: string;
-}[]): boolean;
+}[], settings?: AdminSettings): boolean;
 type BootRole = Role | "dev";
 interface BootOptions {
   readonly role: BootRole;

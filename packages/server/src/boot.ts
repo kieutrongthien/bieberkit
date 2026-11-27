@@ -216,6 +216,7 @@ export async function boot(options: BootOptions): Promise<Running> {
         // A file goes from the browser to the bucket with a signed URL, so the policy of the admin names that origin (ADR 0036).
         storageOrigin(env),
         pluginAdmin.folders,
+        project.config.admin,
       );
       const web = server;
       lifecycle.onBoot('http', async () => {

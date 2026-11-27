@@ -26,8 +26,9 @@ import { backoffMs, createAdminClient, shouldRetry } from '@bieberkit/admin-core
 import type { Locale } from '@bieberkit/admin-core';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createRootRoute, createRoute, createRouter, lazyRouteComponent, RouterProvider } from '@tanstack/react-router';
-import { compileAntdTheme, modeOf, readTheme } from '@bieberkit/tokens';
-import { App as AntApp, ConfigProvider, theme as antTheme } from 'antd';
+import { compileAntdTheme, cssVariables, modeOf, readTheme } from '@bieberkit/tokens';
+import { App as AntApp, ConfigProvider, Empty, theme as antTheme } from 'antd';
+import { FolderArt } from './icons.tsx';
 import { useEffect, useState } from 'react';
 import { ENGLISH_RESOURCES, initialLocale, LanguageContext, loadResources, saveLocale } from './language.tsx';
 import type { Resources } from './language.tsx';
@@ -74,6 +75,13 @@ const router = createRouter({
 
 /** The brand tokens that the server wrote in the page from `theme` of the config (UI-06, TOK-02). */
 const brand = readTheme(document.querySelector('meta[name="bk-theme"]')?.getAttribute('content'));
+// The server writes the variables in the page. A page without them, such as the one of `vite dev`, gets those of the theme it read.
+if (document.getElementById('bk-theme') === null) {
+  const style = document.createElement('style');
+  style.id = 'bk-theme';
+  style.textContent = cssVariables(brand);
+  document.head.prepend(style);
+}
 const dark = window.matchMedia('(prefers-color-scheme: dark)');
 
 /** Whether the system asks for the dark palette, kept up to date while the page is open. */
@@ -89,6 +97,10 @@ function useSystemDark(): boolean {
 
 export function App(): JSX.Element {
   const mode = modeOf(brand, useSystemDark());
+  // The parts that the browser draws itself, such as the picker of a date, follow the palette too.
+  useEffect(() => {
+    document.documentElement.style.colorScheme = mode;
+  }, [mode]);
   // English is in the bundle and shows at once. Another language is read first, and the screen waits for it, so that it does not flash in English (UI-12).
   const [resources, setResources] = useState<Resources | undefined>(() => {
     const first = initialLocale();
@@ -111,6 +123,8 @@ export function App(): JSX.Element {
   return (
     <ConfigProvider
       locale={antd}
+      // Where Ant Design has nothing to show, the admin shows its empty folder (UI-23).
+      renderEmpty={() => <Empty image={<FolderArt />} />}
       theme={{
         token: compiled.token,
         algorithm: compiled.algorithm === 'dark' ? antTheme.darkAlgorithm : antTheme.defaultAlgorithm,

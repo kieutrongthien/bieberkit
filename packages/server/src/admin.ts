@@ -27,6 +27,7 @@ import { join } from 'node:path';
 import { serveStatic } from '@bieberkit/http';
 import { cssVariables, DEFAULT_THEME } from '@bieberkit/tokens';
 import type { Theme } from '@bieberkit/tokens';
+import type { AdminSettings } from '@bieberkit/admin-core';
 import type { HttpServer } from '@bieberkit/http';
 import { retainAssets } from './admin-assets.ts';
 import { ServerError } from './errors.ts';
@@ -154,19 +155,30 @@ export function adminDirectory(root: string): string | undefined {
 const escapeAttribute = (text: string): string =>
   text.replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
 
+/** Data that the adapter reads from the page. */
+const dataMeta = (name: string, value: unknown): string =>
+  `<meta name="${name}" content="${escapeAttribute(JSON.stringify(value))}" />`;
+
 /**
- * The page of the application, told where it lives and what it looks like: its files from the prefix, the prefix for the router, and
- * the theme of the config as CSS variables (a style, which the policy allows) and as data for the adapter (UI-06, TOK-02). The theme
- * is not in the build, so a change of the config is a restart and not a build (UI-14).
+ * The page of the application, told where it lives and what it looks like: its files from the prefix, the prefix for the router, the
+ * theme of the config as CSS variables (a style, which the policy allows) and as data for the adapter (UI-06, TOK-02), and the brand
+ * and the menu of the project as data (UI-24, UI-33). None of it is in the build, so a change of the config is a restart and not a
+ * build (UI-14).
  */
-export function pageAt(prefix: string, theme: Theme): (html: string) => string {
+export function pageAt(prefix: string, theme: Theme, settings: AdminSettings = {}): (html: string) => string {
   const style = `<style id="bk-theme">${cssVariables(theme)}</style>`;
-  const data = `<meta name="bk-theme" content="${escapeAttribute(JSON.stringify(theme))}" />`;
-  return (html) =>
-    html
-      // The build writes the files as `./assets/...`, which is right at the root of a folder and wrong at a route under it.
-      .replaceAll(/(["'(])\.\//g, `$1${prefix}/`)
-      .replace('</head>', `<meta name="bk-admin-base" content="${prefix}" />${data}${style}</head>`);
+  const head = `<meta name="bk-admin-base" content="${prefix}" />${dataMeta('bk-theme', theme)}${dataMeta('bk-admin', settings)}${style}</head>`;
+  const name = settings.brand?.name;
+  return (html) => {
+    // The build writes the files as `./assets/...`, which is right at the root of a folder and wrong at a route under it.
+    const placed = html.replaceAll(/(["'(])\.\//g, `$1${prefix}/`);
+    // The replacements are functions, so that a `$` in a text of the config stays a letter.
+    const titled =
+      name === undefined
+        ? placed
+        : placed.replace(/<title>[^<]*<\/title>/, () => `<title>${escapeAttribute(name)}</title>`);
+    return titled.replace('</head>', () => head);
+  };
 }
 
 /** Serves the admin where `location` says, when an adapter is installed. It answers whether it did. */
@@ -181,6 +193,8 @@ export function registerAdmin(
   storage?: string,
   /** The folders of the plugins that add files to the admin, each served under `/plugins/<plugin>` (UI-04). */
   folders: readonly { readonly plugin: string; readonly directory: string }[] = [],
+  /** The `admin` key of the config: the brand and the menu of the project (UI-24, UI-33). */
+  settings: AdminSettings = {},
 ): boolean {
   const directory = adminDirectory(root);
   if (directory === undefined) return false;
@@ -190,7 +204,7 @@ export function registerAdmin(
     prefix: location.prefix,
     directory,
     policy: policyFor(storage),
-    transformPage: pageAt(location.prefix, theme),
+    transformPage: pageAt(location.prefix, theme, settings),
     ...(location.host === undefined ? {} : { host: location.host }),
   });
   // The files that the plugins add: a module is a script of this origin, under the same policy as the admin. A path with no file is a 404,
