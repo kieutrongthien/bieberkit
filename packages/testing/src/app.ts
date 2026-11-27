@@ -28,7 +28,13 @@ import { createContainer, loadEnv, registerModule } from '@bieberkit/core';
 import type { ModuleDef, ServiceRegistry, SettingDef } from '@bieberkit/core';
 import { uuid7 } from '@bieberkit/data';
 import type { EntityDef } from '@bieberkit/data';
-import { compileEntities, createOutboxDispatcher, currentEntityManager, emitEvent } from '@bieberkit/data/orm';
+import {
+  compileEntities,
+  createOutboxDispatcher,
+  currentEntityManager,
+  emitEvent,
+  mirrorAudit,
+} from '@bieberkit/data/orm';
 import { createCache, createMemoryEngine } from '@bieberkit/cache';
 import { createMailer, createMemoryTransport, MAIL_JOB, prepareMessage } from '@bieberkit/mail';
 import type { Message, PreparedMessage } from '@bieberkit/mail';
@@ -138,6 +144,7 @@ export async function createTestApp(options: TestAppOptions = {}): Promise<TestA
       const found: unknown = module.contributions['scopedPermissions'];
       if (typeof found === 'object' && found !== null) Object.assign(scoped, found);
     }
+    if (options.pluginEnv?.['AUDIT_LOG_MIRROR'] === true) mirrorAudit(db.orm);
     const authorizer = createAuthorizer({ db, entities, schemas, scoped });
     const logger = createMemoryLogger();
     const registry = buildPermissionRegistry(entities);
@@ -225,7 +232,10 @@ export async function createTestApp(options: TestAppOptions = {}): Promise<TestA
         authenticator: {
           authenticate: async (request): Promise<Principal | undefined> => {
             const id = first(request.headers[USER_HEADER]);
-            return id === undefined || id === '' ? undefined : { id, kind: 'user', via: 'token' };
+            if (id === undefined || id === '') return undefined;
+            // A test says that the user is in the grace of the second factor (POL-02) with this header.
+            const enrolBy = first(request.headers['x-test-mfa-enrol-by']);
+            return { id, kind: 'user', via: 'token', ...(enrolBy === undefined ? {} : { mfaEnrolBy: enrolBy }) };
           },
         },
         tenantResolver: {

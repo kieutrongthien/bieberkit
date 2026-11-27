@@ -60,10 +60,12 @@ export const auditPruneCommand: Command = {
     });
     const when = before.toISOString();
     return {
-      data: { before: when, count: done.count, pruned: done.pruned },
-      text: done.pruned
-        ? `Deleted ${String(done.count)} audit entries older than ${when}, and wrote audit.pruned.`
-        : `${String(done.count)} audit entries are older than ${when}. Run again with --yes to delete them.`,
+      data: { before: when, count: done.count, pruned: done.pruned, kept: done.kept },
+      text:
+        (done.pruned
+          ? `Deleted ${String(done.count)} audit entries older than ${when}, and wrote audit.pruned.`
+          : `${String(done.count)} audit entries are older than ${when}. Run again with --yes to delete them.`) +
+        (done.kept === 0 ? '' : ` ${String(done.kept)} older entries are kept by a legal hold.`),
     };
   },
 };

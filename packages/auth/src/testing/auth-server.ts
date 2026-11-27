@@ -33,6 +33,7 @@ import { createApiKey, revokeApiKey } from '../api-keys.ts';
 import type { ApiKeyInput, CreatedApiKey } from '../api-keys.ts';
 import { createAuth } from '../better-auth.ts';
 import type { AuthInstance, AuthLimits, AuthMail, AuthSecondaryStorage } from '../better-auth.ts';
+import type { PolicyReader } from '../policy.ts';
 import { AuthRole, AuthRolePermission, AuthUserRole } from '../roles.ts';
 import { registerAuthRoutes } from '../routes.ts';
 import { createTenantResolver } from '../tenant.ts';
@@ -64,7 +65,7 @@ export interface SendOptions {
 }
 
 export interface MailRecord extends AuthMail {
-  readonly kind: 'verify' | 'reset' | 'magic' | 'invite' | 'mfa-reset';
+  readonly kind: 'verify' | 'reset' | 'magic' | 'invite' | 'mfa-reset' | 'new-device';
 }
 
 export interface AuthServer {
@@ -99,7 +100,7 @@ export interface AuthServer {
     userId: string,
     permissions: readonly string[],
     tenant?: string,
-    options?: { requireMfa?: boolean },
+    options?: { requireMfa?: boolean; ipRestricted?: boolean },
   ): Promise<void>;
   seed(tenant: string, rows: readonly Record<string, unknown>[]): Promise<Record<string, string>>;
   audit(): Promise<{ action: string; actorId: string | null; data: unknown }[]>;
@@ -116,6 +117,8 @@ export interface AuthServerOptions {
   /** Turns the API keys on, with this limit for a key (requests in a window of seconds). */
   readonly apiKeys?: { readonly rateLimit?: { readonly window: number; readonly max: number } } | true;
   readonly secret?: string;
+  /** The policies that the sessions follow (POL-01, POL-04). */
+  readonly policy?: PolicyReader;
   readonly previousSecrets?: readonly string[];
   readonly limits?: AuthLimits;
   readonly trustProxy?: boolean;
@@ -172,6 +175,7 @@ export async function authServer(
     ...(options.previousSecrets === undefined ? {} : { previousSecrets: options.previousSecrets }),
     ...(options.apiKeys === undefined ? {} : { apiKeys: options.apiKeys === true ? {} : options.apiKeys }),
     baseUrl: BASE_URL,
+    ...(options.policy === undefined ? {} : { policy: options.policy }),
     methods: {
       ...(options.totp === true ? { totp: { issuer: 'BieberKit Test' } } : {}),
       ...(options.passkey === true ? { passkey: { rpName: 'BieberKit Test' } } : {}),
@@ -185,6 +189,7 @@ export async function authServer(
       sendVerification: async (mail) => void mails.push({ kind: 'verify', ...mail }),
       sendResetPassword: async (mail) => void mails.push({ kind: 'reset', ...mail }),
       sendInvite: async (mail: AuthMail) => void mails.push({ kind: 'invite', ...mail }),
+      sendNewDevice: async ({ to, device }) => void mails.push({ kind: 'new-device', to, url: device, token: '' }),
       sendMfaReset: async ({ to }: { readonly to: string }) =>
         void mails.push({ kind: 'mfa-reset', to, url: '', token: '' }),
     },
@@ -277,6 +282,7 @@ export async function authServer(
           name: `role-${id}`,
           system: false,
           requireMfa: grantOptions.requireMfa === true,
+          ipRestricted: grantOptions.ipRestricted === true,
         });
         await em.flush();
         for (const permission of permissions) em.create(AuthRolePermission, { roleId: id, permission });

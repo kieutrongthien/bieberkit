@@ -223,7 +223,8 @@ const isDay = (value: string): boolean => {
 
 /** Why the options of a route for deprecation, caching or idempotency are not allowed, or `undefined`. */
 function optionProblem(route: RouteDef): string | undefined {
-  if (route.idempotent === true && route.method !== 'POST') return 'only a POST route can be idempotent.';
+  if (route.idempotent === true && route.method !== 'POST' && route.method !== 'DELETE')
+    return 'only a POST or a DELETE route can be idempotent.';
   const deprecated = route.deprecated;
   if (deprecated !== undefined) {
     if (deprecated.since !== undefined && !isDay(deprecated.since))
@@ -726,13 +727,15 @@ export function createHttpServer(env: HttpEnv, options: HttpServerOptions = {}):
     const scope = state.idempotencyKey;
     if (scope === undefined || state.replayed) return;
     state.idempotencyKey = undefined;
-    if (reply.statusCode >= 200 && reply.statusCode < 300 && typeof payload === 'string') {
+    // An answer with no body, such as the 204 of a DELETE, is kept as the empty text.
+    const body = typeof payload === 'string' ? payload : payload === undefined || payload === null ? '' : undefined;
+    if (reply.statusCode >= 200 && reply.statusCode < 300 && body !== undefined) {
       const headers: Record<string, string> = {};
       for (const name of ['content-type', 'location', 'etag']) {
         const value = reply.getHeader(name);
         if (typeof value === 'string') headers[name] = value;
       }
-      await idempotency.complete(scope, { status: reply.statusCode, headers, body: payload });
+      await idempotency.complete(scope, { status: reply.statusCode, headers, body });
     } else {
       await idempotency.abandon(scope);
     }

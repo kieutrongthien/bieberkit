@@ -24,6 +24,7 @@
 
 import { defineRoute } from '@bieberkit/http';
 import type { RouteContext, RouteDef } from '@bieberkit/http';
+import type { ImportEntry } from './service.ts';
 
 const BASE = '/api/v1/settings/settings';
 const byKey = {
@@ -51,10 +52,54 @@ const view = {
   required: ['key', 'type', 'label', 'scope', 'public', 'secret', 'default', 'value', 'hasValue'],
 } as const;
 
+const importEntry = {
+  type: 'object',
+  properties: { key: { type: 'string', minLength: 1, maxLength: 120 }, value: {}, secret: { type: 'boolean' } },
+  required: ['key'],
+  additionalProperties: false,
+} as const;
+const exported = {
+  type: 'object',
+  properties: {
+    version: { type: 'integer' },
+    scope: { type: 'string' },
+    settings: { type: 'array', items: importEntry },
+  },
+  required: ['version', 'scope', 'settings'],
+} as const;
+const report = {
+  type: 'object',
+  properties: {
+    dryRun: { type: 'boolean' },
+    results: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          key: { type: 'string' },
+          result: { type: 'string', enum: ['created', 'updated', 'unchanged', 'skipped', 'invalid'] },
+          code: { type: 'string' },
+          message: { type: 'string' },
+        },
+        required: ['key', 'result'],
+      },
+    },
+  },
+  required: ['dryRun', 'results'],
+} as const;
+
 const where = (ctx: RouteContext): { tenantId?: string } =>
   ctx.tenantId === undefined ? {} : { tenantId: ctx.tenantId };
 const keyOf = (ctx: RouteContext): string => String(ctx.params['key']);
-const change = (ctx: RouteContext) => ({ ...where(ctx), actorId: ctx.principal?.id ?? null });
+const clientIp = (ctx: RouteContext): string => {
+  const header = ctx.headers['x-bk-client-ip'];
+  return (Array.isArray(header) ? header[0] : header) ?? '';
+};
+const change = (ctx: RouteContext) => ({
+  ...where(ctx),
+  actorId: ctx.principal?.id ?? null,
+  actor: { ip: clientIp(ctx), mfa: ctx.principal?.mfa === true },
+});
 
 export const routes: readonly RouteDef[] = [
   defineRoute({
@@ -118,11 +163,50 @@ export const routes: readonly RouteDef[] = [
     method: 'DELETE',
     url: `${BASE}/:key`,
     permission: 'settings.manage',
+    idempotent: true,
     schema: { params: byKey, response: { 204: { type: 'null' } } },
     async handler(ctx) {
       await ctx.services.settings.reset(keyOf(ctx), change(ctx));
       ctx.status(204);
       return undefined;
+    },
+  }),
+  defineRoute({
+    method: 'GET',
+    url: '/api/v1/settings/export',
+    permission: 'settings.read',
+    schema: { response: { 200: exported } },
+    handler: (ctx) => ctx.services.settings.exportStored(where(ctx)),
+  }),
+  defineRoute({
+    method: 'POST',
+    url: '/api/v1/settings/import',
+    permission: 'settings.manage',
+    idempotent: true,
+    schema: {
+      query: {
+        type: 'object',
+        properties: { dryRun: { type: 'boolean' } },
+        additionalProperties: false,
+      },
+      body: {
+        type: 'object',
+        properties: { settings: { type: 'array', maxItems: 1000, items: importEntry } },
+        required: ['settings'],
+        additionalProperties: false,
+      },
+      response: { 200: report },
+    },
+    handler(ctx) {
+      const list = Reflect.get(Object(ctx.body), 'settings');
+      const entries = (Array.isArray(list) ? list : []).map((item): ImportEntry => {
+        const secret = Reflect.get(Object(item), 'secret') === true;
+        return {
+          key: String(Reflect.get(Object(item), 'key')),
+          ...(secret ? { secret } : { value: Reflect.get(Object(item), 'value') }),
+        };
+      });
+      return ctx.services.settings.importStored(entries, change(ctx), { dryRun: ctx.query['dryRun'] === true });
     },
   }),
   defineRoute({

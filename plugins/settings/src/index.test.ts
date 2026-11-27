@@ -65,6 +65,17 @@ interface Row {
   hasValue: boolean;
 }
 
+interface ImportRow {
+  key: string;
+  result: string;
+  code?: string;
+}
+
+const resultsOf = (body: Readonly<Record<string, unknown>>): ImportRow[] => {
+  const results = body['results'];
+  return Array.isArray(results) ? results : [];
+};
+
 const rowsOf = (body: Readonly<Record<string, unknown>>): Row[] => {
   const data = body['data'];
   return Array.isArray(data) ? data : [];
@@ -210,6 +221,68 @@ describeDialects('SET the settings plugin', ({ open }) => {
     await app.close();
   });
 
+  it('OPS-03 an export carries the stored values and a hole for a secret, and an import in dry run changes nothing', async () => {
+    const { app, manager } = await world();
+    await manager.put(`${SETTINGS}/shop.page-size`, { value: 50 });
+    await manager.put(`${SETTINGS}/shop.smtp.password`, { value: 'hunter2' });
+    const out = await manager.get('/api/v1/settings/export');
+    expect(out.status).toBe(200);
+    expect(out.body).toEqual({
+      version: 1,
+      scope: 'global',
+      settings: expect.arrayContaining([
+        { key: 'shop.page-size', value: 50 },
+        { key: 'shop.smtp.password', secret: true },
+      ]),
+    });
+    expect(JSON.stringify(out.body)).not.toContain('hunter2');
+    const staging = await world();
+    const dry = await staging.manager.post('/api/v1/settings/import?dryRun=true', { settings: out.body['settings'] });
+    expect(dry.body).toMatchObject({ dryRun: true });
+    expect(resultsOf(dry.body).map((item) => [item.key, item.result])).toEqual(
+      expect.arrayContaining([
+        ['shop.page-size', 'created'],
+        ['shop.smtp.password', 'skipped'],
+      ]),
+    );
+    expect((await staging.manager.get(`${SETTINGS}/shop.page-size`)).body).toMatchObject({ hasValue: false });
+    const applied = await staging.manager.post('/api/v1/settings/import', { settings: out.body['settings'] });
+    expect(applied.status).toBe(200);
+    expect((await staging.manager.get(`${SETTINGS}/shop.page-size`)).body).toMatchObject({ value: 50, hasValue: true });
+    expect((await staging.manager.get(`${SETTINGS}/shop.smtp.password`)).body).toMatchObject({ hasValue: false });
+    const again = await staging.manager.post('/api/v1/settings/import', { settings: out.body['settings'] });
+    expect(resultsOf(again.body).find((item) => item.key === 'shop.page-size')?.result).toBe('unchanged');
+    await app.close();
+    await staging.app.close();
+  });
+
+  it('OPS-03 an import with one invalid entry applies none of them and says which', async () => {
+    const { app, manager } = await world();
+    const refused = await manager.post('/api/v1/settings/import', {
+      settings: [
+        { key: 'shop.page-size', value: 70 },
+        { key: 'shop.theme', value: { primary: 'red' } },
+        { key: 'shop.unknown', value: 1 },
+      ],
+    });
+    expect([refused.status, refused.body['code']]).toEqual([422, 'SETTINGS_IMPORT_INVALID']);
+    const results = resultsOf(refused.body);
+    expect(results.filter((item) => item.result === 'invalid').map((item) => item.code)).toEqual([
+      'SETTINGS_INVALID_VALUE',
+      'SETTINGS_UNKNOWN_KEY',
+    ]);
+    expect((await manager.get(`${SETTINGS}/shop.page-size`)).body).toMatchObject({ hasValue: false });
+    await app.close();
+  });
+
+  it('OPS-03 export and import need the permissions of reading and managing', async () => {
+    const { app } = await world();
+    const reader = await app.actingAs(app.newUser(), ['reader']);
+    expect((await reader.get('/api/v1/settings/export')).status).toBe(200);
+    expect((await reader.post('/api/v1/settings/import', { settings: [] })).status).toBe(403);
+    await app.close();
+  });
+
   it('SET-07 the public settings need no session, list only public ones and are cacheable', async () => {
     const { app, manager } = await world();
     await manager.put(`${SETTINGS}/settings.site.name`, { value: 'Demo' });
@@ -246,6 +319,60 @@ describeDialects('SET the settings plugin', ({ open }) => {
     expect((await reader.delete(`${SETTINGS}/shop.page-size`, 0)).status).toBe(403);
     expect((await (await app.actingAs(app.newUser())).get(SETTINGS)).status).toBe(403);
     expect((await app.anonymous().get(SETTINGS)).status).toBe(401);
+    await app.close();
+  });
+});
+
+// Settings with the keys and the guard of the security policies, declared here because a plugin does not import `@bieberkit/auth`.
+const requiredForAll = defineSetting({
+  key: 'security.mfa.required-for-all',
+  type: 'boolean',
+  default: false,
+  label,
+  guard: (value, actor) => value === true && !actor.mfa,
+});
+const requiredSince = defineSetting({ key: 'security.mfa.required-since', type: 'string', default: '', label });
+const secure = defineModule({ name: 'secure', settings: [requiredForAll, requiredSince] });
+
+describeDialects('POL-05 the settings service refuses a change that locks the person out', ({ open }) => {
+  async function world() {
+    const app = await createTestApp({
+      modules: [plugin.module, secure],
+      open,
+      tenant: NIL,
+      roles: { manager: ['settings.read', 'settings.manage'] },
+    });
+    return { app, manager: await app.actingAs(app.newUser(), ['manager']) };
+  }
+
+  it('POL-05 a guard that says lock-out gives SETTINGS_SELF_LOCKOUT (409) and changes nothing', async () => {
+    const { app, manager } = await world();
+    const refused = await manager.put(`${SETTINGS}/security.mfa.required-for-all`, { value: true });
+    expect([refused.status, refused.body['code']]).toEqual([409, 'SETTINGS_SELF_LOCKOUT']);
+    expect((await manager.get(`${SETTINGS}/security.mfa.required-for-all`)).body).toMatchObject({
+      value: false,
+      hasValue: false,
+    });
+    expect((await auditOf(app)).filter((entry) => entry.action === 'settings.setting.updated')).toHaveLength(0);
+    await app.close();
+  });
+
+  it('POL-05 the same value is allowed when it does not lock the person out, and turning it off is never refused', async () => {
+    const { app, manager } = await world();
+    const service = app.services.settings;
+    await service.set(requiredForAll, true, { actorId: null });
+    expect((await manager.put(`${SETTINGS}/security.mfa.required-for-all`, { value: false })).status).toBe(200);
+    await app.close();
+  });
+
+  it('POL-02 turning the rule on stamps required-since, and turning it off clears it', async () => {
+    const { app } = await world();
+    const service = app.services.settings;
+    await service.set(requiredForAll, true, { actorId: null });
+    const since = await service.get(requiredSince);
+    expect(Number.isNaN(Date.parse(since))).toBe(false);
+    await service.set(requiredForAll, false, { actorId: null });
+    expect(await service.get(requiredSince)).toBe('');
     await app.close();
   });
 });

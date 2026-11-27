@@ -51,9 +51,10 @@ const role = {
     name: { type: 'string' },
     system: { type: 'boolean' },
     requireMfa: { type: 'boolean' },
+    ipRestricted: { type: 'boolean' },
     permissions,
   },
-  required: ['id', 'name', 'system', 'requireMfa', 'permissions'],
+  required: ['id', 'name', 'system', 'requireMfa', 'ipRestricted', 'permissions'],
 } as const;
 
 const results = {
@@ -109,6 +110,7 @@ async function rolesOf(ctx: RouteContext, id?: string): Promise<Record<string, u
       name: row.name,
       system: row.system,
       requireMfa: row.requireMfa,
+      ipRestricted: row.ipRestricted,
       permissions: grants
         .filter((grant) => grant.roleId === row.id)
         .map((grant) => grant.permission)
@@ -217,6 +219,7 @@ export const routes: readonly RouteDef[] = [
           name: { type: 'string', minLength: 1, maxLength: 120 },
           permissions,
           requireMfa: { type: 'boolean' },
+          ipRestricted: { type: 'boolean' },
         },
         required: ['name'],
         additionalProperties: false,
@@ -229,6 +232,7 @@ export const routes: readonly RouteDef[] = [
         name: String(field(ctx.body, 'name')),
         permissions: toList(field(ctx.body, 'permissions')),
         requireMfa: field(ctx.body, 'requireMfa') === true,
+        ipRestricted: field(ctx.body, 'ipRestricted') === true,
       });
       ctx.status(201);
       return (await rolesOf(ctx, id))[0];
@@ -246,6 +250,7 @@ export const routes: readonly RouteDef[] = [
           name: { type: 'string', minLength: 1, maxLength: 120 },
           permissions,
           requireMfa: { type: 'boolean' },
+          ipRestricted: { type: 'boolean' },
         },
         additionalProperties: false,
       },
@@ -256,10 +261,12 @@ export const routes: readonly RouteDef[] = [
       const { database } = ctx.services;
       const name = field(ctx.body, 'name');
       const requireMfa = field(ctx.body, 'requireMfa');
-      if (typeof name === 'string' || typeof requireMfa === 'boolean') {
+      const ipRestricted = field(ctx.body, 'ipRestricted');
+      if (typeof name === 'string' || typeof requireMfa === 'boolean' || typeof ipRestricted === 'boolean') {
         await updateRole(database, id, {
           ...(typeof name === 'string' ? { name } : {}),
           ...(typeof requireMfa === 'boolean' ? { requireMfa } : {}),
+          ...(typeof ipRestricted === 'boolean' ? { ipRestricted } : {}),
         });
       }
       const wanted = field(ctx.body, 'permissions');
@@ -292,6 +299,7 @@ export const routes: readonly RouteDef[] = [
     method: 'DELETE',
     url: `${BASE}/roles/:id`,
     permission: 'roles.manage',
+    idempotent: true,
     schema: {
       params: byId,
       query: {
@@ -315,11 +323,16 @@ export const routes: readonly RouteDef[] = [
       method: 'POST',
       url: `${BASE}/roles/:id/${verb}`,
       permission: 'roles.manage',
+      idempotent: true,
       schema: {
         params: byId,
         body: {
           type: 'object',
-          properties: { userIds: { type: 'array', items: uuid, minItems: 1, maxItems: 100 } },
+          properties: {
+            userIds: { type: 'array', items: uuid, minItems: 1, maxItems: 100 },
+            // Limits the role to the users of this group (ROL-09). Only `assign` reads it.
+            groupId: { type: 'string', minLength: 1, maxLength: 120 },
+          },
           required: ['userIds'],
           additionalProperties: false,
         },
@@ -330,6 +343,7 @@ export const routes: readonly RouteDef[] = [
           tenantId: tenantOf(ctx),
           roleId: String(ctx.params['id']),
           userIds: toList(field(ctx.body, 'userIds')),
+          ...(typeof field(ctx.body, 'groupId') === 'string' ? { groupId: String(field(ctx.body, 'groupId')) } : {}),
         };
         return verb === 'assign'
           ? assignRoles(ctx.services.database, input)

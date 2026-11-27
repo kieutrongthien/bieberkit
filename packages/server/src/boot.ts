@@ -25,7 +25,10 @@
 import { join } from 'node:path';
 import {
   authEntities,
+  auditNetworkDenied,
   createAuthenticator,
+  restrictedRoleLookup,
+  securitySettings,
   createAuthorizer,
   createTenantResolver,
   registerAuthRoutes,
@@ -43,6 +46,7 @@ import type { JobDef, QueueSubscription } from '@bieberkit/queue';
 import { ServerError } from './errors.ts';
 import { adminLocation, registerAdmin } from './admin.ts';
 import { migrate } from './migrate.ts';
+import { settingsOf, settingsPolicyReader } from './policy.ts';
 import { createRuntimePlatform, permissionCatalog, registerRuntimeServices } from './services.ts';
 import { runMigrations } from './migrations.ts';
 import { allModules, contributed, contributedRecord } from './modules.ts';
@@ -119,6 +123,8 @@ export async function boot(options: BootOptions): Promise<Running> {
     const db = await createDatabase(env, {
       entities: [...schemas, ...authEntities],
       audit: 'table',
+      // The audit-log plugin copies each entry to the log after commit when it is asked to (AUD-07).
+      auditMirror: extra['AUDIT_LOG_MIRROR'] === true,
       // The key ring of encrypted fields, such as secret settings (SEC-08, SET-03).
       encryption: {
         current: env.APP_KEY,
@@ -162,7 +168,8 @@ export async function boot(options: BootOptions): Promise<Running> {
       db,
       ...platform,
       permissions: permissionCatalog(project, modules),
-      settings: contributed<SettingDef>(modules, 'settings'),
+      // The policies of the authenticator are declared by `@bieberkit/auth`, which is not a module (ADR 0031).
+      settings: [...securitySettings, ...contributed<SettingDef>(modules, 'settings')],
     });
     for (const module of modules) registerModule(container, module);
     await container.boot();
@@ -179,7 +186,11 @@ export async function boot(options: BootOptions): Promise<Running> {
         errorReporter: reporter,
         authorizer,
         services: container.services,
-        authenticator: createAuthenticator(auth),
+        authenticator: createAuthenticator(auth, {
+          policy: settingsPolicyReader(settingsOf(container.services)),
+          restricted: restrictedRoleLookup(db),
+          onDenied: auditNetworkDenied(db),
+        }),
         tenantResolver: createTenantResolver({ db }),
       });
       authorizer.install(server);

@@ -29,7 +29,8 @@ import { dataError } from '../errors.ts';
 import { redactPii } from '../schema/pii.ts';
 import type { EntityDef } from '../schema/define-entity.ts';
 import type { Database, Orm } from './connect.ts';
-import { AuditLog } from './framework.ts';
+import { emitEvent } from './outbox.ts';
+import { AuditHold, AuditLog } from './framework.ts';
 import type { AuditSink, SystemScopeEntry } from './tenant.ts';
 
 export interface AuditEntry {
@@ -65,6 +66,17 @@ function dataText(data: unknown): string | null {
  * Adds an audit entry to the unit of work. The flush that writes the data writes it, in the same transaction, and a flush that
  * fails leaves no entry (§7.5, OBS-05). The actor and the request come from the request context.
  */
+/** The name of the outbox event that carries an audit entry to the mirror (AUD-07). */
+export const AUDIT_RECORDED_EVENT = 'audit.entry.recorded';
+
+// The databases whose audit entries are also written to the outbox. Keyed by configuration, so a process may open several.
+const mirrored = new WeakSet<object>();
+
+/** Turns the mirror on for a database: each audit entry then also leaves an `audit.entry.recorded` event in its transaction (AUD-07). */
+export function mirrorAudit(orm: Orm): void {
+  mirrored.add(orm.config);
+}
+
 export function recordAudit(em: EntityManager, entry: AuditEntry): void {
   if (entry.action.trim() === '' || entry.action.length > 200) {
     throw dataError(
@@ -75,7 +87,7 @@ export function recordAudit(em: EntityManager, entry: AuditEntry): void {
     );
   }
   const context = requestContext.get();
-  em.create(AuditLog, {
+  const row = em.create(AuditLog, {
     action: entry.action,
     at: new Date(),
     entity: entry.entity ?? null,
@@ -86,6 +98,23 @@ export function recordAudit(em: EntityManager, entry: AuditEntry): void {
     actorId: context?.userId ?? null,
     requestId: context?.requestId ?? null,
   });
+  if (mirrored.has(em.config)) {
+    emitEvent(em, {
+      name: AUDIT_RECORDED_EVENT,
+      payload: {
+        id: row.id,
+        at: row.at.toISOString(),
+        action: row.action,
+        entity: row.entity,
+        recordId: row.recordId,
+        actorId: row.actorId,
+        requestId: row.requestId,
+        tenant: row.tenant,
+        reason: row.reason,
+        data: row.data == null ? null : JSON.parse(row.data),
+      },
+    });
+  }
 }
 
 /**
@@ -117,9 +146,11 @@ export interface AuditPruneOptions {
 }
 
 export interface AuditPrune {
-  /** The entries before the date: counted, or deleted when `pruned`. */
+  /** The entries before the date that are not under a hold: counted, or deleted when `pruned`. */
   readonly count: number;
   readonly pruned: boolean;
+  /** The entries before the date that a legal hold keeps (AUD-09). */
+  readonly kept: number;
 }
 
 const NO_DELETE_TRIGGER =
@@ -141,7 +172,17 @@ export async function pruneAuditLog(db: Database, options: AuditPruneOptions): P
     );
   }
   const older = { at: { $lt: before } };
-  if (!options.apply) return { count: await db.fork().count(AuditLog, older), pruned: false };
+  // The entries under a hold that is not released are kept, whatever their age (AUD-09, ADR 0032).
+  const holds = await db.fork().find(AuditHold, { releasedAt: null });
+  const covered = holds.map((hold) => ({
+    ...(hold.tenant == null ? {} : { tenant: hold.tenant }),
+    ...(hold.entity == null ? {} : { entity: hold.entity }),
+    ...(hold.recordId == null ? {} : { recordId: hold.recordId }),
+    ...(hold.actorId == null ? {} : { actorId: hold.actorId }),
+  }));
+  const prunable = covered.length === 0 ? older : { $and: [older, { $not: { $or: covered } }] };
+  const kept = covered.length === 0 ? 0 : await db.fork().count(AuditLog, { $and: [older, { $or: covered }] });
+  if (!options.apply) return { count: await db.fork().count(AuditLog, prunable), pruned: false, kept };
   const em = db.fork();
   if (!(em instanceof SqlEntityManager)) {
     throw dataError('DATA_DRIVER_UNSUPPORTED', 500, 'This database has no SQL.', 'Use PostgreSQL, MySQL or SQLite.');
@@ -149,10 +190,10 @@ export async function pruneAuditLog(db: Database, options: AuditPruneOptions): P
   return em.transactional(async (trx) => {
     const sqlite = db.dialect === 'sqlite';
     if (sqlite) await trx.execute('drop trigger if exists bk_audit_log_no_delete');
-    const count = await trx.nativeDelete(AuditLog, older);
+    const count = await trx.nativeDelete(AuditLog, prunable);
     if (sqlite) await trx.execute(NO_DELETE_TRIGGER);
-    recordAudit(trx, { action: 'audit.pruned', data: { before: before.toISOString(), count } });
+    recordAudit(trx, { action: 'audit.pruned', data: { before: before.toISOString(), count, kept } });
     await trx.flush();
-    return { count, pruned: true };
+    return { count, pruned: true, kept };
   });
 }

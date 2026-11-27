@@ -64,6 +64,7 @@ export async function seed(options: SeedOptions = {}): Promise<Seeded> {
   const db = await createDatabase(env, {
     entities: [...compileEntities(entities), ...authEntities],
     audit: 'table',
+    auditMirror: extra['AUDIT_LOG_MIRROR'] === true,
     encryption: {
       current: env.APP_KEY,
       ...(env.APP_KEY_PREVIOUS === undefined ? {} : { previous: [env.APP_KEY_PREVIOUS] }),

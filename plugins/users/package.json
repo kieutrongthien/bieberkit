@@ -92,10 +92,12 @@
       "POST /api/v1/users/users/:id/enable",
       "POST /api/v1/users/users/:id/mfa/reset",
       "POST /api/v1/users/users/:id/resend-invite",
-      "POST /api/v1/users/users/:id/reset-password"
+      "POST /api/v1/users/users/:id/reset-password",
+      "PUT /api/v1/users/users/:id/groups"
     ],
     "permissions": [
       "users.manage",
+      "users.override-external",
       "users.read",
       "users.reset-mfa",
       "users.revoke-sessions"

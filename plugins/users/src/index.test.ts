@@ -23,6 +23,8 @@
  */
 
 import { expect, it } from 'vitest';
+import { AuthUserGroup, AuthUserRole } from '@bieberkit/auth';
+import { runInUnitOfWork } from '@bieberkit/data/orm';
 import { createTestApp, describeDialects } from '@bieberkit/testing';
 import type { TestApp } from '@bieberkit/testing';
 import roles from '@bieberkit/plugin-roles';
@@ -53,6 +55,14 @@ const metaOf = (body: Readonly<Record<string, unknown>>): Record<string, unknown
 async function make(app: TestApp, email: string, name = 'Someone'): Promise<string> {
   const made = await app.services.auth.api.signUpEmail({ body: { email, password: PASSWORD, name } });
   return made.user.id;
+}
+
+/** A manager whose role is limited to the users of `group` (ROL-09). */
+async function limited(app: TestApp, email: string, group: string) {
+  const id = await make(app, email);
+  const client = await app.actingAs(id, ['manager']);
+  await runInUnitOfWork(app.db, (em) => em.nativeUpdate(AuthUserRole, { userId: id }, { scopeGroup: group }));
+  return { id, client };
 }
 
 describeDialects('USR the users plugin', ({ open }) => {
@@ -226,12 +236,130 @@ describeDialects('USR the users plugin', ({ open }) => {
     await app.close();
   });
 
+  it('OPS-01 a mail route and a delete route replay the answer for the same Idempotency-Key and do the work once', async () => {
+    const { app, manager } = await world();
+    const id = await make(app, 'jo@example.test');
+    const key = { 'idempotency-key': 'reset-jo-1' };
+    const first = await manager.post(`${USERS}/${id}/reset-password`, undefined, key);
+    const second = await manager.post(`${USERS}/${id}/reset-password`, undefined, key);
+    expect([first.status, second.status]).toEqual([202, 202]);
+    expect(second.headers['idempotency-replayed']).toBe('true');
+    await app.runOutbox();
+    expect(app.mailbox.filter((message) => message.to.some((to) => to.address === 'jo@example.test'))).toHaveLength(1);
+    const gone = await make(app, 'gone@example.test');
+    const del = { 'idempotency-key': 'delete-gone-1' };
+    expect((await manager.delete(`${USERS}/${gone}`, 0, del)).status).toBe(204);
+    const again = await manager.delete(`${USERS}/${gone}`, 0, del);
+    expect([again.status, again.headers['idempotency-replayed']]).toEqual([204, 'true']);
+    expect((await manager.delete(`${USERS}/${gone}`, 0)).status).toBe(404);
+    expect((await manager.delete(`${USERS}/${gone}`, 0, { 'idempotency-key': '' })).status).not.toBe(500);
+    await app.close();
+  });
+
+  it('OPS-02 an administrator who sends many invitations is limited as a person, whatever the address', async () => {
+    const { app, manager } = await world();
+    let last = 0;
+    for (let n = 0; n < 21; n += 1) {
+      last = (await manager.post(USERS, { name: `U${String(n)}`, email: `u${String(n)}@example.test`, invite: true }))
+        .status;
+    }
+    expect(last).toBe(429);
+    const other = await app.actingAs(await make(app, 'other@example.test'), ['manager']);
+    expect((await other.post(USERS, { name: 'Z', email: 'z@example.test', invite: true })).status).toBe(201);
+    await app.close();
+  });
+
   it('USR-11 an MFA reset needs users.reset-mfa', async () => {
     const { app, manager } = await world();
     const id = await make(app, 'pam@example.test');
     expect((await manager.post(`${USERS}/${id}/mfa/reset`)).status).toBe(403);
     const support = await app.actingAs(await make(app, 'support@example.test'), ['support']);
     expect((await support.post(`${USERS}/${id}/mfa/reset`)).status).toBe(204);
+    await app.close();
+  });
+
+  it('POL-02 /users/me shows mfaEnrolBy to a user in the grace of the second factor, and only then', async () => {
+    const { app } = await world();
+    const id = await make(app, 'grace@example.test');
+    const me = await app.actingAs(id);
+    expect((await me.get('/api/v1/users/me')).body).not.toHaveProperty('mfaEnrolBy');
+    const by = '2026-12-01T00:00:00.000Z';
+    expect((await me.get('/api/v1/users/me', { 'x-test-mfa-enrol-by': by })).body).toMatchObject({
+      id,
+      mfaEnrolBy: by,
+    });
+    await app.close();
+  });
+
+  it('ROL-09 a manager whose role is limited to a group lists, reads and changes only the users of that group', async () => {
+    const { app, manager } = await world();
+    const ann = await make(app, 'ann@example.test', 'Ann');
+    const bo = await make(app, 'bo@example.test', 'Bo');
+    await manager.put(`${USERS}/${ann}/groups`, { groups: ['hr'] }, {});
+    await manager.put(`${USERS}/${bo}/groups`, { groups: ['sales'] }, {});
+    const hr = await limited(app, 'hr-boss@example.test', 'hr');
+    await manager.put(`${USERS}/${hr.id}/groups`, { groups: ['hr'] }, {});
+    expect(rowsOf((await hr.client.get(USERS)).body).map((row) => row.email)).toEqual([
+      'ann@example.test',
+      'hr-boss@example.test',
+    ]);
+    expect((await hr.client.get(`${USERS}/${ann}`)).body).toMatchObject({ id: ann, groups: ['hr'] });
+    for (const call of [
+      () => hr.client.get(`${USERS}/${bo}`),
+      () => hr.client.patch(`${USERS}/${bo}`, { name: 'X' }, 0),
+      () => hr.client.post(`${USERS}/${bo}/disable`, { reason: 'x' }),
+      () => hr.client.post(`${USERS}/${bo}/reset-password`, {}),
+    ]) {
+      const refused = await call();
+      expect([refused.status, refused.body['code']]).toEqual([404, 'USERS_NOT_FOUND']);
+    }
+    expect((await hr.client.patch(`${USERS}/${ann}`, { name: 'Ann H' }, 0)).status).toBe(200);
+    await app.close();
+  });
+
+  it('ROL-09 an unlimited manager still sees everybody', async () => {
+    const { app, manager } = await world();
+    const bo = await make(app, 'bo@example.test');
+    await manager.put(`${USERS}/${bo}/groups`, { groups: ['sales'] }, {});
+    const all = rowsOf((await manager.get(USERS)).body).map((row) => row.email);
+    expect(all).toContain('bo@example.test');
+    expect(all).toContain('manager@example.test');
+    await app.close();
+  });
+
+  it('ROL-09 a limited manager makes a user only inside their groups, and cannot move a user out of them (USERS_OUT_OF_SCOPE)', async () => {
+    const { app } = await world();
+    const hr = await limited(app, 'hr-boss@example.test', 'hr');
+    const outside = await hr.client.post(USERS, {
+      name: 'N',
+      email: 'n@example.test',
+      password: PASSWORD,
+      groups: ['sales'],
+    });
+    expect([outside.status, outside.body['code']]).toEqual([403, 'USERS_OUT_OF_SCOPE']);
+    const none = await hr.client.post(USERS, { name: 'N', email: 'n@example.test', password: PASSWORD });
+    expect([none.status, none.body['code']]).toEqual([403, 'USERS_OUT_OF_SCOPE']);
+    const made = await hr.client.post(USERS, {
+      name: 'N',
+      email: 'n@example.test',
+      password: PASSWORD,
+      groups: ['hr'],
+    });
+    expect([made.status, made.body['groups']]).toEqual([201, ['hr']]);
+    const id = String(made.body['id']);
+    const moved = await hr.client.put(`${USERS}/${id}/groups`, { groups: ['sales'] }, {});
+    expect([moved.status, moved.body['code']]).toEqual([403, 'USERS_OUT_OF_SCOPE']);
+    await app.close();
+  });
+
+  it('ROL-09 groups are audited, and a user who is deleted leaves no groups', async () => {
+    const { app, manager } = await world();
+    const ann = await make(app, 'ann@example.test');
+    const set = await manager.put(`${USERS}/${ann}/groups`, { groups: ['b', 'a', 'a'] }, {});
+    expect(set.body['groups']).toEqual(['a', 'b']);
+    expect((await manager.put(`${USERS}/${ann}/groups`, { groups: ['a'] }, {})).body['groups']).toEqual(['a']);
+    expect((await manager.delete(`${USERS}/${ann}`, 0)).status).toBe(204);
+    expect(await runInUnitOfWork(app.db, (em) => em.count(AuthUserGroup, { userId: ann }))).toBe(0);
     await app.close();
   });
 

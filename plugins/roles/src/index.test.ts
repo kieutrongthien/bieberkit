@@ -186,3 +186,16 @@ it('ROL-08 a manager cannot make a role with a permission that they do not hold'
   expect([refused.status, refused.body['code']]).toEqual([403, 'ROLES_ESCALATION']);
   await app.close();
 });
+
+it('POL-03 a role is made ip-restricted, shown, changed and duplicated with the flag', async () => {
+  const { app, admin } = await world();
+  const made = await admin.post(ROLES, { name: 'office', ipRestricted: true });
+  expect(made.body).toMatchObject({ name: 'office', ipRestricted: true, requireMfa: false });
+  const id = String(made.body['id']);
+  expect((await admin.post(ROLES, { name: 'plain' })).body['ipRestricted']).toBe(false);
+  const copy = await admin.post(`${ROLES}/${id}/duplicate`, { name: 'office-copy' });
+  expect(copy.body['ipRestricted']).toBe(true);
+  const changed = await admin.patch(`${ROLES}/${id}`, { ipRestricted: false }, 0);
+  expect(changed.body['ipRestricted']).toBe(false);
+  await app.close();
+});

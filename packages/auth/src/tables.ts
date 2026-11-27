@@ -257,6 +257,20 @@ export const AuthRateLimit: EntitySchema<AuthRateLimitRow> = new EntitySchema<Au
   uniques: [{ name: 'bk_auth_rate_limits_key_unique', properties: ['key'] }],
 });
 
+/** A device that a user signed in from, by a hash of its user agent (POL-04). Not a Better Auth model. */
+export const AuthKnownDevice: EntitySchema = new EntitySchema({
+  name: 'authKnownDevice',
+  tableName: 'bk_auth_known_devices',
+  properties: {
+    id: id(),
+    userId: { kind: 'm:1', entity: () => AuthUser, mapToPk: true, fieldName: 'user_id', deleteRule: 'cascade' },
+    fingerprint: { type: 'string', length: 64 },
+    firstSeenAt: instant('first_seen_at'),
+    lastSeenAt: instant('last_seen_at'),
+  },
+  uniques: [{ name: 'bk_auth_known_devices_user_fingerprint_unique', properties: ['userId', 'fingerprint'] }],
+});
+
 // Better Auth names the model `twoFactor` and the table option `twoFactorTable`; both are set to `authTwoFactor`.
 export const AuthTwoFactor: EntitySchema = new EntitySchema({
   name: 'authTwoFactor',
@@ -339,6 +353,7 @@ export const authTableEntities: readonly EntitySchema[] = [
   AuthTwoFactor,
   AuthPasskey,
   AuthApiKey,
+  AuthKnownDevice,
 ];
 
 const VERSION = '0.2.0';
@@ -346,6 +361,7 @@ const STRONG = '0.3.0';
 const KEYS = '0.4.0';
 const PROFILE = '0.5.0';
 const LIFECYCLE = '0.6.0';
+const NETWORK = '0.7.0';
 const instantType = (dialect: string): 'timestamptz' | 'datetime' =>
   dialect === 'postgres' ? 'timestamptz' : 'datetime';
 
@@ -566,5 +582,65 @@ export const authTableSteps: readonly PluginMigrationStep[] = [
   // and PostgreSQL and SQLite read them as one expression.
   authStep(LIFECYCLE, 'users-name-lower-index', async (trx) => {
     await sql`create index bk_auth_users_name_lower_index on bk_auth_users ((lower(name)))`.execute(trx);
+  }),
+  // The sort of the users list by name (OPS-05), ending in the id that the list is ordered by.
+  authStep(NETWORK, 'users-name-index', async (trx) => {
+    await trx.schema.createIndex('bk_auth_users_name_index').on('bk_auth_users').columns(['name', 'id']).execute();
+  }),
+  // PostgreSQL reads a prefix search (`like 'an%'`) through an index only when the index has the pattern operator class (OPS-05).
+  // MySQL and SQLite use the indexes above for it.
+  authStep(NETWORK, 'users-name-lower-like-index', async (trx, dialect) => {
+    if (dialect !== 'postgres') return;
+    await sql`create index bk_auth_users_name_lower_like_index on bk_auth_users ((lower(name)) text_pattern_ops)`.execute(
+      trx,
+    );
+  }),
+  authStep(NETWORK, 'users-email-like-index', async (trx, dialect) => {
+    if (dialect !== 'postgres') return;
+    await sql`create index bk_auth_users_email_like_index on bk_auth_users (email varchar_pattern_ops)`.execute(trx);
+  }),
+  // Version 0.7.0: the groups of a user and a role assignment that is limited to one group (ROL-09).
+  authStep(NETWORK, 'user-roles-scope-group', async (trx) => {
+    await trx.schema.alterTable('bk_auth_user_roles').addColumn('scope_group', 'varchar(120)').execute();
+  }),
+  authStep(NETWORK, 'user-groups-create', async (trx, dialect) => {
+    await trx.schema
+      .createTable('bk_auth_user_groups')
+      .addColumn('user_id', uuidType(dialect), (c) => c.notNull())
+      .addColumn('group_id', 'varchar(120)', (c) => c.notNull())
+      .addPrimaryKeyConstraint('bk_auth_user_groups_pkey', ['user_id', 'group_id'])
+      .addForeignKeyConstraint('bk_auth_user_groups_user_fk', ['user_id'], 'bk_auth_users', ['id'], (c) =>
+        c.onDelete('cascade'),
+      )
+      .execute();
+  }),
+  authStep(NETWORK, 'user-groups-group-index', async (trx) => {
+    await trx.schema
+      .createIndex('bk_auth_user_groups_group_index')
+      .on('bk_auth_user_groups')
+      .column('group_id')
+      .execute();
+  }),
+  // Version 0.7.0: the devices of a user (POL-04) and a role that may be used only from the allowed networks (POL-03).
+  authStep(NETWORK, 'known-devices-create', async (trx, dialect) => {
+    await trx.schema
+      .createTable('bk_auth_known_devices')
+      .addColumn('id', uuidType(dialect), (c) => c.notNull())
+      .addColumn('user_id', uuidType(dialect), (c) => c.notNull())
+      .addColumn('fingerprint', 'varchar(64)', (c) => c.notNull())
+      .addColumn('first_seen_at', instantType(dialect), (c) => c.notNull())
+      .addColumn('last_seen_at', instantType(dialect), (c) => c.notNull())
+      .addPrimaryKeyConstraint('bk_auth_known_devices_pkey', ['id'])
+      .addUniqueConstraint('bk_auth_known_devices_user_fingerprint_unique', ['user_id', 'fingerprint'])
+      .addForeignKeyConstraint('bk_auth_known_devices_user_fk', ['user_id'], 'bk_auth_users', ['id'], (c) =>
+        c.onDelete('cascade'),
+      )
+      .execute();
+  }),
+  authStep(NETWORK, 'roles-ip-restricted', async (trx) => {
+    await trx.schema
+      .alterTable('bk_auth_roles')
+      .addColumn('ip_restricted', 'boolean', (column) => column.notNull().defaultTo(false))
+      .execute();
   }),
 ];

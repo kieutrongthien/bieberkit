@@ -33,6 +33,7 @@ export { createClient, TENANT_HEADER, USER_HEADER } from './client.ts';
 export type { Client, Reply } from './client.ts';
 export { describeEntityContracts } from './contract.ts';
 export type { EntityContractOptions } from './contract.ts';
+export { analyze, fullScans, planOf } from './plan.ts';
 export { describeDialects, openMemoryDatabase } from './database.ts';
 export type { DialectContext, OpenDatabase } from './database.ts';
 export { TestingError } from './errors.ts';

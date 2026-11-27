@@ -95,7 +95,7 @@ async function setup(options: { authorizer?: Authorizer; withQueue?: boolean } =
     .filter(
       (part) =>
         part !== '' &&
-        !/\bbk_(?:auth_|audit_log|migration|plugin_migrations|outbox|sequences|comments|attachments|timeline|tags|jobs|locks)/.test(
+        !/\bbk_(?:auth_|audit_|migration|plugin_migrations|outbox|sequences|comments|attachments|timeline|tags|jobs|locks)/.test(
           part,
         ),
     )) {

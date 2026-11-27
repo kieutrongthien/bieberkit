@@ -371,8 +371,19 @@ export function createMediaService(input: {
   readonly storage: Storage;
   readonly limits: MediaLimits;
   readonly pendingTtlHours: number;
+  /** Writes `media.file.downloaded` when a private file is read (OPS-04). */
+  readonly auditDownloads?: boolean;
 }): MediaService {
   const { db, storage, limits } = input;
+
+  /** Records who read a private file, when the project asks for it. A public file has a URL that nobody sees used (OPS-04). */
+  async function auditDownload(row: Row, via: 'url' | 'content'): Promise<void> {
+    if (input.auditDownloads !== true || read(row, 'visibility') !== 'private') return;
+    await runInTransaction(db, async (em) => {
+      audit(em, 'media.file.downloaded', Media.name, String(read(row, 'id')), { filename: read(row, 'filename'), via });
+      await em.flush();
+    });
+  }
 
   /** The row in a state that allows a step, or 409. */
   async function pending(id: string): Promise<Row> {
@@ -557,6 +568,7 @@ export function createMediaService(input: {
     async readUrl(id, contentUrl) {
       const row = await ready(id);
       const path = pathOfRow(row);
+      await auditDownload(row, 'url');
       if (read(row, 'visibility') === 'public') return { url: await storage.url(path), expiresAt: null };
       try {
         const expiresAt = Date.now() + SIGNED_TTL_MS;
@@ -569,6 +581,7 @@ export function createMediaService(input: {
 
     async content(id) {
       const row = await ready(id);
+      await auditDownload(row, 'content');
       return {
         stream: await storage.stream(pathOfRow(row)),
         contentType: String(read(row, 'contentType')),

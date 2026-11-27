@@ -91,6 +91,10 @@ const plugin: PluginDef = definePlugin({
       .int({ min: 1, max: 8760 })
       .default(24)
       .describe('Hours that a file may wait for its upload before the prune job deletes it (MED-03)'),
+    MEDIA_AUDIT_DOWNLOADS: env
+      .boolean()
+      .default(false)
+      .describe('Write media.file.downloaded to the audit log when a private file is read (OPS-04)'),
   },
   permissions: ['media.read', 'media.upload', 'media.manage'],
   entities: [Media, Folder],
@@ -114,6 +118,7 @@ const plugin: PluginDef = definePlugin({
             ...(quota === undefined ? {} : { quotaBytes: quota * MB }),
           },
           pendingTtlHours: numberOf(values['MEDIA_PENDING_TTL_HOURS'], 24) ?? 24,
+          auditDownloads: values['MEDIA_AUDIT_DOWNLOADS'] === true,
         });
       },
     },

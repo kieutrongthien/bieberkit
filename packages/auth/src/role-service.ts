@@ -46,6 +46,7 @@ export interface NewRole {
   readonly name: string;
   readonly permissions?: readonly string[];
   readonly requireMfa?: boolean;
+  readonly ipRestricted?: boolean;
   /** A system role is made by a seeder (the administrator) and cannot be renamed, deleted or given other permissions. */
   readonly system?: boolean;
 }
@@ -54,11 +55,14 @@ export interface Assignment {
   readonly tenantId?: string;
   readonly userId: string;
   readonly roleId: string;
+  /** Limits the role to the users of this group (ROL-09). Left out, the role applies to every user. */
+  readonly groupId?: string;
 }
 
 export interface BatchAssignment {
   readonly tenantId?: string;
   readonly roleId: string;
+  readonly groupId?: string;
   /** 1 to 100 users. */
   readonly userIds: readonly string[];
 }
@@ -78,6 +82,7 @@ export interface RoleView {
   readonly name: string;
   readonly system: boolean;
   readonly requireMfa: boolean;
+  readonly ipRestricted: boolean;
   readonly permissions: readonly string[];
   readonly memberCount: number;
 }
@@ -259,11 +264,24 @@ export async function createRole(db: Database, input: NewRole): Promise<string> 
   try {
     await runInTransaction(db, async (em) => {
       if ((await em.count(AuthRole, { tenant, name })) > 0) exists();
-      em.create(AuthRole, { id, tenant, name, system: input.system === true, requireMfa: input.requireMfa === true });
+      em.create(AuthRole, {
+        id,
+        tenant,
+        name,
+        system: input.system === true,
+        requireMfa: input.requireMfa === true,
+        ipRestricted: input.ipRestricted === true,
+      });
       // The tables point at each other by key and not by relation, so the role is written first.
       await em.flush();
       for (const permission of permissions) em.create(AuthRolePermission, { roleId: id, permission });
-      const data = { name, permissions, requireMfa: input.requireMfa === true, system: input.system === true };
+      const data = {
+        name,
+        permissions,
+        requireMfa: input.requireMfa === true,
+        ipRestricted: input.ipRestricted === true,
+        system: input.system === true,
+      };
       changed(em, 'auth.role.created', id, tenant, data);
       await em.flush();
     });
@@ -285,6 +303,7 @@ export async function duplicateRole(db: Database, roleId: string, input: { reado
     name: input.name,
     permissions: source.permissions,
     requireMfa: source.role.requireMfa,
+    ipRestricted: source.role.ipRestricted,
   });
 }
 
@@ -317,14 +336,14 @@ export async function setRolePermissions(
 export async function updateRole(
   db: Database,
   roleId: string,
-  changes: { readonly name?: string; readonly requireMfa?: boolean },
+  changes: { readonly name?: string; readonly requireMfa?: boolean; readonly ipRestricted?: boolean },
 ): Promise<boolean> {
   try {
     return await runInTransaction(db, async (em) => {
       const role = await em.findOne(AuthRole, { id: roleId });
       if (role === null) return notFound();
       if (role.system) return system();
-      const data: { name?: string; requireMfa?: boolean } = {};
+      const data: { name?: string; requireMfa?: boolean; ipRestricted?: boolean } = {};
       if (changes.name !== undefined) {
         const name = nameOf(changes.name);
         if (name !== role.name) {
@@ -334,6 +353,8 @@ export async function updateRole(
       }
       if (changes.requireMfa !== undefined && changes.requireMfa !== role.requireMfa)
         data.requireMfa = changes.requireMfa;
+      if (changes.ipRestricted !== undefined && changes.ipRestricted !== role.ipRestricted)
+        data.ipRestricted = changes.ipRestricted;
       if (Object.keys(data).length === 0) return false;
       em.assign(role, data);
       changed(em, 'auth.role.updated', roleId, role.tenant, data);
@@ -441,6 +462,21 @@ export async function grantRoles(
   await em.flush();
 }
 
+/** A group id is 1 to 120 characters, or none. */
+export function groupOf(group: string | undefined): string | null {
+  if (group === undefined) return null;
+  const trimmed = group.trim();
+  if (trimmed === '' || trimmed.length > 120) {
+    throw authError(
+      'GROUPS_INVALID',
+      400,
+      'A group has 1 to 120 characters.',
+      'Give the group as a short text such as sales.',
+    );
+  }
+  return trimmed;
+}
+
 /** Gives a role to a user in its tenant. It says whether the user had it already. */
 export async function assignRole(db: Database, input: Assignment): Promise<boolean> {
   const tenant = tenantOf(input.tenantId);
@@ -450,9 +486,17 @@ export async function assignRole(db: Database, input: Assignment): Promise<boole
   await refuseEscalation(db, tenant, await runInUnitOfWork(db, (em) => permissionsOfRole(em, role.id)), role.id, role);
   return runInTransaction(db, async (em) => {
     if ((await em.count(AuthRole, { id: input.roleId, tenant })) === 0) return notFound();
-    if ((await em.count(AuthUserRole, { tenant, userId, roleId: input.roleId })) > 0) return false;
-    em.create(AuthUserRole, { tenant, userId, roleId: input.roleId });
-    changed(em, 'auth.role.assigned', input.roleId, tenant, { userId });
+    const group = groupOf(input.groupId);
+    const held = await em.findOne(AuthUserRole, { tenant, userId, roleId: input.roleId });
+    if (held !== null) {
+      if ((held.scopeGroup ?? null) === group) return false;
+      em.assign(held, { scopeGroup: group });
+      changed(em, 'auth.role.assigned', input.roleId, tenant, { userId, groupId: group });
+      await em.flush();
+      return true;
+    }
+    em.create(AuthUserRole, { tenant, userId, roleId: input.roleId, scopeGroup: group });
+    changed(em, 'auth.role.assigned', input.roleId, tenant, { userId, ...(group === null ? {} : { groupId: group }) });
     await em.flush();
     return true;
   });
@@ -508,7 +552,7 @@ export async function assignRoles(db: Database, input: BatchAssignment): Promise
       if (user === undefined) results.push({ userId, result: 'not_found' });
       else if (holders.has(userId)) results.push({ userId, result: 'unchanged' });
       else {
-        em.create(AuthUserRole, { tenant, userId, roleId: role.id });
+        em.create(AuthUserRole, { tenant, userId, roleId: role.id, scopeGroup: groupOf(input.groupId) });
         changed(em, 'auth.role.assigned', role.id, tenant, { userId });
         results.push({
           userId,
@@ -569,6 +613,7 @@ export async function getRole(
       name: role.name,
       system: role.system,
       requireMfa: role.requireMfa,
+      ipRestricted: role.ipRestricted,
       permissions: await permissionsOfRole(em, role.id),
       memberCount: await em.count(AuthUserRole, { roleId: role.id }),
     };

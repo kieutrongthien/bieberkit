@@ -27,7 +27,7 @@
 - Packages: `@bieberkit/plugin-users`, `-roles`, `-settings`, `-audit-log`, `-notifications`, `-media`, and the changes they need in `@bieberkit/auth`, `@bieberkit/server` and `bieberkit` (CLI).
 - Layer: plugins, with the platform changes in the product and tools layers. Imports keep pointing downward (PKG-01).
 - Spec sections: 11, 12, 14, 15, OBS-05, AUTH-01 to AUTH-06, AUTHZ-01, AUTHZ-05, S-01 to S-06, DATA-13, DATA-25, IO-04.
-- Status: **Approved in outline by the maintainer on 2026-11-25** (approach 2, and the recommendations of the open questions, which are now decisions below). The maintainer asked for a result that serves a single person and an enterprise equally. Section "Who it is for" and section "Enterprise controls" carry that. S0 implements BPL-01 to BPL-04 and IDN-01, S1 implements USR-01 to USR-12 and ROL-01 to ROL-08 (tests approved by the maintainer on 2026-11-26), S2 implements SET-01 to SET-07 (ADR 0030), S3 implements NTF-01 to NTF-07, S4 implements MED-01 to MED-08, and S5 implements AUD-01 to AUD-06, with the normative requirements in `docs/spec/SPEC.md` sections 12.1 to 12.6 and milestone M1.11 in the roadmap. The remaining IDs are proposals for S6; the full milestone remains open.
+- Status: **Approved in outline by the maintainer on 2026-11-25** (approach 2, and the recommendations of the open questions, which are now decisions below). The maintainer asked for a result that serves a single person and an enterprise equally. Section "Who it is for" and section "Enterprise controls" carry that. S0 implements BPL-01 to BPL-04 and IDN-01, S1 implements USR-01 to USR-12 and ROL-01 to ROL-08 (tests approved by the maintainer on 2026-11-26), S2 implements SET-01 to SET-07 (ADR 0030), S3 implements NTF-01 to NTF-07, S4 implements MED-01 to MED-08, and S5 implements AUD-01 to AUD-06, with the normative requirements in `docs/spec/SPEC.md` sections 12.1 to 12.6 and milestone M1.11 in the roadmap. S6 implements POL-01 to POL-05, IDN-02, IDN-03, ROL-09, AUD-07 to AUD-09 and OPS-01 to OPS-06, with the normative requirements in sections 12.7 to 12.10 of the spec, ADR 0031 and ADR 0032.
 - Builds on: `docs/modules/plugins.md` (the thin slice of M1.8). This file replaces its "what a plugin does" tables slice by slice; `plugins.md` is updated as each slice lands.
 
 ## Purpose
@@ -297,3 +297,16 @@ Taken by the builder on 2026-11-27, within "Left to the builder":
 ## Left to the builder
 
 The exact shape of the `user-service` functions, page size defaults, names of audit actions, whether `lastSignInAt` comes from the session table or a new column, how the policy port caches a read for the length of one request, and the wording of every message (each states what to do, AI-02).
+
+## Decisions of slice S6
+
+Taken while building S6, where the design had a choice or the code showed a limit. The requirements are in `docs/spec/SPEC.md` sections 12.7 to 12.10.
+
+1. **Setting keys are kebab-case.** The key rule of `defineSetting` allows no capital letters, so `security.session.idleMinutes` is `security.session.idle-minutes`.
+2. **The policy is read through a port and kept for two seconds** (ADR 0031), so a change shows within two seconds and not on the next request. The adapter reads with `getStrict`, so a store that cannot be read never opens the network rule.
+3. **A policy is global, except for the per-role override of the session limits**, which is not built. A role carries only `ipRestricted`. This is the one point of POL-01 that remains a proposal.
+4. **A new device is the hash of the user agent.** There is no country, because the framework has no geolocation. The first device of a user is not news. The notice is a mail; a notification inside the app is a follow-up.
+5. **ROL-09 is a limit on the assignment, not a scoped permission.** A role is given for one group (`bk_auth_user_roles.scope_group`) and users are in groups (`bk_auth_user_groups`). The users routes already look up a user before every change, so the limit is one more condition of that lookup. A scoped permission of CASL would have needed `AuthUser` as an entity subject. The framework still has no organization model.
+6. **Legal holds are a framework table** (ADR 0032) and are released by a mark. The audit mirror is switched on by `AUDIT_LOG_MIRROR` at the database, so every writer of an audit entry, a seeder included, takes part.
+7. **`Idempotency-Key` is honored on `POST` and `DELETE`.** A `DELETE` of a deleted record is a 404 without the key and a replay of the 204 with it.
+8. **The prune has no per-actor limit**, because it runs from the command line on the migrate role and has no actor. The export, which is a route, has one.

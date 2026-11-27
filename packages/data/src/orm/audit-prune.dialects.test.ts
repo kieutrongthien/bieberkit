@@ -28,14 +28,14 @@ import { describeDialects } from '../testing/dialects.ts';
 import { pruneAuditLog, recordAudit } from './audit.ts';
 import { runInUnitOfWork } from './connect.ts';
 import type { Database } from './connect.ts';
-import { AuditLog } from './framework.ts';
+import { AuditHold, AuditLog } from './framework.ts';
 import { kyselyOf } from './internals.ts';
 
 const DAY = 86_400_000;
 
-async function write(db: Database, action: string): Promise<void> {
+async function write(db: Database, action: string, entity?: string): Promise<void> {
   await runInUnitOfWork(db, async (em) => {
-    recordAudit(em, { action });
+    recordAudit(em, { action, ...(entity === undefined ? {} : { entity }) });
     await em.flush();
   });
 }
@@ -61,17 +61,17 @@ describeDialects('AUD-06 pruning the audit log', ({ dialect, openFramework }) =>
 
   it('AUD-06 without apply it only counts the rows before the date', async () => {
     const { db, cutoff } = await aged();
-    expect(await pruneAuditLog(db, { before: cutoff, apply: false })).toEqual({ count: 2, pruned: false });
+    expect(await pruneAuditLog(db, { before: cutoff, apply: false })).toEqual({ count: 2, pruned: false, kept: 0 });
     expect(await actions(db)).toEqual(['old.one', 'old.two', 'new.one']);
   });
 
   it('AUD-06 with apply it deletes the rows before the date and writes its own entry in the same transaction', async () => {
     const { db, cutoff } = await aged();
-    expect(await pruneAuditLog(db, { before: cutoff, apply: true })).toEqual({ count: 2, pruned: true });
+    expect(await pruneAuditLog(db, { before: cutoff, apply: true })).toEqual({ count: 2, pruned: true, kept: 0 });
     expect(await actions(db)).toEqual(['new.one', 'audit.pruned']);
     const [entry] = await db.fork().find(AuditLog, { action: 'audit.pruned' });
-    expect(JSON.parse(String(entry?.data))).toEqual({ before: cutoff.toISOString(), count: 2 });
-    expect(await pruneAuditLog(db, { before: cutoff, apply: true })).toEqual({ count: 0, pruned: true });
+    expect(JSON.parse(String(entry?.data))).toEqual({ before: cutoff.toISOString(), count: 2, kept: 0 });
+    expect(await pruneAuditLog(db, { before: cutoff, apply: true })).toEqual({ count: 0, pruned: true, kept: 0 });
   });
 
   it('AUD-06 refuses a date that is not a date', async () => {
@@ -87,5 +87,40 @@ describeDialects('AUD-06 pruning the audit log', ({ dialect, openFramework }) =>
     const kysely = await kyselyOf(db.orm.em);
     await expect(sql`delete from bk_audit_log`.execute(kysely)).rejects.toThrow(/append-only/);
     expect(await actions(db)).toEqual(['new.one', 'audit.pruned']);
+  });
+
+  async function held(entity: string, released = false): Promise<{ db: Database; cutoff: Date }> {
+    const db = await openFramework();
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(Date.now() - 400 * DAY);
+    await write(db, 'old.deal', 'crm.Deal');
+    await write(db, 'old.note', 'crm.Note');
+    vi.useRealTimers();
+    await write(db, 'new.deal', 'crm.Deal');
+    await runInUnitOfWork(db, async (em) => {
+      em.create(AuditHold, {
+        entity,
+        reason: 'lawsuit',
+        createdAt: new Date(),
+        ...(released ? { releasedAt: new Date() } : {}),
+      });
+      await em.flush();
+    });
+    return { db, cutoff: new Date(Date.now() - 365 * DAY) };
+  }
+
+  it('AUD-09 an entry under a hold is never pruned, however old, and the count of those kept is given', async () => {
+    const { db, cutoff } = await held('crm.Deal');
+    expect(await pruneAuditLog(db, { before: cutoff, apply: false })).toEqual({ count: 1, pruned: false, kept: 1 });
+    expect(await pruneAuditLog(db, { before: cutoff, apply: true })).toEqual({ count: 1, pruned: true, kept: 1 });
+    expect(await actions(db)).toEqual(['old.deal', 'new.deal', 'audit.pruned']);
+    const [entry] = await db.fork().find(AuditLog, { action: 'audit.pruned' });
+    expect(JSON.parse(String(entry?.data))).toEqual({ before: cutoff.toISOString(), count: 1, kept: 1 });
+  });
+
+  it('AUD-09 a released hold keeps nothing', async () => {
+    const { db, cutoff } = await held('crm.Deal', true);
+    expect(await pruneAuditLog(db, { before: cutoff, apply: true })).toEqual({ count: 2, pruned: true, kept: 0 });
+    expect(await actions(db)).toEqual(['new.deal', 'audit.pruned']);
   });
 });

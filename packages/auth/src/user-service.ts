@@ -34,10 +34,10 @@ import { holdersQuery, keepLastAdmin, refuseSelf } from './admin-guard.ts';
 import { mailOf } from './better-auth.ts';
 import type { AuthInstance } from './better-auth.ts';
 import { authError } from './errors.ts';
-import { createRateLimiter } from './limits.ts';
+import { createRateLimiter, limitActor } from './limits.ts';
 import type { Limit, RateStorage } from './limits.ts';
-import { AuthRole, AuthUserRole, NIL_TENANT } from './roles.ts';
-import { checkGrantable, grantRoles } from './role-service.ts';
+import { AuthRole, AuthUserGroup, AuthUserRole, NIL_TENANT } from './roles.ts';
+import { checkGrantable, grantRoles, groupOf } from './role-service.ts';
 import {
   AuthAccount,
   AuthApiKey,
@@ -62,11 +62,14 @@ export interface DisableUserInput {
   readonly userId: string;
   readonly reason: string;
   readonly actorId: string | null;
+  /** The caller holds `users.override-external`, so a user managed by a provider may be changed (IDN-02). */
+  readonly overrideExternal?: boolean;
 }
 
 export interface EnableUserInput {
   readonly userId: string;
   readonly actorId: string | null;
+  readonly overrideExternal?: boolean;
 }
 
 export type UserStatus = 'active' | 'disabled' | 'invited';
@@ -87,6 +90,8 @@ export interface UserRecord {
 
 export interface UserDetail extends UserRecord {
   readonly activeSessions: number;
+  /** The groups that the project put the user in (ROL-09). */
+  readonly groups: readonly string[];
 }
 
 export interface UserListQuery {
@@ -104,6 +109,8 @@ export interface UserListQuery {
   readonly pageSize?: unknown;
   readonly cursor?: string;
   readonly withTotal?: boolean;
+  /** Only the users of these groups: the scope of a manager whose role is limited to them (ROL-09). */
+  readonly groupIds?: readonly string[];
 }
 
 export interface UserPage {
@@ -129,6 +136,10 @@ export interface NewUser {
   readonly invite?: boolean;
   /** Roles of the tenant, given in the same transaction (USR-03). */
   readonly roles?: readonly string[];
+  /** Groups to put the user in (ROL-09). */
+  readonly groups?: readonly string[];
+  /** The groups that limit the caller. The new user must be in one of them, or the caller could not see it (ROL-09). */
+  readonly groupIds?: readonly string[];
   readonly tenantId?: string;
   readonly actorId: string | null;
 }
@@ -139,6 +150,7 @@ export interface UserChange {
   readonly email?: string;
   readonly tenantId?: string;
   readonly actorId: string | null;
+  readonly overrideExternal?: boolean;
 }
 
 export interface UserAction {
@@ -159,7 +171,14 @@ export interface UserServiceOptions {
 
 export interface UserService {
   list(query: UserListQuery): Promise<UserPage>;
-  get(userId: string, options?: { readonly tenantId?: string }): Promise<UserDetail>;
+  get(
+    userId: string,
+    options?: { readonly tenantId?: string; readonly groupIds?: readonly string[] },
+  ): Promise<UserDetail>;
+  /** Replaces the groups of a user. A manager limited to groups can only use those, and only on users inside them (ROL-09). */
+  setGroups(
+    input: UserAction & { readonly groups: readonly string[]; readonly groupIds?: readonly string[] },
+  ): Promise<UserDetail>;
   create(input: NewUser): Promise<UserDetail>;
   update(input: UserChange): Promise<UserDetail>;
   disable(input: DisableUserInput): Promise<boolean>;
@@ -171,6 +190,29 @@ export interface UserService {
   sendPasswordReset(input: UserAction): Promise<void>;
   resendInvite(input: UserAction): Promise<void>;
   resetMfa(input: UserAction): Promise<void>;
+  /** For a provider plugin: makes or updates the user of an identity that the provider owns (IDN-03). */
+  upsertExternalUser(input: ExternalUser): Promise<UserDetail>;
+  /** For a provider plugin: disables or enables the user of an identity that the provider owns (IDN-03). */
+  setExternalDisabled(input: ExternalDisabled): Promise<boolean>;
+}
+
+/** The identity of a user that a provider owns. `source` is `sso:<provider>` or `scim:<provider>` (IDN-01). */
+export interface ExternalIdentity {
+  readonly source: string;
+  readonly externalId: string;
+}
+
+export interface ExternalUser extends ExternalIdentity {
+  readonly name: string;
+  readonly email: string;
+  /** Disables or enables the user in the same call. Left out, the state is not touched. */
+  readonly disabled?: boolean;
+  readonly tenantId?: string;
+}
+
+export interface ExternalDisabled extends ExternalIdentity {
+  readonly disabled: boolean;
+  readonly reason?: string;
 }
 
 const notFound = (): never => {
@@ -197,6 +239,51 @@ function audit(em: EntityManager, userId: string, action: string, data?: Record<
   recordAudit(em, { action, entity: ENTITY, recordId: userId, ...(data === undefined ? {} : { data }) });
 }
 
+/** Cleans a list of groups, and refuses one that the caller's own limit does not cover (ROL-09). */
+function groupsOf(groups: readonly string[], limit: readonly string[] | undefined): string[] {
+  const clean = [...new Set(groups.map((group) => groupOf(group) ?? ''))].toSorted((a, b) => a.localeCompare(b));
+  if (clean.length > 50) {
+    throw authError('GROUPS_INVALID', 400, 'A user is in at most 50 groups.', 'Send fewer groups.');
+  }
+  if (limit !== undefined && (clean.length === 0 || clean.some((group) => !limit.includes(group)))) {
+    throw authError(
+      'USERS_OUT_OF_SCOPE',
+      403,
+      'You manage the users of your own groups, so the groups of this user must be among them.',
+      'Use one of your groups.',
+    );
+  }
+  return clean;
+}
+
+const SOURCE = /^(sso|scim):[a-z0-9][a-z0-9._-]{0,50}$/;
+
+/** A provider owns the name, the email and the disabled state of its users, so the users routes refuse to change them (IDN-02). */
+async function refuseManaged(em: EntityManager, userId: string, override: boolean | undefined): Promise<void> {
+  if (override === true || !isUuid(userId)) return;
+  const user = await em.findOne(AuthUser, { id: userId.toLowerCase(), deletedAt: null });
+  if (user !== null && user.source !== 'local') {
+    throw authError(
+      'USERS_MANAGED_EXTERNALLY',
+      409,
+      `This user is managed by ${user.source}.`,
+      'Change it in the identity provider, or use an account that holds users.override-external.',
+    );
+  }
+}
+
+function sourceOf(identity: ExternalIdentity): string {
+  if (!SOURCE.test(identity.source) || identity.externalId.trim() === '' || identity.externalId.length > 255) {
+    throw authError(
+      'USERS_EXTERNAL_INVALID',
+      400,
+      'An external identity has a source such as sso:okta and an external id of 1 to 255 characters.',
+      'Give the source as sso:<provider> or scim:<provider>.',
+    );
+  }
+  return identity.source;
+}
+
 async function unchanged(em: EntityManager, userId: string): Promise<false> {
   if ((await em.findOne(AuthUser, { id: userId, deletedAt: null })) === null) notFound();
   return false;
@@ -210,6 +297,7 @@ export async function disableUser(db: Database, input: DisableUserInput): Promis
   refuseSelf(input.actorId, input.userId);
   return asActor(input.actorId, () =>
     runInTransaction(db, async (em) => {
+      await refuseManaged(em, input.userId, input.overrideExternal);
       await keepLastAdmin(em, db.dialect, input.userId);
       const changed = await em.nativeUpdate(
         AuthUser,
@@ -229,6 +317,7 @@ export async function disableUser(db: Database, input: DisableUserInput): Promis
 export async function enableUser(db: Database, input: EnableUserInput): Promise<boolean> {
   return asActor(input.actorId, () =>
     runInTransaction(db, async (em) => {
+      await refuseManaged(em, input.userId, input.overrideExternal);
       const changed = await em.nativeUpdate(
         AuthUser,
         { id: input.userId, disabledAt: { $ne: null }, deletedAt: null },
@@ -283,9 +372,18 @@ const dateOf = (text: string): Date => {
 };
 
 /** The conditions of a list or a lookup: never a deleted user, and in a tenant only the holders of a role there (Decision 3). */
-function scoped(em: EntityManager, tenantId: string | undefined): FilterQuery<AuthUserRow>[] {
+async function scoped(
+  em: EntityManager,
+  tenantId: string | undefined,
+  groupIds?: readonly string[],
+): Promise<FilterQuery<AuthUserRow>[]> {
   const tenant = tenantScope(tenantId);
   const out: FilterQuery<AuthUserRow>[] = [{ deletedAt: null }];
+  // A manager whose role is limited to groups sees the users of those groups only (ROL-09).
+  if (groupIds !== undefined) {
+    const members = await em.find(AuthUserGroup, { groupId: { $in: [...groupIds] } });
+    out.push({ id: { $in: members.map((row) => row.userId) } });
+  }
   if (tenant !== undefined) {
     const members = holdersQuery(em, 'm', { tenant });
     // The query builder is a sub-query that MikroORM writes in place; its type is not one of the filter.
@@ -332,6 +430,35 @@ function recordOf(user: AuthUserRow, roles: readonly { id: string; name: string 
   };
 }
 
+/**
+ * Disables or enables the user of a provider, with the audit entry. It says whether the state changed. The provider is not a user,
+ * so the entry names it in its data and the actor is the system (IDN-03).
+ */
+async function setManagedState(
+  em: EntityManager,
+  dialect: Database['dialect'],
+  user: AuthUserRow,
+  disabled: boolean,
+  reason: string,
+): Promise<boolean> {
+  if (isDisabledUser(user) === disabled) return false;
+  if (disabled) {
+    await keepLastAdmin(em, dialect, user.id);
+    await em.nativeUpdate(
+      AuthUser,
+      { id: user.id },
+      { disabledAt: new Date(), disabledReason: reason, disabledBy: null },
+    );
+    await em.nativeDelete(AuthSession, { userId: user.id });
+    audit(em, user.id, 'users.user.disabled', { reason, provider: user.source });
+  } else {
+    await em.nativeUpdate(AuthUser, { id: user.id }, { disabledAt: null, disabledReason: null, disabledBy: null });
+    audit(em, user.id, 'users.user.enabled', { provider: user.source });
+  }
+  await em.flush();
+  return true;
+}
+
 /** The sessions of a user that have not expired. They are few, and filtered here because SQLite keeps their dates as text. */
 async function liveSessions(em: EntityManager, userId: string): Promise<AuthSessionRow[]> {
   const now = Date.now();
@@ -342,12 +469,22 @@ async function liveSessions(em: EntityManager, userId: string): Promise<AuthSess
 async function detailOf(em: EntityManager, user: AuthUserRow, tenantId: string | undefined): Promise<UserDetail> {
   const roles = (await rolesOf(em, [user.id], tenantId)).get(user.id) ?? [];
   const activeSessions = (await liveSessions(em, user.id)).length;
-  return { ...recordOf(user, roles), activeSessions };
+  const groups = (await em.find(AuthUserGroup, { userId: user.id }))
+    .map((row) => row.groupId)
+    .toSorted((a, b) => a.localeCompare(b));
+  return { ...recordOf(user, roles), activeSessions, groups };
 }
 
-async function findUser(em: EntityManager, userId: string, tenantId?: string): Promise<AuthUserRow> {
+async function findUser(
+  em: EntityManager,
+  userId: string,
+  tenantId?: string,
+  groupIds?: readonly string[],
+): Promise<AuthUserRow> {
   if (!isUuid(userId)) return notFound();
-  const user = await em.findOne(AuthUser, { $and: [{ id: userId.toLowerCase() }, ...scoped(em, tenantId)] });
+  const user = await em.findOne(AuthUser, {
+    $and: [{ id: userId.toLowerCase() }, ...(await scoped(em, tenantId, groupIds))],
+  });
   return user ?? notFound();
 }
 
@@ -442,7 +579,7 @@ export function createUserService(options: UserServiceOptions): UserService {
       const size = pageSize(query.pageSize);
       const { field, dir } = sortOf(query.sort);
       return runInUnitOfWork(db, async (em) => {
-        const where: FilterQuery<AuthUserRow>[] = scoped(em, query.tenantId);
+        const where: FilterQuery<AuthUserRow>[] = await scoped(em, query.tenantId, query.groupIds);
         if (query.q !== undefined && query.q.trim() !== '') {
           const pattern = likePrefix(query.q.trim().toLowerCase());
           where.push({
@@ -495,7 +632,9 @@ export function createUserService(options: UserServiceOptions): UserService {
     },
 
     get: (userId, lookup = {}) =>
-      runInUnitOfWork(db, async (em) => detailOf(em, await findUser(em, userId, lookup.tenantId), lookup.tenantId)),
+      runInUnitOfWork(db, async (em) =>
+        detailOf(em, await findUser(em, userId, lookup.tenantId, lookup.groupIds), lookup.tenantId),
+      ),
 
     async create(input) {
       const invite = input.invite === true;
@@ -507,6 +646,9 @@ export function createUserService(options: UserServiceOptions): UserService {
           'Send a password, or invite: true.',
         );
       }
+      const groups = groupsOf(input.groups ?? [], input.groupIds === undefined ? undefined : input.groupIds);
+      // An invitation sends a mail, so the administrator who sends them is limited like the one who sends them again (OPS-02).
+      if (invite) await limitActor(db, { action: 'users:invite', actorId: input.actorId, rule: limits.perActor });
       const password = input.password === undefined ? undefined : passwordOf(input.password);
       const email = emailOf(input.email);
       const name = input.name.trim();
@@ -533,6 +675,8 @@ export function createUserService(options: UserServiceOptions): UserService {
           }
           audit(em, id, 'users.user.created', { invite });
           await em.flush();
+          for (const group of groups) em.create(AuthUserGroup, { userId: id, groupId: group });
+          await em.flush();
           await grantRoles(em, input.tenantId, id, roles);
           if (invite) {
             const user = await em.findOneOrFail(AuthUser, { id });
@@ -549,6 +693,8 @@ export function createUserService(options: UserServiceOptions): UserService {
       await asActor(input.actorId, () =>
         runInTransaction(db, async (em) => {
           const user = await findUser(em, input.userId, input.tenantId);
+          if (input.name !== undefined || input.email !== undefined)
+            await refuseManaged(em, user.id, input.overrideExternal);
           const data: { name?: string; email?: string } = {};
           if (input.name !== undefined && input.name.trim() !== user.name) data.name = input.name.trim();
           const email = input.email === undefined ? undefined : emailOf(input.email);
@@ -586,6 +732,7 @@ export function createUserService(options: UserServiceOptions): UserService {
           await em.nativeDelete(AuthSession, { userId });
           await em.nativeDelete(AuthAccount, { userId });
           await em.nativeDelete(AuthUserRole, { userId });
+          await em.nativeDelete(AuthUserGroup, { userId });
           await em.nativeDelete(AuthTwoFactor, { userId });
           await em.nativeDelete(AuthPasskey, { userId });
           await em.nativeDelete(AuthApiKey, { referenceId: userId });
@@ -696,6 +843,84 @@ export function createUserService(options: UserServiceOptions): UserService {
           audit(em, user.id, 'users.user.mfa-reset');
           await em.flush();
           await mailOf(auth).sendMfaReset?.({ to: user.email });
+        }),
+      );
+    },
+    async setGroups(input) {
+      const groups = groupsOf(input.groups, input.groupIds);
+      await asActor(input.actorId, () =>
+        runInTransaction(db, async (em) => {
+          const user = await findUser(em, input.userId, undefined, input.groupIds);
+          const current = (await em.find(AuthUserGroup, { userId: user.id })).map((row) => row.groupId);
+          const added = groups.filter((group) => !current.includes(group));
+          const removed = current.filter((group) => !groups.includes(group));
+          if (added.length === 0 && removed.length === 0) return;
+          if (removed.length > 0) await em.nativeDelete(AuthUserGroup, { userId: user.id, groupId: { $in: removed } });
+          for (const group of added) em.create(AuthUserGroup, { userId: user.id, groupId: group });
+          audit(em, user.id, 'users.user.groups-changed', { added, removed });
+          await em.flush();
+        }),
+      );
+      return service.get(input.userId);
+    },
+
+    async upsertExternalUser(input) {
+      const source = sourceOf(input);
+      const externalId = input.externalId.trim();
+      const email = emailOf(input.email);
+      const name = input.name.trim();
+      const id = await asActor(null, () =>
+        runInTransaction(db, async (em) => {
+          const found = await em.findOne(AuthUser, { source, externalId, deletedAt: null });
+          const now = new Date();
+          if (found === null) {
+            if ((await em.count(AuthUser, { email })) > 0) emailTaken();
+            const created = uuid7();
+            // The provider has verified the address, and the user has no password: the only way in is the provider.
+            em.create(AuthUser, {
+              id: created,
+              name,
+              email,
+              emailVerified: true,
+              source,
+              externalId,
+              createdAt: now,
+              updatedAt: now,
+            });
+            await em.flush();
+            audit(em, created, 'users.user.created', { provider: source, externalId });
+            await em.flush();
+            if (input.disabled === true) {
+              const row = await em.findOneOrFail(AuthUser, { id: created });
+              await setManagedState(em, db.dialect, row, true, 'provider');
+            }
+            return created;
+          }
+          const data: { name?: string; email?: string } = {};
+          if (name !== found.name) data.name = name;
+          if (email !== found.email) {
+            if ((await em.count(AuthUser, { email, id: { $ne: found.id } })) > 0) emailTaken();
+            data.email = email;
+          }
+          if (Object.keys(data).length > 0) {
+            await em.nativeUpdate(AuthUser, { id: found.id }, { ...data, updatedAt: now });
+            audit(em, found.id, 'users.user.updated', { fields: Object.keys(data), provider: source });
+            await em.flush();
+          }
+          if (input.disabled !== undefined) await setManagedState(em, db.dialect, found, input.disabled, 'provider');
+          return found.id;
+        }),
+      );
+      return service.get(id, input.tenantId === undefined ? {} : { tenantId: input.tenantId });
+    },
+
+    async setExternalDisabled(input) {
+      const source = sourceOf(input);
+      return asActor(null, () =>
+        runInTransaction(db, async (em) => {
+          const user = await em.findOne(AuthUser, { source, externalId: input.externalId.trim(), deletedAt: null });
+          if (user === null) return notFound();
+          return setManagedState(em, db.dialect, user, input.disabled, input.reason ?? 'provider');
         }),
       );
     },

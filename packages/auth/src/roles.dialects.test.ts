@@ -77,6 +77,7 @@ describeDialects('AUTHZ-01 the roles tables', ({ open }) => {
       permissions: new Set(),
       roles: [],
       requireMfa: false,
+      ipRestricted: false,
     });
   });
 
@@ -121,7 +122,7 @@ describeDialects('AUTHZ-01 the roles tables', ({ open }) => {
     const app = await authApp(open);
     const make = (tenant: string, name: string) =>
       runInUnitOfWork(app.db, async (em) => {
-        em.create(AuthRole, { id: uuid7(), tenant, name, system: false, requireMfa: false });
+        em.create(AuthRole, { id: uuid7(), tenant, name, system: false, requireMfa: false, ipRestricted: false });
         await em.flush();
       });
     await make(TENANT_A, 'sales');

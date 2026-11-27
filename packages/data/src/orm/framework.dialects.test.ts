@@ -83,7 +83,7 @@ describeDialects('MOD-18 framework tables', ({ dialect, openFramework, emptyData
       .split(';')
       .filter(
         (text) =>
-          /\bbk_(?:auth_|audit_log|migration|plugin_migrations|outbox|sequences|comments|attachments|timeline|tags|jobs|locks)/.test(
+          /\bbk_(?:auth_|audit_|migration|plugin_migrations|outbox|sequences|comments|attachments|timeline|tags|jobs|locks)/.test(
             text,
           ) && text.trim() !== '',
       );

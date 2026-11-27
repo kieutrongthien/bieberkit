@@ -34,6 +34,14 @@ export type LocalizedText = { readonly en: string } & Readonly<Record<string, st
 export type SettingType = 'string' | 'number' | 'boolean' | 'enum' | 'json';
 export type SettingScope = 'global' | 'tenant';
 
+/** Who changes a setting, as far as a guard needs to know (ADR 0031). */
+export interface SettingActor {
+  /** The address of the client, after `TRUST_PROXY`. Empty when unknown. */
+  readonly ip: string;
+  /** Whether the person proved a second factor. */
+  readonly mfa: boolean;
+}
+
 interface Common {
   /** Dotted and lower case, such as `seo.title`. A plugin's keys start with its short name and a dot (PLG_PREFIX_SETTING). */
   readonly key: string;
@@ -47,6 +55,8 @@ interface Common {
   readonly public?: boolean;
   /** Encrypted at rest, never returned and never in audit data (SET-03). */
   readonly secret?: boolean;
+  /** Says whether writing `value` would lock `actor` out. The service then refuses it with `SETTINGS_SELF_LOCKOUT` (POL-05). */
+  readonly guard?: (value: unknown, actor: SettingActor) => boolean;
 }
 
 export type SettingInput<T> =
@@ -71,6 +81,8 @@ export interface SettingDef<T = unknown> {
   readonly values?: readonly string[];
   /** The value of `input` when it is valid for this setting, or `CORE_SETTING_VALUE` with the reason. */
   check(input: unknown): T;
+  /** See `Common.guard`. */
+  readonly guard?: (value: unknown, actor: SettingActor) => boolean;
 }
 
 const KEY = /^[a-z][a-z0-9-]*(\.[a-z][a-z0-9-]*)+$/;
@@ -186,5 +198,6 @@ export function defineSetting(input: SettingInput<unknown>): SettingDef {
     secret: input.secret === true,
     ...(input.type === 'enum' ? { values: Object.freeze([...input.values]) } : {}),
     check,
+    ...(input.guard === undefined ? {} : { guard: input.guard }),
   });
 }

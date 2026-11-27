@@ -272,7 +272,7 @@ A person at the terminal is asked for every choice that no flag gave, the name i
 | `bieberkit migrate` | Apply pending plugin steps and migrations under a lock (`--status`, `--rollback`, `--allow-destructive`) |
 | `bieberkit db:seed` | Run seeders |
 | `bieberkit backup:verify` | Restore the newest backup into a throwaway database and check that nothing is left to migrate (DEP-09) |
-| `bieberkit audit:prune --before <date> [--yes]` | Count the audit entries before a date and, with `--yes`, delete them on `MIGRATE_DATABASE_URL` (AUD-06) |
+| `bieberkit audit:prune --before <date> [--yes]` | Count the audit entries before a date and, with `--yes`, delete them on `MIGRATE_DATABASE_URL`, except those under a legal hold, whose number it prints (AUD-06, AUD-09) |
 | `bieberkit make:entity`, `make:module`, `make:plugin`, `make:job` | Generate code from the official recipes |
 | `bieberkit add <plugin>` / `remove <plugin>` | Install or uninstall a plugin and update config, env schema and migrations |
 | `bieberkit plugins` | List installed plugins, versions and dependency graph |
@@ -905,6 +905,38 @@ The `audit-log` plugin only reads: its four routes are `GET`, and the applicatio
 - **AUD-05** In a tenant, every read sees the entries of that tenant only. Without a tenant, or in the nil tenant, a reader sees every tenant.
 - **AUD-06** Retention is `bieberkit audit:prune --before <date>`, on `MIGRATE_DATABASE_URL` only. It prints the count of entries before the date and deletes them only with `--yes`, in one transaction that also writes `audit.pruned` with the date and the count. On SQLite the append-only trigger is lifted and made again inside that transaction. No route and no job of the application deletes audit rows.
 
+### 12.7 Security policies (slice S6, first part)
+
+The policies of sessions, second factors and networks are settings of the group `security`, declared by `@bieberkit/auth` and read on every request through the `PolicyReader` port that the server fills from the settings service (ADR 0031). A change shows within two seconds, because the server keeps the policy for that long, and needs no restart. If the settings cannot be read, the last good policy is used, and with none the request fails (`getStrict` of the settings service). Their keys are kebab-case, as every setting key is. Each default is what a single person gets: nothing is asked of them.
+
+- **POL-01** `security.session.idle-minutes` (0, off), `security.session.absolute-hours` (0, the lifetime of Better Auth) and `security.session.max-concurrent` (0, off). A session older than the absolute limit, or without a request for the idle time, is refused with `AUTH_SESSION_EXPIRED` (401). At sign in the oldest sessions beyond the maximum are revoked and the new one stays. The idle time is the `updatedAt` of the session, which a request writes at most once a minute. Overrides per role are not part of this slice.
+- **POL-02** `security.mfa.required-for-all` (off) and `security.mfa.grace-days` (7). A user without a second factor may sign in until the grace ends, counted from the later of the day the rule was turned on (`security.mfa.required-since`, which the settings service writes) and the account. `GET /api/v1/users/me` then carries `mfaEnrolBy`. After the grace the cookie is refused with `AUTH_MFA_ENROL_REQUIRED` (403); the native auth routes still work, so the user can enrol.
+- **POL-03** `security.network.admin-allowlist` (empty, no limit) is a list of CIDR ranges, IPv4 or IPv6. A role flagged `ipRestricted` (auth migration 0.7.0, shown and set by the roles routes) can be used only from those ranges. The address is the one resolved through `TRUST_PROXY`. With a list set, an unknown or malformed address is refused: the check fails closed. A refusal is `AUTH_NETWORK_DENIED` (403) and is audited as `auth.network.denied`.
+- **POL-04** `security.sign-in.notify-new-device` (on). The first sign in from a device that a user has not used before, when they have used another, sends a mail (`sendNewDevice`). A device is the hash of its user agent, kept in `bk_auth_known_devices` (auth migration 0.7.0). A failure of the notice never refuses the sign in.
+- **POL-05** Every policy has a validated range (a lifetime of at most 365 days, a CIDR list). A declaration may carry a `guard`. A change that the guard says would lock out the person who makes it is refused with `SETTINGS_SELF_LOCKOUT` (409): an allowlist without their own address, or the rule for everyone while they have no second factor.
+
+### 12.8 Managed identities and delegated administration (slice S6, second part)
+
+- **IDN-02** A user whose `source` is not `local` is managed by that provider. The users routes refuse to change its name, email and disabled state with `USERS_MANAGED_EXTERNALLY` (409), also for the signed-in person on `PATCH /users/me`, unless the caller holds `users.override-external`. Local roles can still be given. Changes that touch no managed field are not refused.
+- **IDN-03** The user service gives provider plugins `upsertExternalUser` and `setExternalDisabled`. A source is `sso:<provider>` or `scim:<provider>` and an external id has 1 to 255 characters (`USERS_EXTERNAL_INVALID`, 400). An identity is found by `(source, externalId)`. A new user is verified, has no password and signs in only through the provider. An email that another user holds is `USERS_EMAIL_TAKEN`, so a provider cannot take over an account. Disabling ends the sessions and keeps the last active administrator (`USERS_LAST_ADMIN`). The audit entries are those of a local change, written by the system, and name the provider in `data.provider`.
+- **ROL-08** A role is created, changed or assigned only with permissions that the actor holds (`ROLES_ESCALATION`, 403, audited). The administrator role is exempt, and a system role is not given by anybody else.
+- **ROL-09** A role can be given to a user for one group only (`groupId` on `POST .../roles/:id/assign`). The project puts users in groups with `PUT /api/v1/users/users/:id/groups` or `groups` on create, 1 to 50 groups of 1 to 120 characters, and the framework knows no organization model. A caller whose roles with `users.*` permissions are all limited to groups sees and changes the users of those groups only: a user outside them is `USERS_NOT_FOUND` (404), and a new user or a move must stay inside them (`USERS_OUT_OF_SCOPE`, 403). A role given without a group, the administrator role and an API key are not limited. Auth migration 0.7.0 adds `bk_auth_user_roles.scope_group` and `bk_auth_user_groups`. A change of groups is audited as `users.user.groups-changed`.
+
+### 12.9 Audit for an enterprise (slice S6, third part)
+
+- **AUD-07** `AUDIT_LOG_MIRROR=true` (default off) writes every audit entry to the outbox in the transaction that wrote it, and a worker job logs it after commit as one structured line with `audit: true`, so a log shipper delivers it to a SIEM or to storage that the database administrator cannot change. The line goes through the logger, so SEC-09 redaction applies, and the entry already had its personal data masked. The request never waits for it.
+- **AUD-08** `GET /api/v1/audit-log/entries` and `GET .../export` take `after=<entry id>` and then read oldest first, each entry once. `meta.nextAfter` is the id to resume from. `after` and `cursor` together, or an `after` that is not an id, are `AUDIT_AFTER_INVALID` (400).
+- **AUD-09** `POST /api/v1/audit-log/holds` places a hold on an entity, a record or an actor, with a reason, `GET` lists the active ones (`status=released|all` for others) and `DELETE .../holds/:id` releases one by a mark, so its row stays. Permission `audit-log.hold` to place and release, `audit-log.read` to list. A hold covers the entries that match every field it sets, in its tenant, or every tenant when placed outside one. `audit:prune` never deletes an entry under an active hold and says how many it kept (`kept` in its data and in its text). Placing and releasing are audited (`audit-log.hold.placed`, `audit-log.hold.released`). At most 200 holds are active at once (`AUDIT_HOLD_LIMIT`, 409). The table `bk_audit_holds` is a framework table (data migration step 0.5.0, ADR 0032).
+
+### 12.10 Operations of the base plugins (slice S6, last part)
+
+- **OPS-01** The routes of the six plugins that send mail or remove data honor `Idempotency-Key` (§13.1). A `DELETE` route may declare `idempotent: true` as a `POST` route does, and an answer with no body, such as a 204, is replayed.
+- **OPS-02** Sensitive actions are limited per actor as well as per address (AUTH-06): invitations (20 in 15 minutes per administrator, with the limits of reset mail and MFA reset of USR-09 to USR-11) and the audit export (10 in 15 minutes per person). Over the limit the answer is 429 with `Retry-After`, `USERS_RATE_LIMITED` or `AUTH_ACTION_LIMITED`. `audit:prune` runs from the command line on the migrate role and has no actor to count.
+- **OPS-03** `GET /api/v1/settings/export` (permission `settings.read`) lists the values stored in the scope of the caller, with `{ key, secret: true }` for a secret and never its value. `POST /api/v1/settings/import` (permission `settings.manage`, `?dryRun=true` to only report) applies such a file. Each entry answers `created`, `updated`, `unchanged`, `skipped` (a secret) or `invalid`; any invalid entry refuses all of them with `SETTINGS_IMPORT_INVALID` (422) and the report.
+- **OPS-04** A media object has the key `<visibility>/<tenant>/media/<id>/<name>`, so a tenant's files are reached by prefix. `MEDIA_AUDIT_DOWNLOADS=true` (default off) writes `media.file.downloaded` when a private file is read through its URL or its content route.
+- **OPS-05** The lists of users, media and the audit log are tested with 100 000 rows on the three dialects: the plan of the list and of each filter does not read the whole table, the first page answers inside a bound, and no list runs `COUNT(*)` unless `withTotal` is asked for. The audit log has indexes for its filters (action, record, actor, request: data migration step 0.5.0), and the users list for the sort by name and, on PostgreSQL, for the prefix search (auth migration 0.7.0).
+- **OPS-06** Each plugin has an operations section in `docs/modules/plugins.md`: what to back up, what each policy does, the audit action names, the retention knobs and how to run `audit:prune`.
+
 ## 13. HTTP API
 
 The API is REST over JSON on Fastify 5, described by an OpenAPI 3.1 document generated at build time. Entity routes are generated from `api` settings, and custom routes use the same validation and permission helpers.
@@ -922,7 +954,7 @@ The API is REST over JSON on Fastify 5, described by an OpenAPI 3.1 document gen
 | Success body | `{ "data": ..., "meta": { "page", "pageSize" } }`, plus `total` only when `withTotal=true` (DATA-11) and `nextCursor` for cursor lists |
 | Errors | RFC 9457 `application/problem+json` with `type`, `title`, `status`, `detail`, a stable `code` and `traceId` |
 | Validation errors | Problem with `errors: [{ path, code, message }]` |
-| Idempotency | `Idempotency-Key` header honored on `POST` for routes that declare `idempotent: true` |
+| Idempotency | `Idempotency-Key` header honored on `POST` and `DELETE` for routes that declare `idempotent: true` |
 | Dates | ISO 8601 in UTC |
 | Naming | camelCase in JSON, snake\_case in the database |
 
@@ -1687,6 +1719,10 @@ Open questions:
 
 | Version | Date | Changes |
 | --- | --- | --- |
+| 0.8.21 | 2026-11-27 | Base plugins S6, operations: section 12.10, OPS-01 to OPS-06; `Idempotency-Key` on `DELETE`, per-actor limits, settings export and import, download audit of media, indexes and the tests at 100 000 rows |
+| 0.8.20 | 2026-11-27 | Base plugins S6, audit: section 12.9, AUD-07 to AUD-09; the audit mirror, `after=` for a SIEM, legal holds and `kept` in `audit:prune` (ADR 0032) |
+| 0.8.19 | 2026-11-27 | Base plugins S6, managed identities: section 12.8, IDN-02, IDN-03, ROL-08 and ROL-09; `USERS_MANAGED_EXTERNALLY`, `upsertExternalUser`, `setExternalDisabled`, groups and roles limited to a group |
+| 0.8.18 | 2026-11-27 | Base plugins S6, policies: section 12.7, POL-01 to POL-05; the `PolicyReader` port (ADR 0031), the `security.*` settings, `ipRestricted` roles, known devices and the `guard` of a setting declaration |
 | 0.8.17 | 2026-11-27 | Base plugins S5: section 12.6, AUD-01 to AUD-06; audit-log filters, one entry with its actor, the export, the actions, tenant reads, and `bieberkit audit:prune` in section 5.2 |
 | 0.8.16 | 2026-11-27 | Base plugins S4: section 12.5, MED-01 to MED-08; media files of a tenant with fixed visibility, read URLs, deletion after commit, folders, filters and limits; S-06 names the type that a ready file keeps |
 | 0.8.15 | 2026-11-26 | Base plugins S3: section 12.4, NTF-01 to NTF-07; the notifier, preferences, retention and module schedules; the sync queue runs an outbox job after the transaction of the dispatcher (BPL-04) |
