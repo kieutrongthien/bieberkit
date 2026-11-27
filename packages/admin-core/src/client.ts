@@ -158,7 +158,12 @@ function retryAfterOf(response: Response): number | undefined {
 function userOf(body: unknown): SessionUser | undefined {
   const user = isRecord(body) ? body['user'] : undefined;
   if (!isRecord(user) || typeof user['id'] !== 'string') return undefined;
-  return { id: user['id'], email: text(user['email'], ''), name: text(user['name'], '') };
+  return {
+    id: user['id'],
+    email: text(user['email'], ''),
+    name: text(user['name'], ''),
+    ...(user['twoFactorEnabled'] === true ? { twoFactorEnabled: true as const } : {}),
+  };
 }
 
 function signedInUser(body: unknown): SessionUser {

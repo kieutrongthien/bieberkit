@@ -27,7 +27,7 @@ import { AxeBuilder } from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
 import type { Browser, Page } from '@playwright/test';
 import { totpCode } from '../packages/auth/src/testing/totp.ts';
-import { callApi, mailedLink, signIn } from './support.ts';
+import { callApi, mailedLink, settle, signIn } from './support.ts';
 
 const RULES = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'];
 const PASSWORD = 'First-Passw0rd-of-a-person';
@@ -104,6 +104,7 @@ async function checkScreen(page: Page, name: string): Promise<void> {
   for (const view of views) {
     await page.setViewportSize({ width: view.width, height: view.height });
     await page.emulateMedia({ colorScheme: view.scheme, reducedMotion: 'reduce' });
+    await settle(page);
     const result = await new AxeBuilder({ page }).withTags(RULES).analyze();
     expect(
       result.violations.map((found) => `${found.id}: ${found.nodes.map((node) => node.target.join(' ')).join(' | ')}`),
@@ -181,6 +182,40 @@ test('UI-26 AUTH-05 a person sets up a second factor, and then signs in with a c
   await page.getByRole('button', { name: 'Use a backup code' }).click();
   await page.getByLabel('Backup code').fill(codes[0] ?? '');
   await page.getByRole('button', { name: 'Verify' }).click();
+  await expect(welcome(page)).toBeVisible();
+  await page.context().close();
+});
+
+test('UI-26 AUTH-05 a person makes new backup codes and turns the factor off, each after the password', async ({
+  browser,
+}) => {
+  test.setTimeout(90_000);
+  const { email } = await person();
+  const page = await browserOf(browser);
+  await signInAs(page, email);
+  await openAccount(page, 'Two-factor sign in');
+  await page.getByRole('button', { name: 'Set up' }).click();
+  const { codes } = await setUpFactor(page);
+
+  await page.getByRole('button', { name: 'New backup codes' }).click();
+  await page.getByLabel('Password', { exact: true }).fill(PASSWORD);
+  await page.getByRole('button', { name: 'Continue' }).click();
+  const list = page.getByRole('list', { name: 'Backup codes' });
+  await expect(list.getByRole('listitem')).toHaveCount(10);
+  expect(await list.getByRole('listitem').allInnerTexts()).not.toEqual(codes);
+  await page.getByRole('checkbox', { name: 'I have saved these codes' }).check();
+  await page.getByRole('button', { name: 'Done' }).click();
+  await expect(list).toHaveCount(0);
+
+  await page.getByRole('button', { name: 'Turn off' }).click();
+  await page.getByLabel('Password', { exact: true }).fill('not the password');
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await expect(page.getByText('The current password is not right.')).toBeVisible();
+  await page.getByLabel('Password', { exact: true }).fill(PASSWORD);
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await expect(page.getByText('Off', { exact: true })).toBeVisible();
+  await signOut(page);
+  await fillSignIn(page, email);
   await expect(welcome(page)).toBeVisible();
   await page.context().close();
 });

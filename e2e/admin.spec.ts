@@ -41,7 +41,7 @@ test('the administrator signs in, manages a setting, and signs out', async ({ pa
   await page.getByLabel('Email').fill(EMAIL);
   await page.getByLabel('Password').fill('not-the-password');
   await page.getByRole('button', { name: 'Sign in' }).click();
-  await expect(page.getByText(/invalid email or password/i)).toBeVisible();
+  await expect(page.getByText('The email or the password is not right.')).toBeVisible();
 
   await page.getByLabel('Password').fill(PASSWORD);
   await page.getByRole('button', { name: 'Sign in' }).click();

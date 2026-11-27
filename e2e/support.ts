@@ -109,3 +109,20 @@ export function mailedLink(email: string, port = 4310): string {
     database.close();
   }
 }
+
+/**
+ * Waits for the animations that end. Ant Design fades its colors when the palette or a panel changes, whatever the person asked about
+ * motion, and axe would read a color half way. An animation that never ends, such as a spinner, is not waited for.
+ */
+export const settle = (page: Page): Promise<unknown> =>
+  page.evaluate(async () => {
+    const frame = (): Promise<unknown> => new Promise((resolve) => requestAnimationFrame(() => resolve(undefined)));
+    await frame();
+    await frame();
+    await Promise.all(
+      document
+        .getAnimations()
+        .filter((animation) => animation.effect?.getComputedTiming().endTime !== Infinity)
+        .map((animation) => animation.finished.catch(() => undefined)),
+    );
+  });

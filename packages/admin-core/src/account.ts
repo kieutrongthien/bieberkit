@@ -53,6 +53,34 @@ export function secretOfUri(uri: string): string {
   }
 }
 
+// The order matters: Edge and Opera also say Chrome, and Chrome also says Safari. An iPhone also says Mac OS X.
+const BROWSERS: readonly (readonly [string, string])[] = [
+  ['Edg', 'Edge'],
+  ['OPR/', 'Opera'],
+  ['Firefox/', 'Firefox'],
+  ['Chrome/', 'Chrome'],
+  ['Safari/', 'Safari'],
+];
+const SYSTEMS: readonly (readonly [string, string])[] = [
+  ['Android', 'Android'],
+  ['iPhone', 'iOS'],
+  ['iPad', 'iOS'],
+  ['Windows', 'Windows'],
+  ['Mac OS X', 'macOS'],
+  ['Linux', 'Linux'],
+];
+
+const named = (userAgent: string, names: readonly (readonly [string, string])[]): string | undefined =>
+  names.find(([mark]) => userAgent.includes(mark))?.[1];
+
+/** A name of the device of a session that a person can tell from another: the browser and the system, or what the device said. */
+export function deviceOf(userAgent: string): string {
+  const browser = named(userAgent, BROWSERS);
+  if (browser === undefined) return userAgent.slice(0, 80);
+  const system = named(userAgent, SYSTEMS);
+  return system === undefined ? browser : `${browser} · ${system}`;
+}
+
 export interface ResetSearch {
   /** The token of the link. It is never kept: the screen holds it in memory and takes it out of the address. */
   readonly token?: string;

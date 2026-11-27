@@ -22,22 +22,29 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { currentEntry, labelText, menuOf } from '@bieberkit/admin-core';
+import { currentEntry, enrolmentNeeded, labelText, menuOf } from '@bieberkit/admin-core';
 import type { MenuGroup, MessageKey } from '@bieberkit/admin-core';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link, Outlet, useRouterState } from '@tanstack/react-router';
+import { useQueryClient } from '@tanstack/react-query';
+import { lazyRouteComponent, Link, Outlet, useNavigate, useRouterState } from '@tanstack/react-router';
 import { Dropdown, Grid, Layout, Menu, Result, Select, Skeleton } from 'antd';
-import { Suspense } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import type { JSX } from 'react';
 import { Brand, firstLetter, SETTINGS } from './Brand.tsx';
 import { OfflineBanner } from './connection.tsx';
-import { useClient, useMeta } from './context.ts';
+import { useClient, useMeta, useSession } from './context.ts';
 import { GoTo } from './GoTo.tsx';
+import { GraceNotice } from './GraceNotice.tsx';
 import { FolderArt, Icon } from './icons.tsx';
 import { LANGUAGE_NAMES, LOCALES, useLanguage, useT } from './language.tsx';
 import { Login } from './Login.tsx';
+import { NoticeContext, useNotice } from './notice.ts';
 
 const { Header, Sider, Content } = Layout;
+
+const enrolScreen = lazyRouteComponent(() => import('./EnrolScreen.tsx'), 'EnrolScreen');
+
+/** The routes that open without a session, and with one: the pages of a forgotten password and of a password link (UI-26). */
+const PUBLIC_ROUTES: ReadonlySet<string> = new Set(['/forgot-password', '/reset-password']);
 
 const GROUP_KEYS: Readonly<Record<string, MessageKey>> = {
   app: 'menu.group.app',
@@ -67,18 +74,36 @@ const initialsOf = (email: string): string =>
     .slice(0, 2)
     .toUpperCase();
 
-function Account(props: { readonly email: string }): JSX.Element {
+/** Ends the session, goes to the home page, and drops everything that was read as this person. */
+function useSignOut(): () => void {
   const client = useClient();
   const queries = useQueryClient();
+  const navigate = useNavigate();
+  return () =>
+    void client
+      .signOut()
+      // The next person at this browser does not land on the page of this one.
+      .then(() => navigate({ to: '/' }))
+      .then(() => queries.resetQueries());
+}
+
+function Account(props: { readonly email: string }): JSX.Element {
+  const navigate = useNavigate();
+  const signOut = useSignOut();
   const t = useT();
   return (
     <Dropdown
       trigger={['click']}
       placement="topLeft"
       menu={{
-        items: [{ key: 'sign-out', label: t('auth.signOut') }],
-        // Everything that was read as this user is dropped, and the session is asked again.
-        onClick: () => void client.signOut().then(() => queries.resetQueries()),
+        items: [
+          { key: 'account', label: t('account.mine') },
+          { key: 'sign-out', label: t('auth.signOut') },
+        ],
+        onClick: ({ key }) => {
+          if (key === 'account') void navigate({ to: '/account' });
+          else signOut();
+        },
       }}
     >
       <button type="button" className="bk-account" aria-haspopup="menu">
@@ -111,6 +136,10 @@ function Frame(props: { readonly email: string }): JSX.Element {
       ? `/${read('module') ?? ''}/${read('resource') ?? ''}`
       : `/ext/${plugin}/${read('page') ?? ''}`;
   const here = currentEntry(groups, address);
+  const atAccount = useRouterState({ select: (state) => state.matches.at(-1)?.routeId === '/account' });
+  const { setNotice } = useNotice();
+  // A sentence that was meant for the sign in is not shown to somebody who is already in.
+  useEffect(() => setNotice(undefined), [setNotice]);
   return (
     <>
       <OfflineBanner />
@@ -142,9 +171,18 @@ function Frame(props: { readonly email: string }): JSX.Element {
           </div>
         </Sider>
         <Layout>
+          <GraceNotice />
           <Header className={compact ? 'bk-header bk-header-compact' : 'bk-header'}>
             <nav className="bk-crumbs" aria-label={t('breadcrumb.label')}>
-              {here === undefined ? null : (
+              {atAccount ? (
+                <ol>
+                  <li>
+                    <Link to="/account" aria-current="page">
+                      {t('account.mine')}
+                    </Link>
+                  </li>
+                </ol>
+              ) : here === undefined ? null : (
                 <ol>
                   <li>{groupName(here.group)}</li>
                   <li>
@@ -185,23 +223,69 @@ function Frame(props: { readonly email: string }): JSX.Element {
   );
 }
 
-/** Asks who is signed in. Nobody gets the login page, and a user gets the frame with the screen of the route. */
-export function Gate(): JSX.Element {
+function Opening(): JSX.Element {
   const t = useT();
-  const client = useClient();
-  const session = useQuery({ queryKey: ['session'], queryFn: async () => (await client.session()) ?? null });
-  if (session.isPending) {
-    return (
-      <div className="bk-opening" role="status">
-        <FolderArt />
-        <span>{t('gate.loading')}</span>
-      </div>
-    );
-  }
+  return (
+    <div className="bk-opening" role="status">
+      <FolderArt />
+      <span>{t('gate.loading')}</span>
+    </div>
+  );
+}
+
+/**
+ * The admin of a signed-in person. When the API says that a second factor is asked of them, the screen that sets it up stands in its
+ * place until it is done (AUTH-05, POL-02). Once it is up it stays, whatever is read again meanwhile, so the backup codes that are
+ * shown once are not lost.
+ */
+function SignedIn(props: { readonly email: string }): JSX.Element {
+  const meta = useMeta();
+  const queries = useQueryClient();
+  const signOut = useSignOut();
+  const [enrolling, setEnrolling] = useState(false);
+  const needed = enrolmentNeeded(meta.error);
+  useEffect(() => {
+    if (needed) setEnrolling(true);
+  }, [needed]);
+  if (!needed && !enrolling) return <Frame email={props.email} />;
+  const EnrolScreen = enrolScreen;
+  return (
+    <Suspense fallback={<Opening />}>
+      <EnrolScreen
+        onDone={() => {
+          setEnrolling(false);
+          void queries.resetQueries();
+        }}
+        onSignOut={signOut}
+      />
+    </Suspense>
+  );
+}
+
+/** Asks who is signed in. Nobody gets the login page, and a user gets the admin with the screen of the route. */
+function Session(): JSX.Element {
+  const t = useT();
+  const session = useSession();
+  if (session.isPending) return <Opening />;
   if (session.isError) {
     return <Result status="error" title={t('gate.noAnswer')} subTitle={session.error.message} />;
   }
-  // A query may not answer `undefined`, so nobody signed in is `null`.
   if (session.data === null) return <Login />;
-  return <Frame email={session.data.email} />;
+  return <SignedIn email={session.data.email} />;
+}
+
+export function Gate(): JSX.Element {
+  const open = useRouterState({ select: (state) => PUBLIC_ROUTES.has(state.matches.at(-1)?.routeId ?? '') });
+  const [notice, setNotice] = useState<MessageKey | undefined>();
+  return (
+    <NoticeContext.Provider value={{ notice, setNotice }}>
+      {open ? (
+        <Suspense fallback={<Opening />}>
+          <Outlet />
+        </Suspense>
+      ) : (
+        <Session />
+      )}
+    </NoticeContext.Provider>
+  );
 }

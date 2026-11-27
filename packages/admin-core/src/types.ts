@@ -184,6 +184,8 @@ export interface SessionUser {
   readonly id: string;
   readonly email: string;
   readonly name: string;
+  /** The account has a second factor. */
+  readonly twoFactorEnabled?: true;
 }
 
 export interface ListParams {

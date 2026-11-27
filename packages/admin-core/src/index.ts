@@ -32,6 +32,7 @@ export type { AdminClient, AdminClientOptions, FieldProblem, SignInResult } from
 export type { AccountClient, AdminSession, CodeKind, Me, TotpEnrolment } from './account-client.ts';
 export {
   authMessageKey,
+  deviceOf,
   enrolmentNeeded,
   normalizeCode,
   PASSWORD_ADVISED,

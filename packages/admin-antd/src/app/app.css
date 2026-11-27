@@ -665,3 +665,184 @@ h1.bk-title.ant-typography {
     animation: none;
   }
 }
+
+/* The account screens (UI-26) */
+.bk-auth-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  margin-top: 16px;
+}
+
+.bk-auth-links a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  color: var(--bk-color-primary);
+  text-decoration: underline;
+}
+
+.bk-auth-links .ant-btn-link {
+  padding-inline: 0;
+}
+
+input.bk-code-input {
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: 3px;
+  text-align: center;
+}
+
+.bk-narrow {
+  max-width: 420px;
+}
+
+h2.bk-step-title.ant-typography {
+  margin: 0;
+  font-size: 18px;
+}
+
+.bk-narrow > h2.bk-step-title.ant-typography {
+  margin-bottom: 8px;
+}
+
+.bk-qr {
+  display: table;
+  margin: 0 auto 16px;
+  padding: 12px;
+  border: 1px solid var(--bk-color-border);
+  border-radius: 10px;
+  background: #fff;
+}
+
+.bk-secret {
+  display: block;
+  margin-bottom: 16px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 15px;
+  text-align: center;
+  overflow-wrap: anywhere;
+  background: var(--bk-color-surface);
+}
+
+.bk-codes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0 0 16px;
+  padding: 14px;
+  border-radius: 10px;
+  font-family: ui-monospace, monospace;
+  text-align: center;
+  list-style: none;
+  overflow-wrap: anywhere;
+  background: var(--bk-color-surface);
+}
+
+.bk-sessions {
+  margin: 0 0 16px;
+  padding: 0;
+  list-style: none;
+}
+
+.bk-sessions li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--bk-color-border);
+}
+
+.bk-sessions p {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+}
+
+.bk-sessions .bk-session-detail {
+  margin-top: 4px;
+  overflow-wrap: anywhere;
+}
+
+.ant-tag.bk-state-on {
+  border: 1px solid var(--bk-color-success);
+  color: var(--bk-color-success);
+  font-weight: 600;
+  background: var(--bk-color-background);
+}
+
+.ant-tag.bk-state-here {
+  border: 0;
+  color: var(--bk-chrome-ink);
+  font-weight: 600;
+  background: var(--bk-chrome-tint);
+}
+
+/* The account has no card around its tabs, so the sheet under the folder tabs is drawn here. */
+.ant-tabs.bk-tabs-wrap > .ant-tabs-body-holder,
+.ant-tabs.bk-tabs-wrap > .ant-tabs-content-holder {
+  padding: 24px 20px;
+  border: 1px solid var(--bk-color-border);
+  border-radius: 14px;
+  background: var(--bk-color-background);
+}
+
+/* Four tabs do not fit in 360 px. They wrap: the button that Ant Design adds for hidden tabs is not allowed in a list of tabs. */
+.ant-tabs.bk-tabs-wrap > .ant-tabs-nav .ant-tabs-nav-list {
+  flex-wrap: wrap;
+}
+
+.ant-tabs.bk-tabs-wrap > .ant-tabs-nav .ant-tabs-nav-wrap {
+  white-space: normal;
+}
+
+.ant-tabs.bk-tabs-wrap > .ant-tabs-nav .ant-tabs-nav-operations {
+  display: none;
+}
+
+.ant-alert.bk-grace {
+  margin: 12px 24px 0;
+}
+
+.bk-grace a {
+  color: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+.bk-enrol {
+  min-height: 100vh;
+}
+
+.bk-enrol-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 24px;
+  background: var(--bk-color-frame);
+}
+
+.bk-enrol-head .ant-btn {
+  color: var(--bk-chrome-frame-strong);
+  border-color: var(--bk-chrome-frame-muted);
+}
+
+.bk-enrol-main {
+  max-width: 520px;
+  margin: 0 auto;
+  padding: 32px 16px;
+}
+
+@media (max-width: 767px) {
+  .ant-alert.bk-grace {
+    margin: 12px 12px 0;
+    margin-left: 52px;
+  }
+}

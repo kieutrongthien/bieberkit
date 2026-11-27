@@ -52,7 +52,15 @@ const welcome = lazyRouteComponent(() => import('./Welcome.tsx'), 'Welcome');
 const listScreen = lazyRouteComponent(() => import('./ListScreen.tsx'), 'ListScreen');
 const formScreen = lazyRouteComponent(() => import('./FormScreen.tsx'), 'FormScreen');
 const extensionPage = lazyRouteComponent(() => import('./ExtensionPage.tsx'), 'ExtensionPage');
+const forgotPassword = lazyRouteComponent(() => import('./ForgotPassword.tsx'), 'ForgotPassword');
+const resetPassword = lazyRouteComponent(() => import('./ResetPassword.tsx'), 'ResetPassword');
+const myAccount = lazyRouteComponent(() => import('./MyAccount.tsx'), 'MyAccount');
 const index = createRoute({ getParentRoute: () => root, path: '/', component: welcome });
+// The account screens (UI-26). An address of one segment cannot be the list of an entity, which has two. The two pages of a
+// password open without a session: the gate draws them on their own.
+const forgot = createRoute({ getParentRoute: () => root, path: 'forgot-password', component: forgotPassword });
+const reset = createRoute({ getParentRoute: () => root, path: 'reset-password', component: resetPassword });
+const account = createRoute({ getParentRoute: () => root, path: 'account', component: myAccount });
 // The pages that plugins add (UI-04). `ext` is a static segment, so it wins over `$module/$resource`.
 const extension = createRoute({ getParentRoute: () => root, path: 'ext/$plugin/$page', component: extensionPage });
 const list = createRoute({ getParentRoute: () => root, path: '$module/$resource', component: listScreen });
@@ -66,7 +74,7 @@ const edit = createRoute({ getParentRoute: () => root, path: '$module/$resource/
 const served = adminBase();
 
 const router = createRouter({
-  routeTree: root.addChildren([index, extension, list, create, edit]),
+  routeTree: root.addChildren([index, forgot, reset, account, extension, list, create, edit]),
   basepath: served === '' ? '/' : served,
   defaultPreload: 'intent',
   // Each route has its own boundary with a retry, so one screen that fails does not take the frame with it (UI-19).

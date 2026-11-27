@@ -25,6 +25,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   authMessageKey,
+  deviceOf,
   enrolmentNeeded,
   normalizeCode,
   passwordIsShort,
@@ -256,6 +257,22 @@ describe('UI-26 the rules of the screens', () => {
   it('AUTH-04 under 15 characters the screen advises a longer one, and asks for no kind of character', () => {
     expect(passwordIsShort('a'.repeat(14))).toBe(true);
     expect(passwordIsShort('a'.repeat(15))).toBe(false);
+  });
+
+  it('UI-26 a session is named after its browser and its system, and an unknown one stays as it said', () => {
+    const chrome =
+      'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
+    expect(deviceOf(chrome)).toBe('Chrome · Linux');
+    expect(deviceOf(`${chrome} Edg/140.0.0.0`)).toBe('Edge · Linux');
+    expect(
+      deviceOf('Mozilla/5.0 (iPhone; CPU iPhone OS 19_0 like Mac OS X) AppleWebKit/605.1.15 Version/19.0 Safari/604.1'),
+    ).toBe('Safari · iOS');
+    expect(deviceOf('Mozilla/5.0 (Android 16; Mobile; rv:140.0) Gecko/140.0 Firefox/140.0')).toBe('Firefox · Android');
+    expect(deviceOf('Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:140.0) Gecko/20100101 Firefox/140.0')).toBe(
+      'Firefox · Windows',
+    );
+    expect(deviceOf('curl/8.5.0')).toBe('curl/8.5.0');
+    expect(deviceOf('')).toBe('');
   });
 
   const refusal = (code: string, status = 400): AdminApiError => new AdminApiError(status, code, 'English text', '');
