@@ -373,3 +373,48 @@ test('UI-21 the vitals of a visit are sent when the person leaves, for a sample,
   await expect.poll(count, { timeout: 5000 }).toBeGreaterThan(before);
   await context.close();
 });
+
+test('UI-11 a row has its child tables as tabs, a new child starts pointing at the row, and the history is the audit log', async () => {
+  const page = shared;
+  await page.goto('/admin/');
+  const account = await makeRow(page, ACCOUNTS, { code: 'TAB-1', name: 'Tabbed' });
+  const id = String(account['id']);
+  await makeRow(page, TICKETS, { title: 'CHILD-1', accountId: id });
+  await makeRow(page, TICKETS, { title: 'CHILD-2', accountId: id });
+  await makeRow(page, TICKETS, { title: 'OTHER-1' });
+  await page.goto(`/admin/crm/accounts/${id}`);
+
+  await page.getByRole('tab', { name: 'Ticket' }).click();
+  await expect(page.getByRole('link', { name: 'CHILD-1' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'CHILD-2' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'OTHER-1' })).toHaveCount(0);
+
+  await page.getByRole('button', { name: 'New Ticket' }).click();
+  await expect(page).toHaveURL(/\/admin\/crm\/tickets\/new\?.*accountId=/);
+  await expect(page.getByRole('textbox', { name: 'accountId' })).toHaveValue(id);
+  await page.getByRole('textbox', { name: 'title' }).fill('CHILD-3');
+  await page.getByRole('button', { name: 'Save' }).click();
+  await expect(page.getByRole('link', { name: 'CHILD-3' })).toBeVisible();
+
+  await page.goto(`/admin/crm/accounts/${id}`);
+  await page.getByRole('tab', { name: 'Ticket' }).click();
+  await expect(page.getByRole('link', { name: 'CHILD-3' })).toBeVisible();
+
+  await page.getByRole('tab', { name: 'History' }).click();
+  await expect(page.getByText('create', { exact: true })).toBeVisible();
+  await expect(page.getByText('Administrator')).toBeVisible();
+});
+
+test('UI-11 the fields that the server fills are shown beside the form, and a move can be taken from the row', async () => {
+  const page = shared;
+  await page.goto('/admin/');
+  const ticket = await makeRow(page, TICKETS, { title: 'DETAIL-1' });
+  await page.goto(`/admin/crm/tickets/${String(ticket['id'])}`);
+  await expect(page.getByText('Filled in by the server')).toBeVisible();
+  await expect(page.getByText('open', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'close' }).click();
+  await page.getByRole('textbox', { name: 'reason' }).fill('done here');
+  await page.getByRole('button', { name: 'Apply' }).click();
+  await expect(page.getByText('closed', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'reopen' })).toBeVisible();
+});

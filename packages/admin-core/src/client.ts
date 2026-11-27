@@ -23,6 +23,8 @@
  */
 
 import { filterParams } from './lists.ts';
+import { HISTORY_PATH, historyOf, historyQuery } from './related.ts';
+import type { HistoryEntry } from './related.ts';
 import type { BulkOutcome } from './lists.ts';
 import type { BulkOperation, BulkResult, ListParams, Meta, MetaEntity, Page, Row, SessionUser } from './types.ts';
 
@@ -78,6 +80,8 @@ export interface AdminClient {
   /** `version` is the version that the person read (API-13). A stale one is a 412 with the current row. */
   update(entity: MetaEntity, id: string, body: Row, version: number): Promise<Row>;
   remove(entity: MetaEntity, id: string, version: number): Promise<void>;
+  /** What the audit log says about one row, newest first. A user without the permission of the audit log gets the error of the API. */
+  history(entity: MetaEntity, id: string): Promise<readonly HistoryEntry[]>;
   /** A move of the state field of a row. `version` is the one that was read, and `input` is what the move asks for, if it asks for something. */
   transition(entity: MetaEntity, id: string, name: string, version: number, input?: Row): Promise<Row>;
   /** One change to many rows. The rows are `{ id, version }`, the version that the person read. Above 100 rows the server queues a job (API-14). */
@@ -218,6 +222,9 @@ export function createAdminClient(options: AdminClientOptions = {}): AdminClient
           headers: { 'if-match': String(version) },
         }),
       );
+    },
+    async history(entity, id) {
+      return historyOf(await request('GET', `${HISTORY_PATH}${historyQuery(entity.name, id)}`));
     },
     async transition(entity, id, name, version, input) {
       return rowOf(

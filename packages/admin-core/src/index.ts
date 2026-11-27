@@ -91,3 +91,15 @@ export {
 } from './transitions.ts';
 export { problemOf } from './validation.ts';
 export type { ValueProblem } from './validation.ts';
+export {
+  historyLine,
+  historyOf,
+  historyQuery,
+  HISTORY_PATH,
+  prefillOf,
+  readOnlyOf,
+  relatedDefaults,
+  relatedFilter,
+  relatedOf,
+} from './related.ts';
+export type { HistoryEntry, Related } from './related.ts';

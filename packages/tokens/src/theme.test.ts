@@ -224,7 +224,7 @@ describe('UI-07 the default theme meets level AA', () => {
     for (const mode of ['light', 'dark'] as const) {
       const token = compileAntdTheme(DEFAULT_THEME, mode).token;
       const background = mode === 'dark' ? DEFAULT_THEME.dark.background : DEFAULT_THEME.colors.background;
-      for (const key of ['colorTextPlaceholder', 'colorTextDescription']) {
+      for (const key of ['colorTextPlaceholder', 'colorTextDescription', 'colorTextTertiary', 'colorTextSecondary']) {
         expect(contrastRatio(String(token[key]), background), `${key} in ${mode}`).toBeGreaterThanOrEqual(4.5);
       }
     }

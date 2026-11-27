@@ -47,9 +47,11 @@ export function compileAntdTheme(theme: Theme, mode: 'light' | 'dark'): AntdThem
       colorTextBase: colors.text,
       // The text of a button that is filled with the brand color: the light tone of a dark palette carries dark text.
       ...(mode === 'dark' ? { colorTextLightSolid: colors.background } : {}),
-      // Ant Design draws a placeholder and a description at a quarter to half of the text, which does not read at level AA (UI-07).
+      // Ant Design draws a placeholder, a description and the label of a list of facts at a quarter to two thirds of the text, which does not read at level AA (UI-07).
       colorTextPlaceholder: mixColors(colors.text, colors.background, 0.65),
       colorTextDescription: mixColors(colors.text, colors.background, 0.7),
+      colorTextTertiary: mixColors(colors.text, colors.background, 0.7),
+      colorTextSecondary: mixColors(colors.text, colors.background, 0.8),
       colorBorder: colors.border,
       borderRadius: theme.radius,
       sizeUnit: theme.spacing,

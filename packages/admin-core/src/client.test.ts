@@ -201,6 +201,25 @@ describe('UI-02 the client of the admin', () => {
     });
   });
 
+  it('UI-03 the history of a row is read from the audit log by entity and record', async () => {
+    const { fetch: fetcher, calls } = fake(() =>
+      json({
+        data: [
+          {
+            id: 'e1',
+            at: '2026-03-05T10:00:00.000Z',
+            action: 'settings.Setting.update',
+            actor: { name: 'Ann' },
+            data: { fields: ['value'] },
+          },
+        ],
+      }),
+    );
+    const entries = await createAdminClient({ fetch: fetcher }).history(ENTITY, '1');
+    expect(calls[0]?.url).toBe('/api/v1/audit-log/entries?entity=settings.Setting&recordId=1&pageSize=20');
+    expect(entries.map((entry) => [entry.who, entry.fields])).toEqual([['Ann', ['value']]]);
+  });
+
   it('UI-03 a move of a state field is a POST to the action of the row, with If-Match and the input', async () => {
     const { fetch: fetcher, calls } = fake(() => json({ data: { id: '1', status: 'closed', version: 3 } }));
     const row = await createAdminClient({ fetch: fetcher }).transition(ENTITY, '1', 'close', 2, { reason: 'done' });

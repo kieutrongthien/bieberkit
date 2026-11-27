@@ -110,6 +110,24 @@ test('UI-07 a form that asks for the input of a move, and the filters that are s
   expect(await violations(page)).toEqual([]);
 });
 
+test('UI-07 a detail with its tabs, its child table and its history has no violation of WCAG 2.2 AA', async () => {
+  const page = shared;
+  await page.goto('/admin/crm/accounts');
+  await page.getByRole('link', { name: 'AXE-1' }).click();
+  await expect(page.getByRole('tab', { name: 'Details' })).toBeVisible();
+  expect(await violations(page)).toEqual([]);
+  await page.getByRole('tab', { name: 'Ticket' }).click();
+  expect(await violations(page)).toEqual([]);
+  await page.getByRole('tab', { name: 'History' }).click();
+  await expect(page.getByText('create', { exact: true })).toBeVisible();
+  expect(await violations(page)).toEqual([]);
+
+  await page.goto('/admin/crm/tickets');
+  await page.getByRole('link', { name: 'Axe ticket' }).click();
+  await expect(page.getByText('Filled in by the server')).toBeVisible();
+  expect(await violations(page)).toEqual([]);
+});
+
 test('UI-07, UI-16 the list of cards at 360 px has no violation of WCAG 2.2 AA', async () => {
   const page = shared;
   await page.setViewportSize({ width: 360, height: 740 });

@@ -34,18 +34,23 @@ import {
   isDirty,
   labelOf,
   loadDraft,
+  prefillOf,
   reapply,
+  readOnlyOf,
+  relatedOf,
   saveDraft,
   shortcutOf,
 } from '@bieberkit/admin-core';
-import type { MetaEntity, Row } from '@bieberkit/admin-core';
+import type { MetaEntity, MetaTransition, Row } from '@bieberkit/admin-core';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useBlocker, useNavigate, useParams } from '@tanstack/react-router';
-import { Alert, App, Button, Card, Form, Result, Space, Table } from 'antd';
+import { useBlocker, useNavigate, useParams, useSearch } from '@tanstack/react-router';
+import { Alert, App, Button, Card, Descriptions, Form, Result, Space, Table, Tabs } from 'antd';
 import { useEffect, useRef, useState } from 'react';
 import type { JSX } from 'react';
 import { Control, fromControl, rulesOf, toControl } from './controls.tsx';
-import { useClient, useEntity } from './context.ts';
+import { useClient, useEntity, useMeta } from './context.ts';
+import { RowMoves } from './moves.tsx';
+import { History, RelatedRows } from './Related.tsx';
 import { useLanguage, useT } from './language.tsx';
 
 /** A value as a cell of the table of a conflict shows it. */
@@ -60,7 +65,11 @@ const isTyping = (target: EventTarget | null): boolean =>
 const isSession = (value: unknown): value is { readonly id: string } =>
   typeof value === 'object' && value !== null && typeof Reflect.get(value, 'id') === 'string';
 
-function Editor(props: { readonly entity: MetaEntity; readonly row?: Row | undefined }): JSX.Element {
+function Editor(props: {
+  readonly entity: MetaEntity;
+  readonly row?: Row | undefined;
+  readonly prefill?: Readonly<Record<string, string>>;
+}): JSX.Element {
   const { entity } = props;
   const client = useClient();
   const queries = useQueryClient();
@@ -80,7 +89,8 @@ function Editor(props: { readonly entity: MetaEntity; readonly row?: Row | undef
   const updating = base !== undefined;
   const fields = formFieldsOf(entity);
   const canSave = updating ? allows(entity, 'update') : allows(entity, 'create');
-  const initial = initialValues(entity, base);
+  const initial = updating ? initialValues(entity, base) : { ...initialValues(entity), ...props.prefill };
+  const meta = useMeta();
   const controls = (values: Readonly<Record<string, unknown>>): Record<string, unknown> =>
     Object.fromEntries(fields.map((field) => [field.key, toControl(field, values[field.key])]));
   const session = queries.getQueryData(['session']);
@@ -193,8 +203,40 @@ function Editor(props: { readonly entity: MetaEntity; readonly row?: Row | undef
     setDirty(true);
   };
 
-  return (
-    <Card title={t(updating ? 'form.edit' : 'form.new', { name: labelOf(entity, locale) })}>
+  /** A move of the state field from the detail: the row of the answer is the row that the form is checked against from now on. */
+  const moveHere = async (row: Row, transition: MetaTransition, input?: Row): Promise<boolean> => {
+    try {
+      const saved = await client.transition(entity, String(row['id']), transition.name, Number(row['version']), input);
+      setBase(saved);
+      void message.success(t('list.moved', { name: transition.name }));
+      await queries.invalidateQueries({ queryKey: ['list', entity.name] });
+      return true;
+    } catch (error) {
+      void message.error(error instanceof Error ? error.message : t('list.notMoved'));
+      return false;
+    }
+  };
+  const computed = base === undefined ? [] : readOnlyOf(entity, base);
+  const id = base === undefined ? undefined : String(base['id']);
+  const related = meta.data === undefined ? [] : relatedOf(meta.data, entity);
+
+  const details = (
+    <>
+      {base === undefined || (computed.length === 0 && (entity.transitions ?? []).length === 0) ? null : (
+        <Space direction="vertical" style={{ width: '100%', marginBottom: 16 }}>
+          {computed.length === 0 ? null : (
+            <Descriptions
+              size="small"
+              column={{ xs: 1, sm: 2 }}
+              title={t('detail.computed')}
+              items={computed.map((item) => ({ key: item.key, label: item.key, children: shown(item.value) }))}
+            />
+          )}
+          <Space wrap>
+            <RowMoves entity={entity} row={base} move={moveHere} />
+          </Space>
+        </Space>
+      )}
       {conflict === undefined ? null : (
         <Alert
           type="warning"
@@ -290,6 +332,26 @@ function Editor(props: { readonly entity: MetaEntity; readonly row?: Row | undef
           <Button onClick={() => void navigate({ to: `/${where}` })}>{t('common.cancel')}</Button>
         </Space>
       </Form>
+    </>
+  );
+
+  return (
+    <Card title={t(updating ? 'form.edit' : 'form.new', { name: labelOf(entity, locale) })}>
+      {id === undefined ? (
+        details
+      ) : (
+        <Tabs
+          items={[
+            { key: 'details', label: t('detail.details'), children: details },
+            ...related.map((item) => ({
+              key: `${item.entity.name}.${item.via.key}`,
+              label: labelOf(item.entity, locale),
+              children: <RelatedRows related={item} id={id} />,
+            })),
+            { key: 'history', label: t('detail.history'), children: <History entity={entity} id={id} /> },
+          ]}
+        />
+      )}
     </Card>
   );
 }
@@ -300,6 +362,7 @@ export function FormScreen(): JSX.Element {
   const params = useParams({ strict: false });
   const client = useClient();
   const id = params.id;
+  const search: Readonly<Record<string, unknown>> = useSearch({ strict: false });
   const row = useQuery({
     queryKey: ['row', entity?.name, id],
     queryFn: () => (entity === undefined || id === undefined ? Promise.resolve({}) : client.get(entity, id)),
@@ -309,5 +372,11 @@ export function FormScreen(): JSX.Element {
   if (loading || (id !== undefined && row.isPending)) return <Card loading />;
   if (entity === undefined || !entity.can.read) return <Result status="404" title={t('form.missing')} />;
   if (row.isError) return <Result status="error" title={t('form.rowLoadError')} subTitle={row.error.message} />;
-  return <Editor key={id ?? 'new'} entity={entity} {...(id === undefined ? {} : { row: row.data })} />;
+  return (
+    <Editor
+      key={id ?? 'new'}
+      entity={entity}
+      {...(id === undefined ? { prefill: prefillOf(formFieldsOf(entity), search) } : { row: row.data })}
+    />
+  );
 }

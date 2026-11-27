@@ -49,57 +49,6 @@ export declare function reapply(base: Values, mine: Values, theirs: Values): {
   values: Record<string, unknown>;
   conflicts: Conflict[];
 };
-type FilterOperator = "eq" | "ne" | "in" | "lt" | "lte" | "gt" | "gte" | "null";
-interface Filter {
-  readonly field: string;
-  readonly op: FilterOperator;
-  readonly value: string;
-}
-export declare function operatorsOf(kind: string): readonly FilterOperator[];
-export declare function filterProblem(entity: MetaEntity, filter: Filter): string | undefined;
-export declare function filterParams(entity: MetaEntity, filters: readonly Filter[]): Record<string, string>;
-interface SavedView {
-  readonly name: string;
-  readonly filters: readonly Filter[];
-  readonly sort?: string;
-}
-export declare const viewsKey: (entity: string, userId: string) => string;
-export declare function loadViews(storage: DraftStorage, key: string): SavedView[];
-export declare function saveView(storage: DraftStorage, key: string, view: SavedView): void;
-export declare function deleteView(storage: DraftStorage, key: string, name: string): void;
-export declare const sameView: (a: SavedView, b: SavedView) => boolean;
-export declare function viewToSearch(view: SavedView): {
-  filters?: readonly Filter[];
-  sort?: string;
-};
-export declare function viewFromSearch(search: Readonly<Record<string, unknown>>): SavedView;
-interface CsvColumn {
-  readonly key: string;
-  readonly title: string;
-}
-export declare function csvOf(columns: readonly CsvColumn[], rows: readonly Readonly<Record<string, unknown>>[]): string;
-export declare function exportPages(total: number, pageSize: number, limit: number): {
-  pages: number;
-  truncated: boolean;
-};
-interface BulkOutcome {
-  readonly id: string;
-  readonly status: string;
-  readonly version?: number;
-  readonly error?: {
-    readonly code: string;
-    readonly message: string;
-  };
-}
-export declare function bulkSummary(outcomes: readonly BulkOutcome[]): {
-  ok: number;
-  failed: {
-    id: string;
-    message: string;
-  }[];
-};
-export declare const PAGE_SIZES: readonly number[];
-export declare const shouldVirtualize: (rows: number) => boolean;
 interface MetaField {
   readonly key: string;
   readonly kind: string;
@@ -193,6 +142,80 @@ type BulkResult = {
   readonly kind: "queued";
   readonly jobId: string;
 };
+type FilterOperator = "eq" | "ne" | "in" | "lt" | "lte" | "gt" | "gte" | "null";
+interface Filter {
+  readonly field: string;
+  readonly op: FilterOperator;
+  readonly value: string;
+}
+export declare function operatorsOf(kind: string): readonly FilterOperator[];
+export declare function filterProblem(entity: MetaEntity, filter: Filter): string | undefined;
+export declare function filterParams(entity: MetaEntity, filters: readonly Filter[]): Record<string, string>;
+interface SavedView {
+  readonly name: string;
+  readonly filters: readonly Filter[];
+  readonly sort?: string;
+}
+export declare const viewsKey: (entity: string, userId: string) => string;
+export declare function loadViews(storage: DraftStorage, key: string): SavedView[];
+export declare function saveView(storage: DraftStorage, key: string, view: SavedView): void;
+export declare function deleteView(storage: DraftStorage, key: string, name: string): void;
+export declare const sameView: (a: SavedView, b: SavedView) => boolean;
+export declare function viewToSearch(view: SavedView): {
+  filters?: readonly Filter[];
+  sort?: string;
+};
+export declare function viewFromSearch(search: Readonly<Record<string, unknown>>): SavedView;
+interface CsvColumn {
+  readonly key: string;
+  readonly title: string;
+}
+export declare function csvOf(columns: readonly CsvColumn[], rows: readonly Readonly<Record<string, unknown>>[]): string;
+export declare function exportPages(total: number, pageSize: number, limit: number): {
+  pages: number;
+  truncated: boolean;
+};
+interface BulkOutcome {
+  readonly id: string;
+  readonly status: string;
+  readonly version?: number;
+  readonly error?: {
+    readonly code: string;
+    readonly message: string;
+  };
+}
+export declare function bulkSummary(outcomes: readonly BulkOutcome[]): {
+  ok: number;
+  failed: {
+    id: string;
+    message: string;
+  }[];
+};
+export declare const PAGE_SIZES: readonly number[];
+export declare const shouldVirtualize: (rows: number) => boolean;
+interface Related {
+  readonly entity: MetaEntity;
+  readonly via: MetaField;
+}
+export declare function relatedOf(meta: Meta, entity: MetaEntity): readonly Related[];
+export declare const relatedFilter: (related: Related, id: string) => Filter;
+export declare const relatedDefaults: (related: Related, id: string) => Readonly<Record<string, string>>;
+export declare function prefillOf(form: readonly MetaField[], search: Readonly<Record<string, unknown>>): Record<string, string>;
+export declare const HISTORY_PATH = "/api/v1/audit-log/entries";
+export declare const historyQuery: (entity: string, id: string, pageSize?: number) => string;
+interface HistoryEntry {
+  readonly id: string;
+  readonly at: string;
+  readonly action: string;
+  readonly who: string;
+  readonly fields: readonly string[];
+}
+export declare function historyOf(body: unknown): HistoryEntry[];
+export declare const historyLine: (entry: HistoryEntry) => string;
+export declare function readOnlyOf(entity: MetaEntity, row: Row): {
+  readonly key: string;
+  readonly value: unknown;
+}[];
 interface FieldProblem {
   readonly path: string;
   readonly code: string;
@@ -220,6 +243,7 @@ interface AdminClient {
   create(entity: MetaEntity, body: Row): Promise<Row>;
   update(entity: MetaEntity, id: string, body: Row, version: number): Promise<Row>;
   remove(entity: MetaEntity, id: string, version: number): Promise<void>;
+  history(entity: MetaEntity, id: string): Promise<readonly HistoryEntry[]>;
   transition(entity: MetaEntity, id: string, name: string, version: number, input?: Row): Promise<Row>;
   bulk(entity: MetaEntity, items: readonly {
     readonly id: string;
@@ -279,6 +303,13 @@ declare const en: {
   readonly "list.notChanged": "The rows were not changed";
   readonly "list.selectRow": "Select {name}";
   readonly "list.sort": "Sort by";
+  readonly "detail.details": "Details";
+  readonly "detail.history": "History";
+  readonly "detail.newRelated": "New {name}";
+  readonly "detail.noRelated": "Nothing yet";
+  readonly "detail.noHistory": "Nothing was recorded for this row";
+  readonly "detail.historyDenied": "The history is not open to you";
+  readonly "detail.computed": "Filled in by the server";
   readonly "list.op.eq": "is";
   readonly "list.op.ne": "is not";
   readonly "list.op.in": "is one of";
@@ -397,5 +428,5 @@ interface ValueProblem {
 }
 export declare function problemOf(field: MetaField, value: unknown): ValueProblem | undefined;
 export declare const packageName = "@bieberkit/admin-core";
-export { type AdminClient, type AdminClientOptions, type BulkOperation, type BulkOutcome, type BulkResult, type Conflict, type Connection, type ConnectionEvent, type CsvColumn, type Dictionary, type DraftStorage, en as ENGLISH, type ErrorReport, type FieldProblem, type Filter, type FilterOperator, type KeyPress, type ListParams, type Locale, type MessageKey, type Meta, type MetaEntity, type MetaField, type MetaMenuItem, type MetaTransition, type Page, type Row, type SavedView, type SessionUser, type Shortcut, type ValueProblem, type Vital, type VitalReport };
+export { type AdminClient, type AdminClientOptions, type BulkOperation, type BulkOutcome, type BulkResult, type Conflict, type Connection, type ConnectionEvent, type CsvColumn, type Dictionary, type DraftStorage, en as ENGLISH, type ErrorReport, type FieldProblem, type Filter, type FilterOperator, type HistoryEntry, type KeyPress, type ListParams, type Locale, type MessageKey, type Meta, type MetaEntity, type MetaField, type MetaMenuItem, type MetaTransition, type Page, type Related, type Row, type SavedView, type SessionUser, type Shortcut, type ValueProblem, type Vital, type VitalReport };
 ```
