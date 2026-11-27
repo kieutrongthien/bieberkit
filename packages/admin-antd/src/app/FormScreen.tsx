@@ -22,12 +22,27 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { AdminApiError, allows, bodyOf, formFieldsOf, initialValues, labelOf } from '@bieberkit/admin-core';
+import {
+  AdminApiError,
+  allows,
+  bodyOf,
+  clearDraft,
+  draftKey,
+  formatDateTime,
+  formFieldsOf,
+  initialValues,
+  isDirty,
+  labelOf,
+  loadDraft,
+  reapply,
+  saveDraft,
+  shortcutOf,
+} from '@bieberkit/admin-core';
 import type { MetaEntity, MetaField, Row } from '@bieberkit/admin-core';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useNavigate, useParams } from '@tanstack/react-router';
-import { Alert, App, Button, Card, Form, Input, InputNumber, Result, Select, Space, Switch } from 'antd';
-import { useState } from 'react';
+import { useBlocker, useNavigate, useParams } from '@tanstack/react-router';
+import { Alert, App, Button, Card, Form, Input, InputNumber, Result, Select, Space, Switch, Table } from 'antd';
+import { useEffect, useRef, useState } from 'react';
 import type { ChangeEvent, JSX } from 'react';
 import { useClient, useEntity } from './context.ts';
 import { useLanguage, useT } from './language.tsx';
@@ -92,8 +107,20 @@ function Control(props: ControlProps): JSX.Element {
   }
 }
 
+/** A value as a cell of the table of a conflict shows it. */
+const shown = (value: unknown): string =>
+  value === null || value === undefined ? '' : typeof value === 'string' ? value : JSON.stringify(value);
+
+/** Whether the focus is in a place where a key is typed. */
+const isTyping = (target: EventTarget | null): boolean =>
+  target instanceof HTMLElement &&
+  (['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || target.isContentEditable);
+
+const isSession = (value: unknown): value is { readonly id: string } =>
+  typeof value === 'object' && value !== null && typeof Reflect.get(value, 'id') === 'string';
+
 function Editor(props: { readonly entity: MetaEntity; readonly row?: Row | undefined }): JSX.Element {
-  const { entity, row } = props;
+  const { entity } = props;
   const client = useClient();
   const queries = useQueryClient();
   const navigate = useNavigate();
@@ -101,29 +128,92 @@ function Editor(props: { readonly entity: MetaEntity; readonly row?: Row | undef
   const t = useT();
   const { locale } = useLanguage();
   const [form] = Form.useForm<Record<string, unknown>>();
-  const [stale, setStale] = useState(false);
+  // The row that the person opened. After a conflict it is the row of the others, which is the one that the next save is checked against.
+  const [base, setBase] = useState<Row | undefined>(props.row);
+  const [conflict, setConflict] = useState<Row | undefined>();
   const [busy, setBusy] = useState(false);
+  const [dirty, setDirty] = useState(false);
+  const leaving = useRef(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const where = entity.path.replace('/api/v1/', '');
-  const updating = row !== undefined;
+  const updating = base !== undefined;
   const fields = formFieldsOf(entity);
   const canSave = updating ? allows(entity, 'update') : allows(entity, 'create');
-  const initial = initialValues(entity, row);
-  const start = Object.fromEntries(fields.map((field) => [field.key, toControl(field, initial[field.key])]));
+  const initial = initialValues(entity, base);
+  const controls = (values: Readonly<Record<string, unknown>>): Record<string, unknown> =>
+    Object.fromEntries(fields.map((field) => [field.key, toControl(field, values[field.key])]));
+  const session = queries.getQueryData(['session']);
+  const key = draftKey(
+    entity.name,
+    base === undefined ? undefined : String(base['id']),
+    isSession(session) ? session.id : 'anonymous',
+  );
+  // A draft rests in the browser, so a field that is personal or encrypted never goes into it (UI-17, PDP-01).
+  const skip = new Set(
+    fields.filter((field) => field.pii === true || field.encrypted === true).map((field) => field.key),
+  );
+  const [draft, setDraft] = useState(() => loadDraft(window.localStorage, key, Date.now()));
+  const offered = draft !== undefined && isDirty(initial, draft) ? draft : undefined;
+
+  const current = (): Record<string, unknown> =>
+    Object.fromEntries(fields.map((field) => [field.key, fromControl(field, form.getFieldValue(field.key))]));
+
+  const changed = (): void => {
+    const values = current();
+    const now = isDirty(initial, values);
+    setDirty(now);
+    clearTimeout(timer.current);
+    // A draft is kept a moment after the last key, and goes when the form is the same as the row again.
+    timer.current = setTimeout(() => {
+      if (now) saveDraft(window.localStorage, key, values, Date.now(), skip);
+      else clearDraft(window.localStorage, key);
+    }, 600);
+  };
+
+  // Leaving with changes asks first, in the application and in the browser (UI-17).
+  useBlocker({
+    shouldBlockFn: () => (dirty && !leaving.current ? !window.confirm(t('form.leave')) : false),
+    enableBeforeUnload: () => dirty && !leaving.current,
+  });
+
+  const submit = (): void => form.submit();
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent): void => {
+      const shortcut = shortcutOf({
+        key: event.key,
+        ctrl: event.ctrlKey,
+        meta: event.metaKey,
+        alt: event.altKey,
+        shift: event.shiftKey,
+        typing: isTyping(event.target),
+      });
+      if (shortcut === 'save' && canSave) {
+        event.preventDefault();
+        submit();
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  });
+  useEffect(() => () => clearTimeout(timer.current), []);
 
   const save = async (values: Record<string, unknown>): Promise<void> => {
     setBusy(true);
-    setStale(false);
+    setConflict(undefined);
     const converted = Object.fromEntries(fields.map((field) => [field.key, fromControl(field, values[field.key])]));
     try {
       const body = bodyOf(entity, converted, updating);
-      if (row === undefined) await client.create(entity, body);
-      else await client.update(entity, String(row['id']), body, Number(row['version']));
+      if (base === undefined) await client.create(entity, body);
+      else await client.update(entity, String(base['id']), body, Number(base['version']));
       await queries.invalidateQueries({ queryKey: ['list', entity.name] });
+      clearTimeout(timer.current);
+      clearDraft(window.localStorage, key);
+      leaving.current = true;
       void message.success(t('form.saved'));
       await navigate({ to: `/${where}` });
     } catch (error) {
       if (error instanceof AdminApiError && error.status === 412) {
-        setStale(true);
+        setConflict(error.current ?? {});
       } else if (error instanceof AdminApiError && error.problems.length > 0) {
         form.setFields(
           error.problems.map((problem) => ({
@@ -139,21 +229,104 @@ function Editor(props: { readonly entity: MetaEntity; readonly row?: Row | undef
     }
   };
 
+  const theirs = conflict === undefined ? {} : initialValues(entity, conflict);
+  const merge = conflict === undefined ? undefined : reapply(initial, current(), theirs);
+  const differing =
+    merge === undefined ? [] : fields.filter((field) => isDirty({ v: current()[field.key] }, { v: theirs[field.key] }));
+  const who = typeof conflict?.['updatedBy'] === 'string' ? conflict['updatedBy'] : t('conflict.unknownUser');
+  const when = typeof conflict?.['updatedAt'] === 'string' ? formatDateTime(locale, conflict['updatedAt']) : '';
+
+  const takeTheirs = (): void => {
+    if (conflict === undefined) return;
+    setBase(conflict);
+    form.setFieldsValue(controls(theirs));
+    clearDraft(window.localStorage, key);
+    setDirty(false);
+    setConflict(undefined);
+  };
+  const keepMine = (): void => {
+    if (conflict === undefined || merge === undefined) return;
+    setBase(conflict);
+    form.setFieldsValue(controls(merge.values));
+    setConflict(undefined);
+    setDirty(true);
+  };
+
   return (
     <Card title={t(updating ? 'form.edit' : 'form.new', { name: labelOf(entity, locale) })}>
-      {stale ? (
+      {conflict === undefined ? null : (
         <Alert
           type="warning"
           showIcon
           style={{ marginBottom: 16 }}
           message={t('form.conflictTitle')}
-          description={t('form.conflictBody')}
+          description={
+            <Space direction="vertical" style={{ width: '100%' }}>
+              {when === '' ? null : <span>{t('conflict.changedBy', { who, when })}</span>}
+              {differing.length === 0 ? null : (
+                <Table
+                  size="small"
+                  pagination={false}
+                  rowKey="key"
+                  dataSource={differing.map((field) => ({
+                    key: field.key,
+                    mine: shown(current()[field.key]),
+                    theirs: shown(theirs[field.key]),
+                  }))}
+                  columns={[
+                    { title: t('conflict.field'), dataIndex: 'key' },
+                    { title: t('conflict.mine'), dataIndex: 'mine' },
+                    { title: t('conflict.theirs'), dataIndex: 'theirs' },
+                  ]}
+                />
+              )}
+              <Space wrap>
+                <Button type="primary" onClick={keepMine}>
+                  {t('conflict.keepMine')}
+                </Button>
+                <Button onClick={takeTheirs}>{t('conflict.takeTheirs')}</Button>
+              </Space>
+            </Space>
+          }
         />
-      ) : null}
+      )}
+      {offered === undefined ? null : (
+        <Alert
+          type="info"
+          showIcon
+          style={{ marginBottom: 16 }}
+          message={t('form.draftFound')}
+          action={
+            <Space>
+              <Button
+                size="small"
+                type="primary"
+                onClick={() => {
+                  form.setFieldsValue(controls(offered));
+                  setDraft(undefined);
+                  setDirty(true);
+                }}
+              >
+                {t('form.draftRestore')}
+              </Button>
+              <Button
+                size="small"
+                onClick={() => {
+                  clearDraft(window.localStorage, key);
+                  setDraft(undefined);
+                }}
+              >
+                {t('form.draftDiscard')}
+              </Button>
+            </Space>
+          }
+        />
+      )}
       <Form<Record<string, unknown>>
         form={form}
         layout="vertical"
-        initialValues={start}
+        initialValues={controls(initial)}
+        onValuesChange={changed}
         onFinish={(values) => void save(values)}
       >
         {fields.map((field) => (

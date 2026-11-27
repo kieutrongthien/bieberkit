@@ -343,15 +343,15 @@ Execution order: M2.1 through M2.7, then the reviewed npm release, then M1.10 Pi
 ### M2.2 Admin renderer
 
 - [ ] Generic list with filters, saved views, bulk actions, export; form with `visibleWhen`, `requiredWhen`, inline child tables, relation pickers, file fields; detail with tabs (UI-03, UI-11)
-- [ ] Lazy chunks per route, per-language translations, virtualized lists, prefetch, optimistic updates (UI-12, UI-13, UI-15)
-- [ ] Mobile layout to 360 px, unsaved-change guard, local drafts, shortcuts, 412 conflict view, error boundaries, offline banner (UI-16 to UI-19)
+- [ ] Lazy chunks per route, per-language translations, virtualized lists, prefetch, optimistic updates (UI-12, UI-13, UI-15). Done: a lazy chunk for each screen, prefetch on intent, `fields=` from the metadata. Open: translations still load in one chunk, lists over 200 rows are not virtualized (TanStack Virtual needs an ADR line), no optimistic updates
+- [ ] Mobile layout to 360 px, unsaved-change guard, local drafts, shortcuts, 412 conflict view, error boundaries, offline banner (UI-16 to UI-19). Done (unit-tested logic, typed and built, not run in a browser): the guard, local drafts, Ctrl/Cmd+S, the 412 view, route and application error boundaries, the offline banner, retry with backoff. Open: the 360 px card layout, the `n` and `/` shortcuts
 - [x] Languages en, vi, zh; font stack; theme tokens (UI-05, UI-06, TOK-01 to TOK-03). Evidence: `admin-core/src/i18n.test.ts`, `tokens/src/theme.test.ts`, the `UI-06` cases of `server/src/admin.test.ts`; the screens are typechecked and built, and the Playwright run needs the browser of the pinned version, which this machine does not have
-- [ ] Hashed assets kept 24 hours after deploy; reload on chunk error (UI-22)
+- [ ] Hashed assets kept 24 hours after deploy; reload on chunk error (UI-22). Done: the reload on a missing chunk, once. Open: the server keeping the previous release's hashed files
 - [ ] Custom widgets, replacement pages, plugin pages and dashboard widgets (UI-04)
 - [x] `@bieberkit/tokens` compiling to Ant Design theme and CSS variables. Also a Tailwind theme and the `theme` key of the config; evidence: `tokens/src/theme.test.ts`, the `UI-06` cases of `server/src/admin.test.ts`
 - [ ] Second small adapter as a test fixture to prove the contract (§26)
-- [ ] Axe checks on generic screens at WCAG 2.2 AA, admin initial JS under 400 KB (UI-07, §18.1)
-- [ ] Client errors and web vitals to the error-reporter contract (UI-21)
+- [ ] Axe checks on generic screens at WCAG 2.2 AA, admin initial JS under 400 KB (UI-07, §18.1). Done: `pnpm check:admin-size` (319.7 kB compressed). Open: axe (`@axe-core/playwright` needs an ADR line and the browser)
+- [ ] Client errors and web vitals to the error-reporter contract (UI-21). Done: the scrubbed report, the shape of a route and the sample, as unit-tested logic. Open: the server endpoint that forwards a report to the error reporter, and the browser side that sends it
 
 ### M2.3 Content and public site
 

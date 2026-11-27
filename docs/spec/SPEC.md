@@ -1724,6 +1724,7 @@ Open questions:
 
 | Version | Date | Changes |
 | --- | --- | --- |
+| 0.8.28 | 2026-11-27 | M2.2 resilience: retry and backoff, the offline state, route error boundaries, lazy screens and the 400 kB budget check, the reload on a missing chunk, the unsaved-change guard, local drafts, Ctrl+S, the 412 view with a three-way merge, and the reports of UI-21 (UI-12, UI-17 to UI-19, UI-21, UI-22; parts) |
 | 0.8.27 | 2026-11-27 | M2.2 languages: the dictionaries of en, vi and zh, the translator, the choice of a language, the formats of numbers, dates and money, and the language switch of the admin (UI-05) |
 | 0.8.26 | 2026-11-27 | M2.2 tokens: the `theme` key of the config, `@bieberkit/tokens` with the defaults, the validation, the Ant Design, CSS variable and Tailwind compilers, and the theme in the page of the admin (UI-06, TOK-01 to TOK-03) |
 | 0.8.25 | 2026-11-27 | M2.1 H2 (ADR 0033, ADR 0034): entity extensions, `extends` with `defineExtension` and a table of the extending plugin with one row for each row of the target (PLG-06); the example of 11.1 and the text of 11.3 |

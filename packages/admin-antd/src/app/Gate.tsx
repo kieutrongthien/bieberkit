@@ -26,7 +26,9 @@ import { labelOf } from '@bieberkit/admin-core';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, Outlet } from '@tanstack/react-router';
 import { Button, Layout, Menu, Result, Select, Skeleton, Space, Typography } from 'antd';
+import { Suspense } from 'react';
 import type { JSX } from 'react';
+import { OfflineBanner } from './connection.tsx';
 import { useClient, useMeta } from './context.ts';
 import { LANGUAGE_NAMES, LOCALES, saveLocale, useLanguage, useT } from './language.tsx';
 import { Login } from './Login.tsx';
@@ -41,54 +43,59 @@ function Frame(props: { readonly email: string }): JSX.Element {
   const { locale, setLocale } = useLanguage();
   const entities = (meta.data?.entities ?? []).filter((entity) => entity.operations.list && entity.can.read);
   return (
-    <Layout style={{ minHeight: '100vh' }}>
-      <Sider breakpoint="md" collapsedWidth={0} theme="light" width={240}>
-        <div style={{ padding: 16 }}>
-          <Typography.Title level={4} style={{ margin: 0 }}>
-            <Link to="/">{t('app.name')}</Link>
-          </Typography.Title>
-        </div>
-        <Menu
-          mode="inline"
-          items={entities.map((entity) => ({
-            key: entity.path,
-            label: <Link to={`/${entity.path.replace('/api/v1/', '')}`}>{labelOf(entity, locale)}</Link>,
-          }))}
-        />
-      </Sider>
-      <Layout>
-        <Header style={{ background: 'transparent', textAlign: 'right' }}>
-          <Space>
-            <Select
-              aria-label={t('language.label')}
-              value={locale}
-              onChange={(next) => {
-                saveLocale(next);
-                setLocale(next);
-              }}
-              options={LOCALES.map((value) => ({ value, label: LANGUAGE_NAMES[value] }))}
-              style={{ width: 130 }}
-            />
-            <Typography.Text>{props.email}</Typography.Text>
-            <Button
-              onClick={() => {
-                // Everything that was read as this user is dropped, and the session is asked again.
-                void client.signOut().then(() => queries.resetQueries());
-              }}
-            >
-              {t('auth.signOut')}
-            </Button>
-          </Space>
-        </Header>
-        <Content style={{ margin: 24 }}>
-          {meta.isError ? (
-            <Result status="error" title={t('gate.menuError')} subTitle={meta.error.message} />
-          ) : (
-            <Outlet />
-          )}
-        </Content>
+    <>
+      <OfflineBanner />
+      <Layout style={{ minHeight: '100vh' }}>
+        <Sider breakpoint="md" collapsedWidth={0} theme="light" width={240}>
+          <div style={{ padding: 16 }}>
+            <Typography.Title level={4} style={{ margin: 0 }}>
+              <Link to="/">{t('app.name')}</Link>
+            </Typography.Title>
+          </div>
+          <Menu
+            mode="inline"
+            items={entities.map((entity) => ({
+              key: entity.path,
+              label: <Link to={`/${entity.path.replace('/api/v1/', '')}`}>{labelOf(entity, locale)}</Link>,
+            }))}
+          />
+        </Sider>
+        <Layout>
+          <Header style={{ background: 'transparent', textAlign: 'right' }}>
+            <Space>
+              <Select
+                aria-label={t('language.label')}
+                value={locale}
+                onChange={(next) => {
+                  saveLocale(next);
+                  setLocale(next);
+                }}
+                options={LOCALES.map((value) => ({ value, label: LANGUAGE_NAMES[value] }))}
+                style={{ width: 130 }}
+              />
+              <Typography.Text>{props.email}</Typography.Text>
+              <Button
+                onClick={() => {
+                  // Everything that was read as this user is dropped, and the session is asked again.
+                  void client.signOut().then(() => queries.resetQueries());
+                }}
+              >
+                {t('auth.signOut')}
+              </Button>
+            </Space>
+          </Header>
+          <Content style={{ margin: 24 }}>
+            {meta.isError ? (
+              <Result status="error" title={t('gate.menuError')} subTitle={meta.error.message} />
+            ) : (
+              <Suspense fallback={<Skeleton active />}>
+                <Outlet />
+              </Suspense>
+            )}
+          </Content>
+        </Layout>
       </Layout>
-    </Layout>
+    </>
   );
 }
 

@@ -37,14 +37,24 @@ export class AdminApiError extends Error {
   readonly code: string;
   readonly fix: string;
   readonly problems: readonly FieldProblem[];
+  /** On a 412: the row as it is now, so that the form can show what changed and who changed it (UI-18). */
+  readonly current: Row | undefined;
 
-  constructor(status: number, code: string, message: string, fix: string, problems: readonly FieldProblem[] = []) {
+  constructor(
+    status: number,
+    code: string,
+    message: string,
+    fix: string,
+    problems: readonly FieldProblem[] = [],
+    current?: Row,
+  ) {
     super(message);
     this.name = 'AdminApiError';
     this.status = status;
     this.code = code;
     this.fix = fix;
     this.problems = problems;
+    this.current = current;
   }
 }
 
@@ -96,6 +106,7 @@ async function failure(response: Response): Promise<AdminApiError> {
     text(problem['detail'], text(problem['message'], response.statusText)),
     text(problem['fix'], ''),
     problemsOf(problem['errors']),
+    isRecord(problem['current']) ? problem['current'] : undefined,
   );
 }
 

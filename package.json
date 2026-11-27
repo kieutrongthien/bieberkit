@@ -30,7 +30,8 @@
     "bench": "node benchmarks/run.mjs",
     "manifests:write": "node --conditions=@bieberkit/source tools/plugin-manifests.ts --write",
     "check:manifests": "node --conditions=@bieberkit/source tools/plugin-manifests.ts",
-    "test:artifacts": "vitest run --config vitest.artifacts.config.ts"
+    "test:artifacts": "vitest run --config vitest.artifacts.config.ts",
+    "check:admin-size": "node tools/check-admin-size.ts"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "0.18.5",

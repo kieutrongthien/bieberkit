@@ -22,28 +22,35 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { createAdminClient } from '@bieberkit/admin-core';
+import { backoffMs, createAdminClient, shouldRetry } from '@bieberkit/admin-core';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { createRootRoute, createRoute, createRouter, RouterProvider } from '@tanstack/react-router';
+import { createRootRoute, createRoute, createRouter, lazyRouteComponent, RouterProvider } from '@tanstack/react-router';
 import { compileAntdTheme, modeOf, readTheme } from '@bieberkit/tokens';
 import { App as AntApp, ConfigProvider, theme as antTheme } from 'antd';
 import { useEffect, useState } from 'react';
 import { antdLocaleOf, initialLocale, LanguageContext } from './language.tsx';
 import type { JSX } from 'react';
-import { Welcome } from './Welcome.tsx';
-import { FormScreen } from './FormScreen.tsx';
-import { ListScreen } from './ListScreen.tsx';
+import { ErrorBoundary, ErrorScreen } from './ErrorScreens.tsx';
 import { Gate } from './Gate.tsx';
 import { ClientContext } from './context.ts';
 
 const client = createAdminClient();
-const queries = new QueryClient({ defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } } });
+// A read that failed is tried again as the retry policy says, with a wait that grows and is spread (UI-19).
+const queries = new QueryClient({
+  defaultOptions: {
+    queries: { retry: shouldRetry, retryDelay: (attempt) => backoffMs(attempt), refetchOnWindowFocus: false },
+  },
+});
 
 const root = createRootRoute({ component: Gate });
-const index = createRoute({ getParentRoute: () => root, path: '/', component: Welcome });
-const list = createRoute({ getParentRoute: () => root, path: '$module/$resource', component: ListScreen });
-const create = createRoute({ getParentRoute: () => root, path: '$module/$resource/new', component: FormScreen });
-const edit = createRoute({ getParentRoute: () => root, path: '$module/$resource/$id', component: FormScreen });
+// Every screen is a chunk of its own, loaded when its route is opened (UI-12).
+const welcome = lazyRouteComponent(() => import('./Welcome.tsx'), 'Welcome');
+const listScreen = lazyRouteComponent(() => import('./ListScreen.tsx'), 'ListScreen');
+const formScreen = lazyRouteComponent(() => import('./FormScreen.tsx'), 'FormScreen');
+const index = createRoute({ getParentRoute: () => root, path: '/', component: welcome });
+const list = createRoute({ getParentRoute: () => root, path: '$module/$resource', component: listScreen });
+const create = createRoute({ getParentRoute: () => root, path: '$module/$resource/new', component: formScreen });
+const edit = createRoute({ getParentRoute: () => root, path: '$module/$resource/$id', component: formScreen });
 
 /**
  * Where the server serves the application: it writes the path in a meta element of the page (`/admin`, `/panel`, or empty for the root
@@ -55,6 +62,8 @@ const router = createRouter({
   routeTree: root.addChildren([index, list, create, edit]),
   basepath: served === '' ? '/' : served,
   defaultPreload: 'intent',
+  // Each route has its own boundary with a retry, so one screen that fails does not take the frame with it (UI-19).
+  defaultErrorComponent: ({ error, reset }) => <ErrorScreen error={error} reset={reset} />,
 });
 
 /** The brand tokens that the server wrote in the page from `theme` of the config (UI-06, TOK-02). */
@@ -91,7 +100,9 @@ export function App(): JSX.Element {
         <LanguageContext.Provider value={{ locale, setLocale }}>
           <ClientContext.Provider value={client}>
             <QueryClientProvider client={queries}>
-              <RouterProvider router={router} />
+              <ErrorBoundary>
+                <RouterProvider router={router} />
+              </ErrorBoundary>
             </QueryClientProvider>
           </ClientContext.Provider>
         </LanguageContext.Provider>

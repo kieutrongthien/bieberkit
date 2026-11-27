@@ -95,7 +95,8 @@ export declare class AdminApiError extends Error {
   readonly code: string;
   readonly fix: string;
   readonly problems: readonly FieldProblem[];
-  constructor(status: number, code: string, message: string, fix: string, problems?: readonly FieldProblem[]);
+  readonly current: Row | undefined;
+  constructor(status: number, code: string, message: string, fix: string, problems?: readonly FieldProblem[], current?: Row);
 }
 interface AdminClientOptions {
   readonly baseUrl?: string;
@@ -147,6 +148,22 @@ declare const en: {
   readonly "form.conflictBody": "Reload the page to see the new version, then make your change again.";
   readonly "form.rowLoadError": "The row could not be loaded";
   readonly "form.missing": "This screen does not exist.";
+  readonly "shell.offline": "You are offline. Changes are not saved until the connection is back.";
+  readonly "error.title": "Something went wrong";
+  readonly "error.retry": "Try again";
+  readonly "error.updated": "The application was updated. Reload the page to continue.";
+  readonly "error.reload": "Reload";
+  readonly "form.leave": "You have unsaved changes. Leave this page?";
+  readonly "form.draftFound": "A draft of this form was found on this browser.";
+  readonly "form.draftRestore": "Restore the draft";
+  readonly "form.draftDiscard": "Discard it";
+  readonly "conflict.changedBy": "Changed by {who} on {when}";
+  readonly "conflict.unknownUser": "another user";
+  readonly "conflict.field": "Field";
+  readonly "conflict.mine": "Your value";
+  readonly "conflict.theirs": "Their value";
+  readonly "conflict.keepMine": "Keep my changes on top of theirs";
+  readonly "conflict.takeTheirs": "Discard mine and take theirs";
 };
 type MessageKey = keyof typeof en;
 type Dictionary = Readonly<Record<MessageKey, string>>;
@@ -164,6 +181,69 @@ export declare function listFields(entity: MetaEntity): readonly string[];
 export declare function initialValues(entity: MetaEntity, row?: Row): Record<string, unknown>;
 export declare function bodyOf(entity: MetaEntity, values: Readonly<Record<string, unknown>>, updating: boolean): Row;
 export declare function allows(entity: MetaEntity, action: "create" | "update" | "delete"): boolean;
+export declare const isNetworkFailure: (error: unknown) => boolean;
+export declare function shouldRetry(failures: number, error: unknown): boolean;
+export declare function backoffMs(attempt: number, random?: () => number): number;
+interface Connection {
+  readonly online: boolean;
+}
+type ConnectionEvent = "online" | "offline" | "request-failed" | "request-ok";
+export declare function connection(state: Connection, event: ConnectionEvent): Connection;
+export declare function isChunkError(error: unknown): boolean;
+export declare function chunkReload(now: number, lastReloadAt: number | undefined): "reload" | "show";
+interface DraftStorage {
+  getItem(key: string): string | null;
+  setItem(key: string, value: string): void;
+  removeItem(key: string): void;
+}
+type Values = Readonly<Record<string, unknown>>;
+export declare function isDirty(initial: Values, current: Values): boolean;
+export declare const draftKey: (entity: string, id: string | undefined, userId: string) => string;
+export declare function saveDraft(storage: DraftStorage, key: string, values: Values, now: number, skip?: ReadonlySet<string>): void;
+export declare function loadDraft(storage: DraftStorage, key: string, now: number): Record<string, unknown> | undefined;
+export declare function clearDraft(storage: DraftStorage, key: string): void;
+interface Conflict {
+  readonly key: string;
+  readonly base: unknown;
+  readonly mine: unknown;
+  readonly theirs: unknown;
+}
+export declare function reapply(base: Values, mine: Values, theirs: Values): {
+  values: Record<string, unknown>;
+  conflicts: Conflict[];
+};
+type Shortcut = "save" | "new" | "search";
+interface KeyPress {
+  readonly key: string;
+  readonly ctrl: boolean;
+  readonly meta: boolean;
+  readonly alt: boolean;
+  readonly shift: boolean;
+  readonly typing: boolean;
+}
+export declare function shortcutOf(press: KeyPress): Shortcut | undefined;
+export declare function routeShape(path: string): string;
+interface ErrorReport {
+  readonly kind: string;
+  readonly message: string;
+  readonly frames: readonly string[];
+  readonly route: string;
+  readonly release?: string;
+}
+export declare function errorReport(error: unknown, context: {
+  readonly route: string;
+  readonly release?: string;
+}): ErrorReport;
+interface Vital {
+  readonly name: string;
+  readonly value: number;
+  readonly rating: string;
+}
+interface VitalReport extends Vital {
+  readonly route: string;
+}
+export declare function vitalReport(vital: Vital, path: string): VitalReport;
+export declare function sampled(rate: number, random?: () => number): boolean;
 export declare const packageName = "@bieberkit/admin-core";
-export type { AdminClient, AdminClientOptions, FieldProblem, ListParams, Locale, MessageKey, Meta, MetaEntity, MetaField, MetaMenuItem, Page, Row, SessionUser };
+export type { AdminClient, AdminClientOptions, Conflict, Connection, ConnectionEvent, DraftStorage, ErrorReport, FieldProblem, KeyPress, ListParams, Locale, MessageKey, Meta, MetaEntity, MetaField, MetaMenuItem, Page, Row, SessionUser, Shortcut, Vital, VitalReport };
 ```

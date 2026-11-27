@@ -65,6 +65,35 @@ function fake(answer: (call: Call) => Response): { fetch: typeof fetch; calls: C
 const json = (body: unknown, status = 200): Response =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 
+describe('UI-18 the 412 of an update', () => {
+  it('UI-18 carries the row as it is now, so that the form can show what changed', async () => {
+    const answered = fake(() =>
+      json(
+        {
+          code: 'DATA_VERSION_STALE',
+          detail: 'The row changed.',
+          fix: 'Reload.',
+          current: { id: 'r1', version: 3, updatedBy: 'u2' },
+        },
+        412,
+      ),
+    );
+    const error = await createAdminClient({ fetch: answered.fetch })
+      .update(ENTITY, 'r1', { key: 'k' }, 2)
+      .catch((caught: unknown) => caught);
+    expect(error).toBeInstanceOf(AdminApiError);
+    expect(error).toMatchObject({ status: 412, current: { id: 'r1', version: 3, updatedBy: 'u2' } });
+  });
+
+  it('UI-18 has no current row for another failure', async () => {
+    const answered = fake(() => json({ code: 'X' }, 500));
+    const error = await createAdminClient({ fetch: answered.fetch })
+      .get(ENTITY, 'r1')
+      .catch((caught: unknown) => caught);
+    expect(error).toMatchObject({ status: 500, current: undefined });
+  });
+});
+
 describe('UI-02 the client of the admin', () => {
   it('reads the user of the session, and says there is none when the answer has no user', async () => {
     const some = fake(() => json({ user: { id: 'u1', email: 'a@b.co', name: 'Ann' }, session: {} }));
