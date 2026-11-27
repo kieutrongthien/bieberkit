@@ -25,6 +25,28 @@
 
 # @bieberkit/cache
 
+## 0.3.0
+
+### Patch Changes
+
+- Updated dependencies [b7300dc]
+- Updated dependencies [88a425e]
+- Updated dependencies [34f5f66]
+- Updated dependencies [20908d4]
+- Updated dependencies [288b6b4]
+- Updated dependencies [bf916e3]
+- Updated dependencies [16b7239]
+- Updated dependencies [7c9da65]
+- Updated dependencies [301f5ab]
+- Updated dependencies [28782a9]
+- Updated dependencies [3bdd7f9]
+- Updated dependencies [a0c784c]
+- Updated dependencies [1aa0d82]
+- Updated dependencies [0089e52]
+  - @bieberkit/data@0.3.0
+  - @bieberkit/core@0.3.0
+  - @bieberkit/http@0.3.0
+
 ## 0.2.0
 
 ### Minor Changes

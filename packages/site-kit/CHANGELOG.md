@@ -25,6 +25,12 @@
 
 # @bieberkit/site-kit
 
+## 0.3.0
+
+### Patch Changes
+
+- @bieberkit/content@0.3.0
+
 ## 0.2.0
 
 ### Patch Changes

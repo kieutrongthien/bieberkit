@@ -70,13 +70,13 @@ Every new back-office, CMS or CRM project rebuilds the same parts: login, roles,
 
 ## Status and versions
 
-> **BieberKit is pre-beta, and there is no real release on npm yet.** The names are reserved there with empty placeholders at `0.0.1`, which you should not use. The first beta is prepared as version `0.2.0`. Release notes: [0.2.0 beta](docs/releases/0.2.0-beta.md). What is left is its first run on GitHub, which [docs/releasing.md](docs/releasing.md) explains.
+> **BieberKit is pre-beta, and there is no real release on npm yet.** The names are reserved there with empty placeholders at `0.0.1`, which you should not use. The first beta is prepared as version `0.3.0`. Release notes: [0.3.0 beta](docs/releases/0.3.0-beta.md). What is left is its first run on GitHub, which [docs/releasing.md](docs/releasing.md) explains.
 
 How versions work:
 
-- **One number for everything.** All 26 packages and plugins share one version, today `0.2.0`, so an upgrade moves one number.
-- **Every `0.x` is a beta.** A minor version (`0.3.0`) may break things, and a patch (`0.2.1`) only fixes them. `1.0.0` comes after the security review and a pilot in production (roadmap M3.5). Until then no release is published as `latest`.
-- **How a beta is published.** A tag on `main` named `v0.2.0-beta` publishes version `0.2.0` under the npm tag `beta`, with GitHub Actions and npm trusted publishing (ADR 0014). The suffix names the npm tag. It is not part of the version.
+- **One number for everything.** All 26 packages and plugins share one version, today `0.3.0`, so an upgrade moves one number.
+- **Every `0.x` is a beta.** A minor version (`0.4.0`) may break things, and a patch (`0.3.1`) only fixes them. `1.0.0` comes after the security review and a pilot in production (roadmap M3.5). Until then no release is published as `latest`.
+- **How a beta is published.** A tag on `main` named `v0.3.0-beta` publishes version `0.3.0` under the npm tag `beta`, with GitHub Actions and npm trusted publishing (ADR 0014). The suffix names the npm tag. It is not part of the version.
 - **How to install one.** `pnpm add @bieberkit/core@beta`, or `pnpm create bieberkit@beta my-app`. Always ask for `@beta`: a plain name does not get a beta, and today `latest` still points at the empty placeholder `0.0.1`.
 - **A fresh release waits 7 days** in a new project (`minimumReleaseAge`, SEC-11).
 

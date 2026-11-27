@@ -1,6 +1,6 @@
 {
   "name": "@bieberkit/plugin-audit-log",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Read access to the audit log of the application: who did what, when, with the filters of an investigation.",
   "keywords": [
     "bieberkit",

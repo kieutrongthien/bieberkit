@@ -25,6 +25,14 @@
 
 # @bieberkit/tokens
 
+## 0.3.0
+
+### Minor Changes
+
+- ce6f7c3: The default brand colors are darker, so that white text on them and they on a white background read at level AA, and the dark palette has light tones of the same hues with dark text on a filled button. The compiler gives Ant Design a placeholder and a description that read, and `contrastRatio` and `mixColors` are exported. The admin has no violation of WCAG 2.2 AA in the screens that the browser tests open. A brand color that the config sets is still the brand color of both palettes.
+
+- 42f5218: Brand tokens (UI-06, TOK-01 to TOK-03). `bieberkit.config.ts` takes a `theme` key (colors, dark palette, radius, spacing, fonts, dark mode), validated with every problem reported together. `@bieberkit/tokens` gives the defaults and the font stack for Latin, Vietnamese and Chinese, `parseTheme`, `compileAntdTheme`, `cssVariables` and `tailwindTheme`. The web role writes the theme into the admin page as data and CSS variables, and `@bieberkit/admin-antd` draws with it, following the system setting for `darkMode: 'auto'`.
+
 ## 0.2.0
 
 No changes in this release.

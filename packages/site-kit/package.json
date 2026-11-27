@@ -1,6 +1,6 @@
 {
   "name": "@bieberkit/site-kit",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "SEO head, sitemap, preview and cache helpers for the public site.",
   "keywords": [
     "bieberkit"

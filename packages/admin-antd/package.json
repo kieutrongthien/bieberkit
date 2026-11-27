@@ -1,6 +1,6 @@
 {
   "name": "@bieberkit/admin-antd",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "The Ant Design adapter of the admin: login, the generic list and form, built as static files for /admin/.",
   "keywords": [
     "bieberkit"

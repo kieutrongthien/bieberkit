@@ -1,6 +1,6 @@
 {
   "name": "@bieberkit/tokens",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Design tokens for Ant Design and CSS variables.",
   "keywords": [
     "bieberkit"

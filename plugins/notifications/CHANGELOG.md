@@ -25,6 +25,43 @@
 
 # @bieberkit/plugin-notifications
 
+## 0.3.0
+
+### Minor Changes
+
+- c90bf7e: Notifications are complete on the API side (NTF-01 to NTF-07). The `notifier` service sends to a user, a list or a role inside the caller's transaction, with levels, categories, links, data, dedupe keys, expiry, preferences per category and channel, mail through the outbox, and a `notifications.created` event. The signed-in person lists, counts, reads, reads all, deletes and sets preferences under `/api/v1/notifications/me`. A daily job prunes old and expired notifications (`NOTIFICATIONS_RETENTION_DAYS`).
+
+  Platform: `@bieberkit/queue` types the `schedules` contribution and gives `schedulesOf`, which the scheduler role now runs. The sync driver runs a job from the outbox after the dispatcher's transaction, and `queue.settle()` waits for such jobs. `Mail` gains `prepare(message)` for an outbox intent.
+
+  Breaking for clients of the thin slice: the entity routes of notifications keep only list, get and delete. Creating is `POST /api/v1/notifications/send` with the new permission `notifications.send`. A caller of the sync queue that read a job's effect right after `publish` now awaits `queue.settle()`.
+
+- 34f5f66: Operations for an enterprise (OPS-01 to OPS-06). The mail and delete routes of the base plugins honor `Idempotency-Key`; a `DELETE` route may now be `idempotent`, and a 204 is replayed. Invitations and the audit export are limited per person (`limitActor`, `AUTH_ACTION_LIMITED`). `GET /api/v1/settings/export` and `POST /api/v1/settings/import?dryRun=true` carry settings between environments, with secrets left out. `MEDIA_AUDIT_DOWNLOADS=true` audits the reading of private files. New indexes keep the lists of users and of the audit log off full scans (data step 0.5.0, auth migration 0.7.0), and `@bieberkit/testing` exports `planOf`, `fullScans` and `analyze` for tests of a query plan. The lists of users, media and the audit log are tested at 100 000 rows on the three dialects.
+
+### Patch Changes
+
+- Updated dependencies [b7300dc]
+- Updated dependencies [88a425e]
+- Updated dependencies [c90bf7e]
+- Updated dependencies [34f5f66]
+- Updated dependencies [20908d4]
+- Updated dependencies [288b6b4]
+- Updated dependencies [210b082]
+- Updated dependencies [bf916e3]
+- Updated dependencies [16b7239]
+- Updated dependencies [7c9da65]
+- Updated dependencies [301f5ab]
+- Updated dependencies [28782a9]
+- Updated dependencies [3bdd7f9]
+- Updated dependencies [a0c784c]
+- Updated dependencies [1aa0d82]
+- Updated dependencies [0089e52]
+  - @bieberkit/data@0.3.0
+  - @bieberkit/core@0.3.0
+  - @bieberkit/queue@0.3.0
+  - @bieberkit/mail@0.3.0
+  - @bieberkit/http@0.3.0
+  - @bieberkit/auth@0.3.0
+
 ## 0.2.0
 
 ### Patch Changes

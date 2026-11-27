@@ -25,6 +25,34 @@
 
 # @bieberkit/queue
 
+## 0.3.0
+
+### Minor Changes
+
+- c90bf7e: Notifications are complete on the API side (NTF-01 to NTF-07). The `notifier` service sends to a user, a list or a role inside the caller's transaction, with levels, categories, links, data, dedupe keys, expiry, preferences per category and channel, mail through the outbox, and a `notifications.created` event. The signed-in person lists, counts, reads, reads all, deletes and sets preferences under `/api/v1/notifications/me`. A daily job prunes old and expired notifications (`NOTIFICATIONS_RETENTION_DAYS`).
+
+  Platform: `@bieberkit/queue` types the `schedules` contribution and gives `schedulesOf`, which the scheduler role now runs. The sync driver runs a job from the outbox after the dispatcher's transaction, and `queue.settle()` waits for such jobs. `Mail` gains `prepare(message)` for an outbox intent.
+
+  Breaking for clients of the thin slice: the entity routes of notifications keep only list, get and delete. Creating is `POST /api/v1/notifications/send` with the new permission `notifications.send`. A caller of the sync queue that read a job's effect right after `publish` now awaits `queue.settle()`.
+
+### Patch Changes
+
+- Updated dependencies [b7300dc]
+- Updated dependencies [88a425e]
+- Updated dependencies [34f5f66]
+- Updated dependencies [20908d4]
+- Updated dependencies [288b6b4]
+- Updated dependencies [bf916e3]
+- Updated dependencies [16b7239]
+- Updated dependencies [7c9da65]
+- Updated dependencies [301f5ab]
+- Updated dependencies [28782a9]
+- Updated dependencies [3bdd7f9]
+- Updated dependencies [1aa0d82]
+- Updated dependencies [0089e52]
+  - @bieberkit/data@0.3.0
+  - @bieberkit/core@0.3.0
+
 ## 0.2.0
 
 ### Minor Changes

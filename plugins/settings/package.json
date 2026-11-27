@@ -1,6 +1,6 @@
 {
   "name": "@bieberkit/plugin-settings",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Settings stored in the database: a key and a value, read and changed through the API and the admin.",
   "keywords": [
     "bieberkit",

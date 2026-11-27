@@ -25,6 +25,18 @@
 
 # @bieberkit/mcp
 
+## 0.3.0
+
+### Patch Changes
+
+- Updated dependencies [88a425e]
+- Updated dependencies [20908d4]
+- Updated dependencies [288b6b4]
+- Updated dependencies [bf916e3]
+- Updated dependencies [16b7239]
+- Updated dependencies [7c9da65]
+  - @bieberkit/core@0.3.0
+
 ## 0.2.0
 
 ### Patch Changes
