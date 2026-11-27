@@ -23,12 +23,14 @@
  */
 
 import { backoffMs, createAdminClient, shouldRetry } from '@bieberkit/admin-core';
+import type { Locale } from '@bieberkit/admin-core';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createRootRoute, createRoute, createRouter, lazyRouteComponent, RouterProvider } from '@tanstack/react-router';
 import { compileAntdTheme, modeOf, readTheme } from '@bieberkit/tokens';
 import { App as AntApp, ConfigProvider, theme as antTheme } from 'antd';
 import { useEffect, useState } from 'react';
-import { antdLocaleOf, initialLocale, LanguageContext } from './language.tsx';
+import { ENGLISH_RESOURCES, initialLocale, LanguageContext, loadResources, saveLocale } from './language.tsx';
+import type { Resources } from './language.tsx';
 import type { JSX } from 'react';
 import { ErrorBoundary, ErrorScreen } from './ErrorScreens.tsx';
 import { Gate } from './Gate.tsx';
@@ -83,21 +85,35 @@ function useSystemDark(): boolean {
 
 export function App(): JSX.Element {
   const mode = modeOf(brand, useSystemDark());
-  const [locale, setLocale] = useState(initialLocale);
+  // English is in the bundle and shows at once. Another language is read first, and the screen waits for it, so that it does not flash in English (UI-12).
+  const [resources, setResources] = useState<Resources | undefined>(() => {
+    const first = initialLocale();
+    return first === 'en' ? ENGLISH_RESOURCES : undefined;
+  });
+  const change = (next: Locale): void => {
+    saveLocale(next);
+    // A chunk that is gone (a deploy) or a network that failed: the language that is on the screen stays, or English when none is.
+    loadResources(next).then(setResources, () => setResources((now) => now ?? ENGLISH_RESOURCES));
+  };
   useEffect(() => {
-    document.documentElement.lang = locale;
-  }, [locale]);
+    if (resources === undefined) change(initialLocale());
+  }, []);
+  useEffect(() => {
+    if (resources !== undefined) document.documentElement.lang = resources.locale;
+  }, [resources]);
   const compiled = compileAntdTheme(brand, mode);
+  if (resources === undefined) return <div aria-busy="true" />;
+  const { locale, dictionary, antd } = resources;
   return (
     <ConfigProvider
-      locale={antdLocaleOf(locale)}
+      locale={antd}
       theme={{
         token: compiled.token,
         algorithm: compiled.algorithm === 'dark' ? antTheme.darkAlgorithm : antTheme.defaultAlgorithm,
       }}
     >
       <AntApp>
-        <LanguageContext.Provider value={{ locale, setLocale }}>
+        <LanguageContext.Provider value={{ locale, dictionary, setLocale: change }}>
           <ClientContext.Provider value={client}>
             <QueryClientProvider client={queries}>
               <ErrorBoundary>

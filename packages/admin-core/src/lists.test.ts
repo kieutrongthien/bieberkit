@@ -32,6 +32,8 @@ import {
   filterProblem,
   loadViews,
   operatorsOf,
+  PAGE_SIZES,
+  shouldVirtualize,
   sameView,
   saveView,
   viewFromSearch,
@@ -236,5 +238,13 @@ describe('UI-03 the outcome of a bulk call', () => {
       { id: 'c', message: 'not_found' },
       { id: 'd', message: 'Not yours.' },
     ]);
+  });
+});
+
+describe('UI-12 long lists', () => {
+  it('UI-12 a table draws only the rows in view above 200 rows, and the sizes of a page stay within what the API takes', () => {
+    expect([shouldVirtualize(25), shouldVirtualize(200), shouldVirtualize(201)]).toEqual([false, false, true]);
+    expect(Math.max(...PAGE_SIZES)).toBeLessThanOrEqual(100);
+    expect(PAGE_SIZES).toContain(25);
   });
 });

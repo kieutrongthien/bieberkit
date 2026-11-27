@@ -264,3 +264,11 @@ export function bulkSummary(outcomes: readonly BulkOutcome[]): {
     .map((outcome) => ({ id: outcome.id, message: outcome.error?.message ?? outcome.status }));
   return { ok: outcomes.length - failed.length, failed };
 }
+
+/** The sizes of a page that a person may choose. The API takes up to 100 (API-14). */
+export const PAGE_SIZES: readonly number[] = [25, 50, 100];
+
+/** The number of rows above which a table draws only the rows in view (UI-12). */
+export const VIRTUAL_ABOVE = 200;
+
+export const shouldVirtualize = (rows: number): boolean => rows > VIRTUAL_ABOVE;

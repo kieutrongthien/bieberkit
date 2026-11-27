@@ -30,10 +30,15 @@ import {
   formatNumber,
   LOCALES,
   localeOf,
-  MESSAGES,
+  loadMessages,
   translator,
 } from './i18n.ts';
-import type { Locale, MessageKey } from './i18n.ts';
+import type { Dictionary, Locale, MessageKey } from './i18n.ts';
+import { en } from './messages/en.ts';
+import { vi } from './messages/vi.ts';
+import { zh } from './messages/zh.ts';
+
+const MESSAGES: Readonly<Record<Locale, Dictionary>> = { en, vi, zh };
 
 const isKey = (key: string): key is MessageKey => key in MESSAGES.en;
 const KEYS: readonly MessageKey[] = Object.keys(MESSAGES.en).filter(isKey);
@@ -67,19 +72,27 @@ describe('UI-05 the dictionaries', () => {
   });
 });
 
+describe('UI-12 the dictionaries are read when they are chosen', () => {
+  it('UI-12 each language gives its own dictionary, and English is the one that is always there', async () => {
+    expect(await loadMessages('en')).toBe(en);
+    expect(await loadMessages('vi')).toBe(vi);
+    expect(await loadMessages('zh')).toBe(zh);
+  });
+});
+
 describe('UI-05 the translator', () => {
   it('UI-05 gives the text of the language, and fills the placeholders', () => {
-    expect(translator('en')('form.edit', { name: 'Customer' })).toBe('Edit Customer');
-    expect(translator('vi')('form.edit', { name: 'Khách hàng' })).toContain('Khách hàng');
-    expect(translator('zh')('list.new')).toBe(MESSAGES.zh['list.new']);
+    expect(translator()('form.edit', { name: 'Customer' })).toBe('Edit Customer');
+    expect(translator(MESSAGES.vi)('form.edit', { name: 'Khách hàng' })).toContain('Khách hàng');
+    expect(translator(MESSAGES.zh)('list.new')).toBe(MESSAGES.zh['list.new']);
   });
 
   it('UI-05 a placeholder that is not given stays as it is, so a mistake shows and does not hide', () => {
-    expect(translator('en')('form.edit')).toBe('Edit {name}');
+    expect(translator()('form.edit')).toBe('Edit {name}');
   });
 
   it('UI-05 a value cannot add a placeholder of its own to the text', () => {
-    expect(translator('en')('form.edit', { name: '{name}' })).toBe('Edit {name}');
+    expect(translator()('form.edit', { name: '{name}' })).toBe('Edit {name}');
   });
 });
 

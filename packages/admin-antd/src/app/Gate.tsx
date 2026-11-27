@@ -25,12 +25,12 @@
 import { labelOf } from '@bieberkit/admin-core';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, Outlet } from '@tanstack/react-router';
-import { Button, Layout, Menu, Result, Select, Skeleton, Space, Typography } from 'antd';
+import { Button, Grid, Layout, Menu, Result, Select, Skeleton, Space, Typography } from 'antd';
 import { Suspense } from 'react';
 import type { JSX } from 'react';
 import { OfflineBanner } from './connection.tsx';
 import { useClient, useMeta } from './context.ts';
-import { LANGUAGE_NAMES, LOCALES, saveLocale, useLanguage, useT } from './language.tsx';
+import { LANGUAGE_NAMES, LOCALES, useLanguage, useT } from './language.tsx';
 import { Login } from './Login.tsx';
 
 const { Header, Sider, Content } = Layout;
@@ -41,6 +41,7 @@ function Frame(props: { readonly email: string }): JSX.Element {
   const meta = useMeta();
   const t = useT();
   const { locale, setLocale } = useLanguage();
+  const compact = Grid.useBreakpoint().md === false;
   const entities = (meta.data?.entities ?? []).filter((entity) => entity.operations.list && entity.can.read);
   return (
     <>
@@ -61,19 +62,24 @@ function Frame(props: { readonly email: string }): JSX.Element {
           />
         </Sider>
         <Layout>
-          <Header style={{ background: 'transparent', textAlign: 'right' }}>
-            <Space>
+          <Header
+            style={{
+              background: 'transparent',
+              textAlign: 'right',
+              height: 'auto',
+              lineHeight: 'normal',
+              padding: compact ? '12px 16px 12px 56px' : '12px 24px',
+            }}
+          >
+            <Space wrap style={{ justifyContent: 'flex-end' }}>
               <Select
                 aria-label={t('language.label')}
                 value={locale}
-                onChange={(next) => {
-                  saveLocale(next);
-                  setLocale(next);
-                }}
+                onChange={(next) => setLocale(next)}
                 options={LOCALES.map((value) => ({ value, label: LANGUAGE_NAMES[value] }))}
                 style={{ width: 130 }}
               />
-              <Typography.Text>{props.email}</Typography.Text>
+              {compact ? null : <Typography.Text>{props.email}</Typography.Text>}
               <Button
                 onClick={() => {
                   // Everything that was read as this user is dropped, and the session is asked again.
@@ -84,7 +90,7 @@ function Frame(props: { readonly email: string }): JSX.Element {
               </Button>
             </Space>
           </Header>
-          <Content style={{ margin: 24 }}>
+          <Content style={{ margin: compact ? 12 : 24 }}>
             {meta.isError ? (
               <Result status="error" title={t('gate.menuError')} subTitle={meta.error.message} />
             ) : (

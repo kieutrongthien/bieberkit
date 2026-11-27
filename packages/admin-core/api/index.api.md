@@ -98,6 +98,8 @@ export declare function bulkSummary(outcomes: readonly BulkOutcome[]): {
     message: string;
   }[];
 };
+export declare const PAGE_SIZES: readonly number[];
+export declare const shouldVirtualize: (rows: number) => boolean;
 interface MetaField {
   readonly key: string;
   readonly kind: string;
@@ -225,8 +227,6 @@ interface AdminClient {
   }[], change: BulkOperation): Promise<BulkResult>;
 }
 export declare function createAdminClient(options?: AdminClientOptions): AdminClient;
-type Locale = "en" | "vi" | "zh";
-export declare const LOCALES: readonly Locale[];
 declare const en: {
   readonly "app.name": "Admin";
   readonly "language.label": "Language";
@@ -277,6 +277,8 @@ declare const en: {
   readonly "list.setField": "Change a field";
   readonly "list.apply": "Apply";
   readonly "list.notChanged": "The rows were not changed";
+  readonly "list.selectRow": "Select {name}";
+  readonly "list.sort": "Sort by";
   readonly "list.op.eq": "is";
   readonly "list.op.ne": "is not";
   readonly "list.op.in": "is one of";
@@ -319,8 +321,10 @@ declare const en: {
 };
 type MessageKey = keyof typeof en;
 type Dictionary = Readonly<Record<MessageKey, string>>;
-export declare const MESSAGES: Readonly<Record<Locale, Dictionary>>;
-export declare function translator(locale: Locale): (key: MessageKey, values?: Readonly<Record<string, string | number>>) => string;
+type Locale = "en" | "vi" | "zh";
+export declare const LOCALES: readonly Locale[];
+export declare function loadMessages(locale: Locale): Promise<Dictionary>;
+export declare function translator(dictionary?: Dictionary): (key: MessageKey, values?: Readonly<Record<string, string | number>>) => string;
 export declare function localeOf(languages: readonly string[], saved: string | undefined, supported?: readonly Locale[]): Locale;
 export declare function formatNumber(locale: Locale, value: number | string): string;
 export declare function formatDate(locale: Locale, day: string): string;
@@ -387,5 +391,5 @@ interface ValueProblem {
 }
 export declare function problemOf(field: MetaField, value: unknown): ValueProblem | undefined;
 export declare const packageName = "@bieberkit/admin-core";
-export type { AdminClient, AdminClientOptions, BulkOperation, BulkOutcome, BulkResult, Conflict, Connection, ConnectionEvent, CsvColumn, DraftStorage, ErrorReport, FieldProblem, Filter, FilterOperator, KeyPress, ListParams, Locale, MessageKey, Meta, MetaEntity, MetaField, MetaMenuItem, MetaTransition, Page, Row, SavedView, SessionUser, Shortcut, ValueProblem, Vital, VitalReport };
+export { type AdminClient, type AdminClientOptions, type BulkOperation, type BulkOutcome, type BulkResult, type Conflict, type Connection, type ConnectionEvent, type CsvColumn, type Dictionary, type DraftStorage, en as ENGLISH, type ErrorReport, type FieldProblem, type Filter, type FilterOperator, type KeyPress, type ListParams, type Locale, type MessageKey, type Meta, type MetaEntity, type MetaField, type MetaMenuItem, type MetaTransition, type Page, type Row, type SavedView, type SessionUser, type Shortcut, type ValueProblem, type Vital, type VitalReport };
 ```

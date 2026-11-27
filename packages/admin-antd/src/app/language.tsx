@@ -22,12 +22,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { localeOf, LOCALES, translator } from '@bieberkit/admin-core';
-import type { Locale, MessageKey } from '@bieberkit/admin-core';
+import { ENGLISH, loadMessages, localeOf, LOCALES, translator } from '@bieberkit/admin-core';
+import type { Dictionary, Locale, MessageKey } from '@bieberkit/admin-core';
 import type { ConfigProviderProps } from 'antd';
 import enUS from 'antd/locale/en_US';
-import viVN from 'antd/locale/vi_VN';
-import zhCN from 'antd/locale/zh_CN';
 import { createContext, useContext, useMemo } from 'react';
 import type { Context } from 'react';
 
@@ -35,15 +33,36 @@ type AntLocale = NonNullable<ConfigProviderProps['locale']>;
 
 const STORAGE_KEY = 'bk-admin-language';
 
-/** Ant Design 6 has no Vietnamese text for two of its keys (`global.clear`, `Input.otpCell`), so the adapter gives them (ADR 0025). */
-const vietnamese: AntLocale = {
-  ...viVN,
-  global: { ...viVN.global, clear: 'Xóa' },
-  Input: { ...viVN.Input, otpCell: 'Ký tự ${index} trên ${total}' },
-};
+/**
+ * The text that Ant Design draws itself (the pagination, the empty state, the date picker), by language. English is in the bundle, and
+ * the other two are chunks of their own that are read when a person chooses them (UI-12). Ant Design 6 has no Vietnamese text for two
+ * of its keys (`global.clear`, `Input.otpCell`), so the adapter gives them (ADR 0025).
+ */
+export async function antdLocaleOf(locale: Locale): Promise<AntLocale> {
+  if (locale === 'vi') {
+    const { default: viVN } = await import('antd/locale/vi_VN');
+    return {
+      ...viVN,
+      global: { ...viVN.global, clear: 'Xóa' },
+      Input: { ...viVN.Input, otpCell: 'Ký tự ${index} trên ${total}' },
+    };
+  }
+  if (locale === 'zh') return (await import('antd/locale/zh_CN')).default;
+  return enUS;
+}
 
-export function antdLocaleOf(locale: Locale): AntLocale {
-  return locale === 'vi' ? vietnamese : locale === 'zh' ? zhCN : enUS;
+/** What a language needs on the screen: its texts, and the texts of Ant Design. */
+export interface Resources {
+  readonly locale: Locale;
+  readonly dictionary: Dictionary;
+  readonly antd: AntLocale;
+}
+
+export const ENGLISH_RESOURCES: Resources = { locale: 'en', dictionary: ENGLISH, antd: enUS };
+
+export async function loadResources(locale: Locale): Promise<Resources> {
+  const [dictionary, antd] = await Promise.all([loadMessages(locale), antdLocaleOf(locale)]);
+  return { locale, dictionary, antd };
 }
 
 /** The language that this person chose, when the browser keeps it. A browser that refuses storage just forgets the choice. */
@@ -68,11 +87,17 @@ export function initialLocale(): Locale {
 }
 
 export interface Language {
+  /** The language that is on the screen. It changes when the texts of a new one have been read. */
   readonly locale: Locale;
+  readonly dictionary: Dictionary;
   readonly setLocale: (locale: Locale) => void;
 }
 
-export const LanguageContext: Context<Language> = createContext<Language>({ locale: 'en', setLocale: () => undefined });
+export const LanguageContext: Context<Language> = createContext<Language>({
+  locale: 'en',
+  dictionary: ENGLISH,
+  setLocale: () => undefined,
+});
 
 export function useLanguage(): Language {
   return useContext(LanguageContext);
@@ -80,8 +105,8 @@ export function useLanguage(): Language {
 
 /** The translator of the language that is on, for the texts of a screen. */
 export function useT(): (key: MessageKey, values?: Readonly<Record<string, string | number>>) => string {
-  const { locale } = useLanguage();
-  return useMemo(() => translator(locale), [locale]);
+  const { dictionary } = useLanguage();
+  return useMemo(() => translator(dictionary), [dictionary]);
 }
 
 export const LANGUAGE_NAMES: Readonly<Record<Locale, string>> = { en: 'English', vi: 'Tiếng Việt', zh: '中文' };

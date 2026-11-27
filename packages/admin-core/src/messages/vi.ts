@@ -1,0 +1,118 @@
+/**
+ * BieberKit
+ *
+ * @file        packages/admin-core/src/messages/vi.ts
+ * @description The Vietnamese dictionary of the admin, loaded when a person chooses the language (UI-05, UI-12).
+ * @author      Bieber Kieu <kieutrongthien@gmail.com>
+ * @copyright   Copyright (c) 2026 Bieber Kieu
+ * @license     Apache-2.0
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import type { Dictionary } from './en.ts';
+
+export const vi: Dictionary = {
+  'app.name': 'Quản trị',
+  'language.label': 'Ngôn ngữ',
+  'auth.signIn.title': 'Đăng nhập',
+  'auth.email': 'Email',
+  'auth.password': 'Mật khẩu',
+  'auth.signIn': 'Đăng nhập',
+  'auth.signOut': 'Đăng xuất',
+  'auth.noAnswer': 'Máy chủ không trả lời. Hãy thử lại.',
+  'welcome.title': 'Chào mừng',
+  'welcome.empty': 'Hiện bạn chưa được mở mục nào. Hãy nhờ quản trị viên cấp vai trò.',
+  'gate.menuError': 'Không tải được menu',
+  'gate.noAnswer': 'Máy chủ không trả lời',
+  'common.yes': 'Có',
+  'common.no': 'Không',
+  'common.cancel': 'Hủy',
+  'common.delete': 'Xóa',
+  'list.new': 'Thêm mới',
+  'list.deleted': 'Đã xóa',
+  'list.notDeleted': 'Không xóa được dòng này',
+  'list.confirmDelete': 'Xóa dòng này?',
+  'list.loadError': 'Không tải được danh sách',
+  'list.missing': 'Màn hình này không tồn tại hoặc bạn không có quyền xem.',
+  'list.filter': 'Bộ lọc',
+  'list.filterField': 'Trường',
+  'list.filterOp': 'Điều kiện',
+  'list.filterValue': 'Giá trị',
+  'list.filterAdd': 'Thêm bộ lọc',
+  'list.filterClear': 'Xóa bộ lọc',
+  'list.filterNull': 'Trống hoặc không',
+  'list.views': 'Chế độ xem đã lưu',
+  'list.viewName': 'Tên chế độ xem',
+  'list.viewSave': 'Lưu chế độ xem',
+  'list.viewDelete': 'Xóa chế độ xem',
+  'list.viewSaved': 'Đã lưu chế độ xem',
+  'list.selected': 'Đã chọn {count}',
+  'list.deleteSelected': 'Xóa các dòng đã chọn',
+  'list.confirmDeleteMany': 'Xóa {count} dòng?',
+  'list.bulkDone': 'Đã xử lý {count} dòng',
+  'list.bulkFailed': '{count} dòng chưa được thay đổi: {why}',
+  'list.bulkQueued': 'Thay đổi này lớn nên được chạy nền.',
+  'list.export': 'Xuất CSV',
+  'list.exportTruncated': 'Tệp chỉ có {limit} dòng đầu. Hãy thu hẹp bộ lọc để lấy phần còn lại.',
+  'list.exportError': 'Không xuất được tệp',
+  'list.moves': 'Chuyển trạng thái',
+  'list.moved': 'Đã {name}',
+  'list.notMoved': 'Không chuyển được trạng thái',
+  'list.setField': 'Đổi một trường',
+  'list.apply': 'Áp dụng',
+  'list.notChanged': 'Các dòng chưa được thay đổi',
+  'list.selectRow': 'Chọn {name}',
+  'list.sort': 'Sắp xếp theo',
+  'list.op.eq': 'là',
+  'list.op.ne': 'khác',
+  'list.op.in': 'là một trong',
+  'list.op.lt': 'nhỏ hơn',
+  'list.op.lte': 'nhiều nhất là',
+  'list.op.gt': 'lớn hơn',
+  'list.op.gte': 'ít nhất là',
+  'list.op.null': 'để trống',
+  'form.saved': 'Đã lưu',
+  'form.notSaved': 'Không lưu được dòng này',
+  'form.edit': 'Sửa {name}',
+  'form.new': 'Thêm {name}',
+  'form.save': 'Lưu',
+  'problem.required': 'Trường này là bắt buộc',
+  'problem.tooShort': 'Tối thiểu {min} ký tự',
+  'problem.tooLong': 'Tối đa {max} ký tự',
+  'problem.tooSmall': 'Tối thiểu là {min}',
+  'problem.tooBig': 'Tối đa là {max}',
+  'problem.pattern': 'Giá trị không đúng định dạng',
+  'form.conflictTitle': 'Có người khác đã sửa dòng này',
+  'form.conflictBody': 'Hãy tải lại trang để xem bản mới, rồi sửa lại.',
+  'form.rowLoadError': 'Không tải được dòng này',
+  'form.missing': 'Màn hình này không tồn tại.',
+  'shell.offline': 'Bạn đang ngoại tuyến. Thay đổi sẽ chưa được lưu cho đến khi có kết nối lại.',
+  'error.title': 'Đã xảy ra lỗi',
+  'error.retry': 'Thử lại',
+  'error.updated': 'Ứng dụng vừa được cập nhật. Hãy tải lại trang để tiếp tục.',
+  'error.reload': 'Tải lại',
+  'form.leave': 'Bạn có thay đổi chưa lưu. Rời khỏi trang này?',
+  'form.draftFound': 'Tìm thấy bản nháp của biểu mẫu này trên trình duyệt.',
+  'form.draftRestore': 'Khôi phục bản nháp',
+  'form.draftDiscard': 'Bỏ bản nháp',
+  'conflict.changedBy': '{who} đã sửa lúc {when}',
+  'conflict.unknownUser': 'một người dùng khác',
+  'conflict.field': 'Trường',
+  'conflict.mine': 'Giá trị của bạn',
+  'conflict.theirs': 'Giá trị của họ',
+  'conflict.keepMine': 'Giữ thay đổi của tôi trên bản của họ',
+  'conflict.takeTheirs': 'Bỏ thay đổi của tôi, lấy bản của họ',
+};

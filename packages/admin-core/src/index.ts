@@ -36,10 +36,11 @@ export {
   formatNumber,
   LOCALES,
   localeOf,
-  MESSAGES,
+  loadMessages,
   translator,
 } from './i18n.ts';
-export type { Locale, MessageKey } from './i18n.ts';
+export { en as ENGLISH } from './messages/en.ts';
+export type { Dictionary, Locale, MessageKey } from './i18n.ts';
 export { allows, bodyOf, columnsOf, formFieldsOf, initialValues, labelOf, listFields } from './screens.ts';
 export type {
   BulkOperation,
@@ -71,7 +72,9 @@ export {
   filterProblem,
   loadViews,
   operatorsOf,
+  PAGE_SIZES,
   sameView,
+  shouldVirtualize,
   saveView,
   viewFromSearch,
   viewsKey,

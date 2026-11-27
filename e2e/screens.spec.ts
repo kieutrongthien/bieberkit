@@ -147,10 +147,15 @@ test('UI-03, IO-04 the export is a CSV of the filtered list, and a formula in a 
 test('UI-05 the language of the screens follows the choice in the header, and stays after a reload', async () => {
   const page = shared;
   await page.goto('/admin/');
+  const files: string[] = [];
+  page.on('request', (request) => void files.push(new URL(request.url()).pathname));
   await page.goto('/admin/crm/accounts');
   await expect(page.getByRole('button', { name: 'New' })).toBeVisible();
+  // The other languages are chunks of their own (UI-12): English does not read them.
+  expect(files.filter((file) => /\/(vi|zh)-[\w-]+\.js$/.test(file))).toEqual([]);
   await pick(page, 'Language', 'Tiếng Việt');
   await expect(page.getByRole('button', { name: 'Thêm mới' })).toBeVisible();
+  expect(files.some((file) => /\/vi-[\w-]+\.js$/.test(file))).toBe(true);
   await page.reload();
   await expect(page.getByRole('button', { name: 'Thêm mới' })).toBeVisible();
   await pick(page, /Ngôn ngữ|Language/, 'English');
@@ -266,4 +271,59 @@ test('UI-03 selected rows take a move together, and one value for a field', asyn
   await page.getByRole('textbox', { name: 'title' }).fill('BLM-same');
   await page.getByRole('button', { name: 'Apply' }).click();
   await expect(page.getByRole('link', { name: 'BLM-same' })).toHaveCount(2);
+});
+
+test('UI-17 n opens a new row and / goes to the filters, and neither takes a letter from a field', async () => {
+  const page = shared;
+  await page.goto('/admin/crm/accounts');
+  await expect(page.getByRole('button', { name: 'New' })).toBeVisible();
+  await page.keyboard.press('/');
+  await expect(page.getByRole('combobox', { name: 'Field' })).toBeFocused();
+  // The focus is in a field now, so `n` is a letter.
+  await page.keyboard.press('n');
+  await expect(page).toHaveURL(/\/admin\/crm\/accounts$/);
+  await page.locator('body').click({ position: { x: 5, y: 5 } });
+  await page.keyboard.press('n');
+  await expect(page).toHaveURL(/\/admin\/crm\/accounts\/new$/);
+  await page.getByRole('textbox', { name: 'code' }).fill('nnn');
+  await expect(page.getByRole('textbox', { name: 'code' })).toHaveValue('nnn');
+});
+
+test('UI-16 at 360 px the list is cards, nothing scrolls sideways, and a card can be selected and moved', async () => {
+  const page = shared;
+  await page.setViewportSize({ width: 360, height: 740 });
+  try {
+    await page.goto('/admin/');
+    await makeRow(page, '/api/v1/crm/tickets', { title: 'MOB-1' });
+    await page.goto('/admin/crm/tickets');
+    const card = page.getByRole('listitem').filter({ has: page.getByRole('link', { name: 'MOB-1' }) });
+    await expect(card).toBeVisible();
+    await expect(page.getByRole('table')).toHaveCount(0);
+    const wide = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+    expect(wide).toBeLessThanOrEqual(0);
+
+    await card.getByRole('button', { name: 'close' }).click();
+    await page.getByRole('textbox', { name: 'reason' }).fill('from a phone');
+    await page.getByRole('button', { name: 'Apply' }).click();
+    await expect(card.getByText('closed')).toBeVisible();
+
+    await card.getByRole('checkbox').check();
+    await expect(page.getByText('1 selected')).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
+
+    await page.goto('/admin/crm/accounts/new');
+    await expect(page.getByRole('textbox', { name: 'code' })).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
+  } finally {
+    await page.setViewportSize({ width: 1280, height: 720 });
+  }
+});
+
+test('UI-12 a person may take a page of 50 rows, and the list asks the API for it', async () => {
+  const page = shared;
+  await page.goto('/admin/crm/accounts');
+  const asked = page.waitForRequest((request) => request.url().includes('pageSize=50'));
+  await page.locator('.ant-pagination-options .ant-select').click();
+  await page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)').getByTitle('50 / page').click();
+  await asked;
 });

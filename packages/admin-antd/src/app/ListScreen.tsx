@@ -34,6 +34,8 @@ import {
   loadViews,
   sameView,
   operatorsOf,
+  PAGE_SIZES,
+  shouldVirtualize,
   saveView,
   viewFromSearch,
   viewsKey,
@@ -42,15 +44,17 @@ import {
 import type { Filter, FilterOperator, MetaEntity, MetaField, Row, SavedView } from '@bieberkit/admin-core';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate, useSearch } from '@tanstack/react-router';
-import { App, Button, Card, Input, Popconfirm, Result, Select, Space, Table, Tag } from 'antd';
+import { App, Button, Card, Grid, Input, Popconfirm, Result, Select, Space, Table, Tag } from 'antd';
 import type { TableColumnsType } from 'antd';
-import { useState } from 'react';
+import type { RefSelectProps } from 'antd/es/select';
+import { useRef, useState } from 'react';
 import type { JSX } from 'react';
 import { useClient, useEntity } from './context.ts';
 import { useLanguage, useT } from './language.tsx';
 import { BulkBar, RowMoves, useRowChanges } from './moves.tsx';
+import { CardRows } from './CardRows.tsx';
+import { useShortcuts } from './shortcuts.ts';
 
-const PAGE_SIZE = 25;
 const EXPORT_PAGE_SIZE = 100;
 const EXPORT_LIMIT = 10_000;
 
@@ -106,8 +110,10 @@ function FilterBar(props: {
   readonly entity: MetaEntity;
   readonly filters: readonly Filter[];
   readonly onChange: (filters: readonly Filter[]) => void;
+  /** The select of the field, so that `/` can take the focus to it. */
+  readonly fieldRef: React.Ref<RefSelectProps>;
 }): JSX.Element {
-  const { entity, filters, onChange } = props;
+  const { entity, filters, onChange, fieldRef } = props;
   const t = useT();
   const fields = entity.fields.filter((field) => field.filterable);
   const [key, setKey] = useState<string | undefined>();
@@ -129,6 +135,7 @@ function FilterBar(props: {
     <Space direction="vertical" size="small" style={{ width: '100%', marginBottom: 12 }}>
       <Space wrap>
         <Select
+          ref={fieldRef}
           aria-label={t('list.filterField')}
           placeholder={t('list.filterField')}
           value={key ?? null}
@@ -281,6 +288,10 @@ function Rows(props: { readonly entity: MetaEntity }): JSX.Element {
   const search: Readonly<Record<string, unknown>> = useSearch({ strict: false });
   const view = viewFromSearch(search);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(PAGE_SIZES[0] ?? 25);
+  const searchField = useRef<RefSelectProps>(null);
+  // Under 768 px a table does not fit, and the rows are cards (UI-16). The first answer of the browser has no width yet, and that is the wide layout.
+  const compact = Grid.useBreakpoint().md === false;
   const [selected, setSelected] = useState<readonly Row[]>([]);
   const [exporting, setExporting] = useState(false);
   const where = entity.path.replace('/api/v1/', '');
@@ -290,11 +301,11 @@ function Rows(props: { readonly entity: MetaEntity }): JSX.Element {
   const sort = view.sort;
   const wanted = JSON.stringify({ filters, sort });
   const list = useQuery({
-    queryKey: ['list', entity.name, page, wanted],
+    queryKey: ['list', entity.name, page, pageSize, wanted],
     queryFn: () =>
       client.list(entity, {
         page,
-        pageSize: PAGE_SIZE,
+        pageSize,
         fields: listFields(entity),
         filters,
         ...(sort === undefined ? {} : { sort }),
@@ -306,6 +317,18 @@ function Rows(props: { readonly entity: MetaEntity }): JSX.Element {
     setSelected([]);
     void navigate({ to: '.', search: viewToSearch(next), replace: true });
   };
+
+  useShortcuts((shortcut) => {
+    if (shortcut === 'new' && allows(entity, 'create')) {
+      void navigate({ to: `/${where}/new` });
+      return true;
+    }
+    if (shortcut === 'search') {
+      searchField.current?.focus();
+      return true;
+    }
+    return false;
+  });
 
   const remove = async (row: Row): Promise<void> => {
     try {
@@ -378,24 +401,23 @@ function Rows(props: { readonly entity: MetaEntity }): JSX.Element {
         show(value, t)
       ),
   }));
+  const rowActions = (row: Row): JSX.Element => (
+    <Space size="small" wrap>
+      <RowMoves entity={entity} row={row} move={changes.move} />
+      {allows(entity, 'delete') ? (
+        <Popconfirm title={t('list.confirmDelete')} okText={t('common.delete')} onConfirm={() => void remove(row)}>
+          <Button danger size="small">
+            {t('common.delete')}
+          </Button>
+        </Popconfirm>
+      ) : null}
+    </Space>
+  );
   if (allows(entity, 'delete') || (entity.transitions ?? []).length > 0) {
-    columns.push({
-      title: '',
-      key: '_actions',
-      render: (_value: unknown, row: Row) => (
-        <Space size="small" wrap>
-          <RowMoves entity={entity} row={row} move={changes.move} />
-          {allows(entity, 'delete') ? (
-            <Popconfirm title={t('list.confirmDelete')} okText={t('common.delete')} onConfirm={() => void remove(row)}>
-              <Button danger size="small">
-                {t('common.delete')}
-              </Button>
-            </Popconfirm>
-          ) : null}
-        </Space>
-      ),
-    });
+    columns.push({ title: '', key: '_actions', render: (_value: unknown, row: Row) => rowActions(row) });
   }
+  const canSelect = allows(entity, 'delete') || allows(entity, 'update');
+  const virtual = shouldVirtualize(list.data?.rows.length ?? 0);
 
   return (
     <Card
@@ -419,12 +441,13 @@ function Rows(props: { readonly entity: MetaEntity }): JSX.Element {
         onPick={applyView}
       />
       <FilterBar
+        fieldRef={searchField}
         entity={entity}
         filters={filters}
         onChange={(next) => applyView({ name: '', filters: next, ...(sort === undefined ? {} : { sort }) })}
       />
       {selected.length === 0 ? null : (
-        <Space style={{ marginBottom: 12 }}>
+        <Space wrap style={{ marginBottom: 12 }}>
           <span>{t('list.selected', { count: selected.length })}</span>
           {allows(entity, 'update') ? (
             <BulkBar entity={entity} rows={selected} change={changes.change} onDone={() => setSelected([])} />
@@ -444,14 +467,48 @@ function Rows(props: { readonly entity: MetaEntity }): JSX.Element {
       )}
       {list.isError ? (
         <Result status="error" title={t('list.loadError')} subTitle={list.error.message} />
+      ) : compact ? (
+        <Space direction="vertical" style={{ width: '100%' }}>
+          <Select
+            allowClear
+            aria-label={t('list.sort')}
+            placeholder={t('list.sort')}
+            value={sort ?? null}
+            style={{ width: '100%' }}
+            options={entity.fields
+              .filter((field) => field.sortable)
+              .flatMap((field) => [
+                { value: field.key, label: `${field.key} ↑` },
+                { value: `-${field.key}`, label: `${field.key} ↓` },
+              ])}
+            onChange={(next: string | undefined) =>
+              applyView({ name: '', filters, ...(next === undefined ? {} : { sort: next }) })
+            }
+          />
+          <CardRows
+            entity={entity}
+            rows={list.data?.rows ?? []}
+            loading={list.isPending}
+            where={where}
+            show={(value) => show(value, t)}
+            actions={(row) => rowActions(row)}
+            selected={canSelect ? selected : undefined}
+            onSelect={setSelected}
+            page={page}
+            pageSize={pageSize}
+            total={list.data?.total ?? 0}
+            onPage={setPage}
+          />
+        </Space>
       ) : (
         <Table<Row>
           rowKey={(row) => String(row['id'])}
           columns={columns}
           dataSource={list.data?.rows.map((row) => ({ ...row })) ?? []}
           loading={list.isPending}
-          scroll={{ x: true }}
-          {...(allows(entity, 'delete') || allows(entity, 'update')
+          scroll={{ x: true, ...(virtual ? { y: 560 } : {}) }}
+          virtual={virtual}
+          {...(canSelect
             ? {
                 rowSelection: {
                   selectedRowKeys: selected.map((row) => String(row['id'])),
@@ -459,9 +516,16 @@ function Rows(props: { readonly entity: MetaEntity }): JSX.Element {
                 },
               }
             : {})}
-          pagination={{ current: page, pageSize: PAGE_SIZE, total: list.data?.total ?? 0, showSizeChanger: false }}
+          pagination={{
+            current: page,
+            pageSize,
+            total: list.data?.total ?? 0,
+            showSizeChanger: true,
+            pageSizeOptions: [...PAGE_SIZES],
+          }}
           onChange={(pagination, _filters, sorter) => {
             setPage(pagination.current ?? 1);
+            setPageSize(pagination.pageSize ?? pageSize);
             const one = Array.isArray(sorter) ? sorter[0] : sorter;
             const field = typeof one?.field === 'string' ? one.field : undefined;
             const next =
