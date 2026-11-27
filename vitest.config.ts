@@ -40,6 +40,10 @@ export default defineConfig({
     // Artifact checks require built output and run explicitly through pnpm test:artifacts.
     exclude: ['tools/lib/plugin-artifacts.test.ts'],
     passWithNoTests: true,
+    // The plugins that tests write into the `node_modules` of a temporary `bk-*` project go through Vite like the rest. Without
+    // this, Node imports them itself, follows `@bieberkit/source` into `packages/*/src` and strips the types: V8 then has two
+    // scripts with one URL and different offsets, and the coverage report puts hits on the wrong lines.
+    server: { deps: { inline: [/\/bk-[^/]+\/(?:.+\/)?node_modules\//] } },
     // TST-03: a test that opens a connection outside this machine fails.
     setupFiles: ['./tools/vitest-setup.ts'],
     // Database URLs for the dialect suites of @bieberkit/data (packages/data/src/testing). The `services` job of ci.yml sets
