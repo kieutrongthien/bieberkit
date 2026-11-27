@@ -70,6 +70,7 @@ export {
   filterProblem,
   loadViews,
   operatorsOf,
+  sameView,
   saveView,
   viewFromSearch,
   viewsKey,

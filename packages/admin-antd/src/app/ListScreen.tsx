@@ -33,6 +33,7 @@ import {
   labelOf,
   listFields,
   loadViews,
+  sameView,
   operatorsOf,
   saveView,
   viewFromSearch,
@@ -197,18 +198,21 @@ function Views(props: {
   const { message } = App.useApp();
   const [views, setViews] = useState(() => loadViews(window.localStorage, storageKey));
   const [name, setName] = useState('');
-  const [picked, setPicked] = useState<string | undefined>();
+  // The view that the list shows now, if it is one that was saved: it follows the filters, so a view can be picked again after a change.
+  const picked =
+    current.filters.length === 0 && current.sort === undefined
+      ? undefined
+      : views.find((view) => sameView(view, current))?.name;
   return (
     <Space wrap style={{ marginBottom: 12 }}>
       <Select
         allowClear
         aria-label={t('list.views')}
         placeholder={t('list.views')}
-        value={picked}
+        value={picked ?? null}
         style={{ minWidth: 180 }}
         options={views.map((view) => ({ value: view.name, label: view.name }))}
         onChange={(next: string | undefined) => {
-          setPicked(next);
           const view = views.find((candidate) => candidate.name === next);
           if (view !== undefined) onPick(view);
         }}
@@ -219,7 +223,6 @@ function Views(props: {
           onClick={() => {
             deleteView(window.localStorage, storageKey, picked);
             setViews(loadViews(window.localStorage, storageKey));
-            setPicked(undefined);
           }}
         >
           {t('list.viewDelete')}
@@ -238,7 +241,6 @@ function Views(props: {
           onClick={() => {
             saveView(window.localStorage, storageKey, { ...current, name: name.trim() });
             setViews(loadViews(window.localStorage, storageKey));
-            setPicked(name.trim());
             setName('');
             void message.success(t('list.viewSaved'));
           }}

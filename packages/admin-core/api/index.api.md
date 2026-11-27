@@ -67,8 +67,9 @@ export declare const viewsKey: (entity: string, userId: string) => string;
 export declare function loadViews(storage: DraftStorage, key: string): SavedView[];
 export declare function saveView(storage: DraftStorage, key: string, view: SavedView): void;
 export declare function deleteView(storage: DraftStorage, key: string, name: string): void;
+export declare const sameView: (a: SavedView, b: SavedView) => boolean;
 export declare function viewToSearch(view: SavedView): {
-  filters?: string;
+  filters?: readonly Filter[];
   sort?: string;
 };
 export declare function viewFromSearch(search: Readonly<Record<string, unknown>>): SavedView;

@@ -1,0 +1,37 @@
+{
+  "name": "@bieberkit/plugin-crm",
+  "version": "0.0.0",
+  "private": true,
+  "description": "A fixture plugin of the browser tests: accounts and tickets with every kind of control that the generic screens draw.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "exports": {
+    ".": "./index.js",
+    "./package.json": "./package.json"
+  },
+  "bieberkit": {
+    "core": "*",
+    "dialects": [
+      "postgres",
+      "mysql",
+      "sqlite"
+    ],
+    "env": [],
+    "tables": [
+      "crm_accounts",
+      "crm_tickets"
+    ],
+    "routes": [
+      "/api/v1/crm/accounts",
+      "/api/v1/crm/tickets"
+    ],
+    "permissions": [
+      "crm.account.read",
+      "crm.account.write",
+      "crm.ticket.read",
+      "crm.ticket.write",
+      "crm.ticket.close"
+    ],
+    "admin": []
+  }
+}

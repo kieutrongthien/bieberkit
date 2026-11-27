@@ -181,10 +181,19 @@ export function deleteView(storage: DraftStorage, key: string, name: string): vo
   );
 }
 
-/** The search of the address for a view, so that a link opens the same list. The filters travel as JSON text. */
-export function viewToSearch(view: SavedView): { filters?: string; sort?: string } {
+/** Whether two views hold the same filters, in the same order, and the same sort. The name does not count. */
+export const sameView = (a: SavedView, b: SavedView): boolean =>
+  (a.sort ?? '') === (b.sort ?? '') &&
+  a.filters.length === b.filters.length &&
+  a.filters.every(
+    (filter, at) =>
+      filter.field === b.filters[at]?.field && filter.op === b.filters[at].op && filter.value === b.filters[at].value,
+  );
+
+/** The search of the address for a view, so that a link opens the same list. A router writes the filters as JSON in the address. */
+export function viewToSearch(view: SavedView): { filters?: readonly Filter[]; sort?: string } {
   return {
-    ...(view.filters.length === 0 ? {} : { filters: JSON.stringify(view.filters) }),
+    ...(view.filters.length === 0 ? {} : { filters: view.filters }),
     ...(view.sort === undefined || view.sort === '' ? {} : { sort: view.sort }),
   };
 }

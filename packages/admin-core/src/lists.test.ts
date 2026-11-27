@@ -32,6 +32,7 @@ import {
   filterProblem,
   loadViews,
   operatorsOf,
+  sameView,
   saveView,
   viewFromSearch,
   viewToSearch,
@@ -169,9 +170,20 @@ describe('UI-03 the saved views', () => {
     expect(loadViews(refusing, key)).toEqual([]);
   });
 
+  it('UI-03 two views are the same when the filters and the sort are, whatever their names', () => {
+    expect(sameView(gold, { ...gold, name: 'Other' })).toBe(true);
+    expect(sameView(gold, { ...gold, sort: 'name' })).toBe(false);
+    expect(sameView(gold, { name: 'Gold', filters: [] })).toBe(false);
+    expect(sameView({ name: '', filters: [] }, { name: 'x', filters: [] })).toBe(true);
+    expect(sameView(gold, { ...gold, filters: [{ field: 'tier', op: 'eq', value: 'vip' }] })).toBe(false);
+  });
+
   it('UI-03 a view goes into the address and comes back out of it, so a link opens the same list', () => {
     const search = viewToSearch(gold);
+    expect(search).toEqual({ filters: gold.filters, sort: '-visits' });
     expect(viewFromSearch(search)).toEqual({ name: '', filters: gold.filters, sort: '-visits' });
+    // An address that was typed or copied holds the filters as JSON text.
+    expect(viewFromSearch({ filters: JSON.stringify(gold.filters) })).toEqual({ name: '', filters: gold.filters });
     expect(viewFromSearch({})).toEqual({ name: '', filters: [] });
     expect(viewFromSearch({ filters: 'not a list', sort: 4 })).toEqual({ name: '', filters: [] });
   });

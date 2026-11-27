@@ -49,38 +49,40 @@ test('the administrator signs in, manages a setting, and signs out', async ({ pa
   await expect(page.getByText(EMAIL)).toBeVisible();
 
   // The menu lists what the administrator may read, and a click opens the list.
-  await page.getByRole('menuitem', { name: 'Setting' }).click();
-  await expect(page).toHaveURL(/\/admin\/settings\/settings$/);
+  await page.getByRole('menuitem', { name: 'Account' }).click();
+  await expect(page).toHaveURL(/\/admin\/crm\/accounts$/);
 
   // Create.
   await page.getByRole('button', { name: 'New' }).click();
-  await page.getByLabel('key').fill('site.name');
-  await page.getByLabel('value').fill('Demo');
+  await page.getByRole('textbox', { name: 'code' }).fill('A-1');
+  await page.getByRole('textbox', { name: 'name' }).fill('Demo');
   await page.getByRole('button', { name: 'Save' }).click();
-  await expect(page.getByRole('link', { name: 'site.name' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'A-1' })).toBeVisible();
 
   // The server refuses a second setting with the same key, at the field.
   await page.getByRole('button', { name: 'New' }).click();
-  await page.getByLabel('key').fill('site.name');
-  await page.getByLabel('value').fill('Again');
+  await page.getByRole('textbox', { name: 'code' }).fill('A-1');
+  await page.getByRole('textbox', { name: 'name' }).fill('Again');
   await page.getByRole('button', { name: 'Save' }).click();
   await expect(page.getByRole('button', { name: 'Save' })).toBeVisible();
+  // The form has unsaved changes, so leaving it asks first (UI-17).
+  page.once('dialog', (dialog) => void dialog.accept());
   await page.getByRole('button', { name: 'Cancel' }).click();
 
   // Change.
-  await page.getByRole('link', { name: 'site.name' }).click();
-  await page.getByLabel('value').fill('Renamed');
+  await page.getByRole('link', { name: 'A-1' }).click();
+  await page.getByRole('textbox', { name: 'name' }).fill('Renamed');
   await page.getByRole('button', { name: 'Save' }).click();
   await expect(page.getByRole('cell', { name: 'Renamed' })).toBeVisible();
 
   // Delete, after the question.
   await page.getByRole('button', { name: 'Delete' }).click();
   await page.getByRole('button', { name: 'Delete' }).last().click();
-  await expect(page.getByRole('link', { name: 'site.name' })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'A-1' })).toHaveCount(0);
 
   // A reload on a route of the application gives the application, not a 404.
   await page.reload();
-  await expect(page).toHaveURL(/\/admin\/settings\/settings$/);
+  await expect(page).toHaveURL(/\/admin\/crm\/accounts$/);
   await expect(page.getByRole('button', { name: 'New' })).toBeVisible();
 
   await page.getByRole('button', { name: 'Sign out' }).click();

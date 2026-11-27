@@ -44,8 +44,8 @@ test('the admin at the root of its own host signs in, reloads on a route, and is
   await page.getByRole('button', { name: 'Sign in' }).click();
   await expect(page.getByRole('heading', { name: 'Welcome' })).toBeVisible();
 
-  await page.getByRole('menuitem', { name: 'Setting' }).click();
-  await expect(page).toHaveURL('http://admin.localhost:4312/settings/settings');
+  await page.getByRole('menuitem', { name: 'Account' }).click();
+  await expect(page).toHaveURL('http://admin.localhost:4312/crm/accounts');
   await expect(page.getByRole('button', { name: 'New' })).toBeVisible();
 
   // A route of the application is the page, not a 404, after a reload.

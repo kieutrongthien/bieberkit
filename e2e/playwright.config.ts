@@ -36,7 +36,7 @@ export default defineConfig({
     trace: 'retain-on-failure',
   },
   projects: [
-    { name: 'chromium', testMatch: 'admin.spec.ts', use: { browserName: 'chromium' } },
+    { name: 'chromium', testMatch: ['admin.spec.ts', 'screens.spec.ts'], use: { browserName: 'chromium' } },
     // The admin at the root of a host of its own. Chromium resolves `*.localhost` to this machine.
     {
       name: 'subdomain',
