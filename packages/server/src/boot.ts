@@ -45,7 +45,7 @@ import type { JobDef, QueueSubscription } from '@bieberkit/queue';
 import { registerClientReports } from './client-reports.ts';
 import { ServerError } from './errors.ts';
 import { parseTheme } from '@bieberkit/tokens';
-import { adminLocation, registerAdmin } from './admin.ts';
+import { adminLocation, registerAdmin, storageOrigin } from './admin.ts';
 import { migrate } from './migrate.ts';
 import { settingsOf, settingsPolicyReader } from './policy.ts';
 import { createRuntimePlatform, permissionCatalog, registerRuntimeServices } from './services.ts';
@@ -210,6 +210,8 @@ export async function boot(options: BootOptions): Promise<Running> {
         parseTheme(project.config.theme),
         // The hashed files of the releases before stay for a day, so a tab that is open at a deploy keeps working (UI-22).
         env.ADMIN_ASSETS_DIR ?? join(project.root, 'data', 'admin-assets'),
+        // A file goes from the browser to the bucket with a signed URL, so the policy of the admin names that origin (ADR 0036).
+        storageOrigin(env),
       );
       const web = server;
       lifecycle.onBoot('http', async () => {

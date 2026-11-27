@@ -48,6 +48,8 @@ export interface MetaField {
   readonly default?: unknown;
   /** The choices of a `oneOf` field. */
   readonly values?: readonly string[];
+  /** For a file or an image: the media types that it takes. */
+  readonly accept?: readonly string[];
   /** The currency of a `money` field, and the digits of a `decimal` one. */
   readonly currency?: string;
   readonly precision?: number;

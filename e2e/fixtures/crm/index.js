@@ -38,6 +38,9 @@ export const Account = defineEntity({
     active: f.boolean().default(true).index(),
     since: f.date().optional().index(),
     note: f.text({ max: 500 }).optional(),
+    // Files of the media library (UI-11).
+    attachment: f.file({ accept: ['application/pdf'] }).optional(),
+    photo: f.image().optional(),
     // Shown and required for an account that is not active (UI-11).
     reason: f
       .string({ max: 100 })

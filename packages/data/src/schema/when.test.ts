@@ -169,3 +169,32 @@ describe('UI-11 the admin options of a field', () => {
     ).toThrow(/eq, ne, in or set/);
   });
 });
+
+describe('UI-11 the fields of a file', () => {
+  it('UI-11 f.file and f.image hold the id of a media record, with the widget and the types that they take', () => {
+    expect(f.file().def).toMatchObject({ kind: 'string', min: 36, max: 36, admin: { widget: 'file', accept: [] } });
+    expect(f.image().def.admin).toEqual({ widget: 'image', accept: ['image/*'] });
+    expect(f.file({ accept: ['application/pdf', 'image/png'] }).def.admin?.accept).toEqual([
+      'application/pdf',
+      'image/png',
+    ]);
+  });
+
+  it('UI-11 a media type that is not one is refused, and a file field may be optional, and shown by a condition', () => {
+    expect(() => f.file({ accept: ['pdf'] })).toThrow(/not a media type/);
+    expect(() => f.file({ accept: [''] })).toThrow(/not a media type/);
+    const thing = defineEntity({
+      name: 'crm.Doc',
+      table: 'crm_docs',
+      fields: {
+        id: f.id(),
+        tier: f.oneOf(['a', 'b']).default('a'),
+        contract: f
+          .file()
+          .optional()
+          .admin({ visibleWhen: { field: 'tier', eq: 'b' } }),
+      },
+    });
+    expect(thing.fields['contract']?.admin).toMatchObject({ widget: 'file', visibleWhen: { field: 'tier', eq: 'b' } });
+  });
+});

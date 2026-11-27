@@ -84,6 +84,44 @@ export function adminLocation(appUrl: string, adminUrl: string | undefined): Adm
  * no form that leaves the origin. `style-src` allows inline styles because Ant Design writes its tokens as style elements at run time
  * and a static file cannot carry a nonce (ADR 0025).
  */
+/**
+ * The origin of the storage that the browser reaches with a signed URL: the endpoint of an S3 disk, or the host of the bucket of AWS. The
+ * local disk has none, because the browser never talks to it. The admin may send a file there (`connect-src`) and show a picture from
+ * there (`img-src`), and nothing else is added to the policy (ADR 0036).
+ */
+export function storageOrigin(env: {
+  readonly STORAGE_DISK: string;
+  readonly S3_BUCKET: string | undefined;
+  readonly S3_REGION: string | undefined;
+  readonly S3_ENDPOINT: string | undefined;
+  readonly S3_FORCE_PATH_STYLE: boolean;
+}): string | undefined {
+  if (env.STORAGE_DISK !== 's3') return undefined;
+  try {
+    if (env.S3_ENDPOINT !== undefined) {
+      const endpoint = new URL(env.S3_ENDPOINT);
+      // A bucket in the host name (virtual hosted style) is another origin than the endpoint.
+      return env.S3_FORCE_PATH_STYLE || env.S3_BUCKET === undefined
+        ? endpoint.origin
+        : `${endpoint.protocol}//${env.S3_BUCKET}.${endpoint.host}`;
+    }
+    return env.S3_BUCKET === undefined
+      ? undefined
+      : `https://${env.S3_BUCKET}.s3.${env.S3_REGION ?? 'us-east-1'}.amazonaws.com`;
+  } catch {
+    return undefined;
+  }
+}
+
+/** The policy of the admin, with the storage origin in the two places where the browser uses it. */
+export function policyFor(storage?: string): string {
+  if (storage === undefined) return ADMIN_POLICY;
+  return ADMIN_POLICY.replace("img-src 'self' data:", `img-src 'self' data: ${storage}`).replace(
+    "connect-src 'self'",
+    `connect-src 'self' ${storage}`,
+  );
+}
+
 export const ADMIN_POLICY: string = [
   "default-src 'none'",
   "script-src 'self'",
@@ -139,6 +177,8 @@ export function registerAdmin(
   theme: Theme = DEFAULT_THEME,
   /** Where the hashed files of the releases before are kept for a day (UI-22). Without it the admin serves its own build only. */
   retained?: string,
+  /** The origin of the storage that the browser reaches with a signed URL, when there is one. */
+  storage?: string,
 ): boolean {
   const directory = adminDirectory(root);
   if (directory === undefined) return false;
@@ -147,7 +187,7 @@ export function registerAdmin(
     ...(retained === undefined ? {} : { retained }),
     prefix: location.prefix,
     directory,
-    policy: ADMIN_POLICY,
+    policy: policyFor(storage),
     transformPage: pageAt(location.prefix, theme),
     ...(location.host === undefined ? {} : { host: location.host }),
   });

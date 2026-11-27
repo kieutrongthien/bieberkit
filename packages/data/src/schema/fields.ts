@@ -81,6 +81,8 @@ export interface FieldAdmin {
   readonly requiredWhen?: When;
   /** The control that draws the field, when it is not the one of its kind (UI-04). */
   readonly widget?: string;
+  /** For a file or an image: the media types that it takes, such as `image/*` or `application/pdf`. */
+  readonly accept?: readonly string[];
 }
 
 /** The plain data behind a field. It holds no library object except the schema values the author passed in. */
@@ -294,8 +296,8 @@ export class Field {
     if (typeof options !== 'object' || options === null)
       invalid('.admin() takes an object.', 'Pass { visibleWhen, requiredWhen }.');
     for (const key of Object.keys(options))
-      if (key !== 'visibleWhen' && key !== 'requiredWhen' && key !== 'widget')
-        invalid(`.admin() does not know ${key}.`, 'Use visibleWhen, requiredWhen or widget.');
+      if (key !== 'visibleWhen' && key !== 'requiredWhen' && key !== 'widget' && key !== 'accept')
+        invalid(`.admin() does not know ${key}.`, 'Use visibleWhen, requiredWhen, widget or accept.');
     if (['id', 'createdAt', 'updatedAt', 'sequence', 'state', 'hasOne', 'hasMany'].includes(kind))
       this.#reject('.admin()');
     for (const key of ['visibleWhen', 'requiredWhen'] as const) {
@@ -558,9 +560,32 @@ export interface FieldBuilders {
   hasMany(target: () => EntityDef<string>): HasManyField;
   state(options: StateOptions): StateField;
   custom(options: CustomOptions): CustomField;
+  /** A file of the media library: the field holds the id of a media record. `accept` limits the media types (UI-11, ADR 0036). */
+  file(options?: { accept?: readonly string[] }): StringField;
+  /** A file that is an image: `file` with `accept` of `image/*`, drawn with a preview. */
+  image(options?: { accept?: readonly string[] }): StringField;
 }
 
 /** The field builders of spec 10.1. */
+const MEDIA_TYPE = /^[a-z0-9][a-z0-9!#$&^_.+-]*\/(?:\*|[a-z0-9][a-z0-9!#$&^_.+-]*)$/;
+
+/** The field of a file: the id of a media record, 36 characters, with the widget and the types that it takes. */
+function mediaField(widget: 'file' | 'image', accept: readonly string[]): Field {
+  for (const type of accept)
+    if (typeof type !== 'string' || !MEDIA_TYPE.test(type))
+      invalid(
+        `${JSON.stringify(type)} is not a media type that f.${widget} can accept.`,
+        'Write "image/png", "image/*" or "application/pdf".',
+      );
+  return new Field({
+    kind: 'string',
+    min: 36,
+    max: 36,
+    compare: 'exact',
+    admin: Object.freeze({ widget, accept: Object.freeze([...accept]) }),
+  });
+}
+
 export const f: FieldBuilders = {
   id: () => new Field({ kind: 'id' }),
   string: (options) => {
@@ -596,6 +621,8 @@ export const f: FieldBuilders = {
     }
     return new Field({ kind: 'int', min, max });
   },
+  file: (options = {}) => mediaField('file', options.accept ?? []),
+  image: (options = {}) => mediaField('image', options.accept ?? ['image/*']),
   boolean: () => new Field({ kind: 'boolean' }),
   date: () => new Field({ kind: 'date' }),
   dateTime: () => new Field({ kind: 'dateTime' }),

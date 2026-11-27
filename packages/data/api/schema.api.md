@@ -29,9 +29,9 @@ Generated from the built declaration files by `pnpm api:update`. Do not edit by 
 
 ```ts
 import * as z from "zod/mini";
-import { A as evaluateWhen, C as FieldKind, D as TransitionDef, E as StateOptions, M as mapWhenFields, N as whenFields, O as f, P as whenProblem, S as FieldDef, T as SchemaValue, _ as ColumnDef, a as EntityDef, b as FieldAdmin, c as FieldLike, d as StandardColumn, f as TableConstraints, g as tableConstraints, h as standardColumns, i as ConstraintDef, j as isUnset, k as When, l as OrmOverride, m as snake, n as AdminOptions, o as EntityOptions, p as defineEntity, r as ApiOptions, s as Feature, t as ActionDef, u as Permissions, v as ComputedFn, w as ResetEvery, x as FieldBuilders, y as Field } from "./define-entity-CgNUqL6l.js";
-import { a as ResolvedEntities, c as resolveExtensions, i as ExtensionRef, n as ExtensionOptions, o as ResolvedExtension, r as ExtensionPermissions, s as defineExtension, t as ExtensionDef } from "./extend-txOG6agM.js";
-import { a as UpdateInput, i as Row, n as EntityRegistry, o as generateRegistrySource, r as RegistryOptions, t as CreateInput } from "./registry-xVZjG8Qd.js";
+import { A as evaluateWhen, C as FieldKind, D as TransitionDef, E as StateOptions, M as mapWhenFields, N as whenFields, O as f, P as whenProblem, S as FieldDef, T as SchemaValue, _ as ColumnDef, a as EntityDef, b as FieldAdmin, c as FieldLike, d as StandardColumn, f as TableConstraints, g as tableConstraints, h as standardColumns, i as ConstraintDef, j as isUnset, k as When, l as OrmOverride, m as snake, n as AdminOptions, o as EntityOptions, p as defineEntity, r as ApiOptions, s as Feature, t as ActionDef, u as Permissions, v as ComputedFn, w as ResetEvery, x as FieldBuilders, y as Field } from "./define-entity-CiRXYWez.js";
+import { a as ResolvedEntities, c as resolveExtensions, i as ExtensionRef, n as ExtensionOptions, o as ResolvedExtension, r as ExtensionPermissions, s as defineExtension, t as ExtensionDef } from "./extend-DsqQMNJN.js";
+import { a as UpdateInput, i as Row, n as EntityRegistry, o as generateRegistrySource, r as RegistryOptions, t as CreateInput } from "./registry-D7gGAobK.js";
 type SchemaMode = "create" | "update" | "read";
 interface ApiField {
   readonly key: string;

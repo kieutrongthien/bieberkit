@@ -23,6 +23,7 @@
  */
 
 import { problemOf } from '@bieberkit/admin-core';
+import { FileControl } from './FileControl.tsx';
 import { RelationSelect } from './RelationSelect.tsx';
 import type { MetaField, MessageKey } from '@bieberkit/admin-core';
 import type { Rule } from 'antd/es/form';
@@ -83,6 +84,17 @@ export function Control(props: ControlProps): JSX.Element {
           allowClear={!field.required}
           options={(field.values ?? []).map((value) => ({ value, label: value }))}
           onChange={(value) => onChange?.(value)}
+        />
+      );
+    case 'file':
+    case 'image':
+      return (
+        <FileControl
+          field={field}
+          id={id}
+          value={props.value}
+          onChange={onChange}
+          {...(props.label === undefined ? {} : { label: props.label })}
         />
       );
     case 'relation':

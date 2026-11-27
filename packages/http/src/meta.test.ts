@@ -40,6 +40,7 @@ interface Field {
   filterable: boolean;
   sortable: boolean;
   validation?: Record<string, unknown>;
+  accept?: string[];
   visibleWhen?: Record<string, unknown>;
   requiredWhen?: Record<string, unknown>;
   target?: { entity: string; path: string; title?: string };
@@ -210,6 +211,13 @@ describe('META-02 what it describes', () => {
       path: '/api/v1/crm/people',
       title: 'name',
     });
+  });
+
+  it('UI-11 a file field is drawn as a file, with the types that it takes', async () => {
+    const account = entity(await fetchMeta(), 'crm.Account');
+    expect(field(account, 'contract')).toMatchObject({ kind: 'string', widget: 'file', accept: ['application/pdf'] });
+    expect(field(account, 'logo')).toMatchObject({ widget: 'image', accept: ['image/*'] });
+    expect(field(account, 'code').accept).toBeUndefined();
   });
 
   it('UI-11 gives the conditions of a field, over the keys of the API', async () => {

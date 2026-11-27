@@ -49,6 +49,57 @@ export declare function reapply(base: Values, mine: Values, theirs: Values): {
   values: Record<string, unknown>;
   conflicts: Conflict[];
 };
+type FilterOperator = "eq" | "ne" | "in" | "lt" | "lte" | "gt" | "gte" | "null";
+interface Filter {
+  readonly field: string;
+  readonly op: FilterOperator;
+  readonly value: string;
+}
+export declare function operatorsOf(kind: string): readonly FilterOperator[];
+export declare function filterProblem(entity: MetaEntity, filter: Filter): string | undefined;
+export declare function filterParams(entity: MetaEntity, filters: readonly Filter[]): Record<string, string>;
+interface SavedView {
+  readonly name: string;
+  readonly filters: readonly Filter[];
+  readonly sort?: string;
+}
+export declare const viewsKey: (entity: string, userId: string) => string;
+export declare function loadViews(storage: DraftStorage, key: string): SavedView[];
+export declare function saveView(storage: DraftStorage, key: string, view: SavedView): void;
+export declare function deleteView(storage: DraftStorage, key: string, name: string): void;
+export declare const sameView: (a: SavedView, b: SavedView) => boolean;
+export declare function viewToSearch(view: SavedView): {
+  filters?: readonly Filter[];
+  sort?: string;
+};
+export declare function viewFromSearch(search: Readonly<Record<string, unknown>>): SavedView;
+interface CsvColumn {
+  readonly key: string;
+  readonly title: string;
+}
+export declare function csvOf(columns: readonly CsvColumn[], rows: readonly Readonly<Record<string, unknown>>[]): string;
+export declare function exportPages(total: number, pageSize: number, limit: number): {
+  pages: number;
+  truncated: boolean;
+};
+interface BulkOutcome {
+  readonly id: string;
+  readonly status: string;
+  readonly version?: number;
+  readonly error?: {
+    readonly code: string;
+    readonly message: string;
+  };
+}
+export declare function bulkSummary(outcomes: readonly BulkOutcome[]): {
+  ok: number;
+  failed: {
+    id: string;
+    message: string;
+  }[];
+};
+export declare const PAGE_SIZES: readonly number[];
+export declare const shouldVirtualize: (rows: number) => boolean;
 type When = {
   readonly field: string;
   readonly eq: unknown;
@@ -80,6 +131,7 @@ interface MetaField {
   readonly encrypted?: boolean;
   readonly default?: unknown;
   readonly values?: readonly string[];
+  readonly accept?: readonly string[];
   readonly currency?: string;
   readonly precision?: number;
   readonly scale?: number;
@@ -177,57 +229,24 @@ type BulkResult = {
   readonly kind: "queued";
   readonly jobId: string;
 };
-type FilterOperator = "eq" | "ne" | "in" | "lt" | "lte" | "gt" | "gte" | "null";
-interface Filter {
-  readonly field: string;
-  readonly op: FilterOperator;
-  readonly value: string;
-}
-export declare function operatorsOf(kind: string): readonly FilterOperator[];
-export declare function filterProblem(entity: MetaEntity, filter: Filter): string | undefined;
-export declare function filterParams(entity: MetaEntity, filters: readonly Filter[]): Record<string, string>;
-interface SavedView {
-  readonly name: string;
-  readonly filters: readonly Filter[];
-  readonly sort?: string;
-}
-export declare const viewsKey: (entity: string, userId: string) => string;
-export declare function loadViews(storage: DraftStorage, key: string): SavedView[];
-export declare function saveView(storage: DraftStorage, key: string, view: SavedView): void;
-export declare function deleteView(storage: DraftStorage, key: string, name: string): void;
-export declare const sameView: (a: SavedView, b: SavedView) => boolean;
-export declare function viewToSearch(view: SavedView): {
-  filters?: readonly Filter[];
-  sort?: string;
-};
-export declare function viewFromSearch(search: Readonly<Record<string, unknown>>): SavedView;
-interface CsvColumn {
-  readonly key: string;
-  readonly title: string;
-}
-export declare function csvOf(columns: readonly CsvColumn[], rows: readonly Readonly<Record<string, unknown>>[]): string;
-export declare function exportPages(total: number, pageSize: number, limit: number): {
-  pages: number;
-  truncated: boolean;
-};
-interface BulkOutcome {
+interface MediaFile {
   readonly id: string;
+  readonly filename: string;
+  readonly contentType: string;
+  readonly kind: string;
+  readonly size: number;
   readonly status: string;
-  readonly version?: number;
-  readonly error?: {
-    readonly code: string;
-    readonly message: string;
-  };
 }
-export declare function bulkSummary(outcomes: readonly BulkOutcome[]): {
-  ok: number;
-  failed: {
-    id: string;
-    message: string;
-  }[];
-};
-export declare const PAGE_SIZES: readonly number[];
-export declare const shouldVirtualize: (rows: number) => boolean;
+export declare function acceptsType(accept: readonly string[], contentType: string): boolean;
+export declare const acceptAttribute: (field: MetaField) => string | undefined;
+export declare function fileProblem(field: MetaField, file: {
+  readonly name: string;
+  readonly size: number;
+  readonly type: string;
+}): "empty" | "type" | undefined;
+export declare function sizeText(bytes: number): string;
+export declare const isPicture: (file: MediaFile) => boolean;
+export declare function uploadName(name: string): string;
 interface Related {
   readonly entity: MetaEntity;
   readonly via: MetaField;
@@ -278,6 +297,9 @@ interface AdminClient {
   create(entity: MetaEntity, body: Row): Promise<Row>;
   update(entity: MetaEntity, id: string, body: Row, version: number): Promise<Row>;
   remove(entity: MetaEntity, id: string, version: number): Promise<void>;
+  uploadFile(file: File): Promise<MediaFile>;
+  mediaFile(id: string): Promise<MediaFile>;
+  mediaUrl(id: string): Promise<string>;
   history(entity: MetaEntity, id: string): Promise<readonly HistoryEntry[]>;
   transition(entity: MetaEntity, id: string, name: string, version: number, input?: Row): Promise<Row>;
   bulk(entity: MetaEntity, items: readonly {
@@ -353,6 +375,13 @@ declare const en: {
   readonly "lines.add": "Add {name}";
   readonly "lines.remove": "Remove";
   readonly "lines.removeLine": "Remove {name}";
+  readonly "file.type": "This file is not of a type that the field takes: {types}";
+  readonly "file.empty": "The file is empty";
+  readonly "file.noSigning": "The storage cannot take an upload from the browser. Use an S3 disk for files.";
+  readonly "file.failed": "The file could not be sent";
+  readonly "file.sending": "Sending";
+  readonly "file.remove": "Remove";
+  readonly "file.removeNamed": "Remove the file of {name}";
   readonly "list.op.eq": "is";
   readonly "list.op.ne": "is not";
   readonly "list.op.in": "is one of";
@@ -494,5 +523,5 @@ export declare function lineProblems(inline: MetaInline, line: Readonly<Line>): 
 export declare function linesChanged(inline: MetaInline, start: readonly Line[], now: readonly Line[]): boolean;
 export declare const newLine: (inline: MetaInline) => Line;
 export declare const packageName = "@bieberkit/admin-core";
-export { type AdminClient, type AdminClientOptions, type BulkOperation, type BulkOutcome, type BulkResult, type Conflict, type Connection, type ConnectionEvent, type CsvColumn, type Dictionary, type DraftStorage, en as ENGLISH, type ErrorReport, type FieldProblem, type FieldStates, type Filter, type FilterOperator, type HistoryEntry, type KeyPress, type Line, type ListParams, type Locale, type MessageKey, type Meta, type MetaEntity, type MetaField, type MetaInline, type MetaMenuItem, type MetaTransition, type Page, type Related, type Row, type SavedView, type SessionUser, type Shortcut, type ValueProblem, type Vital, type VitalReport, type When };
+export { type AdminClient, type AdminClientOptions, type BulkOperation, type BulkOutcome, type BulkResult, type Conflict, type Connection, type ConnectionEvent, type CsvColumn, type Dictionary, type DraftStorage, en as ENGLISH, type ErrorReport, type FieldProblem, type FieldStates, type Filter, type FilterOperator, type HistoryEntry, type KeyPress, type Line, type ListParams, type Locale, type MediaFile, type MessageKey, type Meta, type MetaEntity, type MetaField, type MetaInline, type MetaMenuItem, type MetaTransition, type Page, type Related, type Row, type SavedView, type SessionUser, type Shortcut, type ValueProblem, type Vital, type VitalReport, type When };
 ```

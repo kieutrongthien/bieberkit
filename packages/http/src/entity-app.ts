@@ -61,6 +61,8 @@ export const Account: EntityDef<'crm.Account'> = defineEntity({
     note: f.text({ max: 500 }).optional(),
     // Lines that are edited with the account and saved with it (MOD-09).
     notes: f.hasMany(() => AccountNote).inline(),
+    contract: f.file({ accept: ['application/pdf'] }).optional(),
+    logo: f.image().optional(),
     // Shown and required for an account that is not active (UI-11).
     reason: f
       .string({ max: 100 })

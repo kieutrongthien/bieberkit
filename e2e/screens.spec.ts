@@ -510,3 +510,115 @@ test('MOD-09 the lines of a ticket are edited in its form, saved with it, and a 
   await page.getByRole('link', { name: 'LINES-1 renamed' }).click();
   await expect(page.getByRole('textbox', { name: 'Work note 1 text' })).toHaveValue('called the client');
 });
+
+/** The media routes and the bucket, played by the page: the e2e project has a disk that cannot sign, so the bytes need somewhere to go. */
+async function playMedia(
+  page: Page,
+  file: { id: string; filename: string; contentType: string; kind: string },
+): Promise<string[]> {
+  const seen: string[] = [];
+  const record = (status: string) => ({ data: { ...file, size: 5, status } });
+  await page.route('**/api/v1/media**', async (route) => {
+    const url = new URL(route.request().url());
+    const key = `${route.request().method()} ${url.pathname}`;
+    seen.push(key);
+    const json = (body: unknown, status = 200) =>
+      route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
+    if (key === 'POST /api/v1/media') return json(record('pending'), 201);
+    if (key.endsWith('/upload-url'))
+      return json({
+        url: `${url.origin}/__bucket/${file.id}`,
+        method: 'PUT',
+        headers: { 'content-type': file.contentType },
+        expiresAt: 1,
+      });
+    if (key.endsWith('/confirm')) return json({ id: file.id, status: 'ready', size: 5 });
+    if (key.endsWith('/url')) return json({ url: `${url.origin}/__bucket/${file.id}`, expiresAt: null });
+    return json(record('ready'));
+  });
+  await page.route('**/__bucket/**', (route) => {
+    seen.push(`${route.request().method()} bucket`);
+    // A one pixel picture, so that the preview of an image has bytes to show.
+    return route.fulfill({
+      status: 200,
+      contentType: 'image/png',
+      body: Buffer.from(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGD4DwABBAEAHnOcQAAAAABJRU5ErkJggg==',
+        'base64',
+      ),
+    });
+  });
+  return seen;
+}
+
+test('UI-11 a file is picked, goes to the library and then to the bucket, and the form keeps its id', async () => {
+  const page = shared;
+  await page.goto('/admin/crm/accounts/new');
+  const seen = await playMedia(page, {
+    id: '0198aaaa-0000-7000-8000-000000000001',
+    filename: 'contract.pdf',
+    contentType: 'application/pdf',
+    kind: 'document',
+  });
+  let sent: Record<string, unknown> = {};
+  await page.route('**/api/v1/crm/accounts', async (route) => {
+    if (route.request().method() !== 'POST') return route.continue();
+    sent = JSON.parse(route.request().postData() ?? '{}');
+    return route.fulfill({
+      status: 201,
+      contentType: 'application/json',
+      body: JSON.stringify({ data: { id: 'x', version: 1 } }),
+    });
+  });
+  await page.getByRole('textbox', { name: 'code' }).fill('FILE-1');
+  await page.getByRole('textbox', { name: 'name' }).fill('With a file');
+
+  // A file of a type that the field does not take is refused before anything is sent.
+  await page
+    .getByLabel('attachment')
+    .setInputFiles({ name: 'picture.png', mimeType: 'image/png', buffer: Buffer.from('12345') });
+  await expect(page.getByRole('alert').filter({ hasText: 'application/pdf' })).toBeVisible();
+  expect(seen).toEqual([]);
+
+  await page
+    .getByLabel('attachment')
+    .setInputFiles({ name: 'contract.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-') });
+  await expect(page.getByText('contract.pdf (5 B)')).toBeVisible();
+  expect(seen.slice(0, 4)).toEqual([
+    'POST /api/v1/media',
+    'POST /api/v1/media/0198aaaa-0000-7000-8000-000000000001/upload-url',
+    'PUT bucket',
+    'POST /api/v1/media/0198aaaa-0000-7000-8000-000000000001/confirm',
+  ]);
+  await page.getByRole('button', { name: 'Save' }).click();
+  await expect.poll(() => sent['attachment']).toBe('0198aaaa-0000-7000-8000-000000000001');
+  await page.unrouteAll({ behavior: 'ignoreErrors' });
+});
+
+test('UI-11 an image shows its picture, a file can be removed, and the server refuses an id that is not a file of the library', async () => {
+  const page = shared;
+  await page.goto('/admin/crm/accounts/new');
+  await playMedia(page, {
+    id: '0198aaaa-0000-7000-8000-000000000002',
+    filename: 'logo.png',
+    contentType: 'image/png',
+    kind: 'image',
+  });
+  await page.getByRole('textbox', { name: 'code' }).fill('FILE-2');
+  await page.getByRole('textbox', { name: 'name' }).fill('With a picture');
+  await page
+    .getByLabel('photo')
+    .setInputFiles({ name: 'logo.png', mimeType: 'image/png', buffer: Buffer.from('12345') });
+  await expect(page.getByRole('img', { name: 'logo.png' })).toBeVisible();
+
+  // The library of this project has no such file, so the server refuses it at the field and nothing is saved.
+  await page.getByRole('button', { name: 'Save' }).click();
+  await expect(page.getByText('is not a file that you may use')).toBeVisible();
+  await expect(page).toHaveURL(/\/crm\/accounts\/new/);
+
+  await page.getByRole('button', { name: 'Remove the file of photo' }).click();
+  await expect(page.getByRole('img', { name: 'logo.png' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Save' }).click();
+  await expect(page.getByRole('link', { name: 'FILE-2' })).toBeVisible();
+  await page.unrouteAll({ behavior: 'ignoreErrors' });
+});

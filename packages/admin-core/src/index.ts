@@ -120,3 +120,5 @@ export {
 export type { HistoryEntry, Related } from './related.ts';
 export { editableInline, initialLines, lineProblems, linesBody, linesChanged, MAX_LINES, newLine } from './inline.ts';
 export type { Line } from './inline.ts';
+export { acceptAttribute, acceptsType, fileProblem, isPicture, sizeText, uploadName } from './files.ts';
+export type { MediaFile } from './files.ts';

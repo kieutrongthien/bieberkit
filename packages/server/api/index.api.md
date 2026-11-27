@@ -44,7 +44,7 @@ interface AdminLocation {
 export declare function adminLocation(appUrl: string, adminUrl: string | undefined): AdminLocation;
 export declare const ADMIN_POLICY: string;
 export declare function adminDirectory(root: string): string | undefined;
-export declare function registerAdmin(server: HttpServer, root: string, location: AdminLocation, theme?: Theme, retained?: string): boolean;
+export declare function registerAdmin(server: HttpServer, root: string, location: AdminLocation, theme?: Theme, retained?: string, storage?: string): boolean;
 type BootRole = Role | "dev";
 interface BootOptions {
   readonly role: BootRole;

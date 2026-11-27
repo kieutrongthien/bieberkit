@@ -25,7 +25,7 @@
 import { describe, expect, it } from 'vitest';
 import { validateConfig } from '@bieberkit/core';
 import { parseTheme, themeSection } from '@bieberkit/tokens';
-import { adminLocation, pageAt } from './admin.ts';
+import { ADMIN_POLICY, adminLocation, pageAt, policyFor, storageOrigin } from './admin.ts';
 
 const APP = 'https://example.com';
 
@@ -123,5 +123,41 @@ describe('UI-06 the theme in the page of the admin', () => {
     });
     expect(() => validateConfig({ ...base, theme: { radius: 99 } }, { sections: [themeSection] })).toThrow(/radius/);
     expect(() => validateConfig({ ...base, theme: { radius: 4 } })).toThrow(/theme/);
+  });
+});
+
+describe('ADR 0036 the policy of the admin and the storage that it uploads to', () => {
+  const s3 = {
+    STORAGE_DISK: 's3',
+    S3_BUCKET: 'files',
+    S3_REGION: 'eu-west-1',
+    S3_ENDPOINT: undefined,
+    S3_FORCE_PATH_STYLE: false,
+  };
+
+  it('ADR 0036 the local disk adds nothing, because the browser never talks to it', () => {
+    expect(storageOrigin({ ...s3, STORAGE_DISK: 'local' })).toBeUndefined();
+    expect(policyFor(undefined)).toBe(ADMIN_POLICY);
+  });
+
+  it('ADR 0036 the origin is the endpoint with a path style, the bucket in the host with a virtual style, and the host of AWS without an endpoint', () => {
+    expect(storageOrigin({ ...s3, S3_ENDPOINT: 'http://localhost:9000/ignored/path', S3_FORCE_PATH_STYLE: true })).toBe(
+      'http://localhost:9000',
+    );
+    expect(storageOrigin({ ...s3, S3_ENDPOINT: 'https://acct.r2.cloudflarestorage.com' })).toBe(
+      'https://files.acct.r2.cloudflarestorage.com',
+    );
+    expect(storageOrigin(s3)).toBe('https://files.s3.eu-west-1.amazonaws.com');
+    expect(storageOrigin({ ...s3, S3_BUCKET: undefined })).toBeUndefined();
+    expect(storageOrigin({ ...s3, S3_ENDPOINT: 'not a url' })).toBeUndefined();
+  });
+
+  it('ADR 0036 the origin is in connect-src and img-src and in no other directive, and the rest of the policy is the same', () => {
+    const policy = policyFor('https://files.example.com');
+    expect(policy).toContain("connect-src 'self' https://files.example.com");
+    expect(policy).toContain("img-src 'self' data: https://files.example.com");
+    expect(policy.match(/files\.example\.com/g)).toHaveLength(2);
+    expect(policy.replaceAll(' https://files.example.com', '')).toBe(ADMIN_POLICY);
+    expect(policy).toContain("script-src 'self'");
   });
 });

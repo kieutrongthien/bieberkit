@@ -49,6 +49,7 @@ import type { BulkQueue } from './bulk.ts';
 import { apiFields, toJsonSchema } from '@bieberkit/data/schema';
 import type { ApiField, EntityDef, JsonSchema } from '@bieberkit/data/schema';
 import { enforceConditions } from './conditions.ts';
+import { checkFiles } from './files.ts';
 import { inlineLinksOf, readInline, takeInline, withInline, writeInline } from './inline.ts';
 import { searchableOf, searchWhere } from './search.ts';
 import { HttpError, ValidationFailed } from './problem.ts';
@@ -687,8 +688,10 @@ export function entityRoutes(schema: OrmSchema, context: EntityRoutesContext): R
       permission: permissionOf(def, 'create'),
       idempotent: true,
       schema: { body: withInline(toJsonSchema(def, 'create'), links, 'write'), response: { 201: single } },
-      handler: (ctx) =>
-        runInUnitOfWork(db, async (em) => {
+      handler: async (ctx) => {
+        // The files that the body names are checked first: the media service opens a transaction of its own (UI-11).
+        await checkFiles(def, ctx, asRow(ctx.body));
+        return runInUnitOfWork(db, async (em) => {
           const write = await need(ctx, 'create');
           const { rest: sent, lines } = takeInline(links, asRow(ctx.body));
           checkWritable(write, sent, 'create');
@@ -712,7 +715,8 @@ export function entityRoutes(schema: OrmSchema, context: EntityRoutesContext): R
               ...(await readInline(em, links, id)),
             },
           };
-        }),
+        });
+      },
     });
   }
 
@@ -727,9 +731,10 @@ export function entityRoutes(schema: OrmSchema, context: EntityRoutesContext): R
         body: withInline(toJsonSchema(def, 'update'), links, 'write'),
         response: { 200: single },
       },
-      handler: (ctx) => {
+      handler: async (ctx) => {
         const id = String(ctx.params['id']);
         const expected = ifMatchOf(ctx);
+        await checkFiles(def, ctx, asRow(ctx.body));
         return withCurrent(db, schema, id, () =>
           runInUnitOfWork(db, async (em) => {
             const write = await need(ctx, 'update');

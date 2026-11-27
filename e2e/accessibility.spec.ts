@@ -128,6 +128,13 @@ test('UI-07 a detail with its tabs, its child table and its history has no viola
   expect(await violations(page)).toEqual([]);
 });
 
+test('UI-07 a form with file fields has no violation of WCAG 2.2 AA', async () => {
+  const page = shared;
+  await page.goto('/admin/crm/accounts/new');
+  await expect(page.getByLabel('attachment')).toBeVisible();
+  expect(await violations(page)).toEqual([]);
+});
+
 test('UI-07 a form with a relation picker, closed and with its list open, has no violation of WCAG 2.2 AA', async () => {
   const page = shared;
   await page.goto('/admin/crm/tickets/new');

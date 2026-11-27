@@ -28,7 +28,7 @@
 Generated from the built declaration files by `pnpm api:update`. Do not edit by hand. A change here is a change to the public API and needs a changeset (spec section 22.3).
 
 ```ts
-import { S as FieldDef, a as EntityDef, c as FieldLike } from "./define-entity-CgNUqL6l.js";
+import { S as FieldDef, a as EntityDef, c as FieldLike } from "./define-entity-CiRXYWez.js";
 interface ExtensionPermissions {
   readonly fields?: Readonly<Record<string, {
     readonly read?: string;

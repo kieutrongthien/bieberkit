@@ -29,12 +29,12 @@ Generated from the built declaration files by `pnpm api:update`. Do not edit by 
 
 ```ts
 import { D as DestructiveFinding, _ as EncryptionKeys, a as ResolvedConnection, c as currentEntityManager, d as runInUnitOfWork, f as AuditSink, g as ReferenceVisibility, h as runAsTenant, i as Orm, l as resolveConnection, m as currentTenantId, n as DatabaseEnv, o as afterCommit, p as SystemScopeEntry, r as DatabaseOptions, s as createDatabase, t as Database, u as runInTransaction, v as PluginMigrationStep, y as StepDatabase } from "./connect-E7O4kGaH.js";
-import { D as TransitionDef, a as EntityDef, w as ResetEvery } from "./define-entity-CgNUqL6l.js";
+import { D as TransitionDef, a as EntityDef, w as ResetEvery } from "./define-entity-CiRXYWez.js";
 import { Dialect, Logger } from "@bieberkit/core";
 import { EntityData, EntityManager, EntityName, EntityProperty, EntitySchema, FilterOptions, FilterQuery, FindOneOptions, FindOptions, NativeInsertUpdateOptions, Platform, Primary, RequiredEntityData, Type, UpdateOptions } from "@mikro-orm/core";
 import { Kysely, RawBuilder, SqliteDialect, Transaction } from "kysely";
 import { SqlEntityManager } from "@mikro-orm/sql";
-import { o as ResolvedExtension } from "./extend-txOG6agM.js";
+import { o as ResolvedExtension } from "./extend-DsqQMNJN.js";
 export declare function useEncryptionKeys(keys: EncryptionKeys | undefined): void;
 type OrmSchema = EntitySchema<Record<string, unknown>>;
 interface CompileOptions {

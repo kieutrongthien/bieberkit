@@ -120,6 +120,7 @@ export const META_SCHEMA: JsonSchema = {
                 precision: { type: 'integer' },
                 scale: { type: 'integer' },
                 validation: { type: 'object', additionalProperties: true },
+                accept: strings,
                 visibleWhen: { type: 'object', additionalProperties: true },
                 requiredWhen: { type: 'object', additionalProperties: true },
                 target: {
@@ -238,7 +239,7 @@ function fieldOf(
     descriptor: {
       key: field.key,
       kind: declared.kind,
-      widget: field.writable ? (WIDGETS[declared.kind] ?? 'text') : 'readonly',
+      widget: field.writable ? (declared.admin?.widget ?? WIDGETS[declared.kind] ?? 'text') : 'readonly',
       required: field.writable && requiredKeys.includes(field.key),
       readOnly: !field.writable,
       filterable: indexed,
@@ -253,6 +254,9 @@ function fieldOf(
       ...(declared.scale === undefined ? {} : { scale: declared.scale }),
       ...(typeof validation === 'object' && validation !== null ? { validation } : {}),
       // The conditions name the fields of the entity, and the form reads the keys of the API (`owner` is `ownerId`).
+      ...(declared.admin?.accept === undefined || declared.admin.accept.length === 0
+        ? {}
+        : { accept: [...declared.admin.accept] }),
       ...(declared.admin?.visibleWhen === undefined
         ? {}
         : { visibleWhen: mapWhenFields(declared.admin.visibleWhen, keyOf) }),

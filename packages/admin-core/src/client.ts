@@ -23,6 +23,8 @@
  */
 
 import { filterParams } from './lists.ts';
+import { uploadName } from './files.ts';
+import type { MediaFile } from './files.ts';
 import { HISTORY_PATH, historyOf, historyQuery } from './related.ts';
 import type { HistoryEntry } from './related.ts';
 import type { BulkOutcome } from './lists.ts';
@@ -80,6 +82,16 @@ export interface AdminClient {
   /** `version` is the version that the person read (API-13). A stale one is a 412 with the current row. */
   update(entity: MetaEntity, id: string, body: Row, version: number): Promise<Row>;
   remove(entity: MetaEntity, id: string, version: number): Promise<void>;
+  /**
+   * Sends a file to the media library and answers its record, ready to be named by a field: the record is made, the file goes straight to
+   * the storage with the signed URL, and the upload is confirmed (ADR 0036). A disk that cannot sign is an `AdminApiError` with the code
+   * `STORAGE_SIGNING_UNSUPPORTED`.
+   */
+  uploadFile(file: File): Promise<MediaFile>;
+  /** The record of a file of the media library. */
+  mediaFile(id: string): Promise<MediaFile>;
+  /** An address that shows the file for a while. */
+  mediaUrl(id: string): Promise<string>;
   /** What the audit log says about one row, newest first. A user without the permission of the audit log gets the error of the API. */
   history(entity: MetaEntity, id: string): Promise<readonly HistoryEntry[]>;
   /** A move of the state field of a row. `version` is the one that was read, and `input` is what the move asks for, if it asks for something. */
@@ -137,6 +149,20 @@ function outcomeOf(value: Record<string, unknown>): BulkOutcome {
     status: text(value['status'], 'invalid'),
     ...(typeof value['version'] === 'number' ? { version: value['version'] } : {}),
     ...(error === undefined ? {} : { error: { code: text(error['code'], ''), message: text(error['message'], '') } }),
+  };
+}
+
+const MEDIA_PATH = '/api/v1/media';
+
+function fileOf(body: unknown): MediaFile {
+  const data = isRecord(body) && isRecord(body['data']) ? body['data'] : {};
+  return {
+    id: text(data['id'], ''),
+    filename: text(data['filename'], ''),
+    contentType: text(data['contentType'], ''),
+    kind: text(data['kind'], ''),
+    size: typeof data['size'] === 'number' ? data['size'] : 0,
+    status: text(data['status'], ''),
   };
 }
 
@@ -224,6 +250,45 @@ export function createAdminClient(options: AdminClientOptions = {}): AdminClient
           headers: { 'if-match': String(version) },
         }),
       );
+    },
+    async uploadFile(file) {
+      const made = fileOf(
+        await request('POST', MEDIA_PATH, {
+          body: {
+            filename: uploadName(file.name),
+            contentType: file.type === '' ? 'application/octet-stream' : file.type,
+            size: file.size,
+          },
+        }),
+      );
+      const signed = await request('POST', `${MEDIA_PATH}/${encodeURIComponent(made.id)}/upload-url`, { body: {} });
+      const target = isRecord(signed) ? signed : {};
+      const headers = isRecord(target['headers'])
+        ? Object.fromEntries(Object.entries(target['headers']).map(([key, value]) => [key, text(value, '')]))
+        : {};
+      // The bytes go to the storage and not to this server, with the headers that were signed and no cookie.
+      const sent = await call(text(target['url'], ''), {
+        method: text(target['method'], 'PUT'),
+        headers,
+        body: file,
+        credentials: 'omit',
+      });
+      if (!sent.ok)
+        throw new AdminApiError(
+          sent.status,
+          'ADMIN_UPLOAD_REFUSED',
+          'The storage did not take the file.',
+          'Try again.',
+        );
+      await request('POST', `${MEDIA_PATH}/${encodeURIComponent(made.id)}/confirm`, { body: {} });
+      return this.mediaFile(made.id);
+    },
+    async mediaFile(id) {
+      return fileOf(await request('GET', `${MEDIA_PATH}/${encodeURIComponent(id)}`));
+    },
+    async mediaUrl(id) {
+      const answer = await request('GET', `${MEDIA_PATH}/${encodeURIComponent(id)}/url`);
+      return isRecord(answer) ? text(answer['url'], '') : '';
     },
     async history(entity, id) {
       return historyOf(await request('GET', `${HISTORY_PATH}${historyQuery(entity.name, id)}`));

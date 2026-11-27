@@ -78,6 +78,7 @@ interface FieldAdmin {
   readonly visibleWhen?: When;
   readonly requiredWhen?: When;
   readonly widget?: string;
+  readonly accept?: readonly string[];
 }
 interface FieldDef {
   readonly kind: FieldKind;
@@ -228,6 +229,12 @@ interface FieldBuilders {
   hasMany(target: () => EntityDef<string>): HasManyField;
   state(options: StateOptions): StateField;
   custom(options: CustomOptions): CustomField;
+  file(options?: {
+    accept?: readonly string[];
+  }): StringField;
+  image(options?: {
+    accept?: readonly string[];
+  }): StringField;
 }
 declare const f: FieldBuilders;
 type Feature = "attachments" | "comments" | "timeline" | "tags";
