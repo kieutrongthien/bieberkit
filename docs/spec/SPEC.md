@@ -278,7 +278,7 @@ A person at the terminal is asked for every choice that no flag gave, the name i
 | `bieberkit plugins` | List installed plugins, versions and dependency graph |
 | `bieberkit env:check` | Validate the current environment against the merged schema |
 | `bieberkit env:example` | Regenerate `.env.example` |
-| `bieberkit check [rule]` | Run framework rules: headers, env-access, boundaries, orm, sql, transactions, migrations, routes, generated. `// bieberkit-ignore BK_CODE: reason` lets one violation through |
+| `bieberkit check [rule]` | Run framework rules: headers, env-access, boundaries, orm, sql, transactions, migrations, routes, generated, plugin-steps, plugin-tables, scoped-permissions. `// bieberkit-ignore BK_CODE: reason` lets one violation through |
 | `bieberkit doctor` | Check connectivity to database, Valkey or Redis, storage and mail |
 | `bieberkit routes` | Print routes with their permissions |
 | `bieberkit openapi` / `client:generate` | Emit `openapi.json` / regenerate the typed client |
@@ -1719,6 +1719,7 @@ Open questions:
 
 | Version | Date | Changes |
 | --- | --- | --- |
+| 0.8.23 | 2026-11-27 | M2.1 H4: `check boundaries` for relative and `node_modules` paths into a plugin and for exports patterns (PLG-01), and the rule `plugin-tables` (PLG-02) |
 | 0.8.22 | 2026-11-27 | M2.1 H5: `DEPLOY_ID` names a deploy for DATA-08, `bieberkit migrate --deploy-id`, `BK_MIGRATE_REFUSED` names the waiting steps, and `BK_STEP_CONTRACT_NO_AFTER` |
 | 0.8.21 | 2026-11-27 | Base plugins S6, operations: section 12.10, OPS-01 to OPS-06; `Idempotency-Key` on `DELETE`, per-actor limits, settings export and import, download audit of media, indexes and the tests at 100 000 rows |
 | 0.8.20 | 2026-11-27 | Base plugins S6, audit: section 12.9, AUD-07 to AUD-09; the audit mirror, `after=` for a SIEM, legal holds and `kept` in `audit:prune` (ADR 0032) |

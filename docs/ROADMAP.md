@@ -337,7 +337,7 @@ Execution order: M2.1 through M2.7, then the reviewed npm release, then M1.10 Pi
 - [x] Static manifests generated at plugin build and checked in CI; first-party manifests bundled in `create-bieberkit` (PLG-07). H1: `bieberkit build` in a plugin writes the field, `build --check` verifies without writing, `pnpm check:manifests` runs inside the existing CI check, and `pnpm test:artifacts` verifies the six plugin tarballs and the packed scaffolder graph after build (`docs/modules/plugin-hardening.md`)
 - [ ] Extension tables and `extends` for fields on other plugins' entities (PLG-06, §11.3)
 - [ ] `bieberkit plugins` graph, `make:plugin`, `remove` with migration prompt (PLG-03)
-- [ ] `check` rules for plugin imports and cross-plugin table queries (PLG-01, PLG-02)
+- [x] `check` rules for plugin imports and cross-plugin table queries (PLG-01, PLG-02). H4: `boundaries` sees relative and `node_modules` paths into another plugin, exports patterns and plugins known by keyword; the new `plugin-tables` rule sees tables and entities of another plugin as far as static code shows, and says what it cannot. Evidence: the `PLG-01` and `PLG-02` cases of `cli/src/check/check.test.ts`, `plugin-tables.repo.test.ts` (the six first-party plugins pass)
 - [x] Expand then contract guard in the migrate role (DATA-08). H5: `DEPLOY_ID` / `bieberkit migrate --deploy-id` make every run of one release one deploy; the refusal is proven through the migrate role in `server/src/migrations.test.ts` (refusal, next deploy, backfill of rows from the old version, retry, two migrate roles) and on three dialects in `data/src/orm/plugin-migrate.dialects.test.ts`; `check plugin-steps` warns about a contract step with no `after`
 
 ### M2.2 Admin renderer

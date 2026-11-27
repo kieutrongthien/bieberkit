@@ -127,6 +127,14 @@ The guard of the runner already refused a contract step in the deploy of its exp
 
 `packages/server/src/migrations.test.ts` proves it through the migrate role: refusal with `BK_MIGRATE_REFUSED` and the project files not run, the next deploy finishing the contract, the backfill of a row that the old version wrote between the two deploys (and the failure of a contract without one), a retry with the same id, `DEPLOY_ID` of the environment, and two migrate roles of one release. `plugin-migrate.dialects.test.ts` adds the retry case on the three dialects. `bieberkit check plugin-steps` warns about a contract step with no `after` (`BK_STEP_CONTRACT_NO_AFTER`), because the guard cannot protect it. The backfill stays a convention of the step: no code can tell whether a contract step repairs the rows that the old version wrote.
 
+## Slice H4: the rules for plugins (implemented)
+
+`check boundaries` (PLG-01) now sees a relative path, inside the project or through `node_modules`, into the files of another plugin package, an `exports` key that is a pattern, a plugin that is known by its keyword or its static manifest and not by its name, and a plugin that imports its own files. `check plugin-tables` (PLG-02) is new. Both read the plugins from their `package.json` (PLG-07) and import none.
+
+What PLG-02 sees: a table of another plugin that is a literal in a query builder call or in SQL text, and an entity that the file imported from another plugin and gave to the entity manager. What it does not see is listed in `docs/modules/cli.md` and in the messages: a computed name, `classOf(em, name)`, a variable that holds a table. The tables of the framework and of `@bieberkit/auth` (`bk_auth_*`, `bk_audit_*`) are not a plugin's, and the code of the project is not a plugin, so neither is read. The rule is a static check and no sandbox (PLG-04). It is not in the Oxlint plugin, which reads one file and has no list of plugins.
+
+The first-party plugins pass it (`plugin-tables.repo.test.ts`): they read each other only through the services they publish and `@bieberkit/auth`.
+
 ## Phase 2 integration and npm release
 
 M2.2 consumes the verified plugin metadata; M2.3 adds content and the public site; M2.4 supplies realtime, workflows, search and other shared features. M2.5 composes those capabilities into templates, M2.6 distributes editable source, and M2.7 proves the full matrix and upgrade paths. Keep integration coverage during development; do not postpone all dialect tests until M2.7.
