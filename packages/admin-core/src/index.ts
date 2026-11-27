@@ -28,7 +28,22 @@
 export const packageName = '@bieberkit/admin-core';
 
 export { AdminApiError, createAdminClient } from './client.ts';
-export type { AdminClient, AdminClientOptions, FieldProblem } from './client.ts';
+export type { AdminClient, AdminClientOptions, FieldProblem, SignInResult } from './client.ts';
+export type { AccountClient, AdminSession, CodeKind, Me, TotpEnrolment } from './account-client.ts';
+export {
+  authMessageKey,
+  enrolmentNeeded,
+  normalizeCode,
+  PASSWORD_ADVISED,
+  PASSWORD_MAX,
+  PASSWORD_MIN,
+  passwordIsShort,
+  passwordProblem,
+  resetSearchOf,
+  secretOfUri,
+  stepExpired,
+} from './account.ts';
+export type { ResetSearch } from './account.ts';
 export {
   formatDate,
   formatDateTime,

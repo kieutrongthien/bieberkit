@@ -22,6 +22,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { accountClient } from './account-client.ts';
+import type { AccountClient } from './account-client.ts';
 import { filterParams } from './lists.ts';
 import { uploadName } from './files.ts';
 import type { MediaFile } from './files.ts';
@@ -45,6 +47,8 @@ export class AdminApiError extends Error {
   readonly problems: readonly FieldProblem[];
   /** On a 412: the row as it is now, so that the form can show what changed and who changed it (UI-18). */
   readonly current: Row | undefined;
+  /** On a 429: how many seconds to wait, when the server says (AUTH-06). */
+  readonly retryAfter: number | undefined;
 
   constructor(
     status: number,
@@ -53,6 +57,7 @@ export class AdminApiError extends Error {
     fix: string,
     problems: readonly FieldProblem[] = [],
     current?: Row,
+    retryAfter?: number,
   ) {
     super(message);
     this.name = 'AdminApiError';
@@ -61,6 +66,7 @@ export class AdminApiError extends Error {
     this.fix = fix;
     this.problems = problems;
     this.current = current;
+    this.retryAfter = retryAfter;
   }
 }
 
@@ -70,10 +76,15 @@ export interface AdminClientOptions {
   readonly fetch?: typeof fetch;
 }
 
-export interface AdminClient {
+/** What a right password gives: the session, or for an account with a second factor the step that asks for the code. */
+export type SignInResult =
+  | { readonly kind: 'signedIn'; readonly user: SessionUser }
+  | { readonly kind: 'secondFactor' };
+
+export interface AdminClient extends AccountClient {
   /** The user of the session, or `undefined` when nobody is signed in. */
   session(): Promise<SessionUser | undefined>;
-  signIn(email: string, password: string): Promise<SessionUser>;
+  signIn(email: string, password: string): Promise<SignInResult>;
   signOut(): Promise<void>;
   meta(): Promise<Meta>;
   list(entity: MetaEntity, params?: ListParams): Promise<Page>;
@@ -133,13 +144,28 @@ async function failure(response: Response): Promise<AdminApiError> {
     text(problem['fix'], ''),
     problemsOf(problem['errors']),
     isRecord(problem['current']) ? problem['current'] : undefined,
+    retryAfterOf(response),
   );
+}
+
+/** The API says `Retry-After`, and Better Auth says `X-Retry-After`. */
+function retryAfterOf(response: Response): number | undefined {
+  const header = response.headers.get('retry-after') ?? response.headers.get('x-retry-after');
+  const seconds = header === null ? Number.NaN : Number(header);
+  return Number.isInteger(seconds) && seconds >= 0 ? seconds : undefined;
 }
 
 function userOf(body: unknown): SessionUser | undefined {
   const user = isRecord(body) ? body['user'] : undefined;
   if (!isRecord(user) || typeof user['id'] !== 'string') return undefined;
   return { id: user['id'], email: text(user['email'], ''), name: text(user['name'], '') };
+}
+
+function signedInUser(body: unknown): SessionUser {
+  const user = userOf(body);
+  if (user === undefined)
+    throw new AdminApiError(500, 'ADMIN_SIGN_IN_ANSWER', 'The server did not say who signed in.', '');
+  return user;
 }
 
 function outcomeOf(value: Record<string, unknown>): BulkOutcome {
@@ -208,14 +234,18 @@ export function createAdminClient(options: AdminClientOptions = {}): AdminClient
   }
 
   return {
+    ...accountClient({
+      request: (method, path, body) => request(method, path, body === undefined ? {} : { body }),
+      userOf: signedInUser,
+      isNotFound: (error) => error instanceof AdminApiError && error.status === 404,
+    }),
     async session() {
       return userOf(await request('GET', '/api/auth/get-session'));
     },
     async signIn(email, password) {
-      const user = userOf(await request('POST', '/api/auth/sign-in/email', { body: { email, password } }));
-      if (user === undefined)
-        throw new AdminApiError(500, 'ADMIN_SIGN_IN_ANSWER', 'The server did not say who signed in.', '');
-      return user;
+      const body = await request('POST', '/api/auth/sign-in/email', { body: { email, password } });
+      if (isRecord(body) && body['twoFactorRedirect'] === true) return { kind: 'secondFactor' };
+      return { kind: 'signedIn', user: signedInUser(body) };
     },
     async signOut() {
       await request('POST', '/api/auth/sign-out', { body: {} });
