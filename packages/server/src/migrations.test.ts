@@ -93,6 +93,29 @@ describe('DATA-08 the migrate commands over a project', () => {
     expect(await makeMigration(await options(fixture))).toBeNull();
   });
 
+  it('PLG-06 the migration of a module that extends an entity makes the table of the extension, and does not touch the table of the entity', async () => {
+    const fixture = project({
+      'apps/server/src/modules/seo/module.ts': `import { defineModule } from '@bieberkit/core';
+import { defineExtension, f } from '@bieberkit/data';
+export default defineModule({
+  name: 'seo',
+  extends: { 'crm.Person': defineExtension({ table: 'seo_person_ext', fields: { seoTitle: f.string({ max: 70 }).optional() } }) },
+});
+`,
+    });
+    const opts = await options(fixture);
+    const made = await makeMigration(opts);
+    const up = made?.up.join('\n') ?? '';
+    expect(up).toMatch(/create table .?seo_person_ext/i);
+    expect(up).toMatch(/create table .?crm_people/i);
+    expect(up).not.toMatch(/alter table .?crm_people/i);
+    const crm = /create table .?crm_people[^;]*;/i.exec(up)?.[0] ?? '';
+    expect(crm).not.toContain('seo_title');
+    const run = await runMigrations(opts);
+    expect(run.migrations).toEqual([made?.name]);
+    expect((await migrationStatus(opts)).pending).toEqual([]);
+  });
+
   it('DATA-08 runs the steps of the framework and then the files of the project, and runs nothing the second time', async () => {
     const fixture = project();
     const opts = await options(fixture);

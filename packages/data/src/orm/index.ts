@@ -89,8 +89,16 @@ export type {
   PurgeOptions,
 } from './outbox.ts';
 export { bulkInsert, bulkUpdate } from './bulk.ts';
-export { compileEntities, entityOfSchema } from './compile.ts';
-export type { CompileOptions, OrmSchema } from './compile.ts';
+export { compileEntities, entityOfSchema, extensionsOfSchema } from './compile.ts';
+export {
+  applyExtensions,
+  extensionFieldsOf,
+  hasExtensions,
+  splitExtensionBody,
+  writeExtensions,
+} from './extensions.ts';
+export type { ExtensionWrite } from './extensions.ts';
+export type { CompileOptions, OrmSchema, StoredExtension } from './compile.ts';
 export {
   afterCommit,
   createDatabase,

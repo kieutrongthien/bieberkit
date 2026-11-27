@@ -54,6 +54,14 @@ export { seed } from './seed.ts';
 export type { SeedOptions, Seeded } from './seed.ts';
 export { ServerError } from './errors.ts';
 export { COLLECTORS } from './manifest.ts';
-export { allModules, contributed, contributedRecord, MODULES_DIR, projectModules } from './modules.ts';
+export {
+  allModules,
+  contributed,
+  contributedRecord,
+  entitiesOf,
+  extensionRefsOf,
+  MODULES_DIR,
+  projectModules,
+} from './modules.ts';
 export { CONFIG_FILE, envOwnersOf, findProjectRoot, importFile, loadConfig, loadProject } from './project.ts';
 export type { LoadedPlugin, Project, ProjectConfig } from './project.ts';

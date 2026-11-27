@@ -36,7 +36,6 @@ import {
 import type { ScopedPermission } from '@bieberkit/auth';
 import { createContainer, createLifecycle, exitCode, loadEnv, parseRole, registerModule } from '@bieberkit/core';
 import type { EnvSource, Role, SettingDef } from '@bieberkit/core';
-import type { EntityDef } from '@bieberkit/data';
 import { compileEntities, createDatabase, createOutboxDispatcher } from '@bieberkit/data/orm';
 import type { Database } from '@bieberkit/data/orm';
 import { createHttpServer, registerEntityRoutes, registerMeta, registerOpenApi } from '@bieberkit/http';
@@ -49,7 +48,7 @@ import { migrate } from './migrate.ts';
 import { settingsOf, settingsPolicyReader } from './policy.ts';
 import { createRuntimePlatform, permissionCatalog, registerRuntimeServices } from './services.ts';
 import { runMigrations } from './migrations.ts';
-import { allModules, contributed, contributedRecord } from './modules.ts';
+import { allModules, contributed, contributedRecord, entitiesOf } from './modules.ts';
 import { observe } from './observe.ts';
 import { envOwnersOf, loadProject } from './project.ts';
 
@@ -103,8 +102,8 @@ export async function boot(options: BootOptions): Promise<Running> {
     extra: envOwnersOf(project),
   });
 
-  const entities = contributed<EntityDef<string>>(modules, 'entities');
-  const schemas = compileEntities(entities);
+  const { entities, extensions } = entitiesOf(modules);
+  const schemas = compileEntities(entities, { extensions });
   const owners = envOwnersOf(project);
   const seen = await observe({
     role: options.role,

@@ -730,7 +730,12 @@ A plugin is a module packaged for reuse, with a manifest that the CLI and the ke
 
 ```ts
 import { definePlugin, env } from '@bieberkit/core'
-import { f } from '@bieberkit/data'
+import { defineExtension, f } from '@bieberkit/data'
+
+const PageSeo = defineExtension({
+  table: 'seo_page_ext',
+  fields: { seoTitle: f.string({ max: 70 }).optional(), noindex: f.boolean().default(false) },
+})
 
 export default definePlugin({
   name: '@bieberkit/plugin-seo',
@@ -740,7 +745,7 @@ export default definePlugin({
   dialects: ['postgres', 'mysql', 'sqlite'],
   env: { SEO_SITEMAP_CRON: env.string().default('0 3 * * *') },
   entities: [SeoMeta],
-  extends: { 'pages.Page': { fields: { seo: f.hasOne(() => SeoMeta) } } },
+  extends: { 'pages.Page': PageSeo },
   permissions: ['seo.read', 'seo.manage'],
   jobs: [generateSitemap],
   schedules: [{ job: generateSitemap, cron: 'SEO_SITEMAP_CRON' }],
@@ -799,7 +804,7 @@ The resolver is one pure function that reports every problem together, each with
 
 * **PLG-07** Each plugin publishes a static manifest in the `bieberkit` field of its `package.json`: `core`, `dialects`, `requires`, `conflicts` and the key lists `env`, `tables`, `routes`, `permissions` and `admin`. The CI check compares canonical text (keys sorted), so only a real difference fails it. It is generated from `definePlugin` at plugin build and checked against it in CI. The scaffolder reads first-party manifests bundled in `create-bieberkit`, so it can resolve the graph before anything is installed. Route collisions are checked again at kernel boot.
 
-- **PLG-06** Fields a plugin adds to another plugin's entity live in the extending plugin's own 1:1 extension table, never as columns in the target table. Ownership stays clear (MOD-01), the target plugin can upgrade its schema freely, and removing the extending plugin drops only its own table.
+- **PLG-06** Fields a plugin adds to another plugin's entity live in the extending plugin's own 1:1 extension table, never as columns in the target table. Ownership stays clear (MOD-01), the target plugin can upgrade its schema freely, and removing the extending plugin drops only its own table. The plugin declares them with `extends: { '<module>.<Entity>': defineExtension({ table, fields, permissions? }) }` (ADR 0033). The table has one row for each row of the target, found by a unique foreign key to it that is deleted with it (composite with `tenant_id` for a tenant target), and its fields are merged into the API, the metadata and the types of the target. They are read in one batched query and written in the transaction of the target, whose `version` covers them. A field that the target or another extension has, an unknown target and a table that is taken are boot errors (`DATA_EXTENSION_FIELD_CLASH`, `DATA_EXTENSION_TARGET_UNKNOWN`, `DATA_EXTENSION_TABLE_CLASH`). Filtering and sorting by an extension field, relation fields, and targets with hand-written routes are not supported yet.
 
 - **PLG-08** The resolver accepts exact versions, `^`, `~`, `>=` and `*`, and rejects pre-release tags, `||`, partial versions and `x` ranges with `PLG_BAD_RANGE`, so it needs no dependency (PKG-04). Plugin authors see the error when they build (ADR 0011).
 
@@ -1719,6 +1724,7 @@ Open questions:
 
 | Version | Date | Changes |
 | --- | --- | --- |
+| 0.8.25 | 2026-11-27 | M2.1 H2 (ADR 0033, ADR 0034): entity extensions, `extends` with `defineExtension` and a table of the extending plugin with one row for each row of the target (PLG-06); the example of 11.1 and the text of 11.3 |
 | 0.8.24 | 2026-11-27 | M2.1 H3: `bieberkit plugins` shows the graph with its edges and what each plugin owns, `make:plugin`, and `remove` that changes nothing when pnpm fails or the question is cancelled (PLG-03) |
 | 0.8.23 | 2026-11-27 | M2.1 H4: `check boundaries` for relative and `node_modules` paths into a plugin and for exports patterns (PLG-01), and the rule `plugin-tables` (PLG-02) |
 | 0.8.22 | 2026-11-27 | M2.1 H5: `DEPLOY_ID` names a deploy for DATA-08, `bieberkit migrate --deploy-id`, `BK_MIGRATE_REFUSED` names the waiting steps, and `BK_STEP_CONTRACT_NO_AFTER` |

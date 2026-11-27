@@ -127,6 +127,17 @@ The guard of the runner already refused a contract step in the deploy of its exp
 
 `packages/server/src/migrations.test.ts` proves it through the migrate role: refusal with `BK_MIGRATE_REFUSED` and the project files not run, the next deploy finishing the contract, the backfill of a row that the old version wrote between the two deploys (and the failure of a contract without one), a retry with the same id, `DEPLOY_ID` of the environment, and two migrate roles of one release. `plugin-migrate.dialects.test.ts` adds the retry case on the three dialects. `bieberkit check plugin-steps` warns about a contract step with no `after` (`BK_STEP_CONTRACT_NO_AFTER`), because the guard cannot protect it. The backfill stays a convention of the step: no code can tell whether a contract step repairs the rows that the old version wrote.
 
+## Slice H2: entity extensions (implemented)
+
+The design is [ADR 0033](../adr/0033-entity-extensions.md): `extends: { 'crm.Account': defineExtension({ table, fields, permissions? }) }` stores the fields in a 1:1 table of the extending plugin (the id of the target row is its key, with a composite `(tenant_id, id)` foreign key for a tenant target) and merges them into the API, the metadata and the types of the target through an effective entity, with one batched read and a write in the transaction of the target. It changes the data layer, the generated routes and the plugin contract, so by AGENTS.md (Workflow 6) the tests below were shown to the maintainer before any code was written (ADR 0033 is accepted). One decision changed while building it, and is recorded in ADR 0034: the extension row is keyed by a unique `record`, as the table of translations is, and not by the id of the target. The tests:
+
+- `packages/data/src/schema/extend.test.ts`: `defineExtension` and `resolveExtensions` (the declaration, the effective entity, the three boot errors).
+- `packages/testing/src/extends.dialects.test.ts`: the table, the API (create, read, update, version, validation, field permissions, tenant, delete, two plugins, `_meta`, the audit entry) and the boot errors, on three dialects.
+- `packages/server/src/manifest.test.ts`: the tables of the extensions are in the manifest.
+- `packages/cli/src/plugin.test.ts`: `remove` lists and drops the extension table and only it, and the plugin of the target cannot be removed first.
+
+Not in the slice: a filter, a sort or a search by an extension field, relation fields, and targets with hand-written routes (`media`, `users.User`).
+
 ## Slice H3: the plugin CLI (implemented)
 
 `bieberkit plugins` gives the graph: `edges` (`from`, `to` and the range), `requiredBy`, and what each plugin owns (`tables`, `routes` from its manifest), in the text and in `--json`, which say the same. `bieberkit make:plugin <name>` makes a plugin package (a `bieberkit-plugin-<name>` or `@scope/bieberkit-plugin-<name>` name, or `@bieberkit/plugin-<name>` with `--first-party`; the folder is `plugins/<name>` or `--dir`) with the header of the project, one entity with its permissions and generated routes, a test, a README and its `bieberkit` field, written as `bieberkit build` would derive it. It needs no application: `--author` and `--license` replace the project when there is none. The test makes a plugin, runs `bieberkit build --check` on it, resolves it on the three dialects, and runs `check headers`, `boundaries` and `plugin-tables` on what it wrote.

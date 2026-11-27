@@ -28,6 +28,7 @@ import { dataError } from '../errors.ts';
 import { uuid7 } from '../keys/uuid7.ts';
 import { defineEntity, snake, standardColumns, tableConstraints } from '../schema/define-entity.ts';
 import type { EntityDef } from '../schema/define-entity.ts';
+import type { ResolvedExtension } from '../schema/extend.ts';
 import { Field, f } from '../schema/fields.ts';
 import type { FieldDef } from '../schema/fields.ts';
 import { fold } from '../text/fold.ts';
@@ -44,12 +45,29 @@ export interface CompileOptions {
   readonly tenancy?: 'single' | 'shared-schema';
   /** Hand written schemas, added unchanged after the generated ones (ADR 0009, decision 8). */
   readonly raw?: readonly OrmSchema[];
+  /**
+   * The extensions that `resolveExtensions` checked. `defs` are then its effective entities, and the compiler makes the table of
+   * each extension and leaves the extension fields out of the table of the target (PLG-06, ADR 0033).
+   */
+  readonly extensions?: readonly ResolvedExtension[];
 }
 
 type Property = Record<string, unknown>;
 
 const DEFINITIONS = new WeakMap<object, EntityDef<string>>();
 const TRANSLATIONS = new WeakMap<object, OrmSchema>();
+const EXTENSIONS = new WeakMap<object, StoredExtension[]>();
+
+/** An extension of a schema: the schema that stores it and the names of its fields, which are not columns of the extended table. */
+export interface StoredExtension {
+  readonly schema: OrmSchema;
+  readonly fields: readonly string[];
+}
+
+/** The extensions of an entity, in the order of the plugins. Empty when nothing extends it. */
+export function extensionsOfSchema(schema: object): readonly StoredExtension[] {
+  return EXTENSIONS.get(schema) ?? [];
+}
 
 /** The schema that holds the translations of `schema`, if it has localized fields. */
 export function translationSchemaOf(schema: object): OrmSchema | undefined {
@@ -101,6 +119,10 @@ function translationOf(def: EntityDef<string>, tenant: boolean): EntityDef<strin
 }
 
 const DATETIME_PRECISION = 3;
+
+function omit<T>(source: Readonly<Record<string, T>>, names: ReadonlySet<string>): Record<string, T> {
+  return Object.fromEntries(Object.entries(source).filter(([name]) => !names.has(name)));
+}
 
 /** The function that fills a shadow column. The bulk helpers and the guard read which field and mode it belongs to. */
 export type ShadowFn = ((entity: Record<string, unknown>) => string | null) & {
@@ -299,7 +321,16 @@ function backRelation(owner: EntityDef<string>, field: string, target: EntityDef
 export function compileEntities(defs: readonly EntityDef<string>[], options: CompileOptions = {}): OrmSchema[] {
   const shared = (options.tenancy ?? 'shared-schema') === 'shared-schema';
   const translations = defs.flatMap((def) => translationOf(def, shared && def.tenant) ?? []);
-  const everything = [...defs, ...translations];
+  const extensions = options.extensions ?? [];
+  const stored = extensions.map((extension) => extension.entity);
+  // The fields that a target gets from its extensions are columns of the extension tables, never of its own.
+  const extended = new Map<string, Set<string>>();
+  for (const extension of extensions) {
+    const names = extended.get(extension.target) ?? new Set<string>();
+    for (const name of extension.fields) names.add(name);
+    extended.set(extension.target, names);
+  }
+  const everything = [...defs, ...translations, ...stored];
   const byName = new Map<string, EntityDef<string>>();
   for (const def of everything) {
     if (byName.has(def.name)) invalid(def.name, 'it is listed twice.', 'List each entity once.');
@@ -327,7 +358,10 @@ export function compileEntities(defs: readonly EntityDef<string>[], options: Com
     const columnOfProperty = new Map<string, string>();
     for (const column of standardColumns({ ...def, tenant })) columnOfProperty.set(column.column, column.property);
 
-    for (const [name, field] of Object.entries(def.fields)) {
+    const outside = extended.get(def.name);
+    // The definition without the fields of its extensions: what the table, its keys and its indexes are made from.
+    const bare = outside === undefined ? def : { ...def, fields: omit(def.fields, outside) };
+    for (const [name, field] of Object.entries(bare.fields)) {
       if (['id', 'createdAt', 'updatedAt'].includes(field.kind)) continue;
       const column = snake(name);
       if (field.kind === 'belongsTo') {
@@ -371,7 +405,7 @@ export function compileEntities(defs: readonly EntityDef<string>[], options: Com
       columnOfProperty.set(column, name);
     }
 
-    const effective = { ...def, tenant };
+    const effective = { ...bare, tenant };
     const constraints = tableConstraints(effective);
     const toProperties = (columns: readonly string[]): string[] =>
       columns.map(
@@ -415,6 +449,13 @@ export function compileEntities(defs: readonly EntityDef<string>[], options: Com
     } as never);
     DEFINITIONS.set(schema, def);
     compiled.set(def.name, { schema, def, tenant });
+  }
+
+  for (const extension of extensions) {
+    const base = schemaOf(extension.target);
+    const table = schemaOf(extension.entity.name);
+    if (base === undefined || table === undefined) continue;
+    EXTENSIONS.set(base, [...(EXTENSIONS.get(base) ?? []), { schema: table, fields: extension.fields }]);
   }
 
   for (const translation of translations) {

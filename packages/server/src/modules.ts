@@ -25,6 +25,8 @@
 import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import type { ModuleDef } from '@bieberkit/core';
+import { resolveExtensions } from '@bieberkit/data';
+import type { EntityDef, ExtensionDef, ExtensionRef, ResolvedEntities } from '@bieberkit/data';
 import { ServerError } from './errors.ts';
 import { importFile } from './project.ts';
 import type { Project } from './project.ts';
@@ -80,4 +82,28 @@ export function contributedRecord<T>(modules: readonly ModuleDef[], key: string)
     for (const [name, item] of Object.entries(value)) merged[name] = item;
   }
   return merged;
+}
+
+/** The extensions that the modules declare under `extends`, one for each entity that a module extends, in the order of the modules (PLG-06). */
+export function extensionRefsOf(modules: readonly ModuleDef[]): ExtensionRef[] {
+  return modules.flatMap((module) => {
+    const value: unknown = module.contributions['extends'];
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) return [];
+    // The package that owns the key declared its type, a record of extensions by the name of the entity.
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion
+    return Object.entries(value as Record<string, ExtensionDef>).map(([target, extension]) => ({
+      module: module.name,
+      target,
+      extension,
+    }));
+  });
+}
+
+/**
+ * The entities of the application: those of the modules, with the fields that other modules add to them (PLG-06, ADR 0033). Every
+ * reader of the entity list goes through here, so the routes, the metadata, the authorizer, the types and the compiler see the same one.
+ * `extensions` is what `compileEntities` needs to make the tables.
+ */
+export function entitiesOf(modules: readonly ModuleDef[]): ResolvedEntities {
+  return resolveExtensions(contributed<EntityDef<string>>(modules, 'entities'), extensionRefsOf(modules));
 }

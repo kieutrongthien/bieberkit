@@ -26,7 +26,7 @@ import { join } from 'node:path';
 import { AUTH_PLUGIN, authMigrationSteps } from '@bieberkit/auth';
 import { createLogger, loadEnv } from '@bieberkit/core';
 import type { CoreEnv, EnvSource } from '@bieberkit/core';
-import type { EntityDef, PluginMigrationStep } from '@bieberkit/data';
+import type { PluginMigrationStep } from '@bieberkit/data';
 import {
   compileEntities,
   createDatabase,
@@ -38,7 +38,7 @@ import {
 import type { AuditPrune, MadeMigration, Migrator, PluginRun } from '@bieberkit/data/orm';
 import { QUEUE_PLUGIN, queueMigrationSteps } from '@bieberkit/queue';
 import { ServerError } from './errors.ts';
-import { allModules, contributed } from './modules.ts';
+import { allModules, contributed, entitiesOf } from './modules.ts';
 import { envOwnersOf, loadProject } from './project.ts';
 
 /** The folder of the migration files and of the snapshots, in version control (spec section 9.3). */
@@ -85,9 +85,9 @@ async function withMigrator<T>(options: MigrationsOptions, run: (opened: Opened)
     envFile: join(project.root, '.env'),
     extra: envOwnersOf(project),
   });
-  const entities = contributed<EntityDef<string>>(modules, 'entities');
+  const { entities, extensions } = entitiesOf(modules);
   const migrator = await openMigrator(env, {
-    entities: compileEntities(entities),
+    entities: compileEntities(entities, { extensions }),
     directory: join(project.root, MIGRATIONS_DIR),
     logger: createLogger({ level: env.LOG_LEVEL, role: 'migrate' }),
   });
