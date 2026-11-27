@@ -24,7 +24,7 @@
 
 # 0034. The row of an extension is keyed by a unique `record`, not by the id of the target
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-11-27
 - Deciders: Bieber Kieu
 - Requirements: PLG-06, DATA-19, DATA-26, P1
