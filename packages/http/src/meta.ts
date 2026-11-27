@@ -65,6 +65,7 @@ export const META_SCHEMA: JsonSchema = {
           'fields',
           'form',
           'transitions',
+          'inline',
         ],
         properties: {
           name: text,
@@ -74,6 +75,23 @@ export const META_SCHEMA: JsonSchema = {
           can: flags(['read', 'create', 'update', 'delete']),
           features: strings,
           searchable: strings,
+          inline: {
+            type: 'array',
+            items: {
+              type: 'object',
+              required: ['name', 'entity', 'label', 'fields', 'form', 'can'],
+              properties: {
+                name: text,
+                entity: text,
+                label: { type: 'object', additionalProperties: text },
+                title: text,
+                fields: { type: 'array', items: { type: 'object', additionalProperties: true } },
+                form: strings,
+                can: flags(['create', 'update', 'delete']),
+              },
+              additionalProperties: false,
+            },
+          },
           softDelete: { type: 'boolean' },
           tenant: { type: 'boolean' },
           title: text,
@@ -165,8 +183,16 @@ interface StaticField {
   readonly update: string | undefined;
 }
 
+interface StaticInline {
+  readonly name: string;
+  readonly child: EntityDef<string>;
+  readonly fields: readonly Record<string, unknown>[];
+  readonly permissions: Readonly<Record<'create' | 'update' | 'delete', string>>;
+}
+
 interface StaticEntity {
   readonly def: EntityDef<string>;
+  readonly inline: readonly StaticInline[];
   readonly path: string;
   readonly fields: readonly StaticField[];
   readonly transitions: readonly {
@@ -253,6 +279,35 @@ function inputSchemaOf(input: unknown): JsonSchema | undefined {
   }
 }
 
+/** The inline collections of an entity: the fields of a line that a form edits, and the permissions to make, change and remove one (MOD-09). */
+function inlineOf(def: EntityDef<string>): StaticInline[] {
+  const found: StaticInline[] = [];
+  for (const [name, field] of Object.entries(def.fields)) {
+    if (field.kind !== 'hasMany' || field.inline !== true || field.target === undefined) continue;
+    const child = field.target();
+    const create = toJsonSchema(child, 'create');
+    const read = toJsonSchema(child, 'read');
+    const back = Object.entries(child.fields).find(
+      ([, other]) => other.kind === 'belongsTo' && other.target?.().name === def.name,
+    )?.[0];
+    const childKeys = new Map(apiFields(child).map((one) => [one.name, one.key]));
+    const keyOf = (one: string): string => childKeys.get(one) ?? one;
+    found.push({
+      name,
+      child,
+      fields: apiFields(child)
+        .filter((one) => one.name !== back && one.writable)
+        .map((one) => fieldOf(child, one, create, read, keyOf).descriptor),
+      permissions: {
+        create: permissionOf(child, 'create'),
+        update: permissionOf(child, 'update'),
+        delete: permissionOf(child, 'delete'),
+      },
+    });
+  }
+  return found;
+}
+
 function staticOf(def: EntityDef<string>): StaticEntity {
   const create = toJsonSchema(def, 'create');
   const read = toJsonSchema(def, 'read');
@@ -262,6 +317,7 @@ function staticOf(def: EntityDef<string>): StaticEntity {
   const keyOf = (name: string): string => keys.get(name) ?? name;
   return {
     def,
+    inline: inlineOf(def),
     path: base,
     fields: apiFields(def).map((field) => fieldOf(def, field, create, read, keyOf)),
     transitions: Object.entries(machine?.transitions ?? {}).map(([name, declared]) => ({
@@ -355,6 +411,21 @@ export function registerMeta(server: HttpServer, entities: readonly EntityDef<st
             delete: await can(permissions.delete),
           },
           features: [...def.features],
+          inline: await Promise.all(
+            entity.inline.map(async (line) => ({
+              name: line.name,
+              entity: line.child.name,
+              label: { ...line.child.label },
+              ...(line.child.admin.title === undefined ? {} : { title: line.child.admin.title }),
+              fields: line.fields,
+              form: line.fields.map((one) => String(one['key'])),
+              can: {
+                create: await can(line.permissions.create),
+                update: await can(line.permissions.update),
+                delete: await can(line.permissions.delete),
+              },
+            })),
+          ),
           // What `q` looks in, by the keys of the API, for the fields that the caller may read.
           searchable: searchableOf(def)
             .map((field) => field.key)

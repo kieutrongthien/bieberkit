@@ -60,6 +60,7 @@ export type {
   Meta,
   MetaEntity,
   MetaField,
+  MetaInline,
   MetaMenuItem,
   MetaTransition,
   When,
@@ -117,3 +118,5 @@ export {
   relatedOf,
 } from './related.ts';
 export type { HistoryEntry, Related } from './related.ts';
+export { editableInline, initialLines, lineProblems, linesBody, linesChanged, MAX_LINES, newLine } from './inline.ts';
+export type { Line } from './inline.ts';

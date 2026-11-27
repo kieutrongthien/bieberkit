@@ -39,7 +39,7 @@ import type { Database } from '@bieberkit/data/orm';
 import { createQueue, QUEUE_PLUGIN, queueMigrationSteps } from '@bieberkit/queue';
 import type { Queue } from '@bieberkit/queue';
 import { createBulkJob, JOBS_PATH, registerJobRoutes } from './bulk-job.ts';
-import { Account, Hidden, Note, Person } from './entity-app.ts';
+import { Account, AccountNote, Hidden, Note, Person } from './entity-app.ts';
 import { registerEntityRoutes } from './entity-routes.ts';
 import type { Authorizer, Principal } from './ports.ts';
 import { OTHER_TENANT, TENANT, testServer } from './testing.ts';
@@ -79,7 +79,7 @@ const allowAll: Authorizer = { can: async () => true };
 
 async function setup(options: { authorizer?: Authorizer; withQueue?: boolean } = {}) {
   const authorizer = options.authorizer ?? allowAll;
-  const schemas = compileEntities([Person, Account, Note, Hidden]);
+  const schemas = compileEntities([Person, Account, AccountNote, Note, Hidden]);
   const url = join(directory, `${randomUUID()}.db`);
   const db = await createDatabase(
     { DB_CONNECTION: 'sqlite', DATABASE_URL: url, DATABASE_READ_URLS: [], DB_POOL_MAX: 5 },

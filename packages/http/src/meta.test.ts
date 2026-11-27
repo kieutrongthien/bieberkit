@@ -52,6 +52,14 @@ interface Entity {
   can: Record<string, boolean>;
   features: string[];
   searchable?: string[];
+  inline?: {
+    name: string;
+    entity: string;
+    label: Record<string, string>;
+    fields: Field[];
+    form: string[];
+    can: Record<string, boolean>;
+  }[];
   fields: Field[];
   form: string[];
   list: string[];
@@ -176,6 +184,21 @@ describe('META-02 what it describes', () => {
     expect(field(account, 'visits')).toMatchObject({ filterable: true, sortable: true });
     expect(field(account, 'tier')).toMatchObject({ filterable: true });
     expect(field(account, 'note')).toMatchObject({ filterable: false });
+  });
+
+  it('MOD-09 describes the inline collections: the entity of the lines, the fields that a form edits, and what the caller may do', async () => {
+    const account = entity(await fetchMeta(), 'crm.Account');
+    expect(account.inline).toHaveLength(1);
+    const [notes] = account.inline ?? [];
+    expect(notes).toMatchObject({
+      name: 'notes',
+      entity: 'crm.AccountNote',
+      can: { create: true, update: true, delete: true },
+    });
+    // The relation back to the record is not a field of a line in a form, and the fields are the writable ones.
+    expect(notes?.fields.map((item) => item.key)).toEqual(['text', 'position']);
+    expect(notes?.form).toEqual(['text', 'position']);
+    expect(entity(await fetchMeta(), 'crm.Note').inline).toEqual([]);
   });
 
   it('UI-11 says which fields a search looks in, and which field names a row of a relation', async () => {

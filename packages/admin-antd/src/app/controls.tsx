@@ -49,11 +49,16 @@ export interface ControlProps {
   readonly value?: unknown;
   readonly checked?: boolean;
   readonly onChange?: (value: unknown) => void;
+  /** The name that a screen reader gives the control when no label points at it, as in a table. */
+  readonly label?: string;
 }
 
 export function Control(props: ControlProps): JSX.Element {
   const { field, id, onChange } = props;
-  const identity = id === undefined ? {} : { id };
+  const identity = {
+    ...(id === undefined ? {} : { id }),
+    ...(props.label === undefined ? {} : { 'aria-label': props.label }),
+  };
   const text = typeof props.value === 'string' ? props.value : undefined;
   const typed = (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>): void => onChange?.(event.target.value);
   switch (field.widget) {
@@ -81,7 +86,15 @@ export function Control(props: ControlProps): JSX.Element {
         />
       );
     case 'relation':
-      return <RelationSelect field={field} id={id} value={props.value} onChange={onChange} />;
+      return (
+        <RelationSelect
+          field={field}
+          id={id}
+          value={props.value}
+          onChange={onChange}
+          {...(props.label === undefined ? {} : { label: props.label })}
+        />
+      );
     case 'date':
       return <Input {...identity} type="date" value={text} onChange={typed} />;
     case 'datetime':

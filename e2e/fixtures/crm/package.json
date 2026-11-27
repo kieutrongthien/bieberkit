@@ -19,7 +19,8 @@
     "env": [],
     "tables": [
       "crm_accounts",
-      "crm_tickets"
+      "crm_tickets",
+      "crm_ticket_notes"
     ],
     "routes": [
       "/api/v1/crm/accounts",

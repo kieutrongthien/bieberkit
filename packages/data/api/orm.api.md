@@ -49,19 +49,19 @@ interface StoredExtension {
 export declare function extensionsOfSchema(schema: object): readonly StoredExtension[];
 export declare function entityOfSchema(schema: object): EntityDef<string>;
 export declare function compileEntities(defs: readonly EntityDef<string>[], options?: CompileOptions): OrmSchema[];
-type Row$7 = Record<string, unknown>;
+type Row$8 = Record<string, unknown>;
 interface AggregateOptions {
   readonly groupBy?: readonly string[];
   readonly sum?: readonly string[];
   readonly count?: boolean;
-  readonly where?: Row$7;
-  readonly scope?: Row$7;
+  readonly where?: Row$8;
+  readonly scope?: Row$8;
   readonly maxGroups?: number;
 }
 interface AggregateRow {
-  readonly group: Row$7;
+  readonly group: Row$8;
   readonly count?: number;
-  readonly sum?: Row$7;
+  readonly sum?: Row$8;
 }
 interface AggregateResult {
   readonly rows: AggregateRow[];
@@ -256,7 +256,7 @@ interface SequenceOptions {
   readonly now?: Date;
 }
 export declare function nextSequence(em: EntityManager, key: SequenceKey, options?: SequenceOptions): Promise<number>;
-type Row$6 = Record<string, unknown>;
+type Row$7 = Record<string, unknown>;
 interface TransitionResult {
   readonly name: string;
   readonly from: string;
@@ -269,9 +269,9 @@ interface AvailableTransition {
   readonly permission?: string;
 }
 export declare function transitionOf(schema: OrmSchema, name: string): TransitionDef;
-export declare function availableTransitions(schema: OrmSchema, row: Row$6): readonly AvailableTransition[];
+export declare function availableTransitions(schema: OrmSchema, row: Row$7): readonly AvailableTransition[];
 export declare function entityEventName(entity: string, name: string): string;
-export declare function transition(em: EntityManager, schema: OrmSchema, row: Row$6, name: string, input?: unknown): Promise<TransitionResult>;
+export declare function transition(em: EntityManager, schema: OrmSchema, row: Row$7, name: string, input?: unknown): Promise<TransitionResult>;
 export declare function retryOnDeadlock<T>(run: () => Promise<T>): Promise<T>;
 interface OutboxEvent {
   readonly name: string;
@@ -340,24 +340,24 @@ interface PurgeOptions {
   readonly now?: () => number;
 }
 export declare function purgeProcessed(db: Database, options?: PurgeOptions): Promise<number>;
+type Row$6 = Record<string, unknown>;
+export declare function bulkInsert(em: EntityManager, schema: OrmSchema, rows: readonly Row$6[]): Promise<void>;
+export declare function bulkUpdate(em: EntityManager, schema: OrmSchema, where: Row$6, data: Row$6): Promise<number>;
 type Row$5 = Record<string, unknown>;
-export declare function bulkInsert(em: EntityManager, schema: OrmSchema, rows: readonly Row$5[]): Promise<void>;
-export declare function bulkUpdate(em: EntityManager, schema: OrmSchema, where: Row$5, data: Row$5): Promise<number>;
-type Row$4 = Record<string, unknown>;
 export declare function extensionFieldsOf(schema: OrmSchema): ReadonlySet<string>;
 export declare function hasExtensions(schema: OrmSchema): boolean;
-export declare function applyExtensions(em: EntityManager, schema: OrmSchema, rows: readonly Row$4[]): Promise<void>;
+export declare function applyExtensions(em: EntityManager, schema: OrmSchema, rows: readonly Row$5[]): Promise<void>;
 interface ExtensionWrite {
   readonly schema: OrmSchema;
-  readonly body: Row$4;
+  readonly body: Row$5;
 }
-export declare function splitExtensionBody(schema: OrmSchema, body: Row$4): {
-  base: Row$4;
+export declare function splitExtensionBody(schema: OrmSchema, body: Row$5): {
+  base: Row$5;
   writes: ExtensionWrite[];
 };
-export declare function writeExtensions(em: EntityManager, record: Row$4, writes: readonly {
+export declare function writeExtensions(em: EntityManager, record: Row$5, writes: readonly {
   readonly schema: OrmSchema;
-  readonly data: Row$4;
+  readonly data: Row$5;
 }[]): Promise<void>;
 type RequestKysely = Kysely<StepDatabase>;
 export declare function requestKysely(db: Database): RequestKysely;
@@ -465,6 +465,10 @@ export declare class BieberEntityManager extends SqlEntityManager {
 }
 export declare function softDelete(em: EntityManager, row: Record<string, unknown>): void;
 export declare function restore(em: EntityManager, row: Record<string, unknown>): void;
+type Row$4 = Record<string, unknown>;
+export declare const MAX_INLINE_ROWS = 200;
+export declare function childEntities(em: EntityManager, schema: OrmSchema, back: string, parentId: string, limit?: number): Promise<Row$4[]>;
+export declare function childRows(em: EntityManager, schema: OrmSchema, back: string, parentId: string, limit?: number): Promise<Row$4[]>;
 export declare const READ_YOUR_WRITES_MS: number;
 interface ReadYourWrites {
   record(userId: string): Promise<void>;

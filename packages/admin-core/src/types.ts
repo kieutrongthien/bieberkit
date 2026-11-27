@@ -78,6 +78,19 @@ export interface MetaTransition {
   readonly input?: Readonly<Record<string, unknown>>;
 }
 
+/** A collection of lines that a form edits with the record (MOD-09). The lines are in the body of the record, under `name`. */
+export interface MetaInline {
+  readonly name: string;
+  readonly entity: string;
+  readonly label: Readonly<Record<string, string>>;
+  readonly title?: string;
+  /** The fields of a line that a person fills in. */
+  readonly fields: readonly MetaField[];
+  readonly form: readonly string[];
+  /** What the signed in user may do with the lines. */
+  readonly can: Readonly<Record<'create' | 'update' | 'delete', boolean>>;
+}
+
 export interface MetaEntity {
   /** `module.Entity`. */
   readonly name: string;
@@ -89,6 +102,8 @@ export interface MetaEntity {
   /** What the signed in user may do with the entity. */
   readonly can: Readonly<Record<'read' | 'create' | 'update' | 'delete', boolean>>;
   readonly features?: readonly string[];
+  /** The collections of lines that the form of this entity edits. */
+  readonly inline?: readonly MetaInline[];
   /** The keys of the fields that `q` looks in, when the entity can be searched. */
   readonly searchable?: readonly string[];
   readonly transitions?: readonly MetaTransition[];

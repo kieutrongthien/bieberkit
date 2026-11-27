@@ -1725,6 +1725,7 @@ Open questions:
 
 | Version | Date | Changes |
 | --- | --- | --- |
+| 0.8.33 | 2026-11-27 | MOD-09: inline collections are in the body and the answer of a record, are saved in its transaction with the permissions of the line entity, and the form edits them as a table (UI-11) |
 | 0.8.32 | 2026-11-27 | UI-11: the search of a list with `q` over the fields that are `searchable()` (folded, a prefix of the text), relation pickers with server search, the name of a related row in a list, and `include` with `fields` |
 | 0.8.31 | 2026-11-27 | UI-11: `.admin({ visibleWhen, requiredWhen })` on a field, conditions as data that the server enforces on create, update and bulk update and that `_meta` carries to the form |
 | 0.8.30 | 2026-11-27 | ADR 0035: the admin draws tables, forms and long lists with Ant Design and keeps their logic in pure functions of `admin-core`, so UI-01, UI-10 and UI-12 no longer name TanStack Table, Form and Virtual; axe is a dev dependency of the browser tests |

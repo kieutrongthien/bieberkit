@@ -475,3 +475,38 @@ test('UI-11 a relation is picked by typing, the picker asks the server to search
   await expect(page.getByRole('link', { name: 'REL-TICKET' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'MOV-1' })).toHaveCount(0);
 });
+
+test('MOD-09 the lines of a ticket are edited in its form, saved with it, and a line that is not valid is shown before anything is sent', async () => {
+  const page = shared;
+  await page.goto('/admin/crm/tickets/new');
+  await page.getByRole('textbox', { name: 'title' }).fill('LINES-1');
+  await page.getByRole('button', { name: 'Add Work note' }).click();
+  await page.getByRole('button', { name: 'Add Work note' }).click();
+  await page.getByRole('textbox', { name: 'Work note 1 text' }).fill('call the client');
+  // The second line has no text, which a line needs.
+  await page.getByRole('button', { name: 'Save' }).click();
+  await expect(page.getByText('Some lines are not valid')).toBeVisible();
+  await expect(page.getByRole('alert').filter({ hasText: 'This field is required' })).toHaveCount(1);
+  await expect(page).toHaveURL(/\/crm\/tickets\/new/);
+  await page.getByRole('textbox', { name: 'Work note 2 text' }).fill('write the report');
+  await page.getByRole('button', { name: 'Save' }).click();
+  await expect(page.getByRole('link', { name: 'LINES-1' })).toBeVisible();
+
+  // The lines come back when the row is opened, and a change of one and the removal of the other are saved.
+  await page.getByRole('link', { name: 'LINES-1' }).click();
+  await expect(page.getByRole('textbox', { name: 'Work note 1 text' })).toHaveValue('call the client');
+  await expect(page.getByRole('textbox', { name: 'Work note 2 text' })).toHaveValue('write the report');
+  await page.getByRole('textbox', { name: 'Work note 1 text' }).fill('called the client');
+  await page.getByRole('button', { name: 'Remove Work note 2' }).click();
+  await page.getByRole('button', { name: 'Save' }).click();
+  await expect(page.getByRole('link', { name: 'LINES-1' })).toBeVisible();
+  await page.getByRole('link', { name: 'LINES-1' }).click();
+  await expect(page.getByRole('textbox', { name: 'Work note 1 text' })).toHaveValue('called the client');
+  await expect(page.getByRole('textbox', { name: 'Work note 2 text' })).toHaveCount(0);
+
+  // A save that changes the title and leaves the lines alone does not touch them.
+  await page.getByRole('textbox', { name: 'title' }).fill('LINES-1 renamed');
+  await page.getByRole('button', { name: 'Save' }).click();
+  await page.getByRole('link', { name: 'LINES-1 renamed' }).click();
+  await expect(page.getByRole('textbox', { name: 'Work note 1 text' })).toHaveValue('called the client');
+});

@@ -59,6 +59,8 @@ export const Account: EntityDef<'crm.Account'> = defineEntity({
     active: f.boolean().default(true),
     balance: f.money({ currency: 'VND' }).optional(),
     note: f.text({ max: 500 }).optional(),
+    // Lines that are edited with the account and saved with it (MOD-09).
+    notes: f.hasMany(() => AccountNote).inline(),
     // Shown and required for an account that is not active (UI-11).
     reason: f
       .string({ max: 100 })
@@ -97,6 +99,19 @@ export const Account: EntityDef<'crm.Account'> = defineEntity({
   admin: { title: 'name', list: ['code', 'name', 'owner', 'status'] },
 });
 
+/** A line of an account, with no routes of its own: it is edited inside the account (MOD-09). */
+export const AccountNote: EntityDef<'crm.AccountNote'> = defineEntity({
+  name: 'crm.AccountNote',
+  table: 'crm_account_notes',
+  tenant: true,
+  fields: {
+    id: f.id(),
+    account: f.belongsTo(() => Account).index(),
+    text: f.string({ min: 1, max: 50 }),
+    position: f.int({ min: 0 }).default(0),
+  },
+});
+
 /** No soft delete, and a delete route: a row is removed. */
 export const Note: EntityDef<'crm.Note'> = defineEntity({
   name: 'crm.Note',
@@ -126,7 +141,7 @@ export interface EntityApp {
 
 /** A server whose user may do everything, over a fresh in-memory SQLite database that holds the sample entities. */
 export async function entityApp(options: HttpServerOptions = {}, env?: HttpEnv): Promise<EntityApp> {
-  const schemas = compileEntities([Person, Account, Note, Hidden]);
+  const schemas = compileEntities([Person, Account, AccountNote, Note, Hidden]);
   const queries: string[] = [];
   const db = await createDatabase(
     { DB_CONNECTION: 'sqlite', DATABASE_URL: ':memory:', DATABASE_READ_URLS: [], DB_POOL_MAX: 1 },

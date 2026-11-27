@@ -57,6 +57,19 @@ export const Account = defineEntity({
   admin: { title: 'name', list: ['code', 'name', 'tier', 'visits', 'active'] },
 });
 
+// A line of a ticket: it has no routes, and the form of the ticket edits it (MOD-09).
+export const TicketNote = defineEntity({
+  name: 'crm.TicketNote',
+  table: 'crm_ticket_notes',
+  fields: {
+    id: f.id(),
+    ticket: f.belongsTo(() => Ticket).index(),
+    text: f.string({ min: 1, max: 60 }),
+    hours: f.int({ min: 0, max: 99 }).default(0),
+  },
+  label: { en: 'Work note', vi: 'Ghi chú công việc', zh: '工作记录' },
+});
+
 export const Ticket = defineEntity({
   name: 'crm.Ticket',
   table: 'crm_tickets',
@@ -79,6 +92,7 @@ export const Ticket = defineEntity({
         reopen: { from: ['closed'], to: 'open', permission: 'crm.ticket.close' },
       },
     }),
+    notes: f.hasMany(() => TicketNote).inline(),
     createdAt: f.createdAt(),
     updatedAt: f.updatedAt(),
   },
@@ -99,5 +113,5 @@ export default definePlugin({
   core: '*',
   dialects: ['postgres', 'mysql', 'sqlite'],
   permissions: ['crm.account.read', 'crm.account.write', 'crm.ticket.read', 'crm.ticket.write', 'crm.ticket.close'],
-  entities: [Account, Ticket],
+  entities: [Account, Ticket, TicketNote],
 });

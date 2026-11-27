@@ -30,9 +30,14 @@ import {
   draftKey,
   formatDateTime,
   formFieldsOf,
+  editableInline,
+  initialLines,
   initialValues,
   isDirty,
   labelOf,
+  lineProblems,
+  linesBody,
+  linesChanged,
   loadDraft,
   prefillOf,
   reapply,
@@ -42,7 +47,7 @@ import {
   shortcutOf,
   statesOf,
 } from '@bieberkit/admin-core';
-import type { MetaEntity, MetaTransition, Row } from '@bieberkit/admin-core';
+import type { Line, MetaEntity, MetaTransition, Row } from '@bieberkit/admin-core';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useBlocker, useNavigate, useParams, useSearch } from '@tanstack/react-router';
 import { Alert, App, Button, Card, Descriptions, Form, Result, Space, Table, Tabs } from 'antd';
@@ -51,6 +56,7 @@ import type { JSX } from 'react';
 import { Control, fromControl, rulesOf, toControl } from './controls.tsx';
 import { useClient, useEntity, useMeta } from './context.ts';
 import { RowMoves } from './moves.tsx';
+import { LinesEditor } from './Lines.tsx';
 import { History, RelatedRows } from './Related.tsx';
 import { useLanguage, useT } from './language.tsx';
 
@@ -84,6 +90,18 @@ function Editor(props: {
   const [conflict, setConflict] = useState<Row | undefined>();
   const [busy, setBusy] = useState(false);
   const [dirty, setDirty] = useState(false);
+  // The lines that the form edits with the record, by collection, and whether a first try to save has shown what is wrong with them.
+  const [lines, setLines] = useState<Record<string, readonly Line[]>>(() => initialLines(entity, props.row));
+  const [tried, setTried] = useState(false);
+  const collections = editableInline(entity);
+  const startLines = initialLines(entity, base);
+  /** The collections whose lines are not what the form started from. */
+  const changedLines = (now: Readonly<Record<string, readonly Line[]>> = lines): Set<string> =>
+    new Set(
+      collections
+        .filter((inline) => linesChanged(inline, startLines[inline.name] ?? [], now[inline.name] ?? []))
+        .map((inline) => inline.name),
+    );
   const leaving = useRef(false);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const where = entity.path.replace('/api/v1/', '');
@@ -118,10 +136,16 @@ function Editor(props: {
     ),
   );
 
+  const editLines = (name: string, next: readonly Line[]): void => {
+    const all = { ...lines, [name]: next };
+    setLines(all);
+    setDirty(isDirty(initial, current()) || changedLines(all).size > 0);
+  };
+
   const changed = (): void => {
     const values = current();
     const now = isDirty(initial, values);
-    setDirty(now);
+    setDirty(now || changedLines().size > 0);
     clearTimeout(timer.current);
     // A draft is kept a moment after the last key, and goes when the form is the same as the row again.
     timer.current = setTimeout(() => {
@@ -167,9 +191,29 @@ function Editor(props: {
       const body = Object.fromEntries(
         Object.entries(bodyOf(entity, converted, updating)).filter(([name]) => visible.has(name)),
       );
+      // A line that the API would refuse is shown, and nothing is sent.
+      setTried(true);
+      if (
+        collections.some((inline) => (lines[inline.name] ?? []).some((line) => lineProblems(inline, line).length > 0))
+      ) {
+        void message.error(t('lines.invalid'));
+        return;
+      }
+      Object.assign(
+        body,
+        linesBody(
+          entity,
+          lines,
+          base === undefined ? new Set(collections.map((inline) => inline.name)) : changedLines(),
+        ),
+      );
       if (base === undefined) await client.create(entity, body);
       else await client.update(entity, String(base['id']), body, Number(base['version']));
+      // The row that was cached is not the row any more, and a person who opens it again must not see the old values.
       await queries.invalidateQueries({ queryKey: ['list', entity.name] });
+      // A cached row is shown first when it is opened again, so it is dropped and not only marked stale.
+      queries.removeQueries({ queryKey: ['row', entity.name] });
+      queries.removeQueries({ queryKey: ['history', entity.name] });
       clearTimeout(timer.current);
       clearDraft(window.localStorage, key);
       leaving.current = true;
@@ -207,6 +251,9 @@ function Editor(props: {
     clearDraft(window.localStorage, key);
     setDirty(false);
     setConflict(undefined);
+    // The answer of a 412 is the row without its lines, so the lines are read again.
+    if (collections.length > 0)
+      void client.get(entity, String(conflict['id'])).then((row) => setLines(initialLines(entity, row)));
   };
   const keepMine = (): void => {
     if (conflict === undefined || merge === undefined) return;
@@ -339,6 +386,16 @@ function Editor(props: {
               <Control field={field} />
             </Form.Item>
           ))}
+        {collections.map((inline) => (
+          <Form.Item key={inline.name} label={labelOf({ ...entity, label: inline.label }, locale)}>
+            <LinesEditor
+              inline={inline}
+              lines={lines[inline.name] ?? []}
+              checked={tried}
+              onChange={(next) => editLines(inline.name, next)}
+            />
+          </Form.Item>
+        ))}
         <Space>
           {canSave ? (
             <Button type="primary" htmlType="submit" loading={busy}>

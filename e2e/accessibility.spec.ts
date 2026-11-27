@@ -138,6 +138,20 @@ test('UI-07 a form with a relation picker, closed and with its list open, has no
   expect(await violations(page)).toEqual([]);
 });
 
+test('UI-07 a form with the lines of a record, empty, with lines, and with a line that is not valid, has no violation of WCAG 2.2 AA', async () => {
+  const page = shared;
+  await page.goto('/admin/crm/tickets/new');
+  await expect(page.getByRole('button', { name: 'Add Work note' })).toBeVisible();
+  expect(await violations(page)).toEqual([]);
+  await page.getByRole('button', { name: 'Add Work note' }).click();
+  await page.getByRole('button', { name: 'Add Work note' }).click();
+  await page.getByRole('textbox', { name: 'Work note 1 text' }).fill('one');
+  await page.getByRole('textbox', { name: 'title' }).fill('AXE-LINES');
+  await page.getByRole('button', { name: 'Save' }).click();
+  await expect(page.getByRole('alert').filter({ hasText: 'This field is required' })).toHaveCount(1);
+  expect(await violations(page)).toEqual([]);
+});
+
 test('UI-07, UI-16 the list of cards at 360 px has no violation of WCAG 2.2 AA', async () => {
   const page = shared;
   await page.setViewportSize({ width: 360, height: 740 });

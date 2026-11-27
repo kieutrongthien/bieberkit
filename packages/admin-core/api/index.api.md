@@ -101,6 +101,15 @@ interface MetaTransition {
   readonly path: string;
   readonly input?: Readonly<Record<string, unknown>>;
 }
+interface MetaInline {
+  readonly name: string;
+  readonly entity: string;
+  readonly label: Readonly<Record<string, string>>;
+  readonly title?: string;
+  readonly fields: readonly MetaField[];
+  readonly form: readonly string[];
+  readonly can: Readonly<Record<"create" | "update" | "delete", boolean>>;
+}
 interface MetaEntity {
   readonly name: string;
   readonly path: string;
@@ -108,6 +117,7 @@ interface MetaEntity {
   readonly operations: Readonly<Record<"list" | "get" | "create" | "update" | "delete", boolean>>;
   readonly can: Readonly<Record<"read" | "create" | "update" | "delete", boolean>>;
   readonly features?: readonly string[];
+  readonly inline?: readonly MetaInline[];
   readonly searchable?: readonly string[];
   readonly transitions?: readonly MetaTransition[];
   readonly softDelete: boolean;
@@ -338,6 +348,11 @@ declare const en: {
   readonly "relation.search": "Type to search";
   readonly "relation.pick": "Pick one";
   readonly "relation.none": "Nothing found";
+  readonly "lines.invalid": "Some lines are not valid";
+  readonly "lines.none": "No lines yet";
+  readonly "lines.add": "Add {name}";
+  readonly "lines.remove": "Remove";
+  readonly "lines.removeLine": "Remove {name}";
   readonly "list.op.eq": "is";
   readonly "list.op.ne": "is not";
   readonly "list.op.in": "is one of";
@@ -467,6 +482,17 @@ interface FieldStates {
 export declare function statesOf(fields: readonly MetaField[], values: Readonly<Record<string, unknown>>): FieldStates;
 export declare function visibleValues(fields: readonly MetaField[], values: Readonly<Record<string, unknown>>): Record<string, unknown>;
 export declare const conditionalFields: (entity: MetaEntity) => readonly MetaField[];
+type Line = Record<string, unknown>;
+export declare const MAX_LINES = 200;
+export declare const editableInline: (entity: MetaEntity) => readonly MetaInline[];
+export declare function initialLines(entity: MetaEntity, row?: Row): Record<string, Line[]>;
+export declare function linesBody(entity: MetaEntity, lines: Readonly<Record<string, readonly Line[]>>, changed: ReadonlySet<string>): Record<string, Row[]>;
+export declare function lineProblems(inline: MetaInline, line: Readonly<Line>): {
+  key: string;
+  problem: ValueProblem;
+}[];
+export declare function linesChanged(inline: MetaInline, start: readonly Line[], now: readonly Line[]): boolean;
+export declare const newLine: (inline: MetaInline) => Line;
 export declare const packageName = "@bieberkit/admin-core";
-export { type AdminClient, type AdminClientOptions, type BulkOperation, type BulkOutcome, type BulkResult, type Conflict, type Connection, type ConnectionEvent, type CsvColumn, type Dictionary, type DraftStorage, en as ENGLISH, type ErrorReport, type FieldProblem, type FieldStates, type Filter, type FilterOperator, type HistoryEntry, type KeyPress, type ListParams, type Locale, type MessageKey, type Meta, type MetaEntity, type MetaField, type MetaMenuItem, type MetaTransition, type Page, type Related, type Row, type SavedView, type SessionUser, type Shortcut, type ValueProblem, type Vital, type VitalReport, type When };
+export { type AdminClient, type AdminClientOptions, type BulkOperation, type BulkOutcome, type BulkResult, type Conflict, type Connection, type ConnectionEvent, type CsvColumn, type Dictionary, type DraftStorage, en as ENGLISH, type ErrorReport, type FieldProblem, type FieldStates, type Filter, type FilterOperator, type HistoryEntry, type KeyPress, type Line, type ListParams, type Locale, type MessageKey, type Meta, type MetaEntity, type MetaField, type MetaInline, type MetaMenuItem, type MetaTransition, type Page, type Related, type Row, type SavedView, type SessionUser, type Shortcut, type ValueProblem, type Vital, type VitalReport, type When };
 ```
