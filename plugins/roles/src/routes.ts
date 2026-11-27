@@ -262,6 +262,11 @@ export const routes: readonly RouteDef[] = [
       const name = field(ctx.body, 'name');
       const requireMfa = field(ctx.body, 'requireMfa');
       const ipRestricted = field(ctx.body, 'ipRestricted');
+      const wanted = field(ctx.body, 'permissions');
+      // A system role refuses permissions, so they go first for it: a request that is refused writes nothing, and not the
+      // `requireMfa` that it would have taken (ROL-06).
+      if (wanted !== undefined && (await getRole(database, id)).system)
+        await setRolePermissions(database, id, toList(wanted));
       if (typeof name === 'string' || typeof requireMfa === 'boolean' || typeof ipRestricted === 'boolean') {
         await updateRole(database, id, {
           ...(typeof name === 'string' ? { name } : {}),
@@ -269,7 +274,6 @@ export const routes: readonly RouteDef[] = [
           ...(typeof ipRestricted === 'boolean' ? { ipRestricted } : {}),
         });
       }
-      const wanted = field(ctx.body, 'permissions');
       if (wanted !== undefined) await setRolePermissions(database, id, toList(wanted));
       return (await rolesOf(ctx, id))[0];
     },

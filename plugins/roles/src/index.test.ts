@@ -107,6 +107,10 @@ it('ROL-06 the PATCH of a system role takes requireMfa from a holder of the admi
   const holder = await app.actingAs(userId, ['manager']);
   const renamed = await holder.patch(`${ROLES}/${id}`, { name: 'boss' }, 0);
   expect([renamed.status, renamed.body['code']]).toEqual([409, 'AUTH_ROLE_SYSTEM']);
+  const mixed = await holder.patch(`${ROLES}/${id}`, { requireMfa: true, permissions: ['roles.read'] }, 0);
+  expect([mixed.status, mixed.body['code']]).toEqual([409, 'AUTH_ROLE_SYSTEM']);
+  // A request that is refused writes nothing, not the part of it that would have been allowed.
+  expect((await admin.get(`${ROLES}/${id}`)).body['requireMfa']).toBe(false);
   const changed = await holder.patch(`${ROLES}/${id}`, { requireMfa: true }, 0);
   expect([changed.status, changed.body['requireMfa']]).toEqual([200, true]);
   await app.close();
