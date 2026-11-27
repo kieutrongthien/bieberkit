@@ -96,3 +96,15 @@ The logic is in `@bieberkit/admin-core`, testable without a browser, and the ada
 - **Reports (UI-21).** `errorReport`, `vitalReport`, `routeShape` and `sampled` build what would be sent: kind, a message without emails or long numbers and tokens, file and line of the frames, the route with ids as `:id`, a sample. What is open: the endpoint of the server that forwards a report to the error reporter, and the browser side that sends it.
 
 Not browser-tested here: the Playwright run needs the browser of the pinned version, which this machine does not have. The behavior above is covered by unit tests of the logic, the type check and the build.
+
+## The list: filters, views, bulk delete and export (UI-03)
+
+The logic is in `lists.ts` of `@bieberkit/admin-core`, and `ListScreen` wires it:
+
+- **Filters.** A `Filter` is a field, an operator and a text. `operatorsOf` gives the operators that the API takes for a kind (`eq ne in null` for text and `oneOf`, the range operators for numbers and dates, `eq null` for a boolean, `eq in null` for a relation). `filterProblem` refuses what the API would refuse: a field that is unknown or not `filterable`, a wrong operator, a value that is not a number, a date or one of the `oneOf` values. `filterParams` makes `filter[field][op]=value`, and `client.list` takes `filters` and throws before any call when one is wrong.
+- **In the address.** The filters (as JSON) and the sort are the search of the route (`viewToSearch`, `viewFromSearch`), so a link or the back button gives the same list. A filter in the address that no longer fits the metadata is dropped.
+- **Views.** `saveView`, `loadViews`, `deleteView` keep named views in `localStorage` under `bk-views:<user>:<entity>`: at most 20, a name saved twice is replaced where it stands, a storage that refuses or holds a broken text gives no view and no error.
+- **Bulk delete.** Rows are selected in the table (when the user may delete), and `client.bulk` calls `POST {path}/bulk` with the version that was read. `bulkSummary` counts what worked and lists each row that did not, with the reason of the API (a 409-like `conflict`, `not_found`, `invalid`). A call above 100 rows is a job, and the screen says so.
+- **Export.** CSV of the columns of the list, for the current filters and sort, read in pages of 100 up to 10,000 rows (`exportPages`); the screen says when the file was cut. A text that starts with `= + - @`, a tab or a CR gets a quote mark in front, so a spreadsheet does not run it (IO-04).
+
+Not done in this slice: bulk update and transitions from the screen (the client supports them), a filter on a field of an extension, `visibleWhen`/`requiredWhen`, child tables, relation pickers and file fields. Not browser-tested: unit tests of the logic, the type check and the build only.

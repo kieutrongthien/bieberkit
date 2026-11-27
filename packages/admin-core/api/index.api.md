@@ -28,6 +28,75 @@
 Generated from the built declaration files by `pnpm api:update`. Do not edit by hand. A change here is a change to the public API and needs a changeset (spec section 22.3).
 
 ```ts
+interface DraftStorage {
+  getItem(key: string): string | null;
+  setItem(key: string, value: string): void;
+  removeItem(key: string): void;
+}
+type Values = Readonly<Record<string, unknown>>;
+export declare function isDirty(initial: Values, current: Values): boolean;
+export declare const draftKey: (entity: string, id: string | undefined, userId: string) => string;
+export declare function saveDraft(storage: DraftStorage, key: string, values: Values, now: number, skip?: ReadonlySet<string>): void;
+export declare function loadDraft(storage: DraftStorage, key: string, now: number): Record<string, unknown> | undefined;
+export declare function clearDraft(storage: DraftStorage, key: string): void;
+interface Conflict {
+  readonly key: string;
+  readonly base: unknown;
+  readonly mine: unknown;
+  readonly theirs: unknown;
+}
+export declare function reapply(base: Values, mine: Values, theirs: Values): {
+  values: Record<string, unknown>;
+  conflicts: Conflict[];
+};
+type FilterOperator = "eq" | "ne" | "in" | "lt" | "lte" | "gt" | "gte" | "null";
+interface Filter {
+  readonly field: string;
+  readonly op: FilterOperator;
+  readonly value: string;
+}
+export declare function operatorsOf(kind: string): readonly FilterOperator[];
+export declare function filterProblem(entity: MetaEntity, filter: Filter): string | undefined;
+export declare function filterParams(entity: MetaEntity, filters: readonly Filter[]): Record<string, string>;
+interface SavedView {
+  readonly name: string;
+  readonly filters: readonly Filter[];
+  readonly sort?: string;
+}
+export declare const viewsKey: (entity: string, userId: string) => string;
+export declare function loadViews(storage: DraftStorage, key: string): SavedView[];
+export declare function saveView(storage: DraftStorage, key: string, view: SavedView): void;
+export declare function deleteView(storage: DraftStorage, key: string, name: string): void;
+export declare function viewToSearch(view: SavedView): {
+  filters?: string;
+  sort?: string;
+};
+export declare function viewFromSearch(search: Readonly<Record<string, unknown>>): SavedView;
+interface CsvColumn {
+  readonly key: string;
+  readonly title: string;
+}
+export declare function csvOf(columns: readonly CsvColumn[], rows: readonly Readonly<Record<string, unknown>>[]): string;
+export declare function exportPages(total: number, pageSize: number, limit: number): {
+  pages: number;
+  truncated: boolean;
+};
+interface BulkOutcome {
+  readonly id: string;
+  readonly status: string;
+  readonly version?: number;
+  readonly error?: {
+    readonly code: string;
+    readonly message: string;
+  };
+}
+export declare function bulkSummary(outcomes: readonly BulkOutcome[]): {
+  ok: number;
+  failed: {
+    id: string;
+    message: string;
+  }[];
+};
 interface MetaField {
   readonly key: string;
   readonly kind: string;
@@ -84,7 +153,25 @@ interface ListParams {
   readonly pageSize?: number;
   readonly sort?: string;
   readonly fields?: readonly string[];
+  readonly filters?: readonly Filter[];
 }
+type BulkOperation = {
+  readonly operation: "update";
+  readonly data: Row;
+} | {
+  readonly operation: "delete";
+} | {
+  readonly operation: "transition";
+  readonly transition: string;
+  readonly input?: Row;
+};
+type BulkResult = {
+  readonly kind: "done";
+  readonly outcomes: readonly BulkOutcome[];
+} | {
+  readonly kind: "queued";
+  readonly jobId: string;
+};
 interface FieldProblem {
   readonly path: string;
   readonly code: string;
@@ -112,6 +199,10 @@ interface AdminClient {
   create(entity: MetaEntity, body: Row): Promise<Row>;
   update(entity: MetaEntity, id: string, body: Row, version: number): Promise<Row>;
   remove(entity: MetaEntity, id: string, version: number): Promise<void>;
+  bulk(entity: MetaEntity, items: readonly {
+    readonly id: string;
+    readonly version: number;
+  }[], change: BulkOperation): Promise<BulkResult>;
 }
 export declare function createAdminClient(options?: AdminClientOptions): AdminClient;
 type Locale = "en" | "vi" | "zh";
@@ -139,6 +230,35 @@ declare const en: {
   readonly "list.confirmDelete": "Delete this row?";
   readonly "list.loadError": "The list could not be loaded";
   readonly "list.missing": "This screen does not exist, or it is not open to you.";
+  readonly "list.filter": "Filter";
+  readonly "list.filterField": "Field";
+  readonly "list.filterOp": "Condition";
+  readonly "list.filterValue": "Value";
+  readonly "list.filterAdd": "Add filter";
+  readonly "list.filterClear": "Clear filters";
+  readonly "list.filterNull": "Empty or not";
+  readonly "list.views": "Saved views";
+  readonly "list.viewName": "Name of the view";
+  readonly "list.viewSave": "Save view";
+  readonly "list.viewDelete": "Delete view";
+  readonly "list.viewSaved": "View saved";
+  readonly "list.selected": "{count} selected";
+  readonly "list.deleteSelected": "Delete selected";
+  readonly "list.confirmDeleteMany": "Delete {count} rows?";
+  readonly "list.bulkDone": "{count} rows done";
+  readonly "list.bulkFailed": "{count} rows were not changed: {why}";
+  readonly "list.bulkQueued": "This is a large change. It runs in the background.";
+  readonly "list.export": "Export CSV";
+  readonly "list.exportTruncated": "The file holds the first {limit} rows only. Narrow the filters to get the rest.";
+  readonly "list.exportError": "The export failed";
+  readonly "list.op.eq": "is";
+  readonly "list.op.ne": "is not";
+  readonly "list.op.in": "is one of";
+  readonly "list.op.lt": "is less than";
+  readonly "list.op.lte": "is at most";
+  readonly "list.op.gt": "is more than";
+  readonly "list.op.gte": "is at least";
+  readonly "list.op.null": "is empty";
   readonly "form.saved": "Saved";
   readonly "form.notSaved": "The row was not saved";
   readonly "form.edit": "Edit {name}";
@@ -191,27 +311,6 @@ type ConnectionEvent = "online" | "offline" | "request-failed" | "request-ok";
 export declare function connection(state: Connection, event: ConnectionEvent): Connection;
 export declare function isChunkError(error: unknown): boolean;
 export declare function chunkReload(now: number, lastReloadAt: number | undefined): "reload" | "show";
-interface DraftStorage {
-  getItem(key: string): string | null;
-  setItem(key: string, value: string): void;
-  removeItem(key: string): void;
-}
-type Values = Readonly<Record<string, unknown>>;
-export declare function isDirty(initial: Values, current: Values): boolean;
-export declare const draftKey: (entity: string, id: string | undefined, userId: string) => string;
-export declare function saveDraft(storage: DraftStorage, key: string, values: Values, now: number, skip?: ReadonlySet<string>): void;
-export declare function loadDraft(storage: DraftStorage, key: string, now: number): Record<string, unknown> | undefined;
-export declare function clearDraft(storage: DraftStorage, key: string): void;
-interface Conflict {
-  readonly key: string;
-  readonly base: unknown;
-  readonly mine: unknown;
-  readonly theirs: unknown;
-}
-export declare function reapply(base: Values, mine: Values, theirs: Values): {
-  values: Record<string, unknown>;
-  conflicts: Conflict[];
-};
 type Shortcut = "save" | "new" | "search";
 interface KeyPress {
   readonly key: string;
@@ -245,5 +344,5 @@ interface VitalReport extends Vital {
 export declare function vitalReport(vital: Vital, path: string): VitalReport;
 export declare function sampled(rate: number, random?: () => number): boolean;
 export declare const packageName = "@bieberkit/admin-core";
-export type { AdminClient, AdminClientOptions, Conflict, Connection, ConnectionEvent, DraftStorage, ErrorReport, FieldProblem, KeyPress, ListParams, Locale, MessageKey, Meta, MetaEntity, MetaField, MetaMenuItem, Page, Row, SessionUser, Shortcut, Vital, VitalReport };
+export type { AdminClient, AdminClientOptions, BulkOperation, BulkOutcome, BulkResult, Conflict, Connection, ConnectionEvent, CsvColumn, DraftStorage, ErrorReport, FieldProblem, Filter, FilterOperator, KeyPress, ListParams, Locale, MessageKey, Meta, MetaEntity, MetaField, MetaMenuItem, Page, Row, SavedView, SessionUser, Shortcut, Vital, VitalReport };
 ```

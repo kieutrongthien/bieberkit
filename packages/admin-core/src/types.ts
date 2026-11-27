@@ -22,6 +22,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type { BulkOutcome, Filter } from './lists.ts';
+
 /** One field of an entity as the metadata describes it. The admin draws a control from `widget` and checks with `validation`. */
 export interface MetaField {
   readonly key: string;
@@ -98,4 +100,17 @@ export interface ListParams {
   readonly sort?: string;
   /** The keys to read, so that a wide entity stays fast (UI-15). Without it the API sends every field. */
   readonly fields?: readonly string[];
+  /** Conditions of the list, as `filter[field][op]=value`. They are checked against the metadata before they are sent (UI-03). */
+  readonly filters?: readonly Filter[];
 }
+
+/** What a bulk call does to the rows that it names (API-14). */
+export type BulkOperation =
+  | { readonly operation: 'update'; readonly data: Row }
+  | { readonly operation: 'delete' }
+  | { readonly operation: 'transition'; readonly transition: string; readonly input?: Row };
+
+/** The answer of a bulk call: the outcome of each row, or the id of the job when the call was too large to wait for. */
+export type BulkResult =
+  | { readonly kind: 'done'; readonly outcomes: readonly BulkOutcome[] }
+  | { readonly kind: 'queued'; readonly jobId: string };

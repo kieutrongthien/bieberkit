@@ -22,7 +22,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { ListParams, Meta, MetaEntity, Page, Row, SessionUser } from './types.ts';
+import { filterParams } from './lists.ts';
+import type { BulkOutcome } from './lists.ts';
+import type { BulkOperation, BulkResult, ListParams, Meta, MetaEntity, Page, Row, SessionUser } from './types.ts';
 
 /** One field that the server refused, from the `errors` of a validation problem. */
 export interface FieldProblem {
@@ -76,6 +78,12 @@ export interface AdminClient {
   /** `version` is the version that the person read (API-13). A stale one is a 412 with the current row. */
   update(entity: MetaEntity, id: string, body: Row, version: number): Promise<Row>;
   remove(entity: MetaEntity, id: string, version: number): Promise<void>;
+  /** One change to many rows. The rows are `{ id, version }`, the version that the person read. Above 100 rows the server queues a job (API-14). */
+  bulk(
+    entity: MetaEntity,
+    items: readonly { readonly id: string; readonly version: number }[],
+    change: BulkOperation,
+  ): Promise<BulkResult>;
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null;
@@ -116,15 +124,26 @@ function userOf(body: unknown): SessionUser | undefined {
   return { id: user['id'], email: text(user['email'], ''), name: text(user['name'], '') };
 }
 
+function outcomeOf(value: Record<string, unknown>): BulkOutcome {
+  const error = isRecord(value['error']) ? value['error'] : undefined;
+  return {
+    id: text(value['id'], ''),
+    status: text(value['status'], 'invalid'),
+    ...(typeof value['version'] === 'number' ? { version: value['version'] } : {}),
+    ...(error === undefined ? {} : { error: { code: text(error['code'], ''), message: text(error['message'], '') } }),
+  };
+}
+
 const rowOf = (body: unknown): Row => (isRecord(body) && isRecord(body['data']) ? body['data'] : {});
 
-function queryOf(params: ListParams): string {
+function queryOf(entity: MetaEntity, params: ListParams): string {
   const query = new URLSearchParams();
   query.set('page', String(params.page ?? 1));
   query.set('pageSize', String(params.pageSize ?? 25));
   query.set('withTotal', 'true');
   if (params.sort !== undefined && params.sort !== '') query.set('sort', params.sort);
   if (params.fields !== undefined && params.fields.length > 0) query.set('fields', params.fields.join(','));
+  for (const [name, value] of Object.entries(filterParams(entity, params.filters ?? []))) query.set(name, value);
   return `?${query.toString()}`;
 }
 
@@ -174,7 +193,7 @@ export function createAdminClient(options: AdminClientOptions = {}): AdminClient
       return body as Meta;
     },
     async list(entity, params = {}) {
-      const body = await request('GET', `${entity.path}${queryOf(params)}`);
+      const body = await request('GET', `${entity.path}${queryOf(entity, params)}`);
       const data = isRecord(body) && Array.isArray(body['data']) ? body['data'] : [];
       const meta = isRecord(body) && isRecord(body['meta']) ? body['meta'] : {};
       return {
@@ -197,6 +216,13 @@ export function createAdminClient(options: AdminClientOptions = {}): AdminClient
           headers: { 'if-match': String(version) },
         }),
       );
+    },
+    async bulk(entity, items, change) {
+      const body = await request('POST', `${entity.path}/bulk`, { body: { ...change, items } });
+      const data = isRecord(body) ? body['data'] : undefined;
+      if (Array.isArray(data)) return { kind: 'done', outcomes: data.filter(isRecord).map(outcomeOf) };
+      if (isRecord(data) && typeof data['jobId'] === 'string') return { kind: 'queued', jobId: data['jobId'] };
+      throw new AdminApiError(500, 'ADMIN_BULK_ANSWER', 'The server did not say what became of the rows.', '');
     },
     async remove(entity, id, version) {
       await request('DELETE', `${entity.path}/${encodeURIComponent(id)}`, {

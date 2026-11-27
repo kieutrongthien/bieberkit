@@ -139,6 +139,77 @@ describe('UI-02 the client of the admin', () => {
     );
   });
 
+  it('UI-03 sends the filters as filter[field][op], and refuses one that the API would refuse before any call is made', async () => {
+    const { fetch: fetcher, calls } = fake(() => json({ data: [], meta: { page: 1, pageSize: 25 } }));
+    const entity: MetaEntity = {
+      ...ENTITY,
+      fields: [
+        {
+          key: 'tier',
+          kind: 'oneOf',
+          widget: 'select',
+          required: false,
+          readOnly: false,
+          filterable: true,
+          sortable: false,
+          values: ['basic', 'gold'],
+        },
+      ],
+    };
+    const client = createAdminClient({ fetch: fetcher, baseUrl: 'http://x.test' });
+    await client.list(entity, { filters: [{ field: 'tier', op: 'in', value: 'gold,basic' }] });
+    expect(decodeURIComponent(calls[0]?.url ?? '')).toContain('filter[tier][in]=gold,basic');
+    await expect(client.list(entity, { filters: [{ field: 'tier', op: 'eq', value: 'platinum' }] })).rejects.toThrow(
+      /tier/,
+    );
+    expect(calls).toHaveLength(1);
+  });
+
+  it('UI-03 a bulk call names the rows with the version that was read, and gives back the outcome of each', async () => {
+    const { fetch: fetcher, calls } = fake(() =>
+      json({
+        data: [
+          { id: '1', status: 'ok', version: 2 },
+          { id: '2', status: 'conflict', error: { code: 'DATA_VERSION_STALE', message: 'Changed.' } },
+        ],
+      }),
+    );
+    const client = createAdminClient({ fetch: fetcher });
+    const result = await client.bulk(
+      ENTITY,
+      [
+        { id: '1', version: 1 },
+        { id: '2', version: 4 },
+      ],
+      { operation: 'delete' },
+    );
+    expect(calls[0]?.method).toBe('POST');
+    expect(calls[0]?.url).toBe('/api/v1/settings/settings/bulk');
+    expect(calls[0]?.body).toEqual({
+      operation: 'delete',
+      items: [
+        { id: '1', version: 1 },
+        { id: '2', version: 4 },
+      ],
+    });
+    expect(result).toEqual({
+      kind: 'done',
+      outcomes: [
+        { id: '1', status: 'ok', version: 2 },
+        { id: '2', status: 'conflict', error: { code: 'DATA_VERSION_STALE', message: 'Changed.' } },
+      ],
+    });
+  });
+
+  it('UI-03 a bulk call that is too large to wait for is a job, and the client says so', async () => {
+    const { fetch: fetcher } = fake(() => json({ data: { jobId: 'job-1', status: 'queued' } }, 202));
+    const result = await createAdminClient({ fetch: fetcher }).bulk(ENTITY, [{ id: '1', version: 1 }], {
+      operation: 'update',
+      data: { value: 'x' },
+    });
+    expect(result).toEqual({ kind: 'queued', jobId: 'job-1' });
+  });
+
   it('creates, updates with If-Match, and deletes with If-Match', async () => {
     const { fetch: fetcher, calls } = fake((call) =>
       call.method === 'DELETE'
