@@ -25,7 +25,7 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { createRunner, scriptedPrompts } from 'create-bieberkit/kit';
+import { CANCEL, createRunner, scriptedPrompts } from 'create-bieberkit/kit';
 import type { Prompts } from 'create-bieberkit/kit';
 import { checkCommand } from './commands/check.ts';
 import { addCommand, removeCommand } from './commands/plugin.ts';
@@ -223,6 +223,30 @@ describe('section 5.2 remove', () => {
     const checked = await run(root, spawn, ['check', 'migrations', '--json']);
     expect(checked.code).toBe(0);
     expect(readdirSync(join(root, 'migrations'))).toHaveLength(1);
+  });
+
+  it('PLG-03 a cancelled question touches nothing: the config, the packages and the migrations stay as they were', async () => {
+    const { root, spawn, calls } = await withPages();
+    const before = readFileSync(join(root, 'bieberkit.config.ts'), 'utf8');
+    const cancelled = await run(root, spawn, ['remove', PAGES], scriptedPrompts([CANCEL]));
+    expect(cancelled.code).not.toBe(0);
+    expect(calls).toEqual([]);
+    expect(readFileSync(join(root, 'bieberkit.config.ts'), 'utf8')).toBe(before);
+    expect(existsSync(join(root, 'migrations'))).toBe(false);
+  });
+
+  it('PLG-03 a pnpm that fails leaves the config, the example and the migrations as they were', async () => {
+    const { root } = project();
+    const ok = pnpmFor(root);
+    await run(root, ok.spawn, ['add', PAGES]);
+    const before = readFileSync(join(root, 'bieberkit.config.ts'), 'utf8');
+    const example = readFileSync(join(root, '.env.example'), 'utf8');
+    const failing = pnpmFor(root, { fail: true });
+    const { code, error } = await run(root, failing.spawn, ['remove', PAGES, '--yes', '--json']);
+    expect([code, error.code]).toEqual([1, 'BK_PNPM_FAILED']);
+    expect(readFileSync(join(root, 'bieberkit.config.ts'), 'utf8')).toBe(before);
+    expect(readFileSync(join(root, '.env.example'), 'utf8')).toBe(example);
+    expect(existsSync(join(root, 'migrations'))).toBe(false);
   });
 
   it('5.2 a plugin that another one requires, and one that is not installed, are refused', async () => {

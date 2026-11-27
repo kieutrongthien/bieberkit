@@ -34,7 +34,7 @@ import { envExampleCommand } from './commands/env-example.ts';
 import { clientGenerateCommand, generateCommand } from './commands/generate.ts';
 import { auditPruneCommand } from './commands/audit.ts';
 import { migrateCommand, migrateMakeCommand } from './commands/migrate.ts';
-import { makeEntityCommand, makeJobCommand, makeModuleCommand } from './commands/make.ts';
+import { makeEntityCommand, makeJobCommand, makeModuleCommand, makePluginCommand } from './commands/make.ts';
 import { addCommand, removeCommand } from './commands/plugin.ts';
 import { openapiCommand } from './commands/openapi.ts';
 import { pluginsCommand } from './commands/plugins.ts';
@@ -59,6 +59,7 @@ export const COMMANDS: readonly Command[] = [
   makeModuleCommand,
   makeEntityCommand,
   makeJobCommand,
+  makePluginCommand,
   migrateMakeCommand,
   backupVerifyCommand(),
   migrateCommand,
