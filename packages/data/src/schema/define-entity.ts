@@ -22,6 +22,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { whenProblem } from './when.ts';
 import { dataError } from '../errors.ts';
 import type { FieldDef } from './fields.ts';
 
@@ -202,6 +203,26 @@ function problemsOf(options: EntityOptions<string>, fields: Readonly<Record<stri
       add('The field createdAt must be made with f.createdAt().', 'Use f.createdAt(), or rename the field.');
     if (name === 'updatedAt' && def.kind !== 'updatedAt')
       add('The field updatedAt must be made with f.updatedAt().', 'Use f.updatedAt(), or rename the field.');
+  }
+
+  for (const [name, def] of Object.entries(fields)) {
+    for (const key of ['visibleWhen', 'requiredWhen'] as const) {
+      const when = def.admin?.[key];
+      if (when === undefined) continue;
+      const problem = whenProblem(when, new Set(names), name);
+      if (problem !== undefined)
+        add(`${name}: ${key}: ${problem}`, 'Use the names of fields of this entity in the condition.');
+    }
+    if (def.admin?.visibleWhen !== undefined && def.optional !== true && def.default === undefined)
+      add(
+        `${name} is hidden by a condition, so it must be optional or have a default.`,
+        'A field that is hidden is not sent: add .optional() or .default(value).',
+      );
+    if (def.admin?.requiredWhen !== undefined && def.optional !== true)
+      add(
+        `${name} is required by a condition, so it must be optional.`,
+        'Add .optional(): the condition says when it is required.',
+      );
   }
 
   for (const name of Object.keys(options.permissions?.fields ?? {})) {

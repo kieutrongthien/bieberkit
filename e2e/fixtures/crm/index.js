@@ -38,6 +38,11 @@ export const Account = defineEntity({
     active: f.boolean().default(true).index(),
     since: f.date().optional().index(),
     note: f.text({ max: 500 }).optional(),
+    // Shown and required for an account that is not active (UI-11).
+    reason: f
+      .string({ max: 100 })
+      .optional()
+      .admin({ visibleWhen: { field: 'active', eq: false }, requiredWhen: { field: 'active', eq: false } }),
     createdAt: f.createdAt(),
     updatedAt: f.updatedAt(),
   },

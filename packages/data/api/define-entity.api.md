@@ -32,6 +32,32 @@ type Compare = "exact" | "ci" | "ci_ai";
 declare function nfc(text: string): string;
 declare function fold(mode: Compare, text: string): string;
 declare function codePointLength(text: string): number;
+type When = {
+  readonly field: string;
+  readonly eq: unknown;
+} | {
+  readonly field: string;
+  readonly ne: unknown;
+} | {
+  readonly field: string;
+  readonly in: readonly unknown[];
+} | {
+  readonly field: string;
+  readonly set: boolean;
+} | {
+  readonly all: readonly When[];
+} | {
+  readonly any: readonly When[];
+} | {
+  readonly not: When;
+};
+declare const isUnset: (value: unknown) => boolean;
+declare function evaluateWhen(when: When, values: Readonly<Record<string, unknown>>): boolean;
+declare function whenFields(when: When): string[];
+declare function mapWhenFields(when: When, rename: (name: string) => string): When;
+declare function whenProblem(when: unknown, known: {
+  has(name: string): boolean;
+}, owner: string, depth?: number): string | undefined;
 type FieldKind = "id" | "string" | "text" | "email" | "oneOf" | "int" | "boolean" | "date" | "dateTime" | "decimal" | "money" | "sequence" | "createdAt" | "updatedAt" | "belongsTo" | "hasOne" | "hasMany" | "state" | "custom";
 interface SchemaValue {
   readonly _zod: unknown;
@@ -48,6 +74,11 @@ interface ColumnDef {
   readonly length?: number;
 }
 type ResetEvery = "year" | "month" | "never";
+interface FieldAdmin {
+  readonly visibleWhen?: When;
+  readonly requiredWhen?: When;
+  readonly widget?: string;
+}
 interface FieldDef {
   readonly kind: FieldKind;
   readonly optional?: true;
@@ -77,7 +108,7 @@ interface FieldDef {
   readonly jsonSchema?: Readonly<Record<string, unknown>>;
   readonly zod?: SchemaValue;
   readonly tsType?: string;
-  readonly admin?: Readonly<Record<string, unknown>>;
+  readonly admin?: FieldAdmin;
   readonly computed?: {
     readonly fn: ComputedFn;
     readonly stored: boolean;
@@ -93,6 +124,7 @@ interface Chain<Self> {
   localized(): Self;
   encrypted(): Self;
   pii(): Self;
+  admin(options: FieldAdmin): Self;
 }
 type ComputedField = Chain<ComputedField>;
 interface Scalar<Self, Default> extends Chain<Self> {
@@ -142,7 +174,7 @@ interface CustomOptions {
   readonly jsonSchema: Readonly<Record<string, unknown>>;
   readonly zod: SchemaValue;
   readonly tsType: string;
-  readonly admin?: Readonly<Record<string, unknown>>;
+  readonly admin?: FieldAdmin;
 }
 declare class Field {
   #private;
@@ -151,6 +183,7 @@ declare class Field {
   optional(): Field;
   unique(): Field;
   index(): Field;
+  admin(options: FieldAdmin): Field;
   searchable(): Field;
   aggregatable(): Field;
   localized(): Field;
@@ -284,5 +317,5 @@ interface TableConstraints {
   readonly indexes: readonly ConstraintDef[];
 }
 declare function tableConstraints(def: EntityDef<string>): TableConstraints;
-export { fold as A, ResetEvery as C, f as D, TransitionDef as E, Compare as O, FieldKind as S, StateOptions as T, ColumnDef as _, EntityDef as a, FieldBuilders as b, FieldLike as c, StandardColumn as d, TableConstraints as f, tableConstraints as g, standardColumns as h, ConstraintDef as i, nfc as j, codePointLength as k, OrmOverride as l, snake as m, AdminOptions as n, EntityOptions as o, defineEntity as p, ApiOptions as r, Feature as s, ActionDef as t, Permissions as u, ComputedFn as v, SchemaValue as w, FieldDef as x, Field as y };
+export { evaluateWhen as A, FieldKind as C, TransitionDef as D, StateOptions as E, Compare as F, codePointLength as I, fold as L, mapWhenFields as M, whenFields as N, f as O, whenProblem as P, nfc as R, FieldDef as S, SchemaValue as T, ColumnDef as _, EntityDef as a, FieldAdmin as b, FieldLike as c, StandardColumn as d, TableConstraints as f, tableConstraints as g, standardColumns as h, ConstraintDef as i, isUnset as j, When as k, OrmOverride as l, snake as m, AdminOptions as n, EntityOptions as o, defineEntity as p, ApiOptions as r, Feature as s, ActionDef as t, Permissions as u, ComputedFn as v, ResetEvery as w, FieldBuilders as x, Field as y };
 ```

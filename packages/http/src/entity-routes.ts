@@ -48,6 +48,7 @@ import { MAX_BULK, MAX_BULK_INLINE } from './bulk.ts';
 import type { BulkQueue } from './bulk.ts';
 import { apiFields, toJsonSchema } from '@bieberkit/data/schema';
 import type { ApiField, EntityDef, JsonSchema } from '@bieberkit/data/schema';
+import { enforceConditions } from './conditions.ts';
 import { HttpError, ValidationFailed } from './problem.ts';
 import type { RouteContext, RouteDef } from './route.ts';
 import type { HttpServer } from './server.ts';
@@ -664,8 +665,10 @@ export function entityRoutes(schema: OrmSchema, context: EntityRoutesContext): R
       handler: (ctx) =>
         runInUnitOfWork(db, async (em) => {
           const write = await need(ctx, 'create');
-          const body = asRow(ctx.body);
-          checkWritable(write, body, 'create');
+          const sent = asRow(ctx.body);
+          checkWritable(write, sent, 'create');
+          // A field that its condition hides is not part of the write, and one that its condition requires must have a value (UI-11).
+          const body = enforceConditions(def, defaultsOf(def), sent);
           const split = splitWrite(schema, body, 'create');
           if (!(await ctx.allows(def.name, 'create', { ...defaultsOf(def), ...split.all })))
             throw authzDenied(def.name, 'create', 'no-permission');
@@ -695,11 +698,12 @@ export function entityRoutes(schema: OrmSchema, context: EntityRoutesContext): R
         return withCurrent(db, schema, id, () =>
           runInUnitOfWork(db, async (em) => {
             const write = await need(ctx, 'update');
-            const body = asRow(ctx.body);
-            checkWritable(write, body, 'update');
+            const sent = asRow(ctx.body);
+            checkWritable(write, sent, 'update');
             const found = await findScoped(em, schema, id, write.scope);
             if (found === null) throw recordNotFound();
             expectVersion(found, expected);
+            const body = enforceConditions(def, snapshotOf(def, found), sent);
             const split = splitWrite(schema, body, 'update');
             // The new state must be one that the caller may write: a row cannot be moved out of the rows that the caller owns.
             if (!(await ctx.allows(def.name, 'update', { ...snapshotOf(def, found), ...split.all })))
@@ -960,7 +964,23 @@ export function entityRoutes(schema: OrmSchema, context: EntityRoutesContext): R
         const next = (typeof row['version'] === 'number' ? row['version'] : 0) + 1;
         try {
           if (operation === 'update') {
-            const data = asRow(body['data']);
+            let data: Row;
+            try {
+              data = enforceConditions(def, snapshotOf(def, row), asRow(body['data']));
+            } catch (error) {
+              if (!(error instanceof ValidationFailed)) throw error;
+              outcomes.push({
+                id,
+                status: 'invalid',
+                error: {
+                  code: error.code,
+                  message: error.errors
+                    .map((issue) => `${issue.path.replace(/^body\./, '')} ${issue.message}`)
+                    .join('; '),
+                },
+              });
+              continue;
+            }
             const split = splitWrite(schema, data, 'update');
             if (!(await ctx.allows(def.name, 'update', { ...snapshotOf(def, row), ...split.all }))) {
               outcomes.push({

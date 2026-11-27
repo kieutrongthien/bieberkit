@@ -24,6 +24,16 @@
 
 import type { BulkOutcome, Filter } from './lists.ts';
 
+/** A condition over the values of a form, as `_meta` carries it (UI-11). `field` is a key of the API. */
+export type When =
+  | { readonly field: string; readonly eq: unknown }
+  | { readonly field: string; readonly ne: unknown }
+  | { readonly field: string; readonly in: readonly unknown[] }
+  | { readonly field: string; readonly set: boolean }
+  | { readonly all: readonly When[] }
+  | { readonly any: readonly When[] }
+  | { readonly not: When };
+
 /** One field of an entity as the metadata describes it. The admin draws a control from `widget` and checks with `validation`. */
 export interface MetaField {
   readonly key: string;
@@ -45,6 +55,10 @@ export interface MetaField {
   /** For a relation: the entity that it points to and where its rows are. */
   readonly target?: { readonly entity: string; readonly path: string };
   readonly validation?: Readonly<Record<string, unknown>>;
+  /** The field is shown when this holds, and it is not sent when it does not. */
+  readonly visibleWhen?: When;
+  /** The field is required when this holds. */
+  readonly requiredWhen?: When;
 }
 
 /** A move of the state field of an entity (MOD-06). `allowed` is whether the signed in user has its permission. */

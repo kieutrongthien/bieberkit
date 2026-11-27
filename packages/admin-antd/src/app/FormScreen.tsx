@@ -40,6 +40,7 @@ import {
   relatedOf,
   saveDraft,
   shortcutOf,
+  statesOf,
 } from '@bieberkit/admin-core';
 import type { MetaEntity, MetaTransition, Row } from '@bieberkit/admin-core';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -108,6 +109,14 @@ function Editor(props: {
 
   const current = (): Record<string, unknown> =>
     Object.fromEntries(fields.map((field) => [field.key, fromControl(field, form.getFieldValue(field.key))]));
+  // What the form shows and asks for follows what it holds, so a change of one field can show or hide another (UI-11).
+  const watched: Record<string, unknown> | undefined = Form.useWatch([], form);
+  const states = statesOf(
+    fields,
+    Object.fromEntries(
+      fields.map((field) => [field.key, fromControl(field, (watched ?? controls(initial))[field.key])]),
+    ),
+  );
 
   const changed = (): void => {
     const values = current();
@@ -153,7 +162,11 @@ function Editor(props: {
     setConflict(undefined);
     const converted = Object.fromEntries(fields.map((field) => [field.key, fromControl(field, values[field.key])]));
     try {
-      const body = bodyOf(entity, converted, updating);
+      // A field that its condition hides is not sent: the server would drop it, and a clear of a hidden field would be a write (UI-11).
+      const { visible } = statesOf(fields, converted);
+      const body = Object.fromEntries(
+        Object.entries(bodyOf(entity, converted, updating)).filter(([name]) => visible.has(name)),
+      );
       if (base === undefined) await client.create(entity, body);
       else await client.update(entity, String(base['id']), body, Number(base['version']));
       await queries.invalidateQueries({ queryKey: ['list', entity.name] });
@@ -312,17 +325,20 @@ function Editor(props: {
         onValuesChange={changed}
         onFinish={(values) => void save(values)}
       >
-        {fields.map((field) => (
-          <Form.Item
-            key={field.key}
-            label={field.key}
-            name={field.key}
-            valuePropName={field.widget === 'switch' ? 'checked' : 'value'}
-            rules={rulesOf(field, t)}
-          >
-            <Control field={field} />
-          </Form.Item>
-        ))}
+        {fields
+          .filter((field) => states.visible.has(field.key))
+          .map((field) => (
+            <Form.Item
+              key={field.key}
+              label={field.key}
+              name={field.key}
+              required={states.required.has(field.key)}
+              valuePropName={field.widget === 'switch' ? 'checked' : 'value'}
+              rules={rulesOf({ ...field, required: states.required.has(field.key) }, t)}
+            >
+              <Control field={field} />
+            </Form.Item>
+          ))}
         <Space>
           {canSave ? (
             <Button type="primary" htmlType="submit" loading={busy}>

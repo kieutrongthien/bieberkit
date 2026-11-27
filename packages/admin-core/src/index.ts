@@ -51,6 +51,7 @@ export type {
   MetaField,
   MetaMenuItem,
   MetaTransition,
+  When,
   Page,
   Row,
   SessionUser,
@@ -90,6 +91,8 @@ export {
   transitionsFor,
 } from './transitions.ts';
 export { problemOf } from './validation.ts';
+export { conditionalFields, evaluateWhen, isUnset, statesOf, visibleValues } from './when.ts';
+export type { FieldStates } from './when.ts';
 export type { ValueProblem } from './validation.ts';
 export {
   historyLine,

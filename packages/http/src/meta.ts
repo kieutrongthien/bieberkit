@@ -22,7 +22,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { apiFields, toJsonSchema } from '@bieberkit/data/schema';
+import { apiFields, mapWhenFields, toJsonSchema } from '@bieberkit/data/schema';
 import { toJSONSchema } from 'zod';
 import type { ZodType } from 'zod';
 import type { ApiField, EntityDef, FieldDef, JsonSchema } from '@bieberkit/data/schema';
@@ -100,6 +100,8 @@ export const META_SCHEMA: JsonSchema = {
                 precision: { type: 'integer' },
                 scale: { type: 'integer' },
                 validation: { type: 'object', additionalProperties: true },
+                visibleWhen: { type: 'object', additionalProperties: true },
+                requiredWhen: { type: 'object', additionalProperties: true },
                 target: {
                   type: 'object',
                   required: ['entity', 'path'],
@@ -175,7 +177,13 @@ interface StaticEntity {
   readonly permissions: Readonly<Record<'read' | 'create' | 'update' | 'delete', string>>;
 }
 
-function fieldOf(def: EntityDef<string>, field: ApiField, create: JsonSchema, read: JsonSchema): StaticField {
+function fieldOf(
+  def: EntityDef<string>,
+  field: ApiField,
+  create: JsonSchema,
+  read: JsonSchema,
+  keyOf: (name: string) => string,
+): StaticField {
   const declared: FieldDef = field.def;
   const properties = (writable: boolean): Record<string, unknown> => {
     const source = writable ? create['properties'] : read['properties'];
@@ -207,6 +215,13 @@ function fieldOf(def: EntityDef<string>, field: ApiField, create: JsonSchema, re
       ...(declared.precision === undefined ? {} : { precision: declared.precision }),
       ...(declared.scale === undefined ? {} : { scale: declared.scale }),
       ...(typeof validation === 'object' && validation !== null ? { validation } : {}),
+      // The conditions name the fields of the entity, and the form reads the keys of the API (`owner` is `ownerId`).
+      ...(declared.admin?.visibleWhen === undefined
+        ? {}
+        : { visibleWhen: mapWhenFields(declared.admin.visibleWhen, keyOf) }),
+      ...(declared.admin?.requiredWhen === undefined
+        ? {}
+        : { requiredWhen: mapWhenFields(declared.admin.requiredWhen, keyOf) }),
       ...(declared.kind === 'belongsTo' && declared.target !== undefined
         ? { target: { entity: declared.target().name, path: pathOf(declared.target()) } }
         : {}),
@@ -232,10 +247,12 @@ function staticOf(def: EntityDef<string>): StaticEntity {
   const read = toJsonSchema(def, 'read');
   const machine = Object.values(def.fields).find((field) => field.kind === 'state' && field.transitions !== undefined);
   const base = pathOf(def);
+  const keys = new Map(apiFields(def).map((field) => [field.name, field.key]));
+  const keyOf = (name: string): string => keys.get(name) ?? name;
   return {
     def,
     path: base,
-    fields: apiFields(def).map((field) => fieldOf(def, field, create, read)),
+    fields: apiFields(def).map((field) => fieldOf(def, field, create, read, keyOf)),
     transitions: Object.entries(machine?.transitions ?? {}).map(([name, declared]) => ({
       name,
       from: declared.from,

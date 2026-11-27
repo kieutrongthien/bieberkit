@@ -49,6 +49,25 @@ export declare function reapply(base: Values, mine: Values, theirs: Values): {
   values: Record<string, unknown>;
   conflicts: Conflict[];
 };
+type When = {
+  readonly field: string;
+  readonly eq: unknown;
+} | {
+  readonly field: string;
+  readonly ne: unknown;
+} | {
+  readonly field: string;
+  readonly in: readonly unknown[];
+} | {
+  readonly field: string;
+  readonly set: boolean;
+} | {
+  readonly all: readonly When[];
+} | {
+  readonly any: readonly When[];
+} | {
+  readonly not: When;
+};
 interface MetaField {
   readonly key: string;
   readonly kind: string;
@@ -69,6 +88,8 @@ interface MetaField {
     readonly path: string;
   };
   readonly validation?: Readonly<Record<string, unknown>>;
+  readonly visibleWhen?: When;
+  readonly requiredWhen?: When;
 }
 interface MetaTransition {
   readonly name: string;
@@ -426,7 +447,16 @@ interface ValueProblem {
   readonly code: "required" | "tooShort" | "tooLong" | "tooSmall" | "tooBig" | "pattern";
   readonly values: Readonly<Record<string, number>>;
 }
-export declare function problemOf(field: MetaField, value: unknown): ValueProblem | undefined;
+export declare function problemOf(field: MetaField, value: unknown, required?: boolean): ValueProblem | undefined;
+export declare const isUnset: (value: unknown) => boolean;
+export declare function evaluateWhen(when: When, values: Readonly<Record<string, unknown>>): boolean;
+interface FieldStates {
+  readonly visible: ReadonlySet<string>;
+  readonly required: ReadonlySet<string>;
+}
+export declare function statesOf(fields: readonly MetaField[], values: Readonly<Record<string, unknown>>): FieldStates;
+export declare function visibleValues(fields: readonly MetaField[], values: Readonly<Record<string, unknown>>): Record<string, unknown>;
+export declare const conditionalFields: (entity: MetaEntity) => readonly MetaField[];
 export declare const packageName = "@bieberkit/admin-core";
-export { type AdminClient, type AdminClientOptions, type BulkOperation, type BulkOutcome, type BulkResult, type Conflict, type Connection, type ConnectionEvent, type CsvColumn, type Dictionary, type DraftStorage, en as ENGLISH, type ErrorReport, type FieldProblem, type Filter, type FilterOperator, type HistoryEntry, type KeyPress, type ListParams, type Locale, type MessageKey, type Meta, type MetaEntity, type MetaField, type MetaMenuItem, type MetaTransition, type Page, type Related, type Row, type SavedView, type SessionUser, type Shortcut, type ValueProblem, type Vital, type VitalReport };
+export { type AdminClient, type AdminClientOptions, type BulkOperation, type BulkOutcome, type BulkResult, type Conflict, type Connection, type ConnectionEvent, type CsvColumn, type Dictionary, type DraftStorage, en as ENGLISH, type ErrorReport, type FieldProblem, type FieldStates, type Filter, type FilterOperator, type HistoryEntry, type KeyPress, type ListParams, type Locale, type MessageKey, type Meta, type MetaEntity, type MetaField, type MetaMenuItem, type MetaTransition, type Page, type Related, type Row, type SavedView, type SessionUser, type Shortcut, type ValueProblem, type Vital, type VitalReport, type When };
 ```

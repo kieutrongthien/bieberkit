@@ -579,6 +579,9 @@ importers:
         specifier: ^4.1.0
         version: 4.1.12(@types/node@24.19.2)(@vitest/coverage-v8@4.1.12)(vite@8.3.8(@types/node@24.19.2)(yaml@2.9.1))
     devDependencies:
+      '@bieberkit/admin-core':
+        specifier: workspace:*
+        version: link:../admin-core
       zod:
         specifier: 4.6.7
         version: 4.6.7

@@ -38,9 +38,16 @@ const numberOf = (schema: Readonly<Record<string, unknown>>, key: string): numbe
   return typeof found === 'number' ? found : undefined;
 };
 
-/** The first thing that is wrong with `value` for `field`, or `undefined`. A switch is never missing, and a field that is not required may be left empty. */
-export function problemOf(field: MetaField, value: unknown): ValueProblem | undefined {
-  if (empty(value)) return field.required && field.widget !== 'switch' ? { code: 'required', values: {} } : undefined;
+/**
+ * The first thing that is wrong with `value` for `field`, or `undefined`. A switch is never missing, and a field that is not required may
+ * be left empty. `required` is `field.required` unless a condition of the form says otherwise.
+ */
+export function problemOf(
+  field: MetaField,
+  value: unknown,
+  required: boolean = field.required,
+): ValueProblem | undefined {
+  if (empty(value)) return required && field.widget !== 'switch' ? { code: 'required', values: {} } : undefined;
   const schema = field.validation ?? {};
   if (typeof value === 'string') {
     const min = numberOf(schema, 'minLength');

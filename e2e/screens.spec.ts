@@ -418,3 +418,27 @@ test('UI-11 the fields that the server fills are shown beside the form, and a mo
   await expect(page.getByText('closed', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'reopen' })).toBeVisible();
 });
+
+test('UI-11 a field that a condition hides is not in the form, and a field that it requires blocks the save until it has a value', async () => {
+  const page = shared;
+  await page.goto('/admin/crm/accounts/new');
+  await page.getByRole('textbox', { name: 'code' }).fill('WHEN-1');
+  await page.getByRole('textbox', { name: 'name' }).fill('Conditional');
+  await expect(page.getByRole('textbox', { name: 'reason' })).toHaveCount(0);
+
+  await page.getByRole('switch', { name: 'active' }).click();
+  await expect(page.getByRole('textbox', { name: 'reason' })).toBeVisible();
+  await page.getByRole('button', { name: 'Save' }).click();
+  await expect(page.getByText('This field is required')).toBeVisible();
+  await expect(page).toHaveURL(/\/crm\/accounts\/new/);
+
+  await page.getByRole('textbox', { name: 'reason' }).fill('closed down');
+  await page.getByRole('button', { name: 'Save' }).click();
+  await expect(page.getByRole('link', { name: 'WHEN-1' })).toBeVisible();
+
+  // Switching back to active hides the field again, and what was typed is not sent.
+  await page.getByRole('link', { name: 'WHEN-1' }).click();
+  await expect(page.getByRole('textbox', { name: 'reason' })).toHaveValue('closed down');
+  await page.getByRole('switch', { name: 'active' }).click();
+  await expect(page.getByRole('textbox', { name: 'reason' })).toHaveCount(0);
+});

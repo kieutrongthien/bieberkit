@@ -40,6 +40,8 @@ interface Field {
   filterable: boolean;
   sortable: boolean;
   validation?: Record<string, unknown>;
+  visibleWhen?: Record<string, unknown>;
+  requiredWhen?: Record<string, unknown>;
   target?: { entity: string; path: string };
 }
 interface Entity {
@@ -173,6 +175,15 @@ describe('META-02 what it describes', () => {
     expect(field(account, 'visits')).toMatchObject({ filterable: true, sortable: true });
     expect(field(account, 'tier')).toMatchObject({ filterable: true });
     expect(field(account, 'note')).toMatchObject({ filterable: false });
+  });
+
+  it('UI-11 gives the conditions of a field, over the keys of the API', async () => {
+    const account = entity(await fetchMeta(), 'crm.Account');
+    expect(field(account, 'reason')).toMatchObject({
+      visibleWhen: { field: 'active', eq: false },
+      requiredWhen: { field: 'active', eq: false },
+    });
+    expect(field(account, 'code').visibleWhen).toBeUndefined();
   });
 
   it('META-02 gives the validation of a field as JSON Schema', async () => {
