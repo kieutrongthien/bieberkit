@@ -24,9 +24,9 @@
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { toManifest } from '@bieberkit/core';
 import type { PluginDef } from '@bieberkit/core';
-import { contributed } from '@bieberkit/server';
-import type { EntityDef } from '@bieberkit/data';
+import { COLLECTORS } from '@bieberkit/server/plugins';
 import type { Command } from '../command.ts';
 import { CliError, usageError } from '../errors.ts';
 import { envExampleOf } from './env-example.ts';
@@ -131,11 +131,9 @@ export function addCommand(deps: PluginDeps = {}): Command {
   };
 }
 
-/** The tables that the entities of a plugin own. */
+/** The tables that a plugin owns: what its manifest lists, which is what the resolver and the checks see too (PLG-03, PLG-07). */
 function tablesOf(def: PluginDef<unknown>): string[] {
-  return contributed<EntityDef<string>>([def.module], 'entities')
-    .map((entity) => entity.table)
-    .toSorted();
+  return [...(toManifest(def, COLLECTORS).tables ?? [])].toSorted();
 }
 
 const quote = (dialect: string, table: string): string => (dialect === 'mysql' ? `\`${table}\`` : `"${table}"`);
@@ -208,13 +206,17 @@ export function removeCommand(deps: PluginDeps = {}): Command {
           });
         }
       }
+      // Everything that can be known is worked out before the first change, and the package manager runs before the files are written,
+      // so a pnpm that fails, or a config that cannot be edited, leaves the project as it was (PLG-03).
       const configPath = join(project.root, CONFIG_FILE);
-      writeFileSync(configPath, removePlugin(readFileSync(configPath, 'utf8'), name));
+      const nextConfig = removePlugin(readFileSync(configPath, 'utf8'), name);
+      const made =
+        tables.length > 0 ? dropMigration(project, found, tables, (deps.now ?? (() => new Date()))()) : undefined;
       await pnpm(spawn, project.root, ['remove', name]);
+      writeFileSync(configPath, nextConfig);
       const after = await loadProject(project.root).catch(() => undefined);
       let migration: string | undefined;
-      if (tables.length > 0) {
-        const made = dropMigration(project, found, tables, (deps.now ?? (() => new Date()))());
+      if (made !== undefined) {
         mkdirSync(join(project.root, 'migrations'), { recursive: true });
         writeFileSync(join(project.root, made.path), made.content);
         migration = made.path;

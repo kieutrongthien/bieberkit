@@ -30,7 +30,7 @@ import type { EntityDef } from '@bieberkit/data';
 import { compileEntities, createDatabase } from '@bieberkit/data/orm';
 import { entityRoutes } from '@bieberkit/http';
 import type { RouteDef } from '@bieberkit/http';
-import { allModules, contributed, loadProject } from '@bieberkit/server';
+import { allModules, contributed, entitiesOf, loadProject } from '@bieberkit/server';
 import type { Project } from '@bieberkit/server';
 
 export { MODULES_DIR } from '@bieberkit/server';
@@ -53,10 +53,8 @@ export interface App {
 export async function loadApp(cwd: string): Promise<App> {
   const project = await loadProject(cwd);
   const modules = await allModules(project);
-  const byName = new Map<string, EntityDef<string>>();
-  for (const entity of contributed<EntityDef<string>>(modules, 'entities')) byName.set(entity.name, entity);
-  const entities = [...byName.values()];
-  const schemas = compileEntities(entities);
+  const { entities, extensions } = entitiesOf(modules);
+  const schemas = compileEntities(entities, { extensions });
   const db = await createDatabase(
     { DB_CONNECTION: 'sqlite', DATABASE_URL: ':memory:', DATABASE_READ_URLS: [], DB_POOL_MAX: 1 },
     // The database only lists routes and holds no data, so a key made here is enough for encrypted fields to open it.

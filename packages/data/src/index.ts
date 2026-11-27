@@ -56,6 +56,15 @@ export type {
   StandardColumn,
   TableConstraints,
 } from './schema/define-entity.ts';
+export { defineExtension, resolveExtensions } from './schema/extend.ts';
+export type {
+  ExtensionDef,
+  ExtensionOptions,
+  ExtensionPermissions,
+  ExtensionRef,
+  ResolvedEntities,
+  ResolvedExtension,
+} from './schema/extend.ts';
 export { f, Field } from './schema/fields.ts';
 export type {
   ColumnDef,
@@ -73,6 +82,7 @@ export type { CreateInput, EntityRegistry, Row, UpdateInput } from './schema/reg
 import type { Database } from './orm/connect.ts';
 import type { PluginMigrationStep as ModuleMigrationStep } from './migrations/steps.ts';
 import type { EntityDef as ModuleEntityDef } from './schema/define-entity.ts';
+import type { ExtensionDef as ModuleExtensionDef } from './schema/extend.ts';
 
 declare module '@bieberkit/core' {
   interface ModuleContributions {
@@ -80,6 +90,8 @@ declare module '@bieberkit/core' {
     entities?: readonly ModuleEntityDef<string>[];
     /** The migration steps of a plugin, in the order of its versions. The migrate role runs them in the boot order of the plugins (DATA-24). */
     migrations?: readonly ModuleMigrationStep[];
+    /** Fields that the module adds to entities of other modules, by the name of the entity. Each is stored in a table of its own (PLG-06, ADR 0033). */
+    extends?: Readonly<Record<string, ModuleExtensionDef>>;
   }
 }
 

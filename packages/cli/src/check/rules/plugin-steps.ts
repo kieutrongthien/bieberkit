@@ -49,6 +49,18 @@ export const pluginStepsRule: Rule = {
             'Make the step a contract step in a later release, after the release that stops using what it drops (DATA-08).',
           ),
         );
+      } else if (risk.kind === 'contract-without-after') {
+        found.push(
+          violation(
+            'plugin-steps',
+            'BK_STEP_CONTRACT_NO_AFTER',
+            plugin,
+            1,
+            risk.message,
+            'Add after: "<id of the expand step>" to the contract step, so that the migrate role refuses it in the same deploy (DATA-08).',
+            'warning',
+          ),
+        );
       } else if (config.database.dialect === 'mysql') {
         found.push(
           violation(

@@ -26,8 +26,8 @@ import { createAuth, createAuthorizer, assignRole, buildPermissionRegistry, crea
 import type { AccessAuthorizer, ScopedPermission } from '@bieberkit/auth';
 import { createContainer, loadEnv, registerModule } from '@bieberkit/core';
 import type { ModuleDef, ServiceRegistry, SettingDef } from '@bieberkit/core';
-import { uuid7 } from '@bieberkit/data';
-import type { EntityDef } from '@bieberkit/data';
+import { resolveExtensions, uuid7 } from '@bieberkit/data';
+import type { EntityDef, ExtensionDef, ExtensionRef } from '@bieberkit/data';
 import {
   compileEntities,
   createOutboxDispatcher,
@@ -119,6 +119,21 @@ export interface TestApp {
 
 const first = (value: string | string[] | undefined): string | undefined => (Array.isArray(value) ? value[0] : value);
 
+/** The extensions that the modules declare under `extends`, as the server reads them (PLG-06). */
+function extensionRefsOf(modules: readonly ModuleDef[]): ExtensionRef[] {
+  return modules.flatMap((module) => {
+    const value: unknown = module.contributions['extends'];
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) return [];
+    // The package of the key declared its type: a record of extensions by the name of the entity.
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion
+    return Object.entries(value as Record<string, ExtensionDef>).map(([target, extension]) => ({
+      module: module.name,
+      target,
+      extension,
+    }));
+  });
+}
+
 function contributed<T>(modules: readonly ModuleDef[], key: string): T[] {
   return modules.flatMap((module) => {
     const value: unknown = module.contributions[key];
@@ -134,8 +149,9 @@ export async function createTestApp(options: TestAppOptions = {}): Promise<TestA
   const byName = new Map<string, EntityDef<string>>();
   for (const entity of [...contributed<EntityDef<string>>(modules, 'entities'), ...(options.entities ?? [])])
     byName.set(entity.name, entity);
-  const entities = [...byName.values()];
-  const schemas = compileEntities(entities);
+  // The fields that modules add to entities of other modules (PLG-06), as the application sees them.
+  const { entities, extensions } = resolveExtensions([...byName.values()], extensionRefsOf(modules));
+  const schemas = compileEntities(entities, { extensions });
   const db = await (options.open ?? openMemoryDatabase)(schemas);
   const acquired: (() => Promise<unknown>)[] = [() => db.close()];
   try {

@@ -27,8 +27,18 @@ import { join } from 'node:path';
 import { MODULES_DIR } from '../app.ts';
 import type { Command } from '../command.ts';
 import { CliError } from '../errors.ts';
-import { checkNames, entityFile, jobFile, moduleFile, register, writeNew } from '../make.ts';
-import { loadConfig } from '../project.ts';
+import {
+  checkNames,
+  checkPluginName,
+  entityFile,
+  jobFile,
+  moduleFile,
+  pluginFiles,
+  register,
+  writeNew,
+} from '../make.ts';
+import { findProjectRoot, loadConfig } from '../project.ts';
+import { usageError } from '../errors.ts';
 
 const made = (files: readonly string[]): { data: unknown; text: string } => ({
   data: { files },
@@ -88,5 +98,56 @@ export const makeJobCommand: Command = {
     const constant = name.replaceAll(/-(\w)/g, (_match, letter: string) => letter.toUpperCase());
     const edited = register(root, module, 'jobs', constant, `./jobs/${name}.ts`);
     return made([file.path, edited]);
+  },
+};
+
+export const makePluginCommand: Command = {
+  name: 'make:plugin',
+  summary:
+    'Make a plugin package with one entity, its permissions, a test and its static manifest: bieberkit make:plugin bieberkit-plugin-notes.',
+  positionals: [{ name: 'name', required: true }],
+  flags: [
+    {
+      name: 'dir',
+      type: 'string',
+      description: 'The folder of the package, from the project root. Defaults to plugins/<name>.',
+    },
+    {
+      name: 'first-party',
+      type: 'boolean',
+      description: 'The plugin is one of the framework: @bieberkit/plugin-<name>.',
+    },
+    {
+      name: 'author',
+      type: 'string',
+      description: 'The author of the files, "Name <email>". Defaults to the one of the project.',
+    },
+    { name: 'license', type: 'string', description: 'The license of the package. Defaults to the one of the project.' },
+  ],
+  async run(context) {
+    const flags = context.args.flags;
+    const name = context.args.positionals[0] ?? '';
+    const short = checkPluginName(name, flags['first-party'] === true);
+    const project = await loadConfig(context.cwd).catch(() => undefined);
+    const author = typeof flags['author'] === 'string' ? flags['author'] : project?.config.author;
+    const license = typeof flags['license'] === 'string' ? flags['license'] : (project?.config.license ?? 'Apache-2.0');
+    if (author === undefined) {
+      throw usageError(
+        'BK_MAKE_AUTHOR_MISSING',
+        'There is no project here to take the author from.',
+        'Pass --author "Name <email>", or run it inside a project.',
+      );
+    }
+    const root = project?.root ?? findProjectRoot(context.cwd) ?? context.cwd;
+    const dir = (typeof flags['dir'] === 'string' ? flags['dir'] : `plugins/${short}`).replace(/\/+$/, '');
+    const files = pluginFiles({ name, short, dir, author, license, year: year() });
+    writeNew(root, files);
+    return {
+      data: { plugin: name, dir, files: files.map((file) => file.path) },
+      text: [
+        ...files.map((file) => `Wrote ${file.path}`),
+        `Next: add ${name} to the dependencies of the project, then bieberkit build in ${dir} to check the manifest.`,
+      ].join('\n'),
+    };
   },
 };

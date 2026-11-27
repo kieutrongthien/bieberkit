@@ -28,9 +28,8 @@ import { createContainer, createLogger, loadEnv, registerModule } from '@bieberk
 import type { JobDef, QueueSubscription } from '@bieberkit/queue';
 import type { EnvSource, ServiceRegistry, SettingDef } from '@bieberkit/core';
 import { createDatabase, compileEntities } from '@bieberkit/data/orm';
-import type { EntityDef } from '@bieberkit/data';
 import { authEntities } from '@bieberkit/auth';
-import { allModules, contributed } from './modules.ts';
+import { allModules, contributed, entitiesOf } from './modules.ts';
 import { createRuntimePlatform, permissionCatalog, registerRuntimeServices } from './services.ts';
 import { envOwnersOf, importFile, loadProject } from './project.ts';
 import { ServerError } from './errors.ts';
@@ -60,9 +59,9 @@ export async function seed(options: SeedOptions = {}): Promise<Seeded> {
     envFile: join(project.root, '.env'),
     extra: envOwnersOf(project),
   });
-  const entities = contributed<EntityDef<string>>(modules, 'entities');
+  const { entities, extensions } = entitiesOf(modules);
   const db = await createDatabase(env, {
-    entities: [...compileEntities(entities), ...authEntities],
+    entities: [...compileEntities(entities, { extensions }), ...authEntities],
     audit: 'table',
     auditMirror: extra['AUDIT_LOG_MIRROR'] === true,
     encryption: {

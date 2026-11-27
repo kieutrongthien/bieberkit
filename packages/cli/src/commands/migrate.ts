@@ -32,7 +32,12 @@ const list = (title: string, names: readonly string[]): string =>
   `${title}${names.length === 0 ? ' none' : `\n${names.map((name) => `  ${name}`).join('\n')}`}`;
 
 function optionsOf(context: CommandContext): MigrationsOptions {
-  return { cwd: context.cwd, ...(context.env === undefined ? {} : { env: context.env }) };
+  const deployId = context.args.flags['deploy-id'];
+  return {
+    cwd: context.cwd,
+    ...(context.env === undefined ? {} : { env: context.env }),
+    ...(typeof deployId === 'string' && deployId !== '' ? { deployId } : {}),
+  };
 }
 
 export const migrateMakeCommand: Command = {
@@ -64,6 +69,12 @@ export const migrateCommand: Command = {
     'Apply the pending steps of the plugins and the pending migrations (--status lists them, --rollback reverts one).',
   flags: [
     { name: 'status', type: 'boolean', description: 'List what ran and what waits, and run nothing.' },
+    {
+      name: 'deploy-id',
+      type: 'string',
+      description:
+        'The id of this deploy, such as the release id (DEPLOY_ID). Every run of one release must use the same one (DATA-08).',
+    },
     { name: 'rollback', type: 'boolean', description: 'Revert the last migration file of the project.' },
     {
       name: 'allow-destructive',

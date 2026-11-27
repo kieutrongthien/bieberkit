@@ -37,6 +37,15 @@ export type {
   StandardColumn,
   TableConstraints,
 } from './define-entity.ts';
+export { defineExtension, resolveExtensions } from './extend.ts';
+export type {
+  ExtensionDef,
+  ExtensionOptions,
+  ExtensionPermissions,
+  ExtensionRef,
+  ResolvedEntities,
+  ResolvedExtension,
+} from './extend.ts';
 export { f, Field } from './fields.ts';
 export type {
   ColumnDef,

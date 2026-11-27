@@ -42,6 +42,15 @@ export const COLLECTORS: readonly KeyCollector[] = [
     collect: (contributions) => listOf(contributions, 'entities').map((entity) => textOf(entity, 'table')),
   },
   {
+    // The table of each extension: it belongs to the plugin that declares it, not to the plugin that it extends (PLG-06).
+    field: 'tables',
+    collect: (contributions) => {
+      const extended = contributions['extends'];
+      if (typeof extended !== 'object' || extended === null || Array.isArray(extended)) return [];
+      return Object.values(extended).map((extension) => textOf(extension, 'table'));
+    },
+  },
+  {
     field: 'routes',
     collect: (contributions) =>
       listOf(contributions, 'routes').map((route) => `${textOf(route, 'method')} ${textOf(route, 'url')}`),

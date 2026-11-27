@@ -55,7 +55,7 @@ declare function stepName(step: Pick<PluginMigrationStep, "plugin" | "id">): str
 declare function orderSteps(steps: readonly PluginMigrationStep[], pluginOrder: readonly string[]): PluginMigrationStep[];
 declare function validateSteps(steps: readonly PluginMigrationStep[], pluginOrder: readonly string[]): void;
 interface StepRisk {
-  readonly kind: "mysql-unguarded-ddl" | "destructive-before-contract";
+  readonly kind: "mysql-unguarded-ddl" | "destructive-before-contract" | "contract-without-after";
   readonly step: string;
   readonly message: string;
 }
@@ -88,6 +88,7 @@ interface DatabaseEnv {
 interface DatabaseOptions {
   readonly entities: readonly EntitySchema[];
   readonly audit?: AuditSink | "table";
+  readonly auditMirror?: boolean;
   readonly encryption?: EncryptionKeys;
   readonly references?: ReferenceVisibility;
   readonly logger?: Logger;

@@ -121,6 +121,37 @@ Tests are written before the implementation and named after the requirement. The
 
 Each slice updates the relevant roadmap row only after its acceptance tests and the required checks pass. A changeset accompanies behavior or public API changes.
 
+## Slice H5: production guard for expand then contract (implemented)
+
+The guard of the runner already refused a contract step in the deploy of its expand step, but only a test of the runner proved it, and a **deploy was one run, not one release**: a retry, or a second migrate role that waited for the lock, got a new random id and finished the contract that the first had refused. Now `DEPLOY_ID` (a core env key) or `bieberkit migrate --deploy-id` names the deploy, and `runMigrations` uses it for the ledger. Without it the id stays random, which is right for a release that is run once.
+
+`packages/server/src/migrations.test.ts` proves it through the migrate role: refusal with `BK_MIGRATE_REFUSED` and the project files not run, the next deploy finishing the contract, the backfill of a row that the old version wrote between the two deploys (and the failure of a contract without one), a retry with the same id, `DEPLOY_ID` of the environment, and two migrate roles of one release. `plugin-migrate.dialects.test.ts` adds the retry case on the three dialects. `bieberkit check plugin-steps` warns about a contract step with no `after` (`BK_STEP_CONTRACT_NO_AFTER`), because the guard cannot protect it. The backfill stays a convention of the step: no code can tell whether a contract step repairs the rows that the old version wrote.
+
+## Slice H2: entity extensions (implemented)
+
+The design is [ADR 0033](../adr/0033-entity-extensions.md): `extends: { 'crm.Account': defineExtension({ table, fields, permissions? }) }` stores the fields in a 1:1 table of the extending plugin (the id of the target row is its key, with a composite `(tenant_id, id)` foreign key for a tenant target) and merges them into the API, the metadata and the types of the target through an effective entity, with one batched read and a write in the transaction of the target. It changes the data layer, the generated routes and the plugin contract, so by AGENTS.md (Workflow 6) the tests below were shown to the maintainer before any code was written (ADR 0033 is accepted). One decision changed while building it, and is recorded in ADR 0034: the extension row is keyed by a unique `record`, as the table of translations is, and not by the id of the target. The tests:
+
+- `packages/data/src/schema/extend.test.ts`: `defineExtension` and `resolveExtensions` (the declaration, the effective entity, the three boot errors).
+- `packages/testing/src/extends.dialects.test.ts`: the table, the API (create, read, update, version, validation, field permissions, tenant, delete, two plugins, `_meta`, the audit entry) and the boot errors, on three dialects.
+- `packages/server/src/manifest.test.ts`: the tables of the extensions are in the manifest.
+- `packages/cli/src/plugin.test.ts`: `remove` lists and drops the extension table and only it, and the plugin of the target cannot be removed first.
+
+Not in the slice: a filter, a sort or a search by an extension field, relation fields, and targets with hand-written routes (`media`, `users.User`).
+
+## Slice H3: the plugin CLI (implemented)
+
+`bieberkit plugins` gives the graph: `edges` (`from`, `to` and the range), `requiredBy`, and what each plugin owns (`tables`, `routes` from its manifest), in the text and in `--json`, which say the same. `bieberkit make:plugin <name>` makes a plugin package (a `bieberkit-plugin-<name>` or `@scope/bieberkit-plugin-<name>` name, or `@bieberkit/plugin-<name>` with `--first-party`; the folder is `plugins/<name>` or `--dir`) with the header of the project, one entity with its permissions and generated routes, a test, a README and its `bieberkit` field, written as `bieberkit build` would derive it. It needs no application: `--author` and `--license` replace the project when there is none. The test makes a plugin, runs `bieberkit build --check` on it, resolves it on the three dialects, and runs `check headers`, `boundaries` and `plugin-tables` on what it wrote.
+
+`bieberkit remove` read the tables of the `entities` of a plugin and edited the config before it ran `pnpm remove`, so a pnpm that failed left a config without the plugin, and a person who cancelled the question was not tested at all. It now reads the tables from the manifest (the list that the resolver and the checks use, which H2 extends with the extension tables), works out the config and the migration first, runs pnpm first and writes after. Tests: a cancelled question and a failing pnpm change nothing.
+
+## Slice H4: the rules for plugins (implemented)
+
+`check boundaries` (PLG-01) now sees a relative path, inside the project or through `node_modules`, into the files of another plugin package, an `exports` key that is a pattern, a plugin that is known by its keyword or its static manifest and not by its name, and a plugin that imports its own files. `check plugin-tables` (PLG-02) is new. Both read the plugins from their `package.json` (PLG-07) and import none.
+
+What PLG-02 sees: a table of another plugin that is a literal in a query builder call or in SQL text, and an entity that the file imported from another plugin and gave to the entity manager. What it does not see is listed in `docs/modules/cli.md` and in the messages: a computed name, `classOf(em, name)`, a variable that holds a table. The tables of the framework and of `@bieberkit/auth` (`bk_auth_*`, `bk_audit_*`) are not a plugin's, and the code of the project is not a plugin, so neither is read. The rule is a static check and no sandbox (PLG-04). It is not in the Oxlint plugin, which reads one file and has no list of plugins.
+
+The first-party plugins pass it (`plugin-tables.repo.test.ts`): they read each other only through the services they publish and `@bieberkit/auth`.
+
 ## Phase 2 integration and npm release
 
 M2.2 consumes the verified plugin metadata; M2.3 adds content and the public site; M2.4 supplies realtime, workflows, search and other shared features. M2.5 composes those capabilities into templates, M2.6 distributes editable source, and M2.7 proves the full matrix and upgrade paths. Keep integration coverage during development; do not postpone all dialect tests until M2.7.

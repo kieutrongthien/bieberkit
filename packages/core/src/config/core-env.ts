@@ -51,6 +51,7 @@ export interface CoreEnvValues {
   DATABASE_URL: string | undefined;
   DATABASE_READ_URLS: readonly string[];
   MIGRATE_DATABASE_URL: string | undefined;
+  DEPLOY_ID: string | undefined;
   DB_POOL_MAX: number;
   REDIS_URL: string | undefined;
   CACHE_REDIS_URL: string | undefined;
@@ -135,6 +136,12 @@ export const coreEnv: EnvSchema<CoreEnvValues> = defineEnv({
     .secret()
     .optional()
     .describe('Schema-owning role, used only by the migrate role. Falls back to DATABASE_URL in development'),
+  DEPLOY_ID: env
+    .string()
+    .optional()
+    .describe(
+      'Names one deploy in the ledger of migration steps, 1 to 40 characters, such as the release id. Every migrate run of one release must use the same id (DATA-08)',
+    ),
   DB_POOL_MAX: env.int({ min: 1 }).default(10).describe('Connections per process'),
   REDIS_URL: env
     .url()

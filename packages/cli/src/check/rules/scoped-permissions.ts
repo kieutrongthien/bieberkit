@@ -26,8 +26,7 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { checkScopedPermissions } from '@bieberkit/auth';
 import type { ScopedPermission } from '@bieberkit/auth';
-import type { EntityDef } from '@bieberkit/data';
-import { contributed, contributedRecord, MODULES_DIR } from '@bieberkit/server';
+import { contributedRecord, entitiesOf, MODULES_DIR } from '@bieberkit/server';
 import type { Rule, Violation } from '../rule.ts';
 import { violation } from '../rule.ts';
 
@@ -37,7 +36,7 @@ export const scopedPermissionsRule: Rule = {
     'The conditions of scoped permissions stay inside the language of the translator, and name an entity and an action that exist (AUTHZ-06).',
   run: async ({ app, root }) => {
     const { modules } = await app();
-    const entities = contributed<EntityDef<string>>(modules, 'entities');
+    const { entities } = entitiesOf(modules);
     const found: Violation[] = [];
     for (const module of modules) {
       {

@@ -22,7 +22,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { resolvePlugins } from '@bieberkit/core';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { runCli } from './run.ts';
@@ -153,5 +155,103 @@ describe('section 5.2 make:job', () => {
     const { root } = project();
     await run(root, ['make:module', 'crm']);
     expect((await run(root, ['make:job', 'crm.SendWelcome'])).code).toBe(2);
+  });
+});
+
+describe('PLG-03 make:plugin', () => {
+  const FILES = [
+    'plugins/notes/README.md',
+    'plugins/notes/package.json',
+    'plugins/notes/src/entity.ts',
+    'plugins/notes/src/index.test.ts',
+    'plugins/notes/src/index.ts',
+    'plugins/notes/tsconfig.json',
+    'plugins/notes/tsdown.config.ts',
+  ];
+  const NAME = 'bieberkit-plugin-notes';
+
+  it('PLG-03 writes a plugin package with the header of the project, the keyword and the static manifest', async () => {
+    const { root } = project();
+    const { code, data } = await run(root, ['make:plugin', NAME, '--json']);
+    expect(code).toBe(0);
+    expect(Array.isArray(data.files) ? data.files.toSorted() : data.files).toEqual(FILES);
+    for (const file of FILES.filter((path) => /\.(?:ts|md)$/.test(path) && !path.endsWith('.md'))) {
+      expect(read(root, file)).toContain(`@file        ${file}`);
+      expect(read(root, file)).toContain('@author      Test <test@example.com>');
+    }
+    const pkg = JSON.parse(read(root, 'plugins/notes/package.json'));
+    expect(pkg).toMatchObject({
+      name: NAME,
+      keywords: expect.arrayContaining(['bieberkit-plugin']),
+      exports: { '.': { '@bieberkit/source': './src/index.ts' } },
+      scripts: { build: 'tsdown && bieberkit build' },
+      bieberkit: { core: '*', requires: {}, tables: ['notes_items'], permissions: ['notes.manage', 'notes.read'] },
+    });
+  });
+
+  it('PLG-03 the plugin that it makes builds and passes the check of its manifest at once, and resolves on every dialect', async () => {
+    const { root } = project();
+    await run(root, ['make:plugin', NAME]);
+    const dir = join(root, 'plugins/notes');
+    const checked = await run(dir, ['build', '--check', '--json']);
+    expect([checked.code, checked.error]).toEqual([0, {}]);
+    const rebuilt = await run(dir, ['build', '--json']);
+    expect(rebuilt.code).toBe(0);
+    const pkg = JSON.parse(read(root, 'plugins/notes/package.json'));
+    for (const dialect of ['sqlite', 'postgres', 'mysql'] as const) {
+      const resolution = resolvePlugins([{ name: NAME, version: pkg.version, manifest: pkg.bieberkit }], {
+        core: '1.0.0',
+        dialect,
+      });
+      expect(resolution.order).toEqual([NAME]);
+    }
+  });
+
+  it('PLG-03 what it writes follows the rules of the check: headers, env access, boundaries and the tables of its own', async () => {
+    const { root } = project();
+    await run(root, ['make:plugin', NAME]);
+    const checked = await run(root, ['check', 'headers', '--json']);
+    expect(checked.data.violations).toEqual([]);
+    expect((await run(root, ['check', 'plugin-tables', '--json'])).data.violations).toEqual([]);
+    expect((await run(root, ['check', 'boundaries', '--json'])).data.violations).toEqual([]);
+  });
+
+  it('PLG-05 the name is a community name, a scoped one, or a first-party one with --first-party, and nothing else', async () => {
+    const { root } = project();
+    for (const bad of ['notes', 'plugin-notes', 'Bieberkit-plugin-notes', '@acme/notes', 'bieberkit-plugin-']) {
+      const refused = await run(root, ['make:plugin', bad, '--json']);
+      expect([bad, refused.code, refused.error.code]).toEqual([bad, 2, 'BK_MAKE_NAME_INVALID']);
+    }
+    const first = await run(root, ['make:plugin', '@bieberkit/plugin-notes', '--json']);
+    expect(first.error.code).toBe('BK_MAKE_NAME_INVALID');
+    expect((await run(root, ['make:plugin', '@bieberkit/plugin-notes', '--first-party'])).code).toBe(0);
+    expect((await run(root, ['make:plugin', '@acme/bieberkit-plugin-tags'])).code).toBe(0);
+    expect(existsSync(join(root, 'plugins/tags/package.json'))).toBe(true);
+  });
+
+  it('PLG-03 a second run is BK_MAKE_EXISTS and changes nothing, and --dir puts the package elsewhere', async () => {
+    const { root } = project();
+    await run(root, ['make:plugin', NAME]);
+    const before = read(root, 'plugins/notes/src/index.ts');
+    writeFileSync(join(root, 'plugins/notes/src/index.ts'), `${before}// edited\n`);
+    const again = await run(root, ['make:plugin', NAME, '--json']);
+    expect(again.error.code).toBe('BK_MAKE_EXISTS');
+    expect(read(root, 'plugins/notes/src/index.ts')).toBe(`${before}// edited\n`);
+    expect((await run(root, ['make:plugin', NAME, '--dir', 'vendor/notes'])).code).toBe(0);
+    expect(existsSync(join(root, 'vendor/notes/package.json'))).toBe(true);
+  });
+
+  it('PLG-03 needs no application: with --author and --license it works in an empty folder', async () => {
+    const empty = mkdtempSync(join(tmpdir(), 'bk-plugin-'));
+    try {
+      const refused = await run(empty, ['make:plugin', NAME, '--json']);
+      expect([refused.code, refused.error.code]).toEqual([2, 'BK_MAKE_AUTHOR_MISSING']);
+      const made = await run(empty, ['make:plugin', NAME, '--author', 'Ann <ann@example.com>', '--license', 'MIT']);
+      expect(made.code).toBe(0);
+      expect(read(empty, 'plugins/notes/src/index.ts')).toContain('@author      Ann <ann@example.com>');
+      expect(JSON.parse(read(empty, 'plugins/notes/package.json'))).toMatchObject({ license: 'MIT' });
+    } finally {
+      rmSync(empty, { recursive: true, force: true });
+    }
   });
 });

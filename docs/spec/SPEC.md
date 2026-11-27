@@ -273,12 +273,12 @@ A person at the terminal is asked for every choice that no flag gave, the name i
 | `bieberkit db:seed` | Run seeders |
 | `bieberkit backup:verify` | Restore the newest backup into a throwaway database and check that nothing is left to migrate (DEP-09) |
 | `bieberkit audit:prune --before <date> [--yes]` | Count the audit entries before a date and, with `--yes`, delete them on `MIGRATE_DATABASE_URL`, except those under a legal hold, whose number it prints (AUD-06, AUD-09) |
-| `bieberkit make:entity`, `make:module`, `make:plugin`, `make:job` | Generate code from the official recipes |
+| `bieberkit make:entity`, `make:module`, `make:plugin`, `make:job` | Generate code from the official recipes. `make:plugin <name>` makes a plugin package (a `bieberkit-plugin-<name>` or `@scope/bieberkit-plugin-<name>` name, PLG-05) with one entity, its permissions, a test and its static manifest, so that `bieberkit build --check` passes at once; it needs no application |
 | `bieberkit add <plugin>` / `remove <plugin>` | Install or uninstall a plugin and update config, env schema and migrations |
-| `bieberkit plugins` | List installed plugins, versions and dependency graph |
+| `bieberkit plugins` | List installed plugins in boot order, with versions, the graph (what each requires, with the range, and what requires it) and what each owns (tables, routes); `--json` gives the same graph with its edges |
 | `bieberkit env:check` | Validate the current environment against the merged schema |
 | `bieberkit env:example` | Regenerate `.env.example` |
-| `bieberkit check [rule]` | Run framework rules: headers, env-access, boundaries, orm, sql, transactions, migrations, routes, generated. `// bieberkit-ignore BK_CODE: reason` lets one violation through |
+| `bieberkit check [rule]` | Run framework rules: headers, env-access, boundaries, orm, sql, transactions, migrations, routes, generated, plugin-steps, plugin-tables, scoped-permissions. `// bieberkit-ignore BK_CODE: reason` lets one violation through |
 | `bieberkit doctor` | Check connectivity to database, Valkey or Redis, storage and mail |
 | `bieberkit routes` | Print routes with their permissions |
 | `bieberkit openapi` / `client:generate` | Emit `openapi.json` / regenerate the typed client |
@@ -529,7 +529,7 @@ MariaDB is best effort and not in CI (ADR 0005). The only MySQL-family dialect v
 
 - Project modules: `bieberkit migrate:make` diffs project entities against a committed schema snapshot (`migrations/.snapshot-<dialect>.json`), never against a live database, so the output is the same on every machine.
 - **DATA-24** Plugins own their migrations: ordered, versioned steps written with a portable schema builder plus data steps, keyed by plugin version and recorded in a `bk_plugin_migrations` table. `bieberkit add` and `bieberkit upgrade` run each plugin's pending steps in version order, so a rename or a split moves data before anything is dropped. A step is `{ plugin, version, id, kind: 'expand' | 'migrate' | 'contract', after?, up(trx, dialect) }` and runs in its own transaction. The ledger row holds the plugin, step id, version, kind, time and the `deploy_id` of the `bieberkit migrate` run, with `(plugin, step_id)` as primary key. The portable builder is Kysely's schema builder with helpers for UUID columns and `setNotNull` (ADR 0011).
-- **DATA-08** Schema changes follow expand, migrate, contract. Old and new versions run side by side during a rolling deploy, so a column is added first, filled, and only removed or constrained in a later release. A plugin MUST NOT ship an expand and its contract in the same minor release, and the migrate role refuses a contract step whose expand step was applied in the same deploy, so skipping several versions can never merge them. `bieberkit check` flags destructive statements (drop, rename, type narrowing, new non-null column without default). The refusal is `PLG_CONTRACT_SAME_DEPLOY`, and later steps of that plugin wait. A contract step starts with an idempotent backfill, because rows written by the old version between the two deploys can still be incomplete (ADR 0011).
+- **DATA-08** Schema changes follow expand, migrate, contract. Old and new versions run side by side during a rolling deploy, so a column is added first, filled, and only removed or constrained in a later release. A plugin MUST NOT ship an expand and its contract in the same minor release, and the migrate role refuses a contract step whose expand step was applied in the same deploy, so skipping several versions can never merge them. `bieberkit check` flags destructive statements (drop, rename, type narrowing, new non-null column without default). The refusal is `PLG_CONTRACT_SAME_DEPLOY`, and later steps of that plugin wait. A deploy is named by `DEPLOY_ID` (1 to 40 characters, or `bieberkit migrate --deploy-id`), which CI and orchestration set to the id of the release, so that every run of one release, a retry or a second migrate role that waited for the lock included, is one deploy and cannot finish what the first refused. Without it each run gets a random id, which is only right for a release that is run once. A contract step starts with an idempotent backfill, because rows written by the old version between the two deploys can still be incomplete (ADR 0011).
 - Migrations run only in the `migrate` role, once per deploy, never at web start, using `MIGRATE_DATABASE_URL` (DATA-25).
 
 ### 9.4 Multi-tenancy
@@ -730,7 +730,12 @@ A plugin is a module packaged for reuse, with a manifest that the CLI and the ke
 
 ```ts
 import { definePlugin, env } from '@bieberkit/core'
-import { f } from '@bieberkit/data'
+import { defineExtension, f } from '@bieberkit/data'
+
+const PageSeo = defineExtension({
+  table: 'seo_page_ext',
+  fields: { seoTitle: f.string({ max: 70 }).optional(), noindex: f.boolean().default(false) },
+})
 
 export default definePlugin({
   name: '@bieberkit/plugin-seo',
@@ -740,7 +745,7 @@ export default definePlugin({
   dialects: ['postgres', 'mysql', 'sqlite'],
   env: { SEO_SITEMAP_CRON: env.string().default('0 3 * * *') },
   entities: [SeoMeta],
-  extends: { 'pages.Page': { fields: { seo: f.hasOne(() => SeoMeta) } } },
+  extends: { 'pages.Page': PageSeo },
   permissions: ['seo.read', 'seo.manage'],
   jobs: [generateSitemap],
   schedules: [{ job: generateSitemap, cron: 'SEO_SITEMAP_CRON' }],
@@ -799,7 +804,7 @@ The resolver is one pure function that reports every problem together, each with
 
 * **PLG-07** Each plugin publishes a static manifest in the `bieberkit` field of its `package.json`: `core`, `dialects`, `requires`, `conflicts` and the key lists `env`, `tables`, `routes`, `permissions` and `admin`. The CI check compares canonical text (keys sorted), so only a real difference fails it. It is generated from `definePlugin` at plugin build and checked against it in CI. The scaffolder reads first-party manifests bundled in `create-bieberkit`, so it can resolve the graph before anything is installed. Route collisions are checked again at kernel boot.
 
-- **PLG-06** Fields a plugin adds to another plugin's entity live in the extending plugin's own 1:1 extension table, never as columns in the target table. Ownership stays clear (MOD-01), the target plugin can upgrade its schema freely, and removing the extending plugin drops only its own table.
+- **PLG-06** Fields a plugin adds to another plugin's entity live in the extending plugin's own 1:1 extension table, never as columns in the target table. Ownership stays clear (MOD-01), the target plugin can upgrade its schema freely, and removing the extending plugin drops only its own table. The plugin declares them with `extends: { '<module>.<Entity>': defineExtension({ table, fields, permissions? }) }` (ADR 0033). The table has one row for each row of the target, found by a unique foreign key to it that is deleted with it (composite with `tenant_id` for a tenant target), and its fields are merged into the API, the metadata and the types of the target. They are read in one batched query and written in the transaction of the target, whose `version` covers them. A field that the target or another extension has, an unknown target and a table that is taken are boot errors (`DATA_EXTENSION_FIELD_CLASH`, `DATA_EXTENSION_TARGET_UNKNOWN`, `DATA_EXTENSION_TABLE_CLASH`). Filtering and sorting by an extension field, relation fields, and targets with hand-written routes are not supported yet.
 
 - **PLG-08** The resolver accepts exact versions, `^`, `~`, `>=` and `*`, and rejects pre-release tags, `||`, partial versions and `x` ranges with `PLG_BAD_RANGE`, so it needs no dependency (PKG-04). Plugin authors see the error when they build (ADR 0011).
 
@@ -1719,6 +1724,10 @@ Open questions:
 
 | Version | Date | Changes |
 | --- | --- | --- |
+| 0.8.25 | 2026-11-27 | M2.1 H2 (ADR 0033, ADR 0034): entity extensions, `extends` with `defineExtension` and a table of the extending plugin with one row for each row of the target (PLG-06); the example of 11.1 and the text of 11.3 |
+| 0.8.24 | 2026-11-27 | M2.1 H3: `bieberkit plugins` shows the graph with its edges and what each plugin owns, `make:plugin`, and `remove` that changes nothing when pnpm fails or the question is cancelled (PLG-03) |
+| 0.8.23 | 2026-11-27 | M2.1 H4: `check boundaries` for relative and `node_modules` paths into a plugin and for exports patterns (PLG-01), and the rule `plugin-tables` (PLG-02) |
+| 0.8.22 | 2026-11-27 | M2.1 H5: `DEPLOY_ID` names a deploy for DATA-08, `bieberkit migrate --deploy-id`, `BK_MIGRATE_REFUSED` names the waiting steps, and `BK_STEP_CONTRACT_NO_AFTER` |
 | 0.8.21 | 2026-11-27 | Base plugins S6, operations: section 12.10, OPS-01 to OPS-06; `Idempotency-Key` on `DELETE`, per-actor limits, settings export and import, download audit of media, indexes and the tests at 100 000 rows |
 | 0.8.20 | 2026-11-27 | Base plugins S6, audit: section 12.9, AUD-07 to AUD-09; the audit mirror, `after=` for a SIEM, legal holds and `kept` in `audit:prune` (ADR 0032) |
 | 0.8.19 | 2026-11-27 | Base plugins S6, managed identities: section 12.8, IDN-02, IDN-03, ROL-08 and ROL-09; `USERS_MANAGED_EXTERNALLY`, `upsertExternalUser`, `setExternalDisabled`, groups and roles limited to a group |

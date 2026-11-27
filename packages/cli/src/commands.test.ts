@@ -77,6 +77,24 @@ describe('section 5.2 plugins', () => {
     expect(out).not.toContain('Boot order');
   });
 
+  it('PLG-03 the graph has its edges with their ranges, who requires each plugin and what it owns, and the text and the JSON say the same', async () => {
+    const { root } = project({ plugins: [SEO, PAGES] });
+    const { json } = await run(root, ['plugins', '--json']);
+    const data: Record<string, unknown> = Object(json['data']);
+    expect(data['edges']).toEqual([{ from: '@bieberkit/plugin-seo', to: '@bieberkit/plugin-pages', range: '*' }]);
+    const plugins: Record<string, unknown>[] = Array.isArray(data['plugins']) ? data['plugins'] : [];
+    const byName = Object.fromEntries(plugins.map((plugin) => [String(plugin['name']), plugin]));
+    expect(byName['@bieberkit/plugin-pages']).toMatchObject({
+      requiredBy: ['@bieberkit/plugin-seo'],
+      tables: [],
+      routes: [],
+    });
+    expect(byName['@bieberkit/plugin-seo']).toMatchObject({ requiredBy: [] });
+    const human = await run(root, ['plugins']);
+    expect(human.out).toContain('@bieberkit/plugin-seo@1.0.0  requires @bieberkit/plugin-pages (*)');
+    expect(human.out).toContain('@bieberkit/plugin-pages@1.0.0  required by @bieberkit/plugin-seo');
+  });
+
   it('5.2 a project with no plugins says so, and the command works from a folder inside the project', async () => {
     const { root } = project();
     const { code, out } = await run(join(root, 'node_modules'), ['plugins']);

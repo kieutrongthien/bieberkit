@@ -33,7 +33,6 @@ import { applySubscriptions } from '@bieberkit/queue';
 import type { Queue, QueueSubscription } from '@bieberkit/queue';
 import { createQueueFromConfig } from '@bieberkit/queue/redis';
 import type { QueueFromConfigOptions } from '@bieberkit/queue/redis';
-import type { EntityDef } from '@bieberkit/data';
 import type { Database } from '@bieberkit/data/orm';
 import type { RouteDef } from '@bieberkit/http';
 import type { Storage } from '@bieberkit/storage';
@@ -41,14 +40,13 @@ import { createStorageFromConfig } from '@bieberkit/storage/flydrive';
 import { adminLocation } from './admin.ts';
 import { authMessages } from './auth-mail.ts';
 import { settingsOf, settingsPolicyReader } from './policy.ts';
-import { contributed, contributedRecord } from './modules.ts';
+import { contributed, contributedRecord, entitiesOf } from './modules.ts';
 import type { Project } from './project.ts';
 
 /** Every permission that the project knows: its entities, its routes, its plugins and its scoped permissions, sorted and without repeats. */
 export function permissionCatalog(project: Pick<Project, 'plugins'>, modules: readonly ModuleDef[]): string[] {
   const all = new Set<string>();
-  for (const entry of buildPermissionRegistry(contributed<EntityDef<string>>(modules, 'entities')).entries)
-    all.add(entry.permission);
+  for (const entry of buildPermissionRegistry(entitiesOf(modules).entities).entries) all.add(entry.permission);
   for (const route of contributed<RouteDef>(modules, 'routes'))
     if (route.permission !== undefined) all.add(route.permission);
   for (const { def } of project.plugins) for (const permission of def.permissions) all.add(permission);

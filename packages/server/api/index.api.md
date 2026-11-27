@@ -30,8 +30,8 @@ Generated from the built declaration files by `pnpm api:update`. Do not edit by 
 ```ts
 import { AuditPrune, Database, MadeMigration, PluginRun } from "@bieberkit/data/orm";
 import { BkError, CoreEnv, EnvSource, ModuleDef, Role } from "@bieberkit/core";
+import { ExtensionRef, PluginMigrationStep, ResolvedEntities } from "@bieberkit/data";
 import { HttpServer } from "@bieberkit/http";
-import { PluginMigrationStep } from "@bieberkit/data";
 import { a as envOwnersOf, c as loadConfig, i as ProjectConfig, l as loadProject, n as LoadedPlugin, o as findProjectRoot, r as Project, s as importFile, t as CONFIG_FILE, u as COLLECTORS } from "./project-CSBZwAGD.js";
 export declare const ADMIN_PACKAGE = "@bieberkit/admin-antd";
 export declare const ADMIN_PREFIX = "/admin";
@@ -76,7 +76,9 @@ interface Migrated {
   readonly applied: readonly string[];
   readonly statements: number;
 }
-export declare function migrate(db: Database, env: Pick<CoreEnv, "APP_ENV" | "QUEUE_DRIVER">): Promise<Migrated>;
+export declare function migrate(db: Database, env: Pick<CoreEnv, "APP_ENV" | "QUEUE_DRIVER"> & {
+  readonly DEPLOY_ID?: string | undefined;
+}): Promise<Migrated>;
 export declare const MIGRATIONS_DIR = "migrations";
 interface MigrationsOptions {
   readonly cwd?: string;
@@ -127,6 +129,8 @@ export declare function projectModules(root: string): Promise<ModuleDef[]>;
 export declare function allModules(project: Project): Promise<ModuleDef[]>;
 export declare function contributed<T>(modules: readonly ModuleDef[], key: string): T[];
 export declare function contributedRecord<T>(modules: readonly ModuleDef[], key: string): Record<string, T>;
+export declare function extensionRefsOf(modules: readonly ModuleDef[]): ExtensionRef[];
+export declare function entitiesOf(modules: readonly ModuleDef[]): ResolvedEntities;
 export declare const packageName = "@bieberkit/server";
 export { type AdminLocation, type BootOptions, type BootRole, COLLECTORS, CONFIG_FILE, type DoctorOptions, type Finding, type LoadedPlugin, type Migrated, type MigrationsOptions, type MigrationsRun, type MigrationsStatus, type Project, type ProjectConfig, type PruneAuditOptions, type RunMigrationsOptions, type Running, type SeedOptions, type Seeded, envOwnersOf, findProjectRoot, importFile, loadConfig, loadProject };
 ```

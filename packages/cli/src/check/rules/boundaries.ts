@@ -22,9 +22,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { existsSync, readFileSync } from 'node:fs';
 import { join, posix } from 'node:path';
 import { importsOf } from '../imports.ts';
+import {
+  exportsSubpath,
+  hasPluginName,
+  installedPackageOfPath,
+  packageOf,
+  pluginOf,
+  readJson,
+} from '../plugin-info.ts';
+import type { PluginInfo } from '../plugin-info.ts';
 import type { Rule, Violation } from '../rule.ts';
 import { isCode, violation } from '../rule.ts';
 
@@ -44,9 +52,6 @@ const DRIVERS = new Set([
 const TOOLS = new Set(['bieberkit', 'create-bieberkit', '@bieberkit/mcp']);
 const MODULES = /^(.*?\/modules\/)([^/]+)\//;
 
-const isPlugin = (name: string): boolean =>
-  name.startsWith('@bieberkit/plugin-') || name.startsWith('bieberkit-plugin-');
-
 /** The package of a specifier, and the part after it. `@scope/name/sub` is `@scope/name` and `sub`. */
 function split(specifier: string): { name: string; sub: string } {
   const parts = specifier.split('/');
@@ -54,15 +59,17 @@ function split(specifier: string): { name: string; sub: string } {
   return { name: parts.slice(0, length).join('/'), sub: parts.slice(length).join('/') };
 }
 
-/** The subpaths that a package exports, when it is installed. `undefined` when it is not, or has no `exports`. */
-function exportedSubpaths(root: string, name: string): ReadonlySet<string> | undefined {
-  const path = join(root, 'node_modules', name, 'package.json');
-  if (!existsSync(path)) return undefined;
-  const found: unknown = JSON.parse(readFileSync(path, 'utf8'));
-  const exported: unknown = typeof found === 'object' && found !== null ? Reflect.get(found, 'exports') : undefined;
-  if (typeof exported !== 'object' || exported === null) return undefined;
-  return new Set(Object.keys(exported).map((key) => key.replace(/^\.\/?/, '')));
+/** The plugin that an installed package is, by name, keyword or manifest, with its `exports`. `undefined` when it is not one or not installed. */
+function installedPlugin(root: string, name: string): PluginInfo | undefined {
+  const json = readJson(join(root, 'node_modules', name, 'package.json'));
+  return json === undefined ? undefined : pluginOf(json, `node_modules/${name}`);
 }
+
+/** Whether a path inside a plugin's package is one of the files that its package exports as its entry. */
+const isEntry = (plugin: PluginInfo, path: string): boolean => {
+  const bare = path.replace(/\.[cm]?[jt]sx?$/, '');
+  return plugin.entries.has(bare) || plugin.entries.has(bare.replace(/\/index$/, ''));
+};
 
 export const boundariesRule: Rule = {
   name: 'boundaries',
@@ -71,6 +78,8 @@ export const boundariesRule: Rule = {
     const found: Violation[] = [];
     for (const file of files.filter(isCode)) {
       const mine = MODULES.exec(file.path);
+      const own = packageOf(root, file.path);
+      const ownPlugin = own === undefined ? undefined : pluginOf(own.json, own.dir);
       for (const { specifier, line } of importsOf(file.text)) {
         const add = (code: string, message: string, fix: string): void => {
           found.push(violation('boundaries', code, file.path, line, message, fix));
@@ -93,6 +102,22 @@ export const boundariesRule: Rule = {
               `Import ${theirs[2]} through its index, or call its published service.`,
             );
           }
+          // A path into the files of another plugin package, local or in `node_modules`, is not its entry (PLG-01).
+          const installed = installedPackageOfPath(target);
+          const where = installed === undefined ? packageOf(root, target) : undefined;
+          const theirPlugin =
+            installed !== undefined
+              ? installedPlugin(root, installed.name)
+              : where === undefined
+                ? undefined
+                : pluginOf(where.json, where.dir);
+          if (theirPlugin !== undefined && theirPlugin.dir !== ownPlugin?.dir && !isEntry(theirPlugin, target)) {
+            add(
+              'BK_BOUNDARY_PLUGIN',
+              `${specifier} reaches into the files of ${theirPlugin.name}.`,
+              `Import from ${theirPlugin.name}, or from a subpath that its package.json exports (PLG-01).`,
+            );
+          }
           continue;
         }
         const { name, sub } = split(specifier);
@@ -108,9 +133,14 @@ export const boundariesRule: Rule = {
             `${name} is a driver library, and only its BieberKit package imports it.`,
             'Use the contract package (queue, cache, storage, mail) and choose the driver in the config (PKG-03).',
           );
-        } else if (isPlugin(name) && sub !== '') {
-          const exported = exportedSubpaths(root, name);
-          const open = exported === undefined ? !/^(?:src|dist|lib|internal)(?:\/|$)/.test(sub) : exported.has(sub);
+        } else if (name !== ownPlugin?.name && sub !== '') {
+          const theirs = installedPlugin(root, name);
+          // A package that is not installed is a plugin only by its name, and then only the folders of its build are closed.
+          if (theirs === undefined && !hasPluginName(name)) continue;
+          const open =
+            theirs === undefined || theirs.exportKeys.length === 0
+              ? !/^(?:src|dist|lib|internal)(?:\/|$)/.test(sub)
+              : exportsSubpath(theirs.exportKeys, sub);
           if (!open)
             add(
               'BK_BOUNDARY_PLUGIN',

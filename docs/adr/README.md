@@ -64,7 +64,9 @@ Status values: `Proposed`, `Accepted`, `Rejected`, `Superseded by NNNN`. Only th
 | [0029](0029-terminal-prompts.md) | Terminal prompts: @clack/prompts behind a port of the kit | Accepted |
 | [0030](0030-setting-declarations.md) | Settings are declared with `defineSetting` and contributed under `settings` | Accepted |
 | [0031](0031-policy-port.md) | The authenticator reads policies through a `PolicyReader` port | Accepted |
-| [0032](0032-audit-holds.md) | Legal holds on audit entries are a framework table | Proposed |
+| [0032](0032-audit-holds.md) | Legal holds on audit entries are a framework table | Accepted |
+| [0033](0033-entity-extensions.md) | Entity extensions: fields of another plugin's entity in a 1:1 table | Accepted |
+| [0034](0034-extension-record-key.md) | The row of an extension is keyed by a unique `record`, not by the id of the target | Accepted |
 
 ## Needed for the Phase 0 gate
 

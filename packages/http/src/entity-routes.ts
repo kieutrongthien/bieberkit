@@ -35,9 +35,12 @@ import {
   recordAudit,
   runInUnitOfWork,
   softDelete,
+  hasExtensions,
+  splitExtensionBody,
   toApiRow,
   transition,
   toOrmData,
+  writeExtensions,
 } from '@bieberkit/data/orm';
 import type { Database, OrmSchema } from '@bieberkit/data/orm';
 import type { AccessAnswer } from './ports.ts';
@@ -295,6 +298,25 @@ async function readOne(em: EntityManager, schema: OrmSchema, id: string, options
   const row = page.rows[0];
   if (row === undefined) throw recordNotFound();
   return row;
+}
+
+/**
+ * A record in the shape of the API after a write. With extensions it is read again, so that the fields of the extension tables are
+ * in it (ADR 0033); without them the row that was written is the answer.
+ */
+async function writtenRow(em: EntityManager, schema: OrmSchema, written: Row): Promise<Row> {
+  if (!hasExtensions(schema)) return toApiRow(schema, written);
+  return toApiRow(schema, await readOne(em, schema, String(written['id']), {}));
+}
+
+/** The body of a write, split into what the entity stores and what its extensions store, each as ORM data (ADR 0033). */
+function splitWrite(schema: OrmSchema, body: Row, mode: 'create' | 'update') {
+  const { base, writes } = splitExtensionBody(schema, body);
+  const own = toOrmData(schema, base, mode);
+  const extensions = writes.map((write) => ({ schema: write.schema, data: toOrmData(write.schema, write.body, mode) }));
+  const all: Row = { ...own };
+  for (const extension of extensions) Object.assign(all, extension.data);
+  return { own, extensions, all };
 }
 
 /** A stale write is 412 with the row as it is now, so that the client can show what changed (API-13). */
@@ -644,17 +666,18 @@ export function entityRoutes(schema: OrmSchema, context: EntityRoutesContext): R
           const write = await need(ctx, 'create');
           const body = asRow(ctx.body);
           checkWritable(write, body, 'create');
-          const data = toOrmData(schema, body, 'create');
-          if (!(await ctx.allows(def.name, 'create', { ...defaultsOf(def), ...data })))
+          const split = splitWrite(schema, body, 'create');
+          if (!(await ctx.allows(def.name, 'create', { ...defaultsOf(def), ...split.all })))
             throw authzDenied(def.name, 'create', 'no-permission');
-          const created = em.create(schema, data);
+          const created = em.create(schema, split.own);
+          await writeExtensions(em, created, split.extensions);
           const id = String(created['id']);
           emitEvent(em, { name: event('created'), payload: { id }, record: { entity: def.name, id, version: 1 } });
           recordAudit(em, { action: `${def.name}.create`, entity: def.name, recordId: id });
           await em.flush();
           ctx.status(201);
           ctx.header('location', `${base}/${id}`);
-          return { data: await respond(ctx, toApiRow(schema, created)) };
+          return { data: await respond(ctx, await writtenRow(em, schema, created)) };
         }),
     });
   }
@@ -677,11 +700,13 @@ export function entityRoutes(schema: OrmSchema, context: EntityRoutesContext): R
             const found = await findScoped(em, schema, id, write.scope);
             if (found === null) throw recordNotFound();
             expectVersion(found, expected);
-            const data = toOrmData(schema, body, 'update');
+            const split = splitWrite(schema, body, 'update');
             // The new state must be one that the caller may write: a row cannot be moved out of the rows that the caller owns.
-            if (!(await ctx.allows(def.name, 'update', { ...snapshotOf(def, found), ...data })))
+            if (!(await ctx.allows(def.name, 'update', { ...snapshotOf(def, found), ...split.all })))
               throw authzDenied(def.name, 'update', 'no-permission');
-            em.assign(found, data);
+            // A change of the extension fields only still changes the record, so its version moves (API-13).
+            em.assign(found, Object.keys(split.own).length === 0 ? { updatedAt: new Date() } : split.own);
+            await writeExtensions(em, found, split.extensions);
             const next = (typeof found['version'] === 'number' ? found['version'] : 0) + 1;
             emitEvent(em, {
               name: event('updated'),
@@ -695,7 +720,7 @@ export function entityRoutes(schema: OrmSchema, context: EntityRoutesContext): R
               data: { fields: Object.keys(body) },
             });
             await em.flush();
-            return { data: await respond(ctx, toApiRow(schema, found)) };
+            return { data: await respond(ctx, await writtenRow(em, schema, found)) };
           }),
         );
       },
@@ -766,7 +791,7 @@ export function entityRoutes(schema: OrmSchema, context: EntityRoutesContext): R
               expectVersion(found, expected);
               await transition(em, schema, found, name, empty ? undefined : ctx.body);
               await em.flush();
-              return { data: await respond(ctx, toApiRow(schema, found)) };
+              return { data: await respond(ctx, await writtenRow(em, schema, found)) };
             }),
           );
         },
@@ -936,8 +961,8 @@ export function entityRoutes(schema: OrmSchema, context: EntityRoutesContext): R
         try {
           if (operation === 'update') {
             const data = asRow(body['data']);
-            const changes = toOrmData(schema, data, 'update');
-            if (!(await ctx.allows(def.name, 'update', { ...snapshotOf(def, row), ...changes }))) {
+            const split = splitWrite(schema, data, 'update');
+            if (!(await ctx.allows(def.name, 'update', { ...snapshotOf(def, row), ...split.all }))) {
               outcomes.push({
                 id,
                 status: 'invalid',
@@ -948,7 +973,8 @@ export function entityRoutes(schema: OrmSchema, context: EntityRoutesContext): R
               });
               continue;
             }
-            em.assign(row, changes);
+            em.assign(row, Object.keys(split.own).length === 0 ? { updatedAt: new Date() } : split.own);
+            await writeExtensions(em, row, split.extensions);
             emitEvent(em, {
               name: event('updated'),
               payload: { id, fields: Object.keys(data) },

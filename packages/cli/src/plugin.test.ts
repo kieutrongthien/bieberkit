@@ -25,7 +25,7 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { createRunner, scriptedPrompts } from 'create-bieberkit/kit';
+import { CANCEL, createRunner, scriptedPrompts } from 'create-bieberkit/kit';
 import type { Prompts } from 'create-bieberkit/kit';
 import { checkCommand } from './commands/check.ts';
 import { addCommand, removeCommand } from './commands/plugin.ts';
@@ -55,7 +55,7 @@ function install(root: string, name: string, extra = ''): void {
   writeFileSync(
     join(folder, 'index.mjs'),
     `import { defineModule, definePlugin, env } from '@bieberkit/core';
-import { defineEntity, f } from '@bieberkit/data';
+import { defineEntity, f } from '@bieberkit/data';${extra.includes('defineExtension') ? "\nimport { defineExtension } from '@bieberkit/data';" : ''}
 const Page = defineEntity({ name: 'pages.Page', table: '${prefix.toLowerCase()}_pages', fields: { id: f.id(), title: f.string({ max: 100 }) }, api: { list: true } });
 export default definePlugin({ name: ${JSON.stringify(name)}, version: '1.0.0', core: '*', dialects: ['sqlite', 'postgres', 'mysql'], env: { ${prefix}_ROOT: env.string().describe('Folder of the pages'), ${prefix}_DEPTH: env.int().default(3).describe('Depth') }, entities: [Page]${extra} });
 `,
@@ -223,6 +223,75 @@ describe('section 5.2 remove', () => {
     const checked = await run(root, spawn, ['check', 'migrations', '--json']);
     expect(checked.code).toBe(0);
     expect(readdirSync(join(root, 'migrations'))).toHaveLength(1);
+  });
+
+  it('PLG-03 a cancelled question touches nothing: the config, the packages and the migrations stay as they were', async () => {
+    const { root, spawn, calls } = await withPages();
+    const before = readFileSync(join(root, 'bieberkit.config.ts'), 'utf8');
+    const cancelled = await run(root, spawn, ['remove', PAGES], scriptedPrompts([CANCEL]));
+    expect(cancelled.code).not.toBe(0);
+    expect(calls).toEqual([]);
+    expect(readFileSync(join(root, 'bieberkit.config.ts'), 'utf8')).toBe(before);
+    expect(existsSync(join(root, 'migrations'))).toBe(false);
+  });
+
+  it('PLG-03 a pnpm that fails leaves the config, the example and the migrations as they were', async () => {
+    const { root } = project();
+    const ok = pnpmFor(root);
+    await run(root, ok.spawn, ['add', PAGES]);
+    const before = readFileSync(join(root, 'bieberkit.config.ts'), 'utf8');
+    const example = readFileSync(join(root, '.env.example'), 'utf8');
+    const failing = pnpmFor(root, { fail: true });
+    const { code, error } = await run(root, failing.spawn, ['remove', PAGES, '--yes', '--json']);
+    expect([code, error.code]).toEqual([1, 'BK_PNPM_FAILED']);
+    expect(readFileSync(join(root, 'bieberkit.config.ts'), 'utf8')).toBe(before);
+    expect(readFileSync(join(root, '.env.example'), 'utf8')).toBe(example);
+    expect(existsSync(join(root, 'migrations'))).toBe(false);
+  });
+
+  it('PLG-06 an extension table is owned by the extending plugin: remove lists it, drops it and only it, and the target stays', async () => {
+    const { root } = project();
+    const { spawn } = pnpmFor(root);
+    install(root, PAGES);
+    install(
+      root,
+      '@bieberkit/plugin-seo',
+      ", requires: { '@bieberkit/plugin-pages': '*' }, extends: { 'pages.Page': defineExtension({ table: 'seo_page_ext', fields: { seoTitle: f.string({ max: 70 }).optional() } }) }",
+    );
+    writeFileSync(
+      join(root, 'bieberkit.config.ts'),
+      readFileSync(join(root, 'bieberkit.config.ts'), 'utf8').replace(
+        'plugins: []',
+        `plugins: ['${PAGES}', '@bieberkit/plugin-seo']`,
+      ),
+    );
+    const listed = await run(root, spawn, ['remove', '@bieberkit/plugin-seo', '--json']);
+    expect(listed.error.message).toContain('seo_page_ext');
+    expect(listed.error.message).not.toContain('pages_pages');
+    const { code, data } = await run(root, spawn, ['remove', '@bieberkit/plugin-seo', '--yes', '--json']);
+    expect(code).toBe(0);
+    // The fixture plugin has an entity of its own, `seo_pages`, besides the extension of `pages_pages`.
+    expect(data).toMatchObject({ plugin: '@bieberkit/plugin-seo', tables: ['seo_page_ext', 'seo_pages'] });
+    const migration = readFileSync(join(root, String(data.migration)), 'utf8');
+    expect(migration).toContain('drop table if exists "seo_page_ext"');
+    expect(migration).not.toContain('pages_pages');
+    expect(readFileSync(join(root, 'bieberkit.config.ts'), 'utf8')).toContain(PAGES);
+  });
+
+  it('PLG-06 the plugin that the extension requires cannot be removed while the extending plugin is installed', async () => {
+    const { root } = project();
+    const { spawn } = pnpmFor(root);
+    install(root, PAGES);
+    install(root, '@bieberkit/plugin-seo', ", requires: { '@bieberkit/plugin-pages': '*' }");
+    writeFileSync(
+      join(root, 'bieberkit.config.ts'),
+      readFileSync(join(root, 'bieberkit.config.ts'), 'utf8').replace(
+        'plugins: []',
+        `plugins: ['${PAGES}', '@bieberkit/plugin-seo']`,
+      ),
+    );
+    const refused = await run(root, spawn, ['remove', PAGES, '--yes', '--json']);
+    expect([refused.code, refused.error.code]).toEqual([1, 'BK_REMOVE_REQUIRED_BY']);
   });
 
   it('5.2 a plugin that another one requires, and one that is not installed, are refused', async () => {

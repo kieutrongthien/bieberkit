@@ -31,6 +31,7 @@ import type { CursorValue } from '../query/page.ts';
 import { fold } from '../text/fold.ts';
 import { entityOfSchema } from './compile.ts';
 import type { OrmSchema } from './compile.ts';
+import { applyExtensions, extensionFieldsOf } from './extensions.ts';
 import { applyTranslations, assertLocale } from './localize.ts';
 
 type Row = Record<string, unknown>;
@@ -124,8 +125,10 @@ export function knownFields(schema: OrmSchema): Map<string, Known> {
   standard('id', false);
   standard('createdAt', true);
   standard('updatedAt', true);
+  // A field of an extension is in another table: it is read and written with the record, and is not queried yet (ADR 0033).
+  const outside = extensionFieldsOf(schema);
   for (const [name, field] of Object.entries(def.fields)) {
-    if (['id', 'createdAt', 'updatedAt', 'hasOne', 'hasMany'].includes(field.kind)) continue;
+    if (['id', 'createdAt', 'updatedAt', 'hasOne', 'hasMany'].includes(field.kind) || outside.has(name)) continue;
     const filterable =
       FILTERABLE_KINDS.includes(field.kind) &&
       field.encrypted !== true &&
@@ -374,7 +377,10 @@ export async function listPage(em: EntityManager, schema: OrmSchema, options: Li
     conditions.push(afterCursor(order, values));
   }
 
-  for (const name of [...(options.select ?? []), ...(options.populate ?? [])]) {
+  const outside = extensionFieldsOf(schema);
+  // The extension fields that are asked for are read from their own table, after the page.
+  const selected = options.select?.filter((name) => !outside.has(name));
+  for (const name of [...(selected ?? []), ...(options.populate ?? [])]) {
     if (!(name in meta.properties))
       queryInvalid(`${name} is not a property of this entity.`, 'Use the name of a property.');
   }
@@ -387,9 +393,7 @@ export async function listPage(em: EntityManager, schema: OrmSchema, options: Li
   if (options.locale !== undefined) assertLocale(options.locale);
 
   const fields =
-    options.select === undefined
-      ? undefined
-      : [...new Set([...options.select, 'id', ...order.map((item) => item.field.lookup)])];
+    selected === undefined ? undefined : [...new Set([...selected, 'id', ...order.map((item) => item.field.lookup)])];
   const connectionType = await readConnection(em);
   const entities = await em.find<Row>(schema, conditions.length === 0 ? {} : { $and: conditions }, {
     orderBy: order.map((item) => ({
@@ -416,10 +420,12 @@ export async function listPage(em: EntityManager, schema: OrmSchema, options: Li
       ? encodeCursor([signature, ...order.map((item) => cursorValue(last[item.field.lookup]))])
       : null;
   const wanted = options.select === undefined ? undefined : new Set([...options.select, 'id']);
-  const rows = shown.map((entity) => {
-    const plain: Row = wrap(entity).toObject();
-    return wanted === undefined ? plain : Object.fromEntries(Object.entries(plain).filter(([key]) => wanted.has(key)));
-  });
+  const plainRows = shown.map((entity): Row => wrap(entity).toObject());
+  await applyExtensions(em, schema, plainRows);
+  const rows =
+    wanted === undefined
+      ? plainRows
+      : plainRows.map((plain) => Object.fromEntries(Object.entries(plain).filter(([key]) => wanted.has(key))));
   if (options.locale !== undefined) await applyTranslations(em, schema, rows, options.locale);
 
   const total = options.withTotal === true ? await em.count(schema, base, { connectionType }) : undefined;

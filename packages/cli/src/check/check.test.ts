@@ -265,6 +265,200 @@ describe('MOD-01 the boundaries rule', () => {
   });
 });
 
+/** A plugin package on disk: a `package.json` with its static manifest (PLG-07), and the files that it gives. */
+const pluginPackage = (
+  dir: string,
+  name: string,
+  options: { tables?: string[]; exports?: Record<string, unknown>; keyword?: boolean } = {},
+): Record<string, string> => ({
+  [`${dir}/package.json`]: JSON.stringify({
+    name,
+    version: '1.0.0',
+    ...(options.keyword === true ? { keywords: ['bieberkit-plugin'] } : {}),
+    exports: options.exports ?? { '.': './src/index.ts' },
+    bieberkit: { core: '*', dialects: ['sqlite'], requires: {}, conflicts: {}, tables: options.tables ?? [] },
+  }),
+  [`${dir}/src/index.ts`]: `${header(`${dir}/src/index.ts`)}export const Media = 1;\n`,
+});
+
+describe('PLG-01 a plugin is reached through its public entry only', () => {
+  const media = pluginPackage('node_modules/@bieberkit/plugin-media', '@bieberkit/plugin-media', {
+    tables: ['bk_media'],
+    exports: { '.': './src/index.ts', './testing': './src/testing.ts' },
+  });
+  const notes = pluginPackage('plugins/notes', '@acme/bieberkit-plugin-notes', {
+    keyword: true,
+    tables: ['acme_notes'],
+  });
+
+  it('PLG-01 a relative path into the files of another plugin is refused, and the entry that its package exports is not', async () => {
+    const files = {
+      ...notes,
+      ...entries(
+        source(
+          'plugins/other/src/a.ts',
+          "import a from '../../notes/src/index.ts';\nimport b from '../../notes/src/secret.ts';",
+        ),
+      ),
+      ...pluginPackage('plugins/other', '@acme/bieberkit-plugin-other', { keyword: true }),
+    };
+    const { violations } = await check(files, ['boundaries']);
+    expect(
+      violations
+        .filter((entry) => entry.file === 'plugins/other/src/a.ts')
+        .map((entry) => [entry.code, entry.line - 10]),
+    ).toEqual([['BK_BOUNDARY_PLUGIN', 2]]);
+  });
+
+  it('PLG-01 a path through node_modules into the files of a plugin is refused', async () => {
+    const files = {
+      ...media,
+      ...entries(
+        source(
+          'apps/server/src/a.ts',
+          "import a from '../../../node_modules/@bieberkit/plugin-media/src/secret.ts';\nimport b from '../../../node_modules/@bieberkit/plugin-media/src/index.ts';",
+        ),
+      ),
+    };
+    const { violations } = await check(files, ['boundaries']);
+    expect(violations.map((entry) => [entry.code, entry.line - 10])).toEqual([['BK_BOUNDARY_PLUGIN', 1]]);
+  });
+
+  it('PLG-01 a plugin that is known by its keyword, and not by its name, has the same rule', async () => {
+    const files = {
+      ...pluginPackage('node_modules/acme-notes', 'acme-notes', { keyword: true }),
+      ...entries(
+        source('apps/server/src/a.ts', "import a from 'acme-notes/src/secret.ts';\nimport b from 'acme-notes';"),
+      ),
+    };
+    const { violations } = await check(files, ['boundaries']);
+    expect(violations.map((entry) => [entry.code, entry.line - 10])).toEqual([['BK_BOUNDARY_PLUGIN', 1]]);
+  });
+
+  it('PLG-01 an exports pattern opens the subpaths that it names, and the others stay closed', async () => {
+    const files = {
+      ...pluginPackage('node_modules/@bieberkit/plugin-seo', '@bieberkit/plugin-seo', {
+        exports: { '.': './index.js', './public/*': './public/*.js' },
+      }),
+      ...entries(
+        source(
+          'apps/server/src/a.ts',
+          "import a from '@bieberkit/plugin-seo/public/card';\nimport b from '@bieberkit/plugin-seo/private/card';",
+        ),
+      ),
+    };
+    const { violations } = await check(files, ['boundaries']);
+    expect(violations.map((entry) => [entry.code, entry.line - 10])).toEqual([['BK_BOUNDARY_PLUGIN', 2]]);
+  });
+
+  it('PLG-01 a plugin may import its own files by its own name', async () => {
+    const files = {
+      ...notes,
+      ...entries(source('plugins/notes/src/a.ts', "import a from '@acme/bieberkit-plugin-notes/src/internal.ts';")),
+    };
+    const { violations } = await check(files, ['boundaries']);
+    expect(violations).toEqual([]);
+  });
+});
+
+describe('PLG-02 a plugin does not query the tables of another plugin', () => {
+  const media = pluginPackage('node_modules/@bieberkit/plugin-media', '@bieberkit/plugin-media', {
+    tables: ['bk_media'],
+  });
+  const notes = pluginPackage('plugins/notes', '@acme/bieberkit-plugin-notes', {
+    keyword: true,
+    tables: ['acme_notes'],
+  });
+  const query = (body: string): Record<string, string> => ({
+    ...media,
+    ...notes,
+    ...entries(source('plugins/notes/src/query.ts', body)),
+  });
+  const findings = async (body: string) => {
+    const { violations } = await check(query(body), ['plugin-tables']);
+    return violations.map((entry) => [entry.code, entry.line - 10]);
+  };
+
+  it('PLG-02 the table of another plugin in a query builder call is refused, with the name of its owner', async () => {
+    const { violations, err } = await check(
+      query(
+        "const a = db.selectFrom('bk_media').selectAll();\nconst b = db.insertInto('bk_media as m');\nconst c = db.selectFrom('acme_notes');",
+      ),
+      ['plugin-tables'],
+    );
+    expect(violations.map((entry) => [entry.code, entry.line - 10])).toEqual([
+      ['BK_PLUGIN_TABLE_QUERY', 1],
+      ['BK_PLUGIN_TABLE_QUERY', 2],
+    ]);
+    expect(JSON.stringify(violations)).toContain('@bieberkit/plugin-media');
+    expect(err).toBe('');
+  });
+
+  it('PLG-02 the table of another plugin in SQL text is refused, in every form of it that is seen', async () => {
+    expect(
+      await findings(
+        [
+          'const a = sql`select * from bk_media where id = ${id}`;',
+          "const b = await em.getConnection().execute('delete from bk_media');",
+          "const c = sql.raw('update bk_media set x = 1');",
+          "const d = db.selectFrom('acme_notes').innerJoin('bk_media', 'bk_media.id', 'acme_notes.media_id');",
+        ].join('\n'),
+      ),
+    ).toEqual([
+      ['BK_PLUGIN_TABLE_QUERY', 1],
+      ['BK_PLUGIN_TABLE_QUERY', 2],
+      ['BK_PLUGIN_TABLE_QUERY', 3],
+      ['BK_PLUGIN_TABLE_QUERY', 4],
+    ]);
+  });
+
+  it('PLG-02 the own tables, the tables of the framework and a word that only looks like a table are not findings', async () => {
+    expect(
+      await findings(
+        [
+          "const a = db.selectFrom('acme_notes');",
+          "const b = db.selectFrom('bk_auth_users');",
+          'const c = sql`select * from bk_audit_log`;',
+          "const d = 'bk_media is a table of another plugin';",
+          '// db.selectFrom("bk_media")',
+        ].join('\n'),
+      ),
+    ).toEqual([]);
+  });
+
+  it('PLG-02 an entity of another plugin passed to the entity manager is refused, and its use as a type or its own entity is not', async () => {
+    expect(
+      await findings(
+        [
+          "import { Media } from '@bieberkit/plugin-media';",
+          "import type { MediaView } from '@bieberkit/plugin-media';",
+          "import { Note } from './entity.ts';",
+          'const a = await em.find(Media, {});',
+          'const b = em.createQueryBuilder(Media);',
+          'const c = await em.find(Note, {});',
+          'const d: MediaView | undefined = undefined;',
+        ].join('\n'),
+      ),
+    ).toEqual([
+      ['BK_PLUGIN_ENTITY_QUERY', 4],
+      ['BK_PLUGIN_ENTITY_QUERY', 5],
+    ]);
+  });
+
+  it('PLG-02 the project code is not a plugin, so the rule does not read it', async () => {
+    const files = { ...media, ...entries(source('apps/server/src/a.ts', "const a = db.selectFrom('bk_media');")) };
+    expect((await check(files, ['plugin-tables'])).violations).toEqual([]);
+  });
+
+  it('PLG-02 the directive with a reason lets one query through', async () => {
+    expect(
+      await findings(
+        "// bieberkit-ignore BK_PLUGIN_TABLE_QUERY: a report that the media team asked for\nconst a = db.selectFrom('bk_media');",
+      ),
+    ).toEqual([]);
+  });
+});
+
 describe('SCH-08 the orm rule', () => {
   it('SCH-08 an entity file that imports the ORM is an error, and the overrides are warnings', async () => {
     const body =
@@ -372,10 +566,16 @@ describe('DATA-08 the migrations rule', () => {
 });
 
 const PLUGIN = '@bieberkit/plugin-p';
-const pluginWith = (kind: string, up: string): Record<string, string> => ({
+const pluginWith = (kind: string, up: string, after = true): Record<string, string> => ({
   [`node_modules/${PLUGIN}/index.mjs`]: `import { definePlugin } from '@bieberkit/core';
 export default definePlugin({ name: '${PLUGIN}', version: '1.0.0', core: '*', dialects: ['sqlite', 'mysql'],
-  migrations: [{ plugin: '${PLUGIN}', version: '1.0.0', id: 'one', kind: '${kind}', up: async (trx) => { ${up} } }] });
+  migrations: [${
+    kind === 'contract' && after
+      ? `{ plugin: '${PLUGIN}', version: '0.9.0', id: 'first', kind: 'expand', up: async () => undefined }, `
+      : ''
+  }{ plugin: '${PLUGIN}', version: '1.0.0', id: 'one', kind: '${kind}', ${
+    kind === 'contract' && after ? "after: 'first', " : ''
+  }up: async (trx) => { ${up} } }] });
 `,
 });
 
@@ -397,6 +597,13 @@ describe('DATA-08 and DATA-27 the plugin-steps rule', () => {
       { plugins: [{ name: PLUGIN }] },
     );
     expect([code, codes]).toEqual([0, []]);
+  });
+
+  it('DATA-08 a contract step with no after is a warning, because the migrate role cannot refuse it', async () => {
+    const { code, violations } = await check(pluginWith('contract', 'return;', false), ['plugin-steps'], {
+      plugins: [{ name: PLUGIN }],
+    });
+    expect([code, violations]).toMatchObject([0, [{ code: 'BK_STEP_CONTRACT_NO_AFTER', severity: 'warning' }]]);
   });
 
   it('DATA-27 on MySQL a step with two DDL statements and one without a guard is a warning, and on SQLite it is not reported', async () => {

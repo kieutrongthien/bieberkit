@@ -29,7 +29,8 @@ Generated from the built declaration files by `pnpm api:update`. Do not edit by 
 
 ```ts
 import { A as fold, C as ResetEvery, D as f, E as TransitionDef, O as Compare, S as FieldKind, T as StateOptions, _ as ColumnDef, a as EntityDef, b as FieldBuilders, c as FieldLike, d as StandardColumn, f as TableConstraints, g as tableConstraints, h as standardColumns, i as ConstraintDef, j as nfc, k as codePointLength, l as OrmOverride, m as snake, n as AdminOptions, o as EntityOptions, p as defineEntity, r as ApiOptions, s as Feature, t as ActionDef, u as Permissions, v as ComputedFn, w as SchemaValue, x as FieldDef, y as Field } from "./define-entity-CMoIdUz2.js";
-import { A as upStatementsOfMigration, C as findStepRisks, D as DestructiveFinding, E as validateSteps, M as dataError, O as DestructiveKind, S as compareVersions, T as stepName, b as StepKind, j as DataError, k as detectDestructive, t as Database, v as PluginMigrationStep, w as orderSteps, x as StepRisk, y as StepDatabase } from "./connect-q_meNF6W.js";
+import { A as upStatementsOfMigration, C as findStepRisks, D as DestructiveFinding, E as validateSteps, M as dataError, O as DestructiveKind, S as compareVersions, T as stepName, b as StepKind, j as DataError, k as detectDestructive, t as Database, v as PluginMigrationStep, w as orderSteps, x as StepRisk, y as StepDatabase } from "./connect-E7O4kGaH.js";
+import { a as ResolvedEntities, c as resolveExtensions, i as ExtensionRef, n as ExtensionOptions, o as ResolvedExtension, r as ExtensionPermissions, s as defineExtension, t as ExtensionDef } from "./extend-d4JXYhzj.js";
 import { a as UpdateInput, i as Row, n as EntityRegistry, t as CreateInput } from "./registry-CFbTH7iw.js";
 interface Uuid7Options {
   readonly now?: () => number;
@@ -59,6 +60,7 @@ declare module "@bieberkit/core" {
   interface ModuleContributions {
     entities?: readonly EntityDef<string>[];
     migrations?: readonly PluginMigrationStep[];
+    extends?: Readonly<Record<string, ExtensionDef>>;
   }
 }
 declare module "@bieberkit/core" {
@@ -66,5 +68,5 @@ declare module "@bieberkit/core" {
     database: Database;
   }
 }
-export { type ActionDef, type AdminOptions, type ApiOptions, type ColumnDef, type Compare, type ComputedFn, type ConstraintDef, type CreateInput, type CursorValue, DataError, type DestructiveFinding, type DestructiveKind, type EntityDef, type EntityOptions, type EntityRegistry, type Feature, Field, type FieldBuilders, type FieldDef, type FieldKind, type FieldLike, type OrmOverride, type Permissions, type PluginMigrationStep, type ResetEvery, type Row, type SchemaValue, type StandardColumn, type StateOptions, type StepDatabase, type StepKind, type StepRisk, type TableConstraints, type TransitionDef, type UpdateInput, type Uuid7Options, codePointLength, compareVersions, dataError, defineEntity, detectDestructive, f, findStepRisks, fold, nfc, orderSteps, snake, standardColumns, stepName, tableConstraints, upStatementsOfMigration, validateSteps };
+export { type ActionDef, type AdminOptions, type ApiOptions, type ColumnDef, type Compare, type ComputedFn, type ConstraintDef, type CreateInput, type CursorValue, DataError, type DestructiveFinding, type DestructiveKind, type EntityDef, type EntityOptions, type EntityRegistry, type ExtensionDef, type ExtensionOptions, type ExtensionPermissions, type ExtensionRef, type Feature, Field, type FieldBuilders, type FieldDef, type FieldKind, type FieldLike, type OrmOverride, type Permissions, type PluginMigrationStep, type ResetEvery, type ResolvedEntities, type ResolvedExtension, type Row, type SchemaValue, type StandardColumn, type StateOptions, type StepDatabase, type StepKind, type StepRisk, type TableConstraints, type TransitionDef, type UpdateInput, type Uuid7Options, codePointLength, compareVersions, dataError, defineEntity, defineExtension, detectDestructive, f, findStepRisks, fold, nfc, orderSteps, resolveExtensions, snake, standardColumns, stepName, tableConstraints, upStatementsOfMigration, validateSteps };
 ```
