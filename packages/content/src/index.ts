@@ -2,7 +2,7 @@
  * BieberKit
  *
  * @file        packages/content/src/index.ts
- * @description Public entry point of @bieberkit/content.
+ * @description Public API of @bieberkit/content: the block format, its checks and the HTML serializer. It imports no framework.
  * @author      Bieber Kieu <kieutrongthien@gmail.com>
  * @copyright   Copyright (c) 2026 Bieber Kieu
  * @license     Apache-2.0
@@ -22,7 +22,40 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-// Public API of @bieberkit/content. Implementation starts after the Phase 0 ADRs (docs/adr/README.md).
-
 /** npm name of this package. */
 export const packageName = '@bieberkit/content';
+
+export { createContent, defineBlock } from './content.ts';
+export type { Content, ContentOptions } from './content.ts';
+export { ContentError } from './errors.ts';
+export type { ContentErrorCode } from './errors.ts';
+export { CONTENT_VERSION } from './types.ts';
+export type {
+  Block,
+  BlockDef,
+  BlockTools,
+  BuiltInBlock,
+  ContentDocument,
+  ContentElement,
+  ContentNode,
+  ContentProblem,
+  CtaBlock,
+  CustomBlock,
+  DrawnBlock,
+  EmbedProvider,
+  GalleryBlock,
+  HeadingBlock,
+  ImageBlock,
+  ImageRef,
+  Inline,
+  ListBlock,
+  ListBody,
+  ListItem,
+  Mark,
+  ParagraphBlock,
+  QuoteBlock,
+  RenderOptions,
+  ResolvedImage,
+  TableBlock,
+  VideoBlock,
+} from './types.ts';

@@ -357,7 +357,7 @@ Execution order: M2.1 through M2.7, then the reviewed npm release, then M1.10 Pi
 
 ### M2.3 Content and public site
 
-- [ ] `@bieberkit/content`: block schema, shared React renderers, sanitization, framework-free HTML serializer (CNT-01 to CNT-03, CNT-05)
+- [x] `@bieberkit/content`: block schema, shared React renderers, sanitization, framework-free HTML serializer (CNT-01 to CNT-03, CNT-05). Evidence: `content/src/{parse,safety,html,react}.test.ts`, the module spec `docs/modules/content.md` and ADR 0038. Open: the admin preview and the site do not use the renderers yet, no entity field stores a document, and a plugin cannot contribute a block through `definePlugin` (a project passes it to `createContent`)
 - [ ] Editor integrated per the accepted ADR (CNT-04)
 - [ ] `apps/site` on TanStack Start with SSR on by default, same-origin routing, no data store credentials (SITE-01 to SITE-04, SITE-09)
 - [ ] `@bieberkit/site-kit`: `seoHead()`, sitemap, preview tokens, cache helpers (SEO-01, SEO-05, SITE-05)

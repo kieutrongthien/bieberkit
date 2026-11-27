@@ -28,50 +28,7 @@
 Generated from the built declaration files by `pnpm api:update`. Do not edit by hand. A change here is a change to the public API and needs a changeset (spec section 22.3).
 
 ```ts
-interface ErrorBody {
-  readonly code: string;
-  readonly status: number;
-  readonly message: string;
-  readonly fix: string;
-}
-interface BkErrorOptions {
-  readonly code: string;
-  readonly status?: number;
-  readonly safeMessage?: string;
-  readonly fix?: string;
-  readonly cause?: unknown;
-}
-export declare class BkError extends Error {
-  readonly code: string;
-  readonly status: number;
-  readonly safeMessage: string;
-  readonly fix: string;
-  constructor(message: string, options: BkErrorOptions);
-  toJSON(): ErrorBody;
-}
-export declare class ConfigError extends BkError {}
-export declare class ContainerError extends BkError {}
-interface EnvProblem {
-  readonly key: string;
-  readonly code: "CFG_ENV_MISSING" | "CFG_ENV_INVALID";
-  readonly message: string;
-  readonly fix: string;
-}
-export declare class EnvValidationError extends ConfigError {
-  readonly problems: readonly EnvProblem[];
-  constructor(problems: readonly EnvProblem[]);
-}
-interface ConfigProblem {
-  readonly key: string;
-  readonly code: "CFG_CONFIG_INVALID" | "CFG_CONFIG_UNKNOWN" | "CFG_CONFIG_SECRET";
-  readonly message: string;
-  readonly fix: string;
-}
-export declare class ConfigValidationError extends ConfigError {
-  readonly problems: readonly ConfigProblem[];
-  constructor(problems: readonly ConfigProblem[]);
-}
-export declare function toBkError(value: unknown): BkError;
+import { BkError, BkErrorOptions, ConfigError, ConfigProblem, ConfigValidationError, ContainerError, EnvProblem, EnvValidationError, ErrorBody, toBkError } from "./errors.js";
 type EnvKind = "string" | "int" | "boolean" | "enum" | "url" | "base64" | "custom";
 type EnvCustomParse<T> = (raw: string) => {
   readonly value: T;
@@ -760,5 +717,5 @@ export declare function defineConfig(input: ProjectConfigInput): ProjectConfigIn
 export declare function defineConfigSection<K extends keyof ConfigSections>(key: K, parser: Parser<ConfigSections[K]>): ConfigSection<K>;
 export declare function validateConfig(input: unknown, options?: ValidateConfigOptions): ProjectConfigInput;
 export declare const packageName = "@bieberkit/core";
-export type { AppEnv, AttributeValue, BkErrorOptions, CollectorOptions, ConfigProblem, ConfigSection, ConfigSections, Container, CoreEnv, CoreEnvResult, CoreEnvValues, Counter, Dialect, EmitResult, EnvCustomParse, EnvDescription, EnvKeyBuilder, EnvKeyDef, EnvKind, EnvOwner, EnvProblem, EnvSchema, EnvSource, EnvValues, ErrorBody, ErrorReportContext, ErrorReporter, EventBus, EventBusOptions, EventHandler, EventName, EventRegistry, FinishedSpan, Gauge, HandlerFailure, Histogram, HistogramOptions, Hook, HookFailure, Installed, IntOptions, KeyCollector, Lifecycle, LifecycleOptions, LoadEnvOptions, LocalizedText, LogFields, LogLevel, LogSanitizer, Logger, LoggerOptions, Manifest, ManifestCheck, MemoryReporter, MemorySpanExporter, MetricLabels, MetricOptions, MetricSample, Metrics, MetricsServer, MetricsServerOptions, ModuleContributions, ModuleDef, ModuleEmitter, ModuleInput, OnOptions, OpenSpan, OtlpExporterOptions, ParsedDsn, Parser, Phase, PluginDef, PluginEntry, PluginInput, PluginProblem, ProcessHandlerOptions, ProcessLike, ProjectConfigInput, ReadCoreEnvOptions, Registration, ReportLevel, ReportSource, ReporterConfig, ReporterFromConfigOptions, RequestContext, RequestScope, Resolution, ResolveContext, Role, SeedFn, SentryReporterOptions, ServiceDefs, ServiceName, ServiceRegistry, ServiceScope, SettingActor, SettingDef, SettingInput, SettingScope, SettingType, Span, SpanAttributes, SpanExporter, SpanKind, SpanOptions, StopResult, TraceParent, Tracer, TracerFromConfigOptions, TracerOptions, TracingConfig, ValidateConfigOptions };
+export { type AppEnv, type AttributeValue, BkError, type BkErrorOptions, type CollectorOptions, ConfigError, type ConfigProblem, type ConfigSection, type ConfigSections, ConfigValidationError, type Container, ContainerError, type CoreEnv, type CoreEnvResult, type CoreEnvValues, type Counter, type Dialect, type EmitResult, type EnvCustomParse, type EnvDescription, type EnvKeyBuilder, type EnvKeyDef, type EnvKind, type EnvOwner, type EnvProblem, type EnvSchema, type EnvSource, EnvValidationError, type EnvValues, type ErrorBody, type ErrorReportContext, type ErrorReporter, type EventBus, type EventBusOptions, type EventHandler, type EventName, type EventRegistry, type FinishedSpan, type Gauge, type HandlerFailure, type Histogram, type HistogramOptions, type Hook, type HookFailure, type Installed, type IntOptions, type KeyCollector, type Lifecycle, type LifecycleOptions, type LoadEnvOptions, type LocalizedText, type LogFields, type LogLevel, type LogSanitizer, type Logger, type LoggerOptions, type Manifest, type ManifestCheck, type MemoryReporter, type MemorySpanExporter, type MetricLabels, type MetricOptions, type MetricSample, type Metrics, type MetricsServer, type MetricsServerOptions, type ModuleContributions, type ModuleDef, type ModuleEmitter, type ModuleInput, type OnOptions, type OpenSpan, type OtlpExporterOptions, type ParsedDsn, type Parser, type Phase, type PluginDef, type PluginEntry, type PluginInput, type PluginProblem, type ProcessHandlerOptions, type ProcessLike, type ProjectConfigInput, type ReadCoreEnvOptions, type Registration, type ReportLevel, type ReportSource, type ReporterConfig, type ReporterFromConfigOptions, type RequestContext, type RequestScope, type Resolution, type ResolveContext, type Role, type SeedFn, type SentryReporterOptions, type ServiceDefs, type ServiceName, type ServiceRegistry, type ServiceScope, type SettingActor, type SettingDef, type SettingInput, type SettingScope, type SettingType, type Span, type SpanAttributes, type SpanExporter, type SpanKind, type SpanOptions, type StopResult, type TraceParent, type Tracer, type TracerFromConfigOptions, type TracerOptions, type TracingConfig, type ValidateConfigOptions, toBkError };
 ```

@@ -29,6 +29,11 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
+    "./errors": {
+      "@bieberkit/source": "./src/errors/errors.ts",
+      "types": "./dist/errors.d.ts",
+      "default": "./dist/errors.js"
+    },
     "./package.json": "./package.json"
   },
   "publishConfig": {
@@ -36,6 +41,10 @@
       ".": {
         "types": "./dist/index.d.ts",
         "default": "./dist/index.js"
+      },
+      "./errors": {
+        "types": "./dist/errors.d.ts",
+        "default": "./dist/errors.js"
       },
       "./package.json": "./package.json"
     },

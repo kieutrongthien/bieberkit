@@ -1250,9 +1250,9 @@ Alternatives considered:
 
 ### 16.5 Block content editor
 
-- **CNT-01** Rich content is stored as versioned block JSON, never as raw HTML. Blocks include heading, paragraph, list, quote, image, gallery, video embed, table, call to action, and custom blocks declared by plugins.
+- **CNT-01** Rich content is stored as versioned block JSON, never as raw HTML: `{ version: 1, blocks }`, a flat list of blocks in which only lists nest (ADR 0038). Blocks include heading, paragraph, list, quote, image, gallery, video embed, table, call to action, and custom blocks declared by plugins.
 - **CNT-02** `@bieberkit/content` defines the block schema and one set of React renderers used by both the admin preview and the site, so preview matches production.
-- **CNT-03** Rendered output is sanitized: links get safe `rel` values, embeds come only from an allowlist, and raw HTML blocks are off by default.
+- **CNT-03** Rendered output is sanitized: links get safe `rel` values, embeds come only from an allowlist, and there is no raw HTML block.
 - **CNT-04** The editor engine is Tiptap 3 (MIT, ADR 0004). Before the editor ships in M2.3, a manual Vietnamese input test (Telex and VNI) MUST pass. If it fails where Lexical passes, a new ADR supersedes ADR 0004. The editor loads as a lazy chunk.
 
 * **CNT-05** `@bieberkit/content` also ships a framework-free HTML serializer, used for emails, RSS feeds and headless renderers (SITE-07).
@@ -1725,6 +1725,7 @@ Open questions:
 
 | Version | Date | Changes |
 | --- | --- | --- |
+| 0.8.37 | 2026-11-27 | ADR 0038: content is `{ version: 1, blocks }`, the HTML serializer and the React renderer draw one checked element tree, and there is no raw HTML block (CNT-01, CNT-03) |
 | 0.8.35 | 2026-11-27 | ADR 0037: the `admin` key of a plugin, its modules served under the admin, the host that a module gets, and `extensions` in `_meta` (UI-04) |
 | 0.8.34 | 2026-11-27 | ADR 0036: `f.file()` and `f.image()`, the check of a file on a write, the upload of the admin to the storage with a signed URL, and the origin of the bucket in the policy of the admin (UI-11, SEC-01) |
 | 0.8.33 | 2026-11-27 | MOD-09: inline collections are in the body and the answer of a record, are saved in its transaction with the permissions of the line entity, and the form edits them as a table (UI-11) |
