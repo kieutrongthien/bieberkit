@@ -49,6 +49,7 @@ export type {
   MetaEntity,
   MetaField,
   MetaMenuItem,
+  MetaTransition,
   Page,
   Row,
   SessionUser,
@@ -77,3 +78,13 @@ export {
   viewToSearch,
 } from './lists.ts';
 export type { BulkOutcome, CsvColumn, Filter, FilterOperator, SavedView } from './lists.ts';
+export {
+  commonTransitions,
+  inputFieldsOf,
+  patchRow,
+  stateKeyOf,
+  transitionPatch,
+  transitionsFor,
+} from './transitions.ts';
+export { problemOf } from './validation.ts';
+export type { ValueProblem } from './validation.ts';

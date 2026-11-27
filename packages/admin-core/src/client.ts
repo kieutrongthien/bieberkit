@@ -78,6 +78,8 @@ export interface AdminClient {
   /** `version` is the version that the person read (API-13). A stale one is a 412 with the current row. */
   update(entity: MetaEntity, id: string, body: Row, version: number): Promise<Row>;
   remove(entity: MetaEntity, id: string, version: number): Promise<void>;
+  /** A move of the state field of a row. `version` is the one that was read, and `input` is what the move asks for, if it asks for something. */
+  transition(entity: MetaEntity, id: string, name: string, version: number, input?: Row): Promise<Row>;
   /** One change to many rows. The rows are `{ id, version }`, the version that the person read. Above 100 rows the server queues a job (API-14). */
   bulk(
     entity: MetaEntity,
@@ -213,6 +215,14 @@ export function createAdminClient(options: AdminClientOptions = {}): AdminClient
       return rowOf(
         await request('PATCH', `${entity.path}/${encodeURIComponent(id)}`, {
           body,
+          headers: { 'if-match': String(version) },
+        }),
+      );
+    },
+    async transition(entity, id, name, version, input) {
+      return rowOf(
+        await request('POST', `${entity.path}/${encodeURIComponent(id)}/actions/${encodeURIComponent(name)}`, {
+          body: input ?? {},
           headers: { 'if-match': String(version) },
         }),
       );

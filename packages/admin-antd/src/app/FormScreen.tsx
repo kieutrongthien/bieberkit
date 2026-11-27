@@ -38,74 +38,15 @@ import {
   saveDraft,
   shortcutOf,
 } from '@bieberkit/admin-core';
-import type { MetaEntity, MetaField, Row } from '@bieberkit/admin-core';
+import type { MetaEntity, Row } from '@bieberkit/admin-core';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useBlocker, useNavigate, useParams } from '@tanstack/react-router';
-import { Alert, App, Button, Card, Form, Input, InputNumber, Result, Select, Space, Switch, Table } from 'antd';
+import { Alert, App, Button, Card, Form, Result, Space, Table } from 'antd';
 import { useEffect, useRef, useState } from 'react';
-import type { ChangeEvent, JSX } from 'react';
+import type { JSX } from 'react';
+import { Control, fromControl, rulesOf, toControl } from './controls.tsx';
 import { useClient, useEntity } from './context.ts';
 import { useLanguage, useT } from './language.tsx';
-
-/** The value of a field as its control holds it: a `datetime-local` input wants `YYYY-MM-DDTHH:mm`. */
-function toControl(field: MetaField, value: unknown): unknown {
-  if (field.widget === 'datetime' && typeof value === 'string') return value.slice(0, 16);
-  if (field.widget === 'date' && typeof value === 'string') return value.slice(0, 10);
-  return value;
-}
-
-/** The value that the API takes: an instant in ISO form. */
-function fromControl(field: MetaField, value: unknown): unknown {
-  if (field.widget === 'datetime' && typeof value === 'string' && value !== '') return new Date(value).toISOString();
-  return value;
-}
-
-/** What `Form.Item` hands to its child: the id for the label, and the value with the function that changes it. */
-interface ControlProps {
-  readonly field: MetaField;
-  readonly id?: string;
-  readonly value?: unknown;
-  readonly checked?: boolean;
-  readonly onChange?: (value: unknown) => void;
-}
-
-function Control(props: ControlProps): JSX.Element {
-  const { field, id, onChange } = props;
-  const identity = id === undefined ? {} : { id };
-  const text = typeof props.value === 'string' ? props.value : undefined;
-  const typed = (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>): void => onChange?.(event.target.value);
-  switch (field.widget) {
-    case 'textarea':
-      return <Input.TextArea {...identity} rows={4} value={text} onChange={typed} />;
-    case 'number':
-      return (
-        <InputNumber
-          {...identity}
-          style={{ width: '100%' }}
-          value={typeof props.value === 'number' ? props.value : null}
-          onChange={(value) => onChange?.(value)}
-        />
-      );
-    case 'switch':
-      return <Switch {...identity} checked={props.checked === true} onChange={(checked) => onChange?.(checked)} />;
-    case 'select':
-      return (
-        <Select
-          {...identity}
-          value={text}
-          allowClear={!field.required}
-          options={(field.values ?? []).map((value) => ({ value, label: value }))}
-          onChange={(value) => onChange?.(value)}
-        />
-      );
-    case 'date':
-      return <Input {...identity} type="date" value={text} onChange={typed} />;
-    case 'datetime':
-      return <Input {...identity} type="datetime-local" value={text} onChange={typed} />;
-    default:
-      return <Input {...identity} type={field.widget === 'email' ? 'email' : 'text'} value={text} onChange={typed} />;
-  }
-}
 
 /** A value as a cell of the table of a conflict shows it. */
 const shown = (value: unknown): string =>
@@ -335,7 +276,7 @@ function Editor(props: { readonly entity: MetaEntity; readonly row?: Row | undef
             label={field.key}
             name={field.key}
             valuePropName={field.widget === 'switch' ? 'checked' : 'value'}
-            rules={[{ required: field.required && field.widget !== 'switch' }]}
+            rules={rulesOf(field, t)}
           >
             <Control field={field} />
           </Form.Item>

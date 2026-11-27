@@ -53,7 +53,15 @@ interface Entity {
   form: string[];
   list: string[];
   title?: string;
-  transitions: { name: string; from: string[]; to: string; permission: string; allowed: boolean; path: string }[];
+  transitions: {
+    name: string;
+    from: string[];
+    to: string;
+    permission: string;
+    allowed: boolean;
+    path: string;
+    input?: Record<string, unknown>;
+  }[];
 }
 interface Meta {
   schemaVersion: number;
@@ -191,9 +199,21 @@ describe('META-02 what it describes', () => {
         permission: 'crm.account.close',
         allowed: true,
         path: '/api/v1/crm/accounts/{id}/actions/close',
+        // What the transition asks for, so that a screen can ask for it (UI-03).
+        input: {
+          type: 'object',
+          properties: { reason: { type: 'string', minLength: 3 } },
+          required: ['reason'],
+        },
       },
     ]);
     expect(entity(await fetchMeta(), 'crm.Note').transitions).toEqual([]);
+  });
+
+  it('META-02 the list of the admin names fields, and a relation is listed under the key that the API sends', async () => {
+    const account = entity(await fetchMeta(), 'crm.Account');
+    expect(account.list).toEqual(['code', 'name', 'ownerId', 'status']);
+    expect(account.title).toBe('name');
   });
 
   it('META-02 takes the list and the title of the admin, and a default list otherwise', async () => {

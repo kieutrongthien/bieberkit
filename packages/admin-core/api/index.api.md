@@ -110,7 +110,23 @@ interface MetaField {
   readonly encrypted?: boolean;
   readonly default?: unknown;
   readonly values?: readonly string[];
+  readonly currency?: string;
+  readonly precision?: number;
+  readonly scale?: number;
+  readonly target?: {
+    readonly entity: string;
+    readonly path: string;
+  };
   readonly validation?: Readonly<Record<string, unknown>>;
+}
+interface MetaTransition {
+  readonly name: string;
+  readonly from: readonly string[];
+  readonly to: string;
+  readonly permission: string;
+  readonly allowed: boolean;
+  readonly path: string;
+  readonly input?: Readonly<Record<string, unknown>>;
 }
 interface MetaEntity {
   readonly name: string;
@@ -118,6 +134,8 @@ interface MetaEntity {
   readonly label: Readonly<Record<string, string>>;
   readonly operations: Readonly<Record<"list" | "get" | "create" | "update" | "delete", boolean>>;
   readonly can: Readonly<Record<"read" | "create" | "update" | "delete", boolean>>;
+  readonly features?: readonly string[];
+  readonly transitions?: readonly MetaTransition[];
   readonly softDelete: boolean;
   readonly tenant: boolean;
   readonly title?: string;
@@ -200,6 +218,7 @@ interface AdminClient {
   create(entity: MetaEntity, body: Row): Promise<Row>;
   update(entity: MetaEntity, id: string, body: Row, version: number): Promise<Row>;
   remove(entity: MetaEntity, id: string, version: number): Promise<void>;
+  transition(entity: MetaEntity, id: string, name: string, version: number, input?: Row): Promise<Row>;
   bulk(entity: MetaEntity, items: readonly {
     readonly id: string;
     readonly version: number;
@@ -252,6 +271,12 @@ declare const en: {
   readonly "list.export": "Export CSV";
   readonly "list.exportTruncated": "The file holds the first {limit} rows only. Narrow the filters to get the rest.";
   readonly "list.exportError": "The export failed";
+  readonly "list.moves": "Move to";
+  readonly "list.moved": "{name} done";
+  readonly "list.notMoved": "The move was not made";
+  readonly "list.setField": "Change a field";
+  readonly "list.apply": "Apply";
+  readonly "list.notChanged": "The rows were not changed";
   readonly "list.op.eq": "is";
   readonly "list.op.ne": "is not";
   readonly "list.op.in": "is one of";
@@ -265,6 +290,12 @@ declare const en: {
   readonly "form.edit": "Edit {name}";
   readonly "form.new": "New {name}";
   readonly "form.save": "Save";
+  readonly "problem.required": "This field is required";
+  readonly "problem.tooShort": "At least {min} characters";
+  readonly "problem.tooLong": "At most {max} characters";
+  readonly "problem.tooSmall": "At least {min}";
+  readonly "problem.tooBig": "At most {max}";
+  readonly "problem.pattern": "The value is not in the form that is expected";
   readonly "form.conflictTitle": "Someone else changed this row";
   readonly "form.conflictBody": "Reload the page to see the new version, then make your change again.";
   readonly "form.rowLoadError": "The row could not be loaded";
@@ -344,6 +375,17 @@ interface VitalReport extends Vital {
 }
 export declare function vitalReport(vital: Vital, path: string): VitalReport;
 export declare function sampled(rate: number, random?: () => number): boolean;
+export declare function stateKeyOf(entity: MetaEntity): string | undefined;
+export declare function transitionsFor(entity: MetaEntity, row: Row): readonly MetaTransition[];
+export declare function commonTransitions(entity: MetaEntity, rows: readonly Row[]): readonly MetaTransition[];
+export declare function inputFieldsOf(schema: Readonly<Record<string, unknown>> | undefined): readonly MetaField[];
+export declare function patchRow(rows: readonly Row[], id: string, patch: Readonly<Record<string, unknown>>): Row[];
+export declare function transitionPatch(entity: MetaEntity, transition: MetaTransition, row: Row): Record<string, unknown>;
+interface ValueProblem {
+  readonly code: "required" | "tooShort" | "tooLong" | "tooSmall" | "tooBig" | "pattern";
+  readonly values: Readonly<Record<string, number>>;
+}
+export declare function problemOf(field: MetaField, value: unknown): ValueProblem | undefined;
 export declare const packageName = "@bieberkit/admin-core";
-export type { AdminClient, AdminClientOptions, BulkOperation, BulkOutcome, BulkResult, Conflict, Connection, ConnectionEvent, CsvColumn, DraftStorage, ErrorReport, FieldProblem, Filter, FilterOperator, KeyPress, ListParams, Locale, MessageKey, Meta, MetaEntity, MetaField, MetaMenuItem, Page, Row, SavedView, SessionUser, Shortcut, Vital, VitalReport };
+export type { AdminClient, AdminClientOptions, BulkOperation, BulkOutcome, BulkResult, Conflict, Connection, ConnectionEvent, CsvColumn, DraftStorage, ErrorReport, FieldProblem, Filter, FilterOperator, KeyPress, ListParams, Locale, MessageKey, Meta, MetaEntity, MetaField, MetaMenuItem, MetaTransition, Page, Row, SavedView, SessionUser, Shortcut, ValueProblem, Vital, VitalReport };
 ```

@@ -24,6 +24,7 @@
 
 import { definePlugin } from '@bieberkit/core';
 import { defineEntity, f } from '@bieberkit/data';
+import { z } from 'zod';
 
 export const Account = defineEntity({
   name: 'crm.Account',
@@ -57,11 +58,19 @@ export const Ticket = defineEntity({
   fields: {
     id: f.id(),
     title: f.string({ min: 1, max: 200 }).index(),
-    account: f.belongsTo(() => Account).optional(),
+    account: f
+      .belongsTo(() => Account)
+      .optional()
+      .index(),
     status: f.state({
       initial: 'open',
       transitions: {
-        close: { from: ['open'], to: 'closed', permission: 'crm.ticket.close' },
+        close: {
+          from: ['open'],
+          to: 'closed',
+          permission: 'crm.ticket.close',
+          input: z.object({ reason: z.string().min(3) }),
+        },
         reopen: { from: ['closed'], to: 'open', permission: 'crm.ticket.close' },
       },
     }),

@@ -201,6 +201,18 @@ describe('UI-02 the client of the admin', () => {
     });
   });
 
+  it('UI-03 a move of a state field is a POST to the action of the row, with If-Match and the input', async () => {
+    const { fetch: fetcher, calls } = fake(() => json({ data: { id: '1', status: 'closed', version: 3 } }));
+    const row = await createAdminClient({ fetch: fetcher }).transition(ENTITY, '1', 'close', 2, { reason: 'done' });
+    expect(row['status']).toBe('closed');
+    expect([calls[0]?.method, calls[0]?.url, calls[0]?.headers['if-match'], calls[0]?.body]).toEqual([
+      'POST',
+      '/api/v1/settings/settings/1/actions/close',
+      '2',
+      { reason: 'done' },
+    ]);
+  });
+
   it('UI-03 a bulk call that is too large to wait for is a job, and the client says so', async () => {
     const { fetch: fetcher } = fake(() => json({ data: { jobId: 'job-1', status: 'queued' } }, 202));
     const result = await createAdminClient({ fetch: fetcher }).bulk(ENTITY, [{ id: '1', version: 1 }], {

@@ -23,6 +23,8 @@
  */
 
 import { apiFields, toJsonSchema } from '@bieberkit/data/schema';
+import { toJSONSchema } from 'zod';
+import type { ZodType } from 'zod';
 import type { ApiField, EntityDef, FieldDef, JsonSchema } from '@bieberkit/data/schema';
 import { HttpError } from './problem.ts';
 import { pathOf, permissionOf } from './entity-routes.ts';
@@ -120,6 +122,7 @@ export const META_SCHEMA: JsonSchema = {
                 permission: text,
                 allowed: { type: 'boolean' },
                 path: text,
+                input: { type: 'object', additionalProperties: true },
               },
               additionalProperties: false,
             },
@@ -162,7 +165,13 @@ interface StaticEntity {
   readonly def: EntityDef<string>;
   readonly path: string;
   readonly fields: readonly StaticField[];
-  readonly transitions: readonly { name: string; from: readonly string[]; to: string; permission: string }[];
+  readonly transitions: readonly {
+    name: string;
+    from: readonly string[];
+    to: string;
+    permission: string;
+    input: JsonSchema | undefined;
+  }[];
   readonly permissions: Readonly<Record<'read' | 'create' | 'update' | 'delete', string>>;
 }
 
@@ -205,6 +214,19 @@ function fieldOf(def: EntityDef<string>, field: ApiField, create: JsonSchema, re
   };
 }
 
+/** The JSON Schema of the input of a transition, so that a screen can ask for it. A schema that cannot be written as JSON Schema gives none. */
+function inputSchemaOf(input: unknown): JsonSchema | undefined {
+  if (input === undefined) return undefined;
+  try {
+    // The transition declares a Zod schema (`checkInput` runs it as a standard schema).
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion
+    const schema: Record<string, unknown> = toJSONSchema(input as ZodType, { io: 'input', unrepresentable: 'any' });
+    return Object.fromEntries(Object.entries(schema).filter(([key]) => key !== '$schema'));
+  } catch {
+    return undefined;
+  }
+}
+
 function staticOf(def: EntityDef<string>): StaticEntity {
   const create = toJsonSchema(def, 'create');
   const read = toJsonSchema(def, 'read');
@@ -219,6 +241,7 @@ function staticOf(def: EntityDef<string>): StaticEntity {
       from: declared.from,
       to: declared.to,
       permission: declared.permission ?? permissionOf(def, 'update'),
+      input: inputSchemaOf(declared.input),
     })),
     permissions: {
       read: permissionOf(def, 'read'),
@@ -271,6 +294,9 @@ export function registerMeta(server: HttpServer, entities: readonly EntityDef<st
           if (!readOnly) form.push(key);
         }
         const keys = fields.map((field) => String(field['key']));
+        // The admin settings name fields of the entity, and a relation reaches the API under another key (`owner` is `ownerId`).
+        const keyOf = new Map(entity.fields.map((field) => [field.name, String(field.descriptor['key'])]));
+        const keyed = (name: string): string => keyOf.get(name) ?? name;
         const transitions = [];
         for (const transition of entity.transitions) {
           transitions.push({
@@ -280,6 +306,7 @@ export function registerMeta(server: HttpServer, entities: readonly EntityDef<st
             permission: transition.permission,
             allowed: await can(transition.permission),
             path: `${entity.path}/{id}/actions/${transition.name}`,
+            ...(transition.input === undefined ? {} : { input: transition.input }),
           });
         }
         out.push({
@@ -302,9 +329,9 @@ export function registerMeta(server: HttpServer, entities: readonly EntityDef<st
           features: [...def.features],
           softDelete: def.softDelete,
           tenant: def.tenant,
-          ...(def.admin.title === undefined ? {} : { title: def.admin.title }),
+          ...(def.admin.title === undefined ? {} : { title: keyed(def.admin.title) }),
           ...(def.admin.icon === undefined ? {} : { icon: def.admin.icon }),
-          list: (def.admin.list ?? keys.slice(0, 5)).filter((key) => keys.includes(key)),
+          list: (def.admin.list?.map(keyed) ?? keys.slice(0, 5)).filter((key) => keys.includes(key)),
           fields,
           form,
           transitions,

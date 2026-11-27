@@ -24,7 +24,6 @@
 
 import {
   allows,
-  bulkSummary,
   columnsOf,
   csvOf,
   deleteView,
@@ -49,6 +48,7 @@ import { useState } from 'react';
 import type { JSX } from 'react';
 import { useClient, useEntity } from './context.ts';
 import { useLanguage, useT } from './language.tsx';
+import { BulkBar, RowMoves, useRowChanges } from './moves.tsx';
 
 const PAGE_SIZE = 25;
 const EXPORT_PAGE_SIZE = 100;
@@ -275,6 +275,7 @@ function Rows(props: { readonly entity: MetaEntity }): JSX.Element {
   const { message } = App.useApp();
   const t = useT();
   const { locale } = useLanguage();
+  const changes = useRowChanges(entity);
   const navigate = useNavigate();
   // The filters and the sort live in the address, so that a link opens the same list and the back button undoes a filter.
   const search: Readonly<Record<string, unknown>> = useSearch({ strict: false });
@@ -317,30 +318,7 @@ function Rows(props: { readonly entity: MetaEntity }): JSX.Element {
   };
 
   const removeSelected = async (): Promise<void> => {
-    try {
-      const result = await client.bulk(
-        entity,
-        selected.map((row) => ({ id: String(row['id']), version: Number(row['version']) })),
-        { operation: 'delete' },
-      );
-      if (result.kind === 'queued') {
-        void message.info(t('list.bulkQueued'));
-      } else {
-        const summary = bulkSummary(result.outcomes);
-        if (summary.ok > 0) void message.success(t('list.bulkDone', { count: summary.ok }));
-        if (summary.failed.length > 0)
-          void message.warning(
-            t('list.bulkFailed', {
-              count: summary.failed.length,
-              why: [...new Set(summary.failed.map((failed) => failed.message))].join(' '),
-            }),
-          );
-      }
-      setSelected([]);
-      await queries.invalidateQueries({ queryKey: ['list', entity.name] });
-    } catch (error) {
-      void message.error(error instanceof Error ? error.message : t('list.notDeleted'));
-    }
+    if (await changes.change(selected, { operation: 'delete' })) setSelected([]);
   };
 
   const exportCsv = async (): Promise<void> => {
@@ -400,16 +378,21 @@ function Rows(props: { readonly entity: MetaEntity }): JSX.Element {
         show(value, t)
       ),
   }));
-  if (allows(entity, 'delete')) {
+  if (allows(entity, 'delete') || (entity.transitions ?? []).length > 0) {
     columns.push({
       title: '',
       key: '_actions',
       render: (_value: unknown, row: Row) => (
-        <Popconfirm title={t('list.confirmDelete')} okText={t('common.delete')} onConfirm={() => void remove(row)}>
-          <Button danger size="small">
-            {t('common.delete')}
-          </Button>
-        </Popconfirm>
+        <Space size="small" wrap>
+          <RowMoves entity={entity} row={row} move={changes.move} />
+          {allows(entity, 'delete') ? (
+            <Popconfirm title={t('list.confirmDelete')} okText={t('common.delete')} onConfirm={() => void remove(row)}>
+              <Button danger size="small">
+                {t('common.delete')}
+              </Button>
+            </Popconfirm>
+          ) : null}
+        </Space>
       ),
     });
   }
@@ -443,6 +426,9 @@ function Rows(props: { readonly entity: MetaEntity }): JSX.Element {
       {selected.length === 0 ? null : (
         <Space style={{ marginBottom: 12 }}>
           <span>{t('list.selected', { count: selected.length })}</span>
+          {allows(entity, 'update') ? (
+            <BulkBar entity={entity} rows={selected} change={changes.change} onDone={() => setSelected([])} />
+          ) : null}
           {allows(entity, 'delete') ? (
             <Popconfirm
               title={t('list.confirmDeleteMany', { count: selected.length })}
@@ -465,7 +451,7 @@ function Rows(props: { readonly entity: MetaEntity }): JSX.Element {
           dataSource={list.data?.rows.map((row) => ({ ...row })) ?? []}
           loading={list.isPending}
           scroll={{ x: true }}
-          {...(allows(entity, 'delete')
+          {...(allows(entity, 'delete') || allows(entity, 'update')
             ? {
                 rowSelection: {
                   selectedRowKeys: selected.map((row) => String(row['id'])),

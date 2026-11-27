@@ -192,3 +192,78 @@ test('UI-18 a save of a row that someone else changed shows what changed, and th
   await expect(page.getByRole('button', { name: 'Keep my changes on top of theirs' })).toBeVisible();
   await expect(listOf(page).getByText('Theirs')).toBeVisible();
 });
+
+const TICKETS = '/api/v1/crm/tickets';
+
+test('UI-03, UI-13 a move that asks for something opens a form, and the row shows its new state at once', async () => {
+  const page = shared;
+  await page.goto('/admin/');
+  await makeRow(page, TICKETS, { title: 'MOV-1' });
+  await page.goto('/admin/crm/tickets');
+  const row = page.getByRole('row').filter({ has: page.getByRole('link', { name: 'MOV-1' }) });
+  await expect(row.getByRole('cell', { name: 'open', exact: true })).toBeVisible();
+
+  // The server answers slowly, so the new state can only come from the screen.
+  await page.route('**/api/v1/crm/tickets/*/actions/close', async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    await route.continue();
+  });
+  await row.getByRole('button', { name: 'close' }).click();
+  // The schema of the move says three letters at least, so the form refuses two before it asks.
+  await page.getByRole('textbox', { name: 'reason' }).fill('ab');
+  await page.getByRole('button', { name: 'Apply' }).click();
+  await expect(page.getByText('At least 3 characters')).toBeVisible();
+  await page.getByRole('textbox', { name: 'reason' }).fill('resolved');
+  await page.getByRole('button', { name: 'Apply' }).click();
+  await expect(row.getByRole('cell', { name: 'closed', exact: true })).toBeVisible({ timeout: 1000 });
+  await expect(page.getByText('close done')).toBeVisible();
+  await page.unroute('**/api/v1/crm/tickets/*/actions/close');
+  await page.reload();
+  await expect(row.getByRole('cell', { name: 'closed', exact: true })).toBeVisible();
+  await expect(row.getByRole('button', { name: 'reopen' })).toBeVisible();
+});
+
+test('UI-13 a move that the server refuses is taken back', async () => {
+  const page = shared;
+  await page.goto('/admin/');
+  await makeRow(page, TICKETS, { title: 'MOV-2' });
+  await page.goto('/admin/crm/tickets');
+  const row = page.getByRole('row').filter({ has: page.getByRole('link', { name: 'MOV-2' }) });
+  await page.route('**/api/v1/crm/tickets/*/actions/close', (route) =>
+    route.fulfill({
+      status: 500,
+      contentType: 'application/json',
+      body: JSON.stringify({ code: 'X', detail: 'Broken.' }),
+    }),
+  );
+  await row.getByRole('button', { name: 'close' }).click();
+  await page.getByRole('textbox', { name: 'reason' }).fill('resolved');
+  await page.getByRole('button', { name: 'Apply' }).click();
+  await expect(page.getByText('Broken.')).toBeVisible();
+  await expect(row.getByRole('cell', { name: 'open', exact: true })).toBeVisible();
+  await page.unroute('**/api/v1/crm/tickets/*/actions/close');
+});
+
+test('UI-03 selected rows take a move together, and one value for a field', async () => {
+  const page = shared;
+  await page.goto('/admin/');
+  await makeRow(page, TICKETS, { title: 'BLM-1' });
+  await makeRow(page, TICKETS, { title: 'BLM-2' });
+  await page.goto('/admin/crm/tickets');
+  const row = (title: string) => page.getByRole('row').filter({ has: page.getByRole('link', { name: title }) });
+  await row('BLM-1').getByRole('checkbox').check();
+  await row('BLM-2').getByRole('checkbox').check();
+  await pick(page, 'Move to', 'close');
+  await page.getByRole('textbox', { name: 'reason' }).fill('batch closed');
+  await page.getByRole('button', { name: 'Apply' }).click();
+  await expect(page.getByText('2 rows done')).toBeVisible();
+  await expect(row('BLM-1').getByRole('cell', { name: 'closed', exact: true })).toBeVisible();
+  await expect(row('BLM-2').getByRole('cell', { name: 'closed', exact: true })).toBeVisible();
+
+  await row('BLM-1').getByRole('checkbox').check();
+  await row('BLM-2').getByRole('checkbox').check();
+  await pick(page, 'Change a field', 'title');
+  await page.getByRole('textbox', { name: 'title' }).fill('BLM-same');
+  await page.getByRole('button', { name: 'Apply' }).click();
+  await expect(page.getByRole('link', { name: 'BLM-same' })).toHaveCount(2);
+});

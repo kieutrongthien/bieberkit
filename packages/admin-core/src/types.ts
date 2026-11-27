@@ -38,7 +38,26 @@ export interface MetaField {
   readonly default?: unknown;
   /** The choices of a `oneOf` field. */
   readonly values?: readonly string[];
+  /** The currency of a `money` field, and the digits of a `decimal` one. */
+  readonly currency?: string;
+  readonly precision?: number;
+  readonly scale?: number;
+  /** For a relation: the entity that it points to and where its rows are. */
+  readonly target?: { readonly entity: string; readonly path: string };
   readonly validation?: Readonly<Record<string, unknown>>;
+}
+
+/** A move of the state field of an entity (MOD-06). `allowed` is whether the signed in user has its permission. */
+export interface MetaTransition {
+  readonly name: string;
+  readonly from: readonly string[];
+  readonly to: string;
+  readonly permission: string;
+  readonly allowed: boolean;
+  /** `{id}` stands for the id of the row. */
+  readonly path: string;
+  /** The JSON Schema of what the transition asks for, when it asks for something. */
+  readonly input?: Readonly<Record<string, unknown>>;
 }
 
 export interface MetaEntity {
@@ -51,6 +70,8 @@ export interface MetaEntity {
   readonly operations: Readonly<Record<'list' | 'get' | 'create' | 'update' | 'delete', boolean>>;
   /** What the signed in user may do with the entity. */
   readonly can: Readonly<Record<'read' | 'create' | 'update' | 'delete', boolean>>;
+  readonly features?: readonly string[];
+  readonly transitions?: readonly MetaTransition[];
   readonly softDelete: boolean;
   readonly tenant: boolean;
   /** The field that names a row. */

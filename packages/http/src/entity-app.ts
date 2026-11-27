@@ -88,6 +88,7 @@ export const Account: EntityDef<'crm.Account'> = defineEntity({
     },
   },
   api: { list: true, get: true, create: true, update: true, delete: true },
+  admin: { title: 'name', list: ['code', 'name', 'owner', 'status'] },
 });
 
 /** No soft delete, and a delete route: a row is removed. */
