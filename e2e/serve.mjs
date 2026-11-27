@@ -38,9 +38,17 @@ const CLI = join(REPOSITORY, 'packages', 'cli', 'dist', 'bin.js');
 const PLUGINS = ['users', 'roles', 'settings', 'audit-log', 'notifications', 'media'];
 const PACKAGES = ['core', 'data', 'http', 'queue', 'server', 'auth', 'log', 'cache', 'mail', 'storage', 'admin-antd'];
 
+// The tests of the account read the mailed links from the outbox, so the database is where they can find it.
+const DATABASE = join(tmpdir(), `bk-e2e-${PORT}.db`);
+for (const suffix of ['', '-wal', '-shm']) rmSync(`${DATABASE}${suffix}`, { force: true });
+
 const env = {
   ...process.env,
   APP_ENV: 'development',
+  DATABASE_URL: DATABASE,
+  MAIL_FROM: 'BieberKit e2e <e2e@example.com>',
+  // Each test of the account signs in from an address of its own, so that the limit of sign ins for an address is not shared.
+  TRUST_PROXY: 'true',
   APP_URL: `http://127.0.0.1:${PORT}`,
   ...(process.env.E2E_ADMIN_URL === undefined ? {} : { ADMIN_URL: process.env.E2E_ADMIN_URL }),
   APP_PORT: String(PORT),

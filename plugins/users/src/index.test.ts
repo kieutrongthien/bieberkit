@@ -23,7 +23,7 @@
  */
 
 import { expect, it } from 'vitest';
-import { AuthUserGroup, AuthUserRole } from '@bieberkit/auth';
+import { assignRole, AuthUserGroup, AuthUserRole, createRole } from '@bieberkit/auth';
 import { runInUnitOfWork } from '@bieberkit/data/orm';
 import { createTestApp, describeDialects } from '@bieberkit/testing';
 import type { TestApp } from '@bieberkit/testing';
@@ -288,6 +288,33 @@ describeDialects('USR the users plugin', ({ open }) => {
       id,
       mfaEnrolBy: by,
     });
+    await app.close();
+  });
+
+  it('USR-12 /users/me says whether a second factor is asked of the person: not by default', async () => {
+    const { app } = await world();
+    const id = await make(app, 'free@example.test');
+    const me = await app.actingAs(id);
+    expect((await me.get('/api/v1/users/me')).body).toMatchObject({ id, mfaRequired: false });
+    await app.close();
+  });
+
+  it('USR-12 /users/me says mfaRequired when the rule for everyone is on, also once the person has a factor', async () => {
+    const { app } = await world();
+    const id = await make(app, 'everyone@example.test');
+    const me = await app.actingAs(id);
+    const reply = await me.get('/api/v1/users/me', { 'x-test-mfa-for-all': 'true' });
+    expect(reply.body).toMatchObject({ id, mfaRequired: true });
+    await app.close();
+  });
+
+  it('USR-12 /users/me says mfaRequired when a role of the person asks for a second factor', async () => {
+    const { app } = await world();
+    const id = await make(app, 'strict@example.test');
+    const strict = await createRole(app.db, { name: 'strict', permissions: [], requireMfa: true });
+    await assignRole(app.db, { userId: id, roleId: strict });
+    const me = await app.actingAs(id);
+    expect((await me.get('/api/v1/users/me')).body).toMatchObject({ id, mfaRequired: true });
     await app.close();
   });
 

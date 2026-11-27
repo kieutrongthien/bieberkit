@@ -122,6 +122,8 @@ export interface AuthServerOptions {
   readonly previousSecrets?: readonly string[];
   readonly limits?: AuthLimits;
   readonly trustProxy?: boolean;
+  /** Where the password links come back to, as the server sets it when the admin is installed (USR-10). */
+  readonly pages?: { readonly resetPassword: string };
   /** Valkey for the sessions (AUTH-02). */
   readonly secondaryStorage?: AuthSecondaryStorage;
 }
@@ -175,6 +177,7 @@ export async function authServer(
     ...(options.previousSecrets === undefined ? {} : { previousSecrets: options.previousSecrets }),
     ...(options.apiKeys === undefined ? {} : { apiKeys: options.apiKeys === true ? {} : options.apiKeys }),
     baseUrl: BASE_URL,
+    ...(options.pages === undefined ? {} : { pages: options.pages }),
     ...(options.policy === undefined ? {} : { policy: options.policy }),
     methods: {
       ...(options.totp === true ? { totp: { issuer: 'BieberKit Test' } } : {}),

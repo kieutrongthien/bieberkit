@@ -25,8 +25,10 @@
 import { expect, it } from 'vitest';
 import { requestContext } from '@bieberkit/core';
 import { uuid7 } from '@bieberkit/data';
+import { runInUnitOfWork } from '@bieberkit/data/orm';
 import type { ScopedPermission } from './ability.ts';
 import { loadGrants } from './roles.ts';
+import { AuthUser } from './tables.ts';
 import {
   assignRole,
   assignRoles,
@@ -233,5 +235,74 @@ describeDialects('ROL the role service', ({ open }) => {
     await expect(createRole(app.db, { name: 'seeded', permissions: ['anything.at.all'] })).resolves.toEqual(
       expect.any(String),
     );
+  });
+});
+
+describeDialects('ROL-06 the second factor of a system role', ({ open }) => {
+  /** Marks the account as having a second factor, which is the flag that the guard reads. */
+  const withFactor = (app: AuthServer, id: string): Promise<unknown> =>
+    runInUnitOfWork(app.db, (em) => em.nativeUpdate(AuthUser, { id }, { twoFactorEnabled: true }));
+
+  const flagOf = async (app: AuthServer, roleId: string): Promise<boolean> =>
+    (await getRole(app.db, roleId)).requireMfa;
+
+  it('ROL-06 a holder of the administrator role turns requireMfa of a system role on and off, and it is audited', async () => {
+    const { app, adminRole, admin } = await world(open);
+    await withFactor(app, admin.id);
+    expect(await as(admin.id, () => updateRole(app.db, adminRole, { requireMfa: true }))).toBe(true);
+    expect(await flagOf(app, adminRole)).toBe(true);
+    expect(await as(admin.id, () => updateRole(app.db, adminRole, { requireMfa: false }))).toBe(true);
+    expect(await flagOf(app, adminRole)).toBe(false);
+    const written = (await app.audit()).filter((entry) => entry.action === 'auth.role.updated');
+    expect(written.filter((entry) => entry.actorId === admin.id)).toHaveLength(2);
+  });
+
+  it('ROL-06 the name and ipRestricted stay unchangeable, also in one change with requireMfa, and nothing is written', async () => {
+    const { app, adminRole, admin } = await world(open);
+    await withFactor(app, admin.id);
+    for (const changes of [{ name: 'boss' }, { ipRestricted: true }, { requireMfa: true, name: 'boss' }])
+      await expect(as(admin.id, () => updateRole(app.db, adminRole, changes))).rejects.toMatchObject({
+        code: 'AUTH_ROLE_SYSTEM',
+        status: 409,
+      });
+    await expect(as(admin.id, () => setRolePermissions(app.db, adminRole, []))).rejects.toMatchObject({
+      code: 'AUTH_ROLE_SYSTEM',
+    });
+    expect(await getRole(app.db, adminRole)).toMatchObject({ name: 'admin', requireMfa: false, ipRestricted: false });
+  });
+
+  it('ROL-06 somebody who does not hold the administrator role cannot change it, and the refusal is audited', async () => {
+    const { app, adminRole } = await world(open);
+    const manager = (await app.login('manager@example.test')).id;
+    const own = await createRole(app.db, { name: 'manager', permissions: ['roles.manage'] });
+    await assignRole(app.db, { userId: manager, roleId: own });
+    await withFactor(app, manager);
+    for (const requireMfa of [true, false]) {
+      await updateRole(app.db, adminRole, { requireMfa: !requireMfa });
+      await expect(as(manager, () => updateRole(app.db, adminRole, { requireMfa }))).rejects.toMatchObject({
+        code: 'ROLES_ESCALATION',
+        status: 403,
+      });
+      expect(await flagOf(app, adminRole)).toBe(!requireMfa);
+    }
+    const denied = (await app.audit()).filter((entry) => entry.action === 'authz.denied');
+    expect(denied.filter((entry) => entry.actorId === manager)).toHaveLength(2);
+  });
+
+  it('POL-05 a holder without a second factor cannot turn it on, and can turn it off', async () => {
+    const { app, adminRole, admin } = await world(open);
+    await expect(as(admin.id, () => updateRole(app.db, adminRole, { requireMfa: true }))).rejects.toMatchObject({
+      code: 'ROLES_SELF_LOCKOUT',
+      status: 409,
+    });
+    expect(await flagOf(app, adminRole)).toBe(false);
+    await updateRole(app.db, adminRole, { requireMfa: true });
+    expect(await as(admin.id, () => updateRole(app.db, adminRole, { requireMfa: false }))).toBe(true);
+  });
+
+  it('ROL-06 the system (a seeder, the CLI) is not limited', async () => {
+    const { app, adminRole } = await world(open);
+    expect(await updateRole(app.db, adminRole, { requireMfa: true })).toBe(true);
+    expect(await flagOf(app, adminRole)).toBe(true);
   });
 });

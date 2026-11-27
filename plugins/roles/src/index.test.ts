@@ -23,6 +23,8 @@
  */
 
 import { expect, it } from 'vitest';
+import { assignRole, AuthUser } from '@bieberkit/auth';
+import { runInUnitOfWork } from '@bieberkit/data/orm';
 import { createTestApp } from '@bieberkit/testing';
 import type { TestApp } from '@bieberkit/testing';
 import plugin, { ADMIN_ROLE, STAFF_ROLE } from './index.ts';
@@ -76,6 +78,37 @@ it('AUTHZ-01 the seed makes the administrator with every permission and the staf
   const staff = roles.find((role) => role.name === STAFF_ROLE);
   expect(staff?.permissions).toEqual(['roles.read']);
   expect(roles.filter((role) => role.name === STAFF_ROLE)).toHaveLength(1);
+  await app.close();
+});
+
+it('AUTH-05 the seed asks no role for a second factor, the administrator role included', async () => {
+  const { app, admin } = await world();
+  await plugin.seed?.(app.services);
+  const response = await admin.get(ROLES);
+  const roles: { name: string; requireMfa: boolean }[] = Array.isArray(response.body['data'])
+    ? response.body['data']
+    : [];
+  expect(roles.length).toBeGreaterThan(0);
+  expect(roles.filter((role) => role.requireMfa)).toEqual([]);
+  await app.close();
+});
+
+it('ROL-06 the PATCH of a system role takes requireMfa from a holder of the administrator role, and from nobody else', async () => {
+  const { app, admin } = await world();
+  await plugin.seed?.(app.services);
+  const system = rolesOf((await admin.get(ROLES)).body).find((role) => role.system);
+  const id = String(system?.id);
+  const refused = await admin.patch(`${ROLES}/${id}`, { requireMfa: true }, 0);
+  expect([refused.status, refused.body['code']]).toEqual([403, 'ROLES_ESCALATION']);
+
+  const userId = await make(app);
+  await assignRole(app.db, { userId, roleId: id });
+  await runInUnitOfWork(app.db, (em) => em.nativeUpdate(AuthUser, { id: userId }, { twoFactorEnabled: true }));
+  const holder = await app.actingAs(userId, ['manager']);
+  const renamed = await holder.patch(`${ROLES}/${id}`, { name: 'boss' }, 0);
+  expect([renamed.status, renamed.body['code']]).toEqual([409, 'AUTH_ROLE_SYSTEM']);
+  const changed = await holder.patch(`${ROLES}/${id}`, { requireMfa: true }, 0);
+  expect([changed.status, changed.body['requireMfa']]).toEqual([200, true]);
   await app.close();
 });
 

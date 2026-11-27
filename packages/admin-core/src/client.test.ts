@@ -114,7 +114,7 @@ describe('UI-02 the client of the admin', () => {
         : json({ success: true }),
     );
     const client = createAdminClient({ fetch: fetcher });
-    expect((await client.signIn('a@b.co', 'secret')).id).toBe('u1');
+    expect(await client.signIn('a@b.co', 'secret')).toMatchObject({ kind: 'signedIn', user: { id: 'u1' } });
     await client.signOut();
     expect(calls.map((call) => [call.method, call.url])).toEqual([
       ['POST', '/api/auth/sign-in/email'],

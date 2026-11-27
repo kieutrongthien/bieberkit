@@ -38,7 +38,7 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
-      testMatch: ['admin.spec.ts', 'screens.spec.ts', 'accessibility.spec.ts', 'identity.spec.ts'],
+      testMatch: ['admin.spec.ts', 'screens.spec.ts', 'accessibility.spec.ts', 'identity.spec.ts', 'account.spec.ts'],
       use: { browserName: 'chromium' },
     },
     // The admin at the root of a host of its own. Chromium resolves `*.localhost` to this machine.

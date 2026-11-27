@@ -251,7 +251,15 @@ export async function createTestApp(options: TestAppOptions = {}): Promise<TestA
             if (id === undefined || id === '') return undefined;
             // A test says that the user is in the grace of the second factor (POL-02) with this header.
             const enrolBy = first(request.headers['x-test-mfa-enrol-by']);
-            return { id, kind: 'user', via: 'token', ...(enrolBy === undefined ? {} : { mfaEnrolBy: enrolBy }) };
+            // The rule for everyone (POL-02) is said with this one.
+            const forAll = first(request.headers['x-test-mfa-for-all']) === 'true';
+            return {
+              id,
+              kind: 'user',
+              via: 'token',
+              ...(enrolBy === undefined ? {} : { mfaEnrolBy: enrolBy }),
+              ...(forAll ? { mfaForAll: true as const } : {}),
+            };
           },
         },
         tenantResolver: {

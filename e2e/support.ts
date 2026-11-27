@@ -22,6 +22,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 import { expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
 
@@ -85,4 +88,24 @@ export function recordOf(value: unknown): Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
     ? Object.fromEntries(Object.entries(value))
     : {};
+}
+
+/**
+ * The newest password link that was mailed to an address. The browser test runs no worker, so the mail waits in the outbox of the
+ * database that `serve.mjs` made.
+ */
+export function mailedLink(email: string, port = 4310): string {
+  const database = new DatabaseSync(join(tmpdir(), `bk-e2e-${String(port)}.db`), { readOnly: true });
+  try {
+    const rows = database.prepare('select * from bk_outbox').all();
+    const found = rows
+      .map((row) => JSON.stringify(row))
+      .filter((text) => text.includes(email))
+      .flatMap((text) => text.match(/https?:\/\/[^\s"\\]+\/api\/auth\/reset-password\/[^\s"\\]+/g) ?? []);
+    const link = found.at(-1);
+    if (link === undefined) throw new Error(`No password link was mailed to ${email}.`);
+    return link;
+  } finally {
+    database.close();
+  }
 }

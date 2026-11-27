@@ -196,7 +196,7 @@ describeDialects('AUTHZ-05 the service of roles', ({ open }) => {
     });
     await expect(deleteRole(db, id)).rejects.toMatchObject({ code: 'AUTH_ROLE_SYSTEM', status: 409 });
     await expect(updateRole(db, id, { name: 'boss' })).rejects.toMatchObject({ code: 'AUTH_ROLE_SYSTEM' });
-    await expect(updateRole(db, id, { requireMfa: false })).rejects.toMatchObject({ code: 'AUTH_ROLE_SYSTEM' });
+    await expect(updateRole(db, id, { ipRestricted: true })).rejects.toMatchObject({ code: 'AUTH_ROLE_SYSTEM' });
     await expect(setRolePermissions(db, id, [])).rejects.toMatchObject({ code: 'AUTH_ROLE_SYSTEM' });
     const user = uuid7();
     expect(await assignRole(db, { tenantId: TENANT, userId: user, roleId: id })).toBe(true);
