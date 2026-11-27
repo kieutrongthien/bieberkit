@@ -423,6 +423,13 @@ describe('chain methods', () => {
     expect(codeOf(() => f.string({ max: 3 }).default(5))).toBe('DATA_FIELD_INVALID');
   });
 
+  it('SR-01 a searchable string or email is compared folded: ci_ai when it says nothing, and ci when it says ci', () => {
+    expect(f.string({ max: 5 }).searchable().def.compare).toBe('ci_ai');
+    expect(f.email().searchable().def.compare).toBe('ci');
+    expect(f.string({ max: 5, compare: 'ci' }).searchable().def.compare).toBe('ci');
+    expect(f.text().searchable().def.compare).toBe('exact');
+  });
+
   it('.searchable and .localized are only for string, text and email', () => {
     for (const make of [() => f.string({ max: 5 }), () => f.text(), () => f.email()]) {
       expect(make().searchable().def.searchable).toBe(true);

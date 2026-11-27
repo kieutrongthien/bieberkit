@@ -39,6 +39,7 @@ export const Person: EntityDef<'crm.Person'> = defineEntity({
   name: 'crm.Person',
   table: 'crm_people',
   api: { list: true, get: true, create: true },
+  admin: { title: 'name' },
   fields: { id: f.id(), name: f.string({ min: 1, max: 50 }) },
 });
 
@@ -50,7 +51,7 @@ export const Account: EntityDef<'crm.Account'> = defineEntity({
   fields: {
     id: f.id(),
     code: f.string({ max: 20 }).unique(),
-    name: f.string({ min: 1, max: 100, compare: 'ci_ai' }).index(),
+    name: f.string({ min: 1, max: 100, compare: 'ci_ai' }).index().searchable(),
     email: f.email().optional().unique(),
     tier: f.oneOf(['basic', 'gold', 'vip']).default('basic').index().aggregatable(),
     visits: f.int({ min: 0 }).default(0).index().aggregatable(),

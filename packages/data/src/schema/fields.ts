@@ -311,7 +311,14 @@ export class Field {
   searchable(): Field {
     if (!TEXT_KINDS.has(this.def.kind)) this.#reject('.searchable()');
     this.#notWhenEncrypted('.searchable()');
-    return this.#with({ searchable: true });
+    // A searched text is compared in the folded form that a shadow column keeps (SR-01, DATA-21), so a search ignores case and
+    // diacritics. A text that says nothing about how it is compared (it is `exact` by default) is `ci_ai`; one that says `ci` stays.
+    const folded = this.def.kind === 'string' || this.def.kind === 'email';
+    const compare = this.def.compare;
+    return this.#with({
+      searchable: true,
+      ...(folded && (compare === undefined || compare === 'exact') ? { compare: 'ci_ai' as const } : {}),
+    });
   }
 
   /** The field may be grouped by, or summed, in the aggregate endpoint (API-15). */

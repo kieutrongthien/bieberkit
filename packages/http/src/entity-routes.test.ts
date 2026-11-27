@@ -367,7 +367,7 @@ describe('13.1 list', () => {
 
   it('SEC-04 an operator or a parameter that does not exist is a validation error', async () => {
     const { app } = await seeded(3);
-    for (const query of ['filter[tier][like]=a', 'filter[tier]=gold', 'q=text', 'nope=1', 'pageSize=0', 'page=0']) {
+    for (const query of ['filter[tier][like]=a', 'filter[tier]=gold', 'qq=text', 'nope=1', 'pageSize=0', 'page=0']) {
       const response = await app.server.inject({ method: 'GET', url: `${BASE}?${query}` });
       expect([query, response.statusCode]).toEqual([query, 400]);
     }
@@ -404,6 +404,20 @@ describe('13.1 list', () => {
     expect(rows(body)[0]?.['owner']).toMatchObject({ id: person?.id, name: 'Ann', version: 1 });
     expect(rows(body)[0]?.['ownerId']).toBe(person?.id);
     expect((await app.server.inject({ method: 'GET', url: `${BASE}?include=code` })).statusCode).toBe(400);
+  });
+
+  it('13.1 a relation that is included comes whole when the list asks for some fields only (UI-11)', async () => {
+    const app = await entityApp();
+    const person = json(
+      (await app.server.inject({ method: 'POST', url: '/api/v1/crm/people', payload: { name: 'Ann' } })).body,
+    ).data;
+    await create(app, { ownerId: person?.id });
+    const reply = await app.server.inject({ method: 'GET', url: `${BASE}?include=owner&fields=name,ownerId` });
+    expect(`${String(reply.statusCode)} ${reply.body.slice(0, 200)}`).toMatch(/^200 /);
+    const row = rows(json(reply.body))[0];
+    expect(row).toMatchObject({ name: expect.any(String), ownerId: person?.id });
+    expect(row?.['owner']).toMatchObject({ id: person?.id, name: 'Ann', version: 1 });
+    expect(row).not.toHaveProperty('code');
   });
 
   it('PERF-04 the number of queries does not depend on the number of rows', async () => {

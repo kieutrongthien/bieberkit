@@ -23,6 +23,7 @@
  */
 
 import { problemOf } from '@bieberkit/admin-core';
+import { RelationSelect } from './RelationSelect.tsx';
 import type { MetaField, MessageKey } from '@bieberkit/admin-core';
 import type { Rule } from 'antd/es/form';
 import { Input, InputNumber, Select, Switch } from 'antd';
@@ -79,6 +80,8 @@ export function Control(props: ControlProps): JSX.Element {
           onChange={(value) => onChange?.(value)}
         />
       );
+    case 'relation':
+      return <RelationSelect field={field} id={id} value={props.value} onChange={onChange} />;
     case 'date':
       return <Input {...identity} type="date" value={text} onChange={typed} />;
     case 'datetime':

@@ -149,6 +149,8 @@ function queryOf(entity: MetaEntity, params: ListParams): string {
   query.set('withTotal', 'true');
   if (params.sort !== undefined && params.sort !== '') query.set('sort', params.sort);
   if (params.fields !== undefined && params.fields.length > 0) query.set('fields', params.fields.join(','));
+  if (params.include !== undefined && params.include.length > 0) query.set('include', params.include.join(','));
+  if (params.q !== undefined && params.q.trim() !== '') query.set('q', params.q.trim());
   for (const [name, value] of Object.entries(filterParams(entity, params.filters ?? []))) query.set(name, value);
   return `?${query.toString()}`;
 }

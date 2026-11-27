@@ -391,7 +391,8 @@ test('UI-11 a row has its child tables as tabs, a new child starts pointing at t
 
   await page.getByRole('button', { name: 'New Ticket' }).click();
   await expect(page).toHaveURL(/\/admin\/crm\/tickets\/new\?.*accountId=/);
-  await expect(page.getByRole('textbox', { name: 'accountId' })).toHaveValue(id);
+  // The relation is filled in, and the picker names the account and not its id.
+  await expect(page.locator('form').getByText('Tabbed')).toBeVisible();
   await page.getByRole('textbox', { name: 'title' }).fill('CHILD-3');
   await page.getByRole('button', { name: 'Save' }).click();
   await expect(page.getByRole('link', { name: 'CHILD-3' })).toBeVisible();
@@ -441,4 +442,36 @@ test('UI-11 a field that a condition hides is not in the form, and a field that 
   await expect(page.getByRole('textbox', { name: 'reason' })).toHaveValue('closed down');
   await page.getByRole('switch', { name: 'active' }).click();
   await expect(page.getByRole('textbox', { name: 'reason' })).toHaveCount(0);
+});
+
+test('UI-11 a relation is picked by typing, the picker asks the server to search, and the list names the row', async () => {
+  const page = shared;
+  await page.goto('/admin/');
+  await makeRow(page, ACCOUNTS, { code: 'REL-A', name: 'Relation Alpha' });
+  await makeRow(page, ACCOUNTS, { code: 'REL-B', name: 'Relation Beta' });
+  await makeRow(page, ACCOUNTS, { code: 'REL-C', name: 'Other Company' });
+  await page.goto('/admin/crm/tickets/new');
+  await page.getByRole('textbox', { name: 'title' }).fill('REL-TICKET');
+
+  const searched = page.waitForRequest((request) => request.url().includes('q=relation+b'));
+  await page.getByRole('combobox', { name: 'accountId' }).click();
+  await page.getByRole('combobox', { name: 'accountId' }).fill('relation b');
+  await searched;
+  const open = page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)');
+  await expect(open.getByTitle('Relation Beta')).toBeVisible();
+  await expect(open.getByTitle('Relation Alpha')).toHaveCount(0);
+  await open.getByTitle('Relation Beta').click();
+  await page.getByRole('button', { name: 'Save' }).click();
+
+  // The list shows the name of the account and not its id.
+  const row = page.getByRole('row').filter({ has: page.getByRole('link', { name: 'REL-TICKET' }) });
+  await expect(row.getByRole('cell', { name: 'Relation Beta' })).toBeVisible();
+
+  // The same picker is the filter of the list.
+  await pick(page, 'Field', 'accountId');
+  await page.getByRole('combobox', { name: 'Value' }).fill('relation b');
+  await page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)').getByTitle('Relation Beta').click();
+  await page.getByRole('button', { name: 'Add filter' }).click();
+  await expect(page.getByRole('link', { name: 'REL-TICKET' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'MOV-1' })).toHaveCount(0);
 });

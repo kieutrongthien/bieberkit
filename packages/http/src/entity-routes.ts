@@ -49,6 +49,7 @@ import type { BulkQueue } from './bulk.ts';
 import { apiFields, toJsonSchema } from '@bieberkit/data/schema';
 import type { ApiField, EntityDef, JsonSchema } from '@bieberkit/data/schema';
 import { enforceConditions } from './conditions.ts';
+import { searchableOf, searchWhere } from './search.ts';
 import { HttpError, ValidationFailed } from './problem.ts';
 import type { RouteContext, RouteDef } from './route.ts';
 import type { HttpServer } from './server.ts';
@@ -356,7 +357,7 @@ const idParams: JsonSchema = {
   additionalProperties: false,
 };
 
-function listQuery(reader: Reader, withPaging: boolean): JsonSchema {
+function listQuery(reader: Reader, withPaging: boolean, searchable = false): JsonSchema {
   const properties: Record<string, JsonSchema> = {
     include: { type: 'string' },
     fields: { type: 'string' },
@@ -370,6 +371,8 @@ function listQuery(reader: Reader, withPaging: boolean): JsonSchema {
       sort: { type: 'string', pattern: '^-?[A-Za-z][A-Za-z0-9]*(,-?[A-Za-z][A-Za-z0-9]*)*$' },
       withTotal: { type: 'boolean' },
     });
+    // The search is there only for an entity that has a field to search (UI-11).
+    if (searchable) Object.assign(properties, { q: { type: 'string', maxLength: 100 } });
   }
   return {
     type: 'object',
@@ -487,7 +490,7 @@ export function entityRoutes(schema: OrmSchema, context: EntityRoutesContext): R
       method: 'GET',
       url: base,
       permission: permissionOf(def, 'read'),
-      schema: { query: listQuery(reader, true), response: { 200: many } },
+      schema: { query: listQuery(reader, true, searchableOf(def).length > 0), response: { 200: many } },
       handler: (ctx) =>
         runInUnitOfWork(db, async (em) => {
           const query = ctx.query;
@@ -511,12 +514,20 @@ export function entityRoutes(schema: OrmSchema, context: EntityRoutesContext): R
           const sort = sortOf(textOf(query['sort']), reader);
           const read = await need(ctx, 'read');
           const closed = closedOf(read.readable);
-          const where = whereOf(query, reader);
+          const filtered = whereOf(query, reader);
+          const search = searchWhere(def, textOf(query['q']));
+          // A person who may not read a field may not search it either.
           refuseNames(
             closed,
-            [...fields.map(nameOfKey), ...Object.keys(where), ...(sort ?? []).map((item) => item.field)],
+            [
+              ...fields.map(nameOfKey),
+              ...Object.keys(filtered),
+              ...(sort ?? []).map((item) => item.field),
+              ...(search === undefined ? [] : searchableOf(def).map((field) => field.name)),
+            ],
             'read',
           );
+          const where = search === undefined ? filtered : { ...filtered, $and: [search] };
           const result = await listPage(em, schema, {
             where,
             ...(read.scope === undefined ? {} : { scope: read.scope }),

@@ -1725,6 +1725,7 @@ Open questions:
 
 | Version | Date | Changes |
 | --- | --- | --- |
+| 0.8.32 | 2026-11-27 | UI-11: the search of a list with `q` over the fields that are `searchable()` (folded, a prefix of the text), relation pickers with server search, the name of a related row in a list, and `include` with `fields` |
 | 0.8.31 | 2026-11-27 | UI-11: `.admin({ visibleWhen, requiredWhen })` on a field, conditions as data that the server enforces on create, update and bulk update and that `_meta` carries to the form |
 | 0.8.30 | 2026-11-27 | ADR 0035: the admin draws tables, forms and long lists with Ant Design and keeps their logic in pure functions of `admin-core`, so UI-01, UI-10 and UI-12 no longer name TanStack Table, Form and Virtual; axe is a dev dependency of the browser tests |
 | 0.8.29 | 2026-11-27 | M2.2: the list (filters, views, bulk changes, moves of a state field, CSV, phone cards, `n` and `/`), the input of a transition in `_meta`, the check of a form, lazy languages, and the hashed files of the release before kept for a day, with `ADMIN_ASSETS_DIR` (UI-03, UI-12, UI-13, UI-16, UI-17, UI-22) |

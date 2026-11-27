@@ -42,7 +42,7 @@ interface Field {
   validation?: Record<string, unknown>;
   visibleWhen?: Record<string, unknown>;
   requiredWhen?: Record<string, unknown>;
-  target?: { entity: string; path: string };
+  target?: { entity: string; path: string; title?: string };
 }
 interface Entity {
   name: string;
@@ -51,6 +51,7 @@ interface Entity {
   operations: Record<string, boolean>;
   can: Record<string, boolean>;
   features: string[];
+  searchable?: string[];
   fields: Field[];
   form: string[];
   list: string[];
@@ -175,6 +176,17 @@ describe('META-02 what it describes', () => {
     expect(field(account, 'visits')).toMatchObject({ filterable: true, sortable: true });
     expect(field(account, 'tier')).toMatchObject({ filterable: true });
     expect(field(account, 'note')).toMatchObject({ filterable: false });
+  });
+
+  it('UI-11 says which fields a search looks in, and which field names a row of a relation', async () => {
+    const meta = await fetchMeta();
+    expect(entity(meta, 'crm.Account').searchable).toEqual(['name']);
+    expect(entity(meta, 'crm.Note').searchable).toEqual([]);
+    expect(field(entity(meta, 'crm.Account'), 'ownerId').target).toEqual({
+      entity: 'crm.Person',
+      path: '/api/v1/crm/people',
+      title: 'name',
+    });
   });
 
   it('UI-11 gives the conditions of a field, over the keys of the API', async () => {

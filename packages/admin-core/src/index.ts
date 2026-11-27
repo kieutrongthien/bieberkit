@@ -41,7 +41,18 @@ export {
 } from './i18n.ts';
 export { en as ENGLISH } from './messages/en.ts';
 export type { Dictionary, Locale, MessageKey } from './i18n.ts';
-export { allows, bodyOf, columnsOf, formFieldsOf, initialValues, labelOf, listFields } from './screens.ts';
+export {
+  allows,
+  bodyOf,
+  columnsOf,
+  formFieldsOf,
+  includeOf,
+  initialValues,
+  labelOf,
+  listFields,
+  relationLabel,
+  titleOf,
+} from './screens.ts';
 export type {
   BulkOperation,
   BulkResult,

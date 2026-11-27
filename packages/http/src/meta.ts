@@ -28,6 +28,7 @@ import type { ZodType } from 'zod';
 import type { ApiField, EntityDef, FieldDef, JsonSchema } from '@bieberkit/data/schema';
 import { HttpError } from './problem.ts';
 import { pathOf, permissionOf } from './entity-routes.ts';
+import { searchableOf } from './search.ts';
 import type { HttpServer } from './server.ts';
 
 export const META_SCHEMA_VERSION = 1;
@@ -72,6 +73,7 @@ export const META_SCHEMA: JsonSchema = {
           operations: flags(['list', 'get', 'create', 'update', 'delete']),
           can: flags(['read', 'create', 'update', 'delete']),
           features: strings,
+          searchable: strings,
           softDelete: { type: 'boolean' },
           tenant: { type: 'boolean' },
           title: text,
@@ -105,7 +107,7 @@ export const META_SCHEMA: JsonSchema = {
                 target: {
                   type: 'object',
                   required: ['entity', 'path'],
-                  properties: { entity: text, path: text },
+                  properties: { entity: text, path: text, title: text },
                   additionalProperties: false,
                 },
               },
@@ -177,6 +179,15 @@ interface StaticEntity {
   readonly permissions: Readonly<Record<'read' | 'create' | 'update' | 'delete', string>>;
 }
 
+/** Where a relation points: the entity, its routes, and the field that names a row, so that a picker can show a row without asking again. */
+function targetOf(target: EntityDef<string>): { entity: string; path: string; title?: string } {
+  const title =
+    target.admin.title === undefined
+      ? undefined
+      : apiFields(target).find((field) => field.name === target.admin.title)?.key;
+  return { entity: target.name, path: pathOf(target), ...(title === undefined ? {} : { title }) };
+}
+
 function fieldOf(
   def: EntityDef<string>,
   field: ApiField,
@@ -223,7 +234,7 @@ function fieldOf(
         ? {}
         : { requiredWhen: mapWhenFields(declared.admin.requiredWhen, keyOf) }),
       ...(declared.kind === 'belongsTo' && declared.target !== undefined
-        ? { target: { entity: declared.target().name, path: pathOf(declared.target()) } }
+        ? { target: targetOf(declared.target()) }
         : {}),
     },
   };
@@ -344,6 +355,10 @@ export function registerMeta(server: HttpServer, entities: readonly EntityDef<st
             delete: await can(permissions.delete),
           },
           features: [...def.features],
+          // What `q` looks in, by the keys of the API, for the fields that the caller may read.
+          searchable: searchableOf(def)
+            .map((field) => field.key)
+            .filter((key) => keys.includes(key)),
           softDelete: def.softDelete,
           tenant: def.tenant,
           ...(def.admin.title === undefined ? {} : { title: keyed(def.admin.title) }),

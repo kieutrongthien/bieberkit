@@ -53,7 +53,11 @@ export interface MetaField {
   readonly precision?: number;
   readonly scale?: number;
   /** For a relation: the entity that it points to and where its rows are. */
-  readonly target?: { readonly entity: string; readonly path: string };
+  readonly target?: {
+    readonly entity: string;
+    readonly path: string;
+    /** The key of the field that names a row of the target. */ readonly title?: string;
+  };
   readonly validation?: Readonly<Record<string, unknown>>;
   /** The field is shown when this holds, and it is not sent when it does not. */
   readonly visibleWhen?: When;
@@ -85,6 +89,8 @@ export interface MetaEntity {
   /** What the signed in user may do with the entity. */
   readonly can: Readonly<Record<'read' | 'create' | 'update' | 'delete', boolean>>;
   readonly features?: readonly string[];
+  /** The keys of the fields that `q` looks in, when the entity can be searched. */
+  readonly searchable?: readonly string[];
   readonly transitions?: readonly MetaTransition[];
   readonly softDelete: boolean;
   readonly tenant: boolean;
@@ -135,6 +141,10 @@ export interface ListParams {
   readonly sort?: string;
   /** The keys to read, so that a wide entity stays fast (UI-15). Without it the API sends every field. */
   readonly fields?: readonly string[];
+  /** The relations to send with each row, by name (`account` for `accountId`), so that a list can name a row and not show its id. */
+  readonly include?: readonly string[];
+  /** A text to look for: the rows where a searchable field starts with it (UI-11). */
+  readonly q?: string;
   /** Conditions of the list, as `filter[field][op]=value`. They are checked against the metadata before they are sent (UI-03). */
   readonly filters?: readonly Filter[];
 }

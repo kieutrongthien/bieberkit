@@ -128,6 +128,16 @@ test('UI-07 a detail with its tabs, its child table and its history has no viola
   expect(await violations(page)).toEqual([]);
 });
 
+test('UI-07 a form with a relation picker, closed and with its list open, has no violation of WCAG 2.2 AA', async () => {
+  const page = shared;
+  await page.goto('/admin/crm/tickets/new');
+  await expect(page.getByRole('combobox', { name: 'accountId' })).toBeVisible();
+  expect(await violations(page)).toEqual([]);
+  await page.getByRole('combobox', { name: 'accountId' }).click();
+  await expect(page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)')).toBeVisible();
+  expect(await violations(page)).toEqual([]);
+});
+
 test('UI-07, UI-16 the list of cards at 360 px has no violation of WCAG 2.2 AA', async () => {
   const page = shared;
   await page.setViewportSize({ width: 360, height: 740 });

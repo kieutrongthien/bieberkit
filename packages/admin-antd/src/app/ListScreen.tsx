@@ -30,11 +30,13 @@ import {
   exportPages,
   filterProblem,
   labelOf,
+  includeOf,
   listFields,
   loadViews,
   sameView,
   operatorsOf,
   PAGE_SIZES,
+  relationLabel,
   shouldVirtualize,
   saveView,
   viewFromSearch,
@@ -49,7 +51,8 @@ import type { TableColumnsType } from 'antd';
 import type { RefSelectProps } from 'antd/es/select';
 import { useRef, useState } from 'react';
 import type { JSX } from 'react';
-import { useClient, useEntity } from './context.ts';
+import { useClient, useEntity, useMeta } from './context.ts';
+import { RelationSelect } from './RelationSelect.tsx';
 import { useLanguage, useT } from './language.tsx';
 import { BulkBar, RowMoves, useRowChanges } from './moves.tsx';
 import { CardRows } from './CardRows.tsx';
@@ -81,6 +84,16 @@ function ValueInput(props: {
           { value: 'true', label: t('common.yes') },
           { value: 'false', label: t('common.no') },
         ]}
+      />
+    );
+  }
+  if (field.kind === 'belongsTo' && (op === 'eq' || op === 'ne')) {
+    return (
+      <RelationSelect
+        label={t('list.filterValue')}
+        field={field}
+        value={value === '' ? null : value}
+        onChange={(next) => onChange(typeof next === 'string' ? next : '')}
       />
     );
   }
@@ -283,6 +296,7 @@ function Rows(props: { readonly entity: MetaEntity }): JSX.Element {
   const t = useT();
   const { locale } = useLanguage();
   const changes = useRowChanges(entity);
+  const meta = useMeta();
   const navigate = useNavigate();
   // The filters and the sort live in the address, so that a link opens the same list and the back button undoes a filter.
   const search: Readonly<Record<string, unknown>> = useSearch({ strict: false });
@@ -307,6 +321,7 @@ function Rows(props: { readonly entity: MetaEntity }): JSX.Element {
         page,
         pageSize,
         fields: listFields(entity),
+        include: includeOf(entity),
         filters,
         ...(sort === undefined ? {} : { sort }),
       }),
@@ -384,6 +399,9 @@ function Rows(props: { readonly entity: MetaEntity }): JSX.Element {
     }
   };
 
+  // A relation shows the name of the row that it points at (asked for with `include=`), and the id when there is none.
+  const cell = (row: Row, field: MetaField, value: unknown): string =>
+    relationLabel(meta.data?.entities ?? [], field, row) ?? show(value, t);
   const columns: TableColumnsType<Row> = columnsOf(entity).map((field, index) => ({
     title: field.key,
     dataIndex: field.key,
@@ -396,9 +414,9 @@ function Rows(props: { readonly entity: MetaEntity }): JSX.Element {
       : {}),
     render: (value: unknown, row: Row) =>
       index === 0 && entity.operations.get ? (
-        <Link to={`/${where}/${String(row['id'])}`}>{show(value, t) || String(row['id'])}</Link>
+        <Link to={`/${where}/${String(row['id'])}`}>{cell(row, field, value) || String(row['id'])}</Link>
       ) : (
-        show(value, t)
+        cell(row, field, value)
       ),
   }));
   const rowActions = (row: Row): JSX.Element => (
@@ -490,7 +508,7 @@ function Rows(props: { readonly entity: MetaEntity }): JSX.Element {
             rows={list.data?.rows ?? []}
             loading={list.isPending}
             where={where}
-            show={(value) => show(value, t)}
+            cell={(row, field) => cell(row, field, row[field.key])}
             actions={(row) => rowActions(row)}
             selected={canSelect ? selected : undefined}
             onSelect={setSelected}

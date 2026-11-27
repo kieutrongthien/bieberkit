@@ -23,7 +23,18 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { allows, bodyOf, columnsOf, formFieldsOf, initialValues, labelOf, listFields } from './screens.ts';
+import {
+  allows,
+  bodyOf,
+  columnsOf,
+  formFieldsOf,
+  initialValues,
+  includeOf,
+  labelOf,
+  listFields,
+  relationLabel,
+  titleOf,
+} from './screens.ts';
 import type { MetaEntity, MetaField } from './types.ts';
 
 const field = (key: string, extra: Partial<MetaField> = {}): MetaField => ({
@@ -98,5 +109,47 @@ describe('UI-03 generic screens from the metadata', () => {
     expect(allows(ENTITY, 'create')).toBe(true);
     expect(allows(ENTITY, 'update')).toBe(false);
     expect(allows(ENTITY, 'delete')).toBe(false);
+  });
+});
+
+describe('UI-11 the name of a row that is chosen', () => {
+  const entity: MetaEntity = { ...ENTITY, title: 'name', list: ['code', 'name'] };
+  it('UI-11 is the field that the relation names, then the title, then the first text of the list, then the id', () => {
+    expect(titleOf(entity, { id: '1', name: 'Acme', code: 'A-1' }, 'code')).toBe('A-1');
+    expect(titleOf(entity, { id: '1', name: 'Acme', code: 'A-1' })).toBe('Acme');
+    expect(titleOf({ ...ENTITY, list: ['code'] }, { id: '1', code: 'A-1' })).toBe('A-1');
+    expect(titleOf(entity, { id: '1', name: '', code: null })).toBe('1');
+    expect(titleOf(undefined, { id: '7' })).toBe('7');
+    expect(titleOf({ ...ENTITY, list: ['visits'] }, { id: '1', visits: 4 })).toBe('4');
+  });
+});
+
+describe('UI-11 a relation in a list names the row', () => {
+  const owner = field('ownerId', {
+    kind: 'belongsTo',
+    target: { entity: 'crm.Person', path: '/api/v1/crm/people', title: 'name' },
+  });
+  const ticket: MetaEntity = { ...ENTITY, list: ['title', 'ownerId'], fields: [field('title'), owner] };
+  const person: MetaEntity = { ...ENTITY, name: 'crm.Person', title: 'name', list: ['name'] };
+
+  it('UI-11 asks for the relations that the columns show, by the name that the API includes them under', () => {
+    expect(includeOf(ticket)).toEqual(['owner']);
+    expect(includeOf(ENTITY)).toEqual([]);
+  });
+
+  it('UI-11 gives the name of the included row, and nothing when the row was not included or the entity is not known', () => {
+    expect(relationLabel([person], owner, { ownerId: 'p1', owner: { id: 'p1', name: 'Ann' } })).toBe('Ann');
+    expect(relationLabel([person], owner, { ownerId: 'p1', owner: null })).toBeUndefined();
+    expect(relationLabel([person], owner, { ownerId: 'p1' })).toBeUndefined();
+    expect(relationLabel([person], field('title'), { title: 'x' })).toBeUndefined();
+    // The relation names the field that names a row, so an entity that is not known does not hide the name.
+    expect(relationLabel([], owner, { owner: { id: 'p1', name: 'Ann' } })).toBe('Ann');
+    expect(
+      relationLabel(
+        [],
+        { ...owner, target: { entity: 'crm.Person', path: '/x' } },
+        { owner: { id: 'p1', name: 'Ann' } },
+      ),
+    ).toBe('p1');
   });
 });

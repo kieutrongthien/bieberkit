@@ -32,7 +32,7 @@ export const Account = defineEntity({
   fields: {
     id: f.id(),
     code: f.string({ min: 1, max: 20 }).unique(),
-    name: f.string({ min: 1, max: 100 }).index(),
+    name: f.string({ min: 1, max: 100 }).index().searchable(),
     tier: f.oneOf(['basic', 'gold', 'vip']).default('basic').index(),
     visits: f.int({ min: 0 }).default(0).index(),
     active: f.boolean().default(true).index(),

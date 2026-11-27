@@ -23,7 +23,7 @@
  */
 
 import { columnsOf } from '@bieberkit/admin-core';
-import type { MetaEntity, Row } from '@bieberkit/admin-core';
+import type { MetaEntity, MetaField, Row } from '@bieberkit/admin-core';
 import { Link } from '@tanstack/react-router';
 import { Card, Checkbox, Empty, Pagination, Skeleton, Space, theme } from 'antd';
 import type { JSX, ReactNode } from 'react';
@@ -34,7 +34,8 @@ export function CardRows(props: {
   readonly rows: readonly Row[];
   readonly loading: boolean;
   readonly where: string;
-  readonly show: (value: unknown) => string;
+  /** The text of a cell: what the row holds for the field, or the name of the row that a relation points at. */
+  readonly cell: (row: Row, field: MetaField) => string;
   readonly actions: (row: Row) => ReactNode;
   readonly selected: readonly Row[] | undefined;
   readonly onSelect: (rows: readonly Row[]) => void;
@@ -43,7 +44,7 @@ export function CardRows(props: {
   readonly total: number;
   readonly onPage: (page: number) => void;
 }): JSX.Element {
-  const { entity, rows, loading, where, show, actions, selected, onSelect } = props;
+  const { entity, rows, loading, where, cell, actions, selected, onSelect } = props;
   const t = useT();
   const { token } = theme.useToken();
   const [title, ...rest] = columnsOf(entity);
@@ -55,7 +56,7 @@ export function CardRows(props: {
       <div role="list" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         {rows.map((row) => {
           const id = String(row['id']);
-          const heading = title === undefined ? id : show(row[title.key]) || id;
+          const heading = title === undefined ? id : cell(row, title) || id;
           return (
             <Card
               key={id}
@@ -91,7 +92,7 @@ export function CardRows(props: {
                 {rest.map((field) => (
                   <div key={field.key} style={{ display: 'contents' }}>
                     <dt style={{ color: token.colorTextDescription }}>{field.key}</dt>
-                    <dd style={{ margin: 0, overflowWrap: 'anywhere' }}>{show(row[field.key])}</dd>
+                    <dd style={{ margin: 0, overflowWrap: 'anywhere' }}>{cell(row, field)}</dd>
                   </div>
                 ))}
               </dl>

@@ -86,6 +86,7 @@ interface MetaField {
   readonly target?: {
     readonly entity: string;
     readonly path: string;
+     readonly title?: string;
   };
   readonly validation?: Readonly<Record<string, unknown>>;
   readonly visibleWhen?: When;
@@ -107,6 +108,7 @@ interface MetaEntity {
   readonly operations: Readonly<Record<"list" | "get" | "create" | "update" | "delete", boolean>>;
   readonly can: Readonly<Record<"read" | "create" | "update" | "delete", boolean>>;
   readonly features?: readonly string[];
+  readonly searchable?: readonly string[];
   readonly transitions?: readonly MetaTransition[];
   readonly softDelete: boolean;
   readonly tenant: boolean;
@@ -144,6 +146,8 @@ interface ListParams {
   readonly pageSize?: number;
   readonly sort?: string;
   readonly fields?: readonly string[];
+  readonly include?: readonly string[];
+  readonly q?: string;
   readonly filters?: readonly Filter[];
 }
 type BulkOperation = {
@@ -331,6 +335,9 @@ declare const en: {
   readonly "detail.noHistory": "Nothing was recorded for this row";
   readonly "detail.historyDenied": "The history is not open to you";
   readonly "detail.computed": "Filled in by the server";
+  readonly "relation.search": "Type to search";
+  readonly "relation.pick": "Pick one";
+  readonly "relation.none": "Nothing found";
   readonly "list.op.eq": "is";
   readonly "list.op.ne": "is not";
   readonly "list.op.in": "is one of";
@@ -388,6 +395,9 @@ export declare function formFieldsOf(entity: MetaEntity): readonly MetaField[];
 export declare function listFields(entity: MetaEntity): readonly string[];
 export declare function initialValues(entity: MetaEntity, row?: Row): Record<string, unknown>;
 export declare function bodyOf(entity: MetaEntity, values: Readonly<Record<string, unknown>>, updating: boolean): Row;
+export declare function titleOf(entity: MetaEntity | undefined, row: Row, hint?: string): string;
+export declare function includeOf(entity: MetaEntity): readonly string[];
+export declare function relationLabel(entities: readonly MetaEntity[], field: MetaField, row: Row): string | undefined;
 export declare function allows(entity: MetaEntity, action: "create" | "update" | "delete"): boolean;
 export declare const isNetworkFailure: (error: unknown) => boolean;
 export declare function shouldRetry(failures: number, error: unknown): boolean;

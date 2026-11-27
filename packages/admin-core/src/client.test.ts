@@ -201,6 +201,16 @@ describe('UI-02 the client of the admin', () => {
     });
   });
 
+  it('UI-11 a list asks for a search with q, and leaves it out when the text is empty', async () => {
+    const { fetch: fetcher, calls } = fake(() => json({ data: [], meta: { page: 1, pageSize: 20 } }));
+    const client = createAdminClient({ fetch: fetcher });
+    await client.list(ENTITY, { pageSize: 20, q: ' nguyen l ' });
+    await client.list(ENTITY, { q: '   ', include: ['owner'] });
+    expect(calls[0]?.url).toContain('q=nguyen+l');
+    expect(calls[1]?.url).not.toContain('q=');
+    expect(calls[1]?.url).toContain('include=owner');
+  });
+
   it('UI-03 the history of a row is read from the audit log by entity and record', async () => {
     const { fetch: fetcher, calls } = fake(() =>
       json({
