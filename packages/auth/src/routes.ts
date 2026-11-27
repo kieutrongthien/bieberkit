@@ -25,7 +25,7 @@
 import { requestContext } from '@bieberkit/core';
 import { emitEvent, recordAudit, runInTransaction } from '@bieberkit/data/orm';
 import type { Database } from '@bieberkit/data/orm';
-import type { HttpServer } from '@bieberkit/http';
+import type { HttpServer, Principal } from '@bieberkit/http';
 import { limiterOf } from './better-auth.ts';
 import type { AuthInstance } from './better-auth.ts';
 import { principalOfSession } from './authenticator.ts';
@@ -66,6 +66,23 @@ const FAILED: Readonly<Record<string, string>> = {
 
 /** A GET that changes data, and so needs the transaction like a POST does. */
 const WRITING_GETS = new Set(['/verify-email', '/magic-link/verify']);
+
+/** The tokens of the sessions that a user has now. */
+async function sessionsOf(auth: AuthInstance, userId: string): Promise<string[]> {
+  const context = await auth.$context;
+  return (await context.internalAdapter.listSessions(userId)).map((session) => session.token);
+}
+
+/**
+ * Ends the sessions that there were before the second factor was turned on. The factor is a mark of the account and not of a session,
+ * so one that was made with the password alone would otherwise count as one that gave a code. The session that the confirmation made
+ * is not among them, and Better Auth has already taken away the one that asked.
+ */
+async function endSessions(auth: AuthInstance, tokens: readonly string[]): Promise<void> {
+  if (tokens.length === 0) return;
+  const context = await auth.$context;
+  for (const token of tokens) await context.internalAdapter.deleteSession(token);
+}
 
 /** Thrown inside the transaction to roll it back, with the answer that the caller gets. */
 class RolledBack extends Error {
@@ -114,6 +131,7 @@ export function registerAuthRoutes(server: HttpServer, options: AuthRoutesOption
       // Native endpoints consume a cookie themselves, independently of API-key precedence on entity routes.
       // Validate that exact cookie, and remove revoked session cookies so public sign-in still works.
       let nativeRequest = request;
+      let signedIn: Principal | undefined;
       const cookie = request.headers.get('cookie');
       if (cookie?.includes('__Host-bk_session=') === true) {
         const principal = await principalOfSession(auth, cookie);
@@ -127,18 +145,23 @@ export function registerAuthRoutes(server: HttpServer, options: AuthRoutesOption
           else headers.set('cookie', kept);
           nativeRequest = new Request(request, { headers });
         } else {
+          signedIn = principal;
           requestContext.update({ userId: principal.id });
         }
       }
       const writes = request.method !== 'GET' || WRITING_GETS.has(path);
       if (!writes) return auth.handler(nativeRequest);
       const recorded = RECORDED[path];
+      // A code that a signed-in person without a factor gets right turns the factor on (AUTH-05).
+      const enrolling = path === '/two-factor/verify-totp' && signedIn !== undefined && signedIn.mfa !== true;
 
       const attempt = async (): Promise<Response> => {
         try {
           return await runInTransaction(db, async (em) => {
+            const earlier = enrolling && signedIn !== undefined ? await sessionsOf(auth, signedIn.id) : [];
             const response = await auth.handler(nativeRequest);
             if (response.status >= 400) throw new RolledBack(response);
+            await endSessions(auth, earlier);
             if (recorded !== undefined) {
               const actor = (await userIdOf(response)) ?? requestContext.get()?.userId;
               if (actor !== undefined && requestContext.get()?.userId === undefined)

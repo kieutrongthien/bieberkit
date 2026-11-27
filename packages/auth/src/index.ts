@@ -38,13 +38,14 @@ export type {
 export { API_KEY_PREFIX, createApiKey, revokeApiKey } from './api-keys.ts';
 export type { ApiKeyInput, CreatedApiKey } from './api-keys.ts';
 export { createAuthenticator } from './authenticator.ts';
-export { createAuth, limiterOf, mailOf } from './better-auth.ts';
+export { createAuth, limiterOf, mailOf, pagesOf } from './better-auth.ts';
 export type {
   AuthApiKeys,
   AuthInstance,
   AuthLimits,
   AuthMail,
   AuthMailOptions,
+  AuthPages,
   AuthSecondaryStorage,
   BetterAuthOptions,
   CreateAuthOptions,

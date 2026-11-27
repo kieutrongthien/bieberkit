@@ -31,7 +31,7 @@ import { recordAudit, runInTransaction, runInUnitOfWork } from '@bieberkit/data/
 import type { Database } from '@bieberkit/data/orm';
 import { HttpError } from '@bieberkit/http';
 import { holdersQuery, keepLastAdmin, refuseSelf } from './admin-guard.ts';
-import { mailOf } from './better-auth.ts';
+import { mailOf, pagesOf } from './better-auth.ts';
 import type { AuthInstance } from './better-auth.ts';
 import { authError } from './errors.ts';
 import { createRateLimiter, limitActor } from './limits.ts';
@@ -548,8 +548,15 @@ export function createUserService(options: UserServiceOptions): UserService {
     }
   }
 
-  /** Writes a reset link that Better Auth's own `/reset-password` accepts, and returns its token and URL (USR-09, USR-10). */
-  async function resetLink(userId: string, ttlSeconds: number): Promise<{ token: string; url: string }> {
+  /**
+   * Writes a reset link that Better Auth's own `/reset-password` accepts, and returns its token and URL (USR-09, USR-10). It comes back
+   * to the reset page of the project, and an invitation says so with `invite=1`. Without that page it comes back to `/reset-password`.
+   */
+  async function resetLink(
+    userId: string,
+    ttlSeconds: number,
+    kind: 'reset' | 'invite' = 'reset',
+  ): Promise<{ token: string; url: string }> {
     const context = await auth.$context;
     const token = randomBytes(18).toString('base64url');
     await context.internalAdapter.createVerificationValue({
@@ -557,7 +564,10 @@ export function createUserService(options: UserServiceOptions): UserService {
       value: userId,
       expiresAt: new Date(Date.now() + ttlSeconds * 1000),
     });
-    const callback = encodeURIComponent(`${new URL(context.baseURL).origin}/reset-password`);
+    const page = pagesOf(auth).resetPassword;
+    const landing = new URL(page ?? '/reset-password', context.baseURL);
+    if (page !== undefined && kind === 'invite') landing.searchParams.set('invite', '1');
+    const callback = encodeURIComponent(landing.href);
     return { token, url: `${context.baseURL}/reset-password/${token}?callbackURL=${callback}` };
   }
 
@@ -570,7 +580,7 @@ export function createUserService(options: UserServiceOptions): UserService {
 
   async function sendInvite(user: AuthUserRow): Promise<void> {
     const send = mailOf(auth).sendInvite ?? mailUnavailable();
-    const link = await resetLink(user.id, inviteTtl);
+    const link = await resetLink(user.id, inviteTtl, 'invite');
     await send({ to: user.email, ...link });
   }
 

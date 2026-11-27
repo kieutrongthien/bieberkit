@@ -95,6 +95,14 @@ export interface CreateAuthOptions {
   readonly methods?: AuthMethods;
   /** The mail contract is M1.5, so the project says how to send. Without it the flows that need a mail answer with an error. */
   readonly mail?: AuthMailOptions;
+  /** The pages that the password links come back to. */
+  readonly pages?: AuthPages;
+}
+
+/** Where a person lands after a mailed link. The server gives the pages of the admin when it is installed (USR-10). */
+export interface AuthPages {
+  /** The address of the page that takes the new password. Without it a link comes back to `/reset-password` of the origin. */
+  readonly resetPassword?: string;
 }
 
 /** How the project sends the mails of authentication. Inside a transaction a callback writes an outbox intent and sends nothing (BPL-02). */
@@ -121,6 +129,13 @@ export type AuthSecondaryStorage = NonNullable<BetterAuthOptions['secondaryStora
 
 const limiters = new WeakMap<object, RateLimiter>();
 const mails = new WeakMap<object, AuthMailOptions>();
+
+const pages = new WeakMap<object, AuthPages>();
+
+/** The pages that an auth instance was made with, for the user service. */
+export function pagesOf(auth: AuthInstance): AuthPages {
+  return pages.get(auth) ?? {};
+}
 
 /** The mail callbacks that an auth instance was made with, for the user service. */
 export function mailOf(auth: AuthInstance): AuthMailOptions {
@@ -227,6 +242,8 @@ export function createAuth(options: CreateAuthOptions): AuthInstance {
       minPasswordLength: 8,
       maxPasswordLength: 128,
       requireEmailVerification: false,
+      // Whoever sets a password through a link may be taking the account back, so every session of it ends (AUTH-06).
+      revokeSessionsOnPasswordReset: true,
       // A reset link went to the mailbox, so using it proves the address, also for the first password of an invitation (USR-10).
       // The ORM writes the flag, because SQLite binds no boolean through the Kysely of the request.
       onPasswordReset: async ({ user }: { user: { id: string } }) => {
@@ -388,5 +405,6 @@ export function createAuth(options: CreateAuthOptions): AuthInstance {
   const auth: AuthInstance = betterAuth(config);
   limiters.set(auth, limiter);
   if (mail !== undefined) mails.set(auth, mail);
+  if (options.pages !== undefined) pages.set(auth, options.pages);
   return auth;
 }
