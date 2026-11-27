@@ -42,6 +42,7 @@ import { createHttpServer, registerEntityRoutes, registerMeta, registerOpenApi }
 import type { HttpServer, RouteDef } from '@bieberkit/http';
 import { createScheduler, schedulesOf } from '@bieberkit/queue';
 import type { JobDef, QueueSubscription } from '@bieberkit/queue';
+import { pluginAdminOf } from './plugin-admin.ts';
 import { registerClientReports } from './client-reports.ts';
 import { ServerError } from './errors.ts';
 import { parseTheme } from '@bieberkit/tokens';
@@ -198,7 +199,9 @@ export async function boot(options: BootOptions): Promise<Running> {
       registerAuthRoutes(server, { auth, db });
       registerEntityRoutes(server, schemas, { db });
       // What the admin reads to draw its menu, its lists and its forms (UI-02).
-      registerMeta(server, entities);
+      // What the plugins add to the admin: read and checked here, shown by `_meta`, served by `registerAdmin` (UI-04).
+      const pluginAdmin = pluginAdminOf(project);
+      registerMeta(server, entities, { extensions: pluginAdmin.extensions });
       // What the admin tells about itself: its errors and its Core Web Vitals (UI-21).
       registerClientReports(server, { reporter, metrics });
       for (const route of contributed<RouteDef>(modules, 'routes')) server.route(route);
@@ -212,6 +215,7 @@ export async function boot(options: BootOptions): Promise<Running> {
         env.ADMIN_ASSETS_DIR ?? join(project.root, 'data', 'admin-assets'),
         // A file goes from the browser to the bucket with a signed URL, so the policy of the admin names that origin (ADR 0036).
         storageOrigin(env),
+        pluginAdmin.folders,
       );
       const web = server;
       lifecycle.onBoot('http', async () => {

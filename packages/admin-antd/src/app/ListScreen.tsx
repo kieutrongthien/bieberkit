@@ -37,6 +37,7 @@ import {
   operatorsOf,
   PAGE_SIZES,
   relationLabel,
+  screenFor,
   shouldVirtualize,
   saveView,
   viewFromSearch,
@@ -55,6 +56,7 @@ import { useClient, useEntity, useMeta } from './context.ts';
 import { RelationSelect } from './RelationSelect.tsx';
 import { useLanguage, useT } from './language.tsx';
 import { BulkBar, RowMoves, useRowChanges } from './moves.tsx';
+import { PluginSlot, useExtensions } from './Plugins.tsx';
 import { CardRows } from './CardRows.tsx';
 import { useShortcuts } from './shortcuts.ts';
 
@@ -568,7 +570,19 @@ function Rows(props: { readonly entity: MetaEntity }): JSX.Element {
 export function ListScreen(): JSX.Element {
   const { entity, loading } = useEntity();
   const t = useT();
+  // The hook is called whatever the metadata holds, so that the order of the hooks does not change when it arrives.
+  const extensions = useExtensions();
+  const replacement = entity === undefined ? undefined : screenFor(extensions, 'list', entity.name);
   if (loading) return <Card loading />;
   if (entity === undefined || !entity.can.read) return <Result status="404" title={t('list.missing')} />;
+  // A plugin may draw the list of an entity in place of the generic one (UI-04).
+  if (replacement !== undefined)
+    return (
+      <PluginSlot
+        module={replacement.module}
+        name={`${replacement.plugin}/${replacement.replace}`}
+        props={{ entity }}
+      />
+    );
   return <Rows entity={entity} />;
 }

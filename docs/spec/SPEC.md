@@ -1168,7 +1168,7 @@ The admin UI is a React single-page app that renders most screens from entity me
 - **UI-01** Stack: React 19.2 (19.2.4 or later), Vite 8, TanStack Router and Query. No React Server Components. Visual components come through a UI adapter (UI-10), Ant Design 6 by default.
 - **UI-02** The shell loads `/api/v1/_meta`, which returns the entities, fields, permissions and menu entries the current user may see.
 - **UI-03** Generic screens: list (filters, sorting, saved views, bulk actions, export), form (validation from the same schemas as the API), detail (tabs for related records, activity, audit history).
-- **UI-04** Escape hatches: a field can use a custom widget, a screen can be replaced by a custom page, and plugins add pages and dashboard widgets.
+- **UI-04** Escape hatches: a field can use a custom widget, a screen can be replaced by a custom page, and plugins add pages and dashboard widgets. A plugin does it with the `admin` key (`pages`, `widgets`, `screens`) and ES modules in the folder `admin` of its package, which the web role serves under the admin and the admin loads with the React, the Ant Design and the client of the admin (ADR 0037).
 - **UI-05** Languages en, vi and zh are bundled. Dates, numbers and currency follow the user's locale. Vietnamese and Chinese labels come from the entity `label` and plugin translation files. The language is the one that the person chose in the header (kept in the browser), then the first language of the browser that is bundled, then English; the three dictionaries have the same keys and the same placeholders, which a test enforces. Money is formatted from the text that the API sends, so its digits are never rounded by a number.
 - **UI-06** Theme tokens (colors, radius, spacing, fonts, dark mode) are set in the `theme` key of `bieberkit.config.ts`, and every one of them is optional. The key is validated at build and at boot with every problem reported together (a color is a hex of 3 or 6 digits, the radius is 0 to 24 px, the spacing 2 to 8 px, `darkMode` is `auto`, `light` or `dark`). The server writes the resolved theme into the page of the admin as data and as CSS variables, so a change is a restart and not a build (UI-14). The default font stack covers Latin, Vietnamese and Chinese scripts.
 - **UI-07** Accessibility target: WCAG 2.2 level AA for all generic screens.
@@ -1725,6 +1725,7 @@ Open questions:
 
 | Version | Date | Changes |
 | --- | --- | --- |
+| 0.8.35 | 2026-11-27 | ADR 0037: the `admin` key of a plugin, its modules served under the admin, the host that a module gets, and `extensions` in `_meta` (UI-04) |
 | 0.8.34 | 2026-11-27 | ADR 0036: `f.file()` and `f.image()`, the check of a file on a write, the upload of the admin to the storage with a signed URL, and the origin of the bucket in the policy of the admin (UI-11, SEC-01) |
 | 0.8.33 | 2026-11-27 | MOD-09: inline collections are in the body and the answer of a record, are saved in its transaction with the permissions of the line entity, and the form edits them as a table (UI-11) |
 | 0.8.32 | 2026-11-27 | UI-11: the search of a list with `q` over the fields that are `searchable()` (folded, a prefix of the text), relation pickers with server search, the name of a related row in a list, and `include` with `fields` |

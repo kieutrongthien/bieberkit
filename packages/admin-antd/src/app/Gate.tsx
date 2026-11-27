@@ -22,7 +22,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { labelOf } from '@bieberkit/admin-core';
+import { labelOf, labelText } from '@bieberkit/admin-core';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, Outlet } from '@tanstack/react-router';
 import { Button, Grid, Layout, Menu, Result, Select, Skeleton, Space, Typography } from 'antd';
@@ -55,10 +55,17 @@ function Frame(props: { readonly email: string }): JSX.Element {
           </div>
           <Menu
             mode="inline"
-            items={entities.map((entity) => ({
-              key: entity.path,
-              label: <Link to={`/${entity.path.replace('/api/v1/', '')}`}>{labelOf(entity, locale)}</Link>,
-            }))}
+            items={[
+              ...entities.map((entity) => ({
+                key: entity.path,
+                label: <Link to={`/${entity.path.replace('/api/v1/', '')}`}>{labelOf(entity, locale)}</Link>,
+              })),
+              // The menu entries that plugins add: the server leaves out those that the person may not use (UI-04).
+              ...(meta.data?.menu ?? []).map((item) => ({
+                key: item.path,
+                label: <Link to={item.path}>{labelText(item.label, locale, item.path)}</Link>,
+              })),
+            ]}
           />
         </Sider>
         <Layout>

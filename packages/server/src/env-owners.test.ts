@@ -34,7 +34,7 @@ it('CFG-01 a plugin whose short name has a dash keeps the prefix that definePlug
     dialects: ['sqlite'],
     env: { AUDIT_TRAIL_MAX: env.int().default(1) },
   });
-  const owners = envOwnersOf({ plugins: [{ def, options: undefined }] });
+  const owners = envOwnersOf({ plugins: [{ def, options: undefined, root: '.' }] });
   expect(owners.map((owner) => owner.prefix)).toEqual(['AUDIT_TRAIL_']);
   expect(() => mergeEnv(owners)).not.toThrow();
 });

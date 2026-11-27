@@ -59,8 +59,13 @@ export type {
   ListParams,
   Meta,
   MetaEntity,
+  MetaExtensions,
   MetaField,
   MetaInline,
+  MetaLabel,
+  MetaPage,
+  MetaScreen,
+  MetaWidget,
   MetaMenuItem,
   MetaTransition,
   When,
@@ -122,3 +127,5 @@ export { editableInline, initialLines, lineProblems, linesBody, linesChanged, MA
 export type { Line } from './inline.ts';
 export { acceptAttribute, acceptsType, fileProblem, isPicture, sizeText, uploadName } from './files.ts';
 export type { MediaFile } from './files.ts';
+export { extensionsOf, fieldWidgetFor, labelText, moduleSrc, pageFor, screenFor, widgetsIn } from './extensions.ts';
+export type { AdminHost } from './extensions.ts';

@@ -121,15 +121,50 @@ export interface MetaEntity {
   readonly fields: readonly MetaField[];
 }
 
+/** A text for the screen: by language (`en`, `vi`, `zh`). */
+export type MetaLabel = Readonly<Record<string, string>>;
+
 export interface MetaMenuItem {
-  readonly label: string;
+  readonly label: MetaLabel;
+  /** A route of the admin, such as `/ext/reports/sales`. */
   readonly path: string;
   readonly permission?: string;
+}
+
+/** A page that a plugin adds, at `/ext/<plugin>/<path>`. `module` is the address of its file under the admin. */
+export interface MetaPage {
+  readonly plugin: string;
+  readonly path: string;
+  readonly module: string;
+  readonly title: MetaLabel;
+}
+
+/** A piece that a plugin draws inside a screen: the slot says where (`dashboard`, `form:<Entity>`, `field:<name>`). */
+export interface MetaWidget {
+  readonly plugin: string;
+  readonly slot: string;
+  readonly module: string;
+  readonly title: MetaLabel;
+}
+
+/** A screen that a plugin draws in place of the generic one: `list:<Entity>` or `form:<Entity>`. */
+export interface MetaScreen {
+  readonly plugin: string;
+  readonly replace: string;
+  readonly module: string;
+}
+
+export interface MetaExtensions {
+  readonly pages: readonly MetaPage[];
+  readonly widgets: readonly MetaWidget[];
+  readonly screens: readonly MetaScreen[];
 }
 
 export interface Meta {
   readonly schemaVersion: number;
   readonly entities: readonly MetaEntity[];
+  /** What the plugins add. Absent from an older server. */
+  readonly extensions?: MetaExtensions;
   readonly menu: readonly MetaMenuItem[];
   readonly permissions: readonly string[];
 }

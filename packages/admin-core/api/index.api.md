@@ -180,14 +180,38 @@ interface MetaEntity {
   readonly form: readonly string[];
   readonly fields: readonly MetaField[];
 }
+type MetaLabel = Readonly<Record<string, string>>;
 interface MetaMenuItem {
-  readonly label: string;
+  readonly label: MetaLabel;
   readonly path: string;
   readonly permission?: string;
+}
+interface MetaPage {
+  readonly plugin: string;
+  readonly path: string;
+  readonly module: string;
+  readonly title: MetaLabel;
+}
+interface MetaWidget {
+  readonly plugin: string;
+  readonly slot: string;
+  readonly module: string;
+  readonly title: MetaLabel;
+}
+interface MetaScreen {
+  readonly plugin: string;
+  readonly replace: string;
+  readonly module: string;
+}
+interface MetaExtensions {
+  readonly pages: readonly MetaPage[];
+  readonly widgets: readonly MetaWidget[];
+  readonly screens: readonly MetaScreen[];
 }
 interface Meta {
   readonly schemaVersion: number;
   readonly entities: readonly MetaEntity[];
+  readonly extensions?: MetaExtensions;
   readonly menu: readonly MetaMenuItem[];
   readonly permissions: readonly string[];
 }
@@ -382,6 +406,8 @@ declare const en: {
   readonly "file.sending": "Sending";
   readonly "file.remove": "Remove";
   readonly "file.removeNamed": "Remove the file of {name}";
+  readonly "plugin.failed": "This part could not be shown";
+  readonly "plugin.missing": "This page does not exist";
   readonly "list.op.eq": "is";
   readonly "list.op.ne": "is not";
   readonly "list.op.in": "is one of";
@@ -522,6 +548,20 @@ export declare function lineProblems(inline: MetaInline, line: Readonly<Line>): 
 }[];
 export declare function linesChanged(inline: MetaInline, start: readonly Line[], now: readonly Line[]): boolean;
 export declare const newLine: (inline: MetaInline) => Line;
+export declare const extensionsOf: (meta: Meta | undefined) => MetaExtensions;
+export declare function labelText(label: MetaLabel | undefined, locale: Locale | string, fallback?: string): string;
+export declare const pageFor: (extensions: MetaExtensions, plugin: string, path: string) => MetaPage | undefined;
+export declare const widgetsIn: (extensions: MetaExtensions, slot: string) => readonly MetaWidget[];
+export declare const fieldWidgetFor: (extensions: MetaExtensions, name: string) => MetaWidget | undefined;
+export declare const screenFor: (extensions: MetaExtensions, kind: "list" | "form", entity: string) => MetaScreen | undefined;
+export declare const moduleSrc: (base: string, module: string) => string;
+interface AdminHost<UI = unknown> {
+  readonly ui: UI;
+  readonly client: AdminClient;
+  readonly locale: Locale;
+  readonly navigate: (path: string) => void;
+  readonly text: (label: MetaLabel | string) => string;
+}
 export declare const packageName = "@bieberkit/admin-core";
-export { type AdminClient, type AdminClientOptions, type BulkOperation, type BulkOutcome, type BulkResult, type Conflict, type Connection, type ConnectionEvent, type CsvColumn, type Dictionary, type DraftStorage, en as ENGLISH, type ErrorReport, type FieldProblem, type FieldStates, type Filter, type FilterOperator, type HistoryEntry, type KeyPress, type Line, type ListParams, type Locale, type MediaFile, type MessageKey, type Meta, type MetaEntity, type MetaField, type MetaInline, type MetaMenuItem, type MetaTransition, type Page, type Related, type Row, type SavedView, type SessionUser, type Shortcut, type ValueProblem, type Vital, type VitalReport, type When };
+export { type AdminClient, type AdminClientOptions, type AdminHost, type BulkOperation, type BulkOutcome, type BulkResult, type Conflict, type Connection, type ConnectionEvent, type CsvColumn, type Dictionary, type DraftStorage, en as ENGLISH, type ErrorReport, type FieldProblem, type FieldStates, type Filter, type FilterOperator, type HistoryEntry, type KeyPress, type Line, type ListParams, type Locale, type MediaFile, type MessageKey, type Meta, type MetaEntity, type MetaExtensions, type MetaField, type MetaInline, type MetaLabel, type MetaMenuItem, type MetaPage, type MetaScreen, type MetaTransition, type MetaWidget, type Page, type Related, type Row, type SavedView, type SessionUser, type Shortcut, type ValueProblem, type Vital, type VitalReport, type When };
 ```

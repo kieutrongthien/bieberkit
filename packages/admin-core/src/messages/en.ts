@@ -96,6 +96,8 @@ export const en = {
   'file.sending': 'Sending',
   'file.remove': 'Remove',
   'file.removeNamed': 'Remove the file of {name}',
+  'plugin.failed': 'This part could not be shown',
+  'plugin.missing': 'This page does not exist',
   'list.op.eq': 'is',
   'list.op.ne': 'is not',
   'list.op.in': 'is one of',

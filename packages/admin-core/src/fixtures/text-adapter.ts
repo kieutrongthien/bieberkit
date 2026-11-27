@@ -38,6 +38,7 @@ import {
   viewsKey,
 } from '../lists.ts';
 import type { Filter, SavedView } from '../lists.ts';
+import { extensionsOf, fieldWidgetFor, labelText, screenFor, widgetsIn } from '../extensions.ts';
 import { allows, bodyOf, columnsOf, formFieldsOf, initialValues, labelOf, listFields } from '../screens.ts';
 import { commonTransitions, inputFieldsOf, patchRow, transitionPatch, transitionsFor } from '../transitions.ts';
 import type { DraftStorage } from '../drafts.ts';
@@ -85,6 +86,23 @@ export class TextAdmin {
     this.meta = await this.client.meta();
     this.locale = locale;
     this.t = translator(await loadMessages(locale));
+  }
+
+  /** What the plugins add: the pages as lines of the menu, and how many widgets a slot has (UI-04). */
+  pluginMenu(): string[] {
+    return (this.meta?.menu ?? []).map((item) => `${labelText(item.label, this.locale, item.path)} -> ${item.path}`);
+  }
+
+  widgetModules(slot: string): string[] {
+    return widgetsIn(extensionsOf(this.meta), slot).map((widget) => widget.module);
+  }
+
+  replacedBy(kind: 'list' | 'form', entity: string): string | undefined {
+    return screenFor(extensionsOf(this.meta), kind, entity)?.module;
+  }
+
+  fieldWidget(name: string): string | undefined {
+    return fieldWidgetFor(extensionsOf(this.meta), name)?.module;
   }
 
   /** The menu: the entities that the user may read and list, by their label in the language. */

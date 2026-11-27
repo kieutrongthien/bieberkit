@@ -316,8 +316,71 @@ export declare function registerEntityRoutes(server: HttpServer, schemas: readon
   db: Database;
   bulk?: BulkQueue;
 }): void;
+type Label = string | Readonly<Record<string, string>>;
+interface AdminPage {
+  readonly path: string;
+  readonly module: string;
+  readonly title: Label;
+  readonly menu?: boolean;
+  readonly permission?: string;
+}
+interface AdminWidget {
+  readonly slot: string;
+  readonly module: string;
+  readonly title?: Label;
+  readonly permission?: string;
+}
+interface AdminScreen {
+  readonly replace: string;
+  readonly module: string;
+  readonly permission?: string;
+}
+interface AdminContribution {
+  readonly pages?: readonly AdminPage[];
+  readonly widgets?: readonly AdminWidget[];
+  readonly screens?: readonly AdminScreen[];
+}
+interface PreparedPage {
+  readonly plugin: string;
+  readonly path: string;
+  readonly module: string;
+  readonly title: Readonly<Record<string, string>>;
+  readonly permission?: string;
+}
+interface PreparedWidget {
+  readonly plugin: string;
+  readonly slot: string;
+  readonly module: string;
+  readonly title: Readonly<Record<string, string>>;
+  readonly permission?: string;
+}
+interface PreparedScreen {
+  readonly plugin: string;
+  readonly replace: string;
+  readonly module: string;
+  readonly permission?: string;
+}
+interface PreparedMenu {
+  readonly label: Readonly<Record<string, string>>;
+  readonly path: string;
+  readonly permission?: string;
+}
+interface AdminExtensions {
+  readonly pages: readonly PreparedPage[];
+  readonly widgets: readonly PreparedWidget[];
+  readonly screens: readonly PreparedScreen[];
+  readonly menu: readonly PreparedMenu[];
+}
+export declare function extensionProblems(plugin: string, admin: AdminContribution): string[];
+export declare const moduleUrl: (plugin: string, module: string) => string;
+export declare function adminExtensionsOf(plugins: readonly {
+  readonly plugin: string;
+  readonly admin: AdminContribution;
+}[]): AdminExtensions;
 export declare const META_SCHEMA: JsonSchema;
-export declare function registerMeta(server: HttpServer, entities: readonly EntityDef<string>[]): void;
+export declare function registerMeta(server: HttpServer, entities: readonly EntityDef<string>[], options?: {
+  readonly extensions?: AdminExtensions;
+}): void;
 interface OpenApiInfo {
   readonly title: string;
   readonly version: string;
@@ -367,7 +430,7 @@ interface StaticOptions {
   readonly directory: string;
   readonly policy: string;
   readonly retained?: string;
-  readonly fallback?: string;
+  readonly fallback?: string | false;
   readonly transformPage?: (html: string) => string;
 }
 export declare function serveStatic(server: HttpServer, options: StaticOptions): void;
@@ -375,7 +438,8 @@ export declare const packageName = "@bieberkit/http";
 declare module "@bieberkit/core" {
   interface ModuleContributions {
     routes?: readonly RouteDef[];
+    admin?: AdminContribution;
   }
 }
-export { type AccessAnswer, type Authenticator, type Authorization, type Authorizer, type BulkInput, type BulkJob, type BulkJobOptions, type BulkQueue, type CorsOptions, type CsrfProtection, type EntityRoutesContext, type HttpEnv, type HttpFetch, type HttpFetchInit, type HttpFetchOptions, type HttpServer, type HttpServerOptions, type IdempotencyBegin, type IdempotencyStore, type InjectOptions, type InjectResponse, type MemoryIdempotencyOptions, type Method, type MountDef, type OpenApiDocument, type OpenApiInfo, type Principal, type Problem, type RateLimitResult, type RateLimiter, type RegisterHttpOptions, type RequestInfo, type ResolvedAddress, type RouteContext, type RouteDef, type RouteSchema, type StageContext, type StageHook, type StageName, type StaticOptions, type StoredResponse, type TenantResolver, pathOf as entityPath };
+export { type AccessAnswer, type AdminContribution, type AdminExtensions, type AdminPage, type AdminScreen, type AdminWidget, type Authenticator, type Authorization, type Authorizer, type BulkInput, type BulkJob, type BulkJobOptions, type BulkQueue, type CorsOptions, type CsrfProtection, type EntityRoutesContext, type HttpEnv, type HttpFetch, type HttpFetchInit, type HttpFetchOptions, type HttpServer, type HttpServerOptions, type IdempotencyBegin, type IdempotencyStore, type InjectOptions, type InjectResponse, type Label, type MemoryIdempotencyOptions, type Method, type MountDef, type OpenApiDocument, type OpenApiInfo, type Principal, type Problem, type RateLimitResult, type RateLimiter, type RegisterHttpOptions, type RequestInfo, type ResolvedAddress, type RouteContext, type RouteDef, type RouteSchema, type StageContext, type StageHook, type StageName, type StaticOptions, type StoredResponse, type TenantResolver, pathOf as entityPath };
 ```

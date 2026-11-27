@@ -20,7 +20,8 @@
     "tables": [
       "crm_accounts",
       "crm_tickets",
-      "crm_ticket_notes"
+      "crm_ticket_notes",
+      "crm_labels"
     ],
     "routes": [
       "/api/v1/crm/accounts",

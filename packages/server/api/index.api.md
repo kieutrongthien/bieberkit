@@ -33,7 +33,7 @@ import { BkError, CoreEnv, EnvSource, ModuleDef, Role } from "@bieberkit/core";
 import { ExtensionRef, PluginMigrationStep, ResolvedEntities } from "@bieberkit/data";
 import { HttpServer } from "@bieberkit/http";
 import { Theme } from "@bieberkit/tokens";
-import { a as envOwnersOf, c as loadConfig, i as ProjectConfig, l as loadProject, n as LoadedPlugin, o as findProjectRoot, r as Project, s as importFile, t as CONFIG_FILE, u as COLLECTORS } from "./project-CQtj2qHf.js";
+import { a as envOwnersOf, c as loadConfig, i as ProjectConfig, l as loadProject, n as LoadedPlugin, o as findProjectRoot, r as Project, s as importFile, t as CONFIG_FILE, u as COLLECTORS } from "./project-BtnDZNX1.js";
 export declare const ADMIN_PACKAGE = "@bieberkit/admin-antd";
 export declare const ADMIN_PREFIX = "/admin";
 interface AdminLocation {
@@ -44,7 +44,10 @@ interface AdminLocation {
 export declare function adminLocation(appUrl: string, adminUrl: string | undefined): AdminLocation;
 export declare const ADMIN_POLICY: string;
 export declare function adminDirectory(root: string): string | undefined;
-export declare function registerAdmin(server: HttpServer, root: string, location: AdminLocation, theme?: Theme, retained?: string, storage?: string): boolean;
+export declare function registerAdmin(server: HttpServer, root: string, location: AdminLocation, theme?: Theme, retained?: string, storage?: string, folders?: readonly {
+  readonly plugin: string;
+  readonly directory: string;
+}[]): boolean;
 type BootRole = Role | "dev";
 interface BootOptions {
   readonly role: BootRole;

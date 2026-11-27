@@ -34,6 +34,7 @@ import type { Resources } from './language.tsx';
 import type { JSX } from 'react';
 import { ErrorBoundary, ErrorScreen } from './ErrorScreens.tsx';
 import { Gate } from './Gate.tsx';
+import { adminBase } from './base.ts';
 import { ClientContext } from './context.ts';
 
 const client = createAdminClient();
@@ -49,7 +50,10 @@ const root = createRootRoute({ component: Gate });
 const welcome = lazyRouteComponent(() => import('./Welcome.tsx'), 'Welcome');
 const listScreen = lazyRouteComponent(() => import('./ListScreen.tsx'), 'ListScreen');
 const formScreen = lazyRouteComponent(() => import('./FormScreen.tsx'), 'FormScreen');
+const extensionPage = lazyRouteComponent(() => import('./ExtensionPage.tsx'), 'ExtensionPage');
 const index = createRoute({ getParentRoute: () => root, path: '/', component: welcome });
+// The pages that plugins add (UI-04). `ext` is a static segment, so it wins over `$module/$resource`.
+const extension = createRoute({ getParentRoute: () => root, path: 'ext/$plugin/$page', component: extensionPage });
 const list = createRoute({ getParentRoute: () => root, path: '$module/$resource', component: listScreen });
 const create = createRoute({ getParentRoute: () => root, path: '$module/$resource/new', component: formScreen });
 const edit = createRoute({ getParentRoute: () => root, path: '$module/$resource/$id', component: formScreen });
@@ -58,10 +62,10 @@ const edit = createRoute({ getParentRoute: () => root, path: '$module/$resource/
  * Where the server serves the application: it writes the path in a meta element of the page (`/admin`, `/panel`, or empty for the root
  * of a host), so that one build runs at any address (UI-14).
  */
-const served = document.querySelector('meta[name="bk-admin-base"]')?.getAttribute('content') ?? '';
+const served = adminBase();
 
 const router = createRouter({
-  routeTree: root.addChildren([index, list, create, edit]),
+  routeTree: root.addChildren([index, extension, list, create, edit]),
   basepath: served === '' ? '/' : served,
   defaultPreload: 'intent',
   // Each route has its own boundary with a retry, so one screen that fails does not take the frame with it (UI-19).

@@ -29,6 +29,7 @@ import type { ApiField, EntityDef, FieldDef, JsonSchema } from '@bieberkit/data/
 import { HttpError } from './problem.ts';
 import { pathOf, permissionOf } from './entity-routes.ts';
 import { searchableOf } from './search.ts';
+import type { AdminExtensions } from './admin-extensions.ts';
 import type { HttpServer } from './server.ts';
 
 export const META_SCHEMA_VERSION = 1;
@@ -45,7 +46,7 @@ const flags = (names: readonly string[]): JsonSchema => ({
 /** The JSON Schema of the answer of `/api/v1/_meta`, published so that other adapters can check against it (META-05). */
 export const META_SCHEMA: JsonSchema = {
   type: 'object',
-  required: ['schemaVersion', 'entities', 'menu', 'dashboards', 'permissions'],
+  required: ['schemaVersion', 'entities', 'extensions', 'menu', 'dashboards', 'permissions'],
   properties: {
     schemaVersion: { type: 'integer', enum: [META_SCHEMA_VERSION] },
     entities: {
@@ -153,6 +154,16 @@ export const META_SCHEMA: JsonSchema = {
         },
         additionalProperties: false,
       },
+    },
+    extensions: {
+      type: 'object',
+      required: ['pages', 'widgets', 'screens'],
+      properties: {
+        pages: { type: 'array', items: { type: 'object', additionalProperties: true } },
+        widgets: { type: 'array', items: { type: 'object', additionalProperties: true } },
+        screens: { type: 'array', items: { type: 'object', additionalProperties: true } },
+      },
+      additionalProperties: false,
     },
     menu: { type: 'array', items: { type: 'object', additionalProperties: true } },
     dashboards: { type: 'array', items: { type: 'object', additionalProperties: true } },
@@ -344,7 +355,12 @@ function staticOf(def: EntityDef<string>): StaticEntity {
  * Serves `/api/v1/_meta` for the entities that have an API. The part of an entity that does not depend on the caller is made here, once,
  * and each request filters it by what the caller may do (META-03, META-04).
  */
-export function registerMeta(server: HttpServer, entities: readonly EntityDef<string>[]): void {
+export function registerMeta(
+  server: HttpServer,
+  entities: readonly EntityDef<string>[],
+  options: { readonly extensions?: AdminExtensions } = {},
+): void {
+  const extensions = options.extensions ?? { pages: [], widgets: [], screens: [], menu: [] };
   const prepared = entities
     .filter((def) => Object.values(def.api).some((on) => on === true))
     .map(staticOf)
@@ -366,6 +382,12 @@ export function registerMeta(server: HttpServer, entities: readonly EntityDef<st
         const answer = await ctx.can(permission);
         answers.set(permission, answer);
         return answer;
+      };
+      /** What the caller may use: a contribution with no permission is for everyone who is signed in. */
+      const allowed = async <T extends { readonly permission?: string }>(items: readonly T[]): Promise<T[]> => {
+        const kept: T[] = [];
+        for (const item of items) if (item.permission === undefined || (await can(item.permission))) kept.push(item);
+        return kept;
       };
       const out: unknown[] = [];
       for (const entity of prepared) {
@@ -447,7 +469,12 @@ export function registerMeta(server: HttpServer, entities: readonly EntityDef<st
       return {
         schemaVersion: META_SCHEMA_VERSION,
         entities: out,
-        menu: [],
+        extensions: {
+          pages: await allowed(extensions.pages),
+          widgets: await allowed(extensions.widgets),
+          screens: await allowed(extensions.screens),
+        },
+        menu: await allowed(extensions.menu),
         dashboards: [],
         permissions: [...answers]
           .filter(([, granted]) => granted)

@@ -38,6 +38,8 @@ export const Account = defineEntity({
     active: f.boolean().default(true).index(),
     since: f.date().optional().index(),
     note: f.text({ max: 500 }).optional(),
+    // Drawn by the control that the plugin gives (UI-04).
+    rating: f.int({ min: 0, max: 5 }).optional().admin({ widget: 'rating' }),
     // Files of the media library (UI-11).
     attachment: f.file({ accept: ['application/pdf'] }).optional(),
     photo: f.image().optional(),
@@ -110,11 +112,36 @@ export const Ticket = defineEntity({
   admin: { title: 'title', list: ['title', 'account', 'status'] },
 });
 
+export const Label = defineEntity({
+  name: 'crm.Label',
+  table: 'crm_labels',
+  fields: { id: f.id(), name: f.string({ min: 1, max: 40 }).index() },
+  permissions: {
+    read: 'crm.account.read',
+    create: 'crm.account.write',
+    update: 'crm.account.write',
+    delete: 'crm.account.write',
+  },
+  api: { list: true, get: true, create: true, update: true, delete: true },
+  label: { en: 'Label' },
+});
+
 export default definePlugin({
   name: '@bieberkit/plugin-crm',
   version: '0.0.0',
   core: '*',
   dialects: ['postgres', 'mysql', 'sqlite'],
   permissions: ['crm.account.read', 'crm.account.write', 'crm.ticket.read', 'crm.ticket.write', 'crm.ticket.close'],
-  entities: [Account, Ticket, TicketNote],
+  entities: [Account, Ticket, TicketNote, Label],
+  // What the plugin adds to the admin: files of its folder admin (UI-04).
+  admin: {
+    pages: [{ path: 'reports', module: 'reports.js', title: { en: 'Reports', vi: 'Báo cáo' }, menu: true }],
+    widgets: [
+      { slot: 'dashboard', module: 'stats.js', title: 'Account stats' },
+      { slot: 'dashboard', module: 'broken.js', title: 'Broken on purpose' },
+      { slot: 'form:crm.Account', module: 'panel.js', title: 'Panel' },
+      { slot: 'field:rating', module: 'rating.js' },
+    ],
+    screens: [{ replace: 'list:crm.Label', module: 'labels.js' }],
+  },
 });

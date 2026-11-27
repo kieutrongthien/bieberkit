@@ -128,6 +128,19 @@ test('UI-07 a detail with its tabs, its child table and its history has no viola
   expect(await violations(page)).toEqual([]);
 });
 
+test('UI-07 the page, the widgets, the panel and the control that a plugin adds have no violation of WCAG 2.2 AA', async () => {
+  const page = shared;
+  await page.goto('/admin/');
+  await expect(page.getByText(/Accounts: \d+/)).toBeVisible();
+  expect(await violations(page)).toEqual([]);
+  await page.goto('/admin/ext/crm/reports');
+  await expect(page.getByText('Accounts by code')).toBeVisible();
+  expect(await violations(page)).toEqual([]);
+  await page.goto('/admin/crm/accounts/new');
+  await expect(page.getByRole('group', { name: 'rating' })).toBeVisible();
+  expect(await violations(page)).toEqual([]);
+});
+
 test('UI-07 a form with file fields has no violation of WCAG 2.2 AA', async () => {
   const page = shared;
   await page.goto('/admin/crm/accounts/new');

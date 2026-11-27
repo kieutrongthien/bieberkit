@@ -23,7 +23,9 @@
  */
 
 import { problemOf } from '@bieberkit/admin-core';
+import { fieldWidgetFor } from '@bieberkit/admin-core';
 import { FileControl } from './FileControl.tsx';
+import { PluginSlot, useExtensions } from './Plugins.tsx';
 import { RelationSelect } from './RelationSelect.tsx';
 import type { MetaField, MessageKey } from '@bieberkit/admin-core';
 import type { Rule } from 'antd/es/form';
@@ -61,6 +63,7 @@ export function Control(props: ControlProps): JSX.Element {
     ...(props.label === undefined ? {} : { 'aria-label': props.label }),
   };
   const text = typeof props.value === 'string' ? props.value : undefined;
+  const custom = fieldWidgetFor(useExtensions(), field.widget);
   const typed = (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>): void => onChange?.(event.target.value);
   switch (field.widget) {
     case 'textarea':
@@ -111,8 +114,18 @@ export function Control(props: ControlProps): JSX.Element {
       return <Input {...identity} type="date" value={text} onChange={typed} />;
     case 'datetime':
       return <Input {...identity} type="datetime-local" value={text} onChange={typed} />;
-    default:
+    default: {
+      // A widget that a plugin gives draws the field whose `admin.widget` has its name (UI-04).
+      if (custom !== undefined)
+        return (
+          <PluginSlot
+            module={custom.module}
+            name={`${custom.plugin}/${custom.slot}`}
+            props={{ field, value: props.value, onChange, id, label: props.label }}
+          />
+        );
       return <Input {...identity} type={field.widget === 'email' ? 'email' : 'text'} value={text} onChange={typed} />;
+    }
   }
 }
 

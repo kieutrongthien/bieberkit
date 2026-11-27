@@ -716,6 +716,7 @@ export declare function checkManifest(pkg: {
   readonly version: string;
   readonly bieberkit?: unknown;
 }, def: PluginDef<unknown>, collectors?: readonly KeyCollector[]): ManifestCheck;
+export declare function shortNameOf(name: string): string;
 export declare function envPrefixOf(name: string): string;
 interface Installed {
   readonly name: string;

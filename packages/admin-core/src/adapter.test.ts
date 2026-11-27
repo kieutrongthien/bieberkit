@@ -84,7 +84,17 @@ const TICKET: MetaEntity = {
 const META: Meta = {
   schemaVersion: 1,
   entities: [TICKET],
-  menu: [],
+  extensions: {
+    pages: [
+      { plugin: 'reports', path: 'sales', module: '/plugins/reports/sales.js', title: { en: 'Sales', vi: 'Doanh số' } },
+    ],
+    widgets: [
+      { plugin: 'reports', slot: 'dashboard', module: '/plugins/reports/stats.js', title: { en: 'Stats' } },
+      { plugin: 'reports', slot: 'field:rating', module: '/plugins/reports/rating.js', title: { en: 'Rating' } },
+    ],
+    screens: [{ plugin: 'reports', replace: 'list:crm.Ticket', module: '/plugins/reports/tickets.js' }],
+  },
+  menu: [{ label: { en: 'Sales', vi: 'Doanh số' }, path: '/ext/reports/sales' }],
   permissions: [],
 };
 
@@ -228,6 +238,16 @@ describe('UI-10 a second adapter over admin-core alone', () => {
     expect(await one.list(ticket)).toContain('[ ] Network | high | open [close]\n[ ] Account | high | closed [reopen]');
     expect(await one.list(ticket)).toContain('filters: priority is high');
     expect(one.paramsOf(ticket)).toEqual({ 'filter[priority][eq]': 'high' });
+  });
+
+  it('UI-04 reads what the plugins add through the same functions: the menu, the widgets of a slot, a replaced screen and a control', async () => {
+    const one = await admin();
+    expect(one.pluginMenu()).toEqual(['Sales -> /ext/reports/sales']);
+    expect(one.widgetModules('dashboard')).toEqual(['/plugins/reports/stats.js']);
+    expect(one.replacedBy('list', 'crm.Ticket')).toBe('/plugins/reports/tickets.js');
+    expect(one.replacedBy('form', 'crm.Ticket')).toBeUndefined();
+    expect(one.fieldWidget('rating')).toBe('/plugins/reports/rating.js');
+    expect((await admin('vi')).pluginMenu()).toEqual(['Doanh số -> /ext/reports/sales']);
   });
 
   it('UI-10 refuses a filter that the API would refuse, and says why, before any call', async () => {

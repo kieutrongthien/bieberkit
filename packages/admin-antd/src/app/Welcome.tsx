@@ -22,17 +22,19 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { labelOf } from '@bieberkit/admin-core';
+import { labelOf, labelText, widgetsIn } from '@bieberkit/admin-core';
 import { Link } from '@tanstack/react-router';
-import { Card, Empty, List, Typography } from 'antd';
+import { Card, Col, Empty, List, Row, Typography } from 'antd';
 import type { JSX } from 'react';
 import { useMeta } from './context.ts';
 import { useLanguage, useT } from './language.tsx';
+import { PluginSlot, useExtensions } from './Plugins.tsx';
 
 export function Welcome(): JSX.Element {
   const meta = useMeta();
   const t = useT();
   const { locale } = useLanguage();
+  const widgets = widgetsIn(useExtensions(), 'dashboard');
   const entities = (meta.data?.entities ?? []).filter((entity) => entity.operations.list && entity.can.read);
   return (
     <Card loading={meta.isPending}>
@@ -48,6 +50,17 @@ export function Welcome(): JSX.Element {
             </List.Item>
           )}
         />
+      )}
+      {widgets.length === 0 ? null : (
+        <Row gutter={[16, 16]} style={{ marginTop: 24 }}>
+          {widgets.map((widget) => (
+            <Col key={widget.module} xs={24} md={12}>
+              <Card size="small" title={labelText(widget.title, locale, widget.slot)}>
+                <PluginSlot module={widget.module} name={`${widget.plugin}/${widget.slot}`} />
+              </Card>
+            </Col>
+          ))}
+        </Row>
       )}
     </Card>
   );

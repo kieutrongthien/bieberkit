@@ -179,6 +179,8 @@ export function registerAdmin(
   retained?: string,
   /** The origin of the storage that the browser reaches with a signed URL, when there is one. */
   storage?: string,
+  /** The folders of the plugins that add files to the admin, each served under `/plugins/<plugin>` (UI-04). */
+  folders: readonly { readonly plugin: string; readonly directory: string }[] = [],
 ): boolean {
   const directory = adminDirectory(root);
   if (directory === undefined) return false;
@@ -191,5 +193,16 @@ export function registerAdmin(
     transformPage: pageAt(location.prefix, theme),
     ...(location.host === undefined ? {} : { host: location.host }),
   });
+  // The files that the plugins add: a module is a script of this origin, under the same policy as the admin. A path with no file is a 404,
+  // and never the page of the application, which is a thing of the folder of the admin only.
+  for (const folder of folders) {
+    serveStatic(server, {
+      prefix: `${location.prefix}/plugins/${folder.plugin}`,
+      directory: folder.directory,
+      policy: policyFor(storage),
+      fallback: false,
+      ...(location.host === undefined ? {} : { host: location.host }),
+    });
+  }
   return true;
 }

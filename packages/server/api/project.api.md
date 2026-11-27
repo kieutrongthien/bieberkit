@@ -35,6 +35,7 @@ declare const CONFIG_FILE = "bieberkit.config.ts";
 interface LoadedPlugin {
   readonly def: PluginDef<unknown>;
   readonly options: unknown;
+  readonly root: string;
 }
 interface Project {
   readonly root: string;
