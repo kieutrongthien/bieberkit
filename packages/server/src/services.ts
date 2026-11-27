@@ -40,6 +40,7 @@ import type { Storage } from '@bieberkit/storage';
 import { createStorageFromConfig } from '@bieberkit/storage/flydrive';
 import { adminLocation } from './admin.ts';
 import { authMessages } from './auth-mail.ts';
+import { settingsOf, settingsPolicyReader } from './policy.ts';
 import { contributed, contributedRecord } from './modules.ts';
 import type { Project } from './project.ts';
 
@@ -126,6 +127,7 @@ export function registerRuntimeServices(
     create: (services) =>
       createAuth({
         db,
+        policy: settingsPolicyReader(settingsOf(services)),
         dialect: db.dialect,
         secret: env.AUTH_SECRET,
         baseUrl: env.APP_URL,

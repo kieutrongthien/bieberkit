@@ -143,13 +143,15 @@ export const MUTANTS: readonly Mutant[] = [
           const permissions = new Set<string>();
           const roles: string[] = [];
           let requireMfa = false;
+          let ipRestricted = false;
           for (const tenant of tenants) {
             const grants = await loadGrants(db, tenant, userId);
             for (const permission of grants.permissions) permissions.add(permission);
             roles.push(...grants.roles);
             requireMfa ||= grants.requireMfa;
+            ipRestricted ||= grants.ipRestricted;
           }
-          return { permissions, roles, requireMfa };
+          return { permissions, roles, requireMfa, ipRestricted };
         },
       }),
   },

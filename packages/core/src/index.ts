@@ -138,7 +138,14 @@ export type { Parser } from './config/parser.ts';
 export { ConfigValidationError } from './errors/errors.ts';
 export type { ConfigProblem } from './errors/errors.ts';
 export { defineSetting, SettingError } from './settings/define-setting.ts';
-export type { LocalizedText, SettingDef, SettingInput, SettingScope, SettingType } from './settings/define-setting.ts';
+export type {
+  LocalizedText,
+  SettingActor,
+  SettingDef,
+  SettingInput,
+  SettingScope,
+  SettingType,
+} from './settings/define-setting.ts';
 export { defineModule, registerModule } from './module/define-module.ts';
 export type { ModuleContributions, ModuleDef, ModuleInput, ServiceDefs } from './module/define-module.ts';
 export { PluginError } from './plugins/errors.ts';

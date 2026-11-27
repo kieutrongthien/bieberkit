@@ -32,6 +32,8 @@ export interface Principal {
   readonly sessionId?: string;
   /** Whether the user proved a second factor (AUTH-05). A role that asks for it refuses a principal that has not. */
   readonly mfa?: boolean;
+  /** When `security.mfa.required-for-all` is on and the user has no second factor yet: the ISO time by which they must enrol (POL-02). */
+  readonly mfaEnrolBy?: string;
   /** For a machine client: the permissions of its key. They replace the roles of a user, which a key has not (AUTH-07). */
   readonly grants?: readonly string[];
   /** For a machine client: the tenant of its key. It is the tenant of the request, and `X-Tenant` may not differ (DATA-19). */

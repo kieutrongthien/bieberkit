@@ -249,3 +249,57 @@ describeDialects('SET the settings plugin', ({ open }) => {
     await app.close();
   });
 });
+
+// Settings with the keys and the guard of the security policies, declared here because a plugin does not import `@bieberkit/auth`.
+const requiredForAll = defineSetting({
+  key: 'security.mfa.required-for-all',
+  type: 'boolean',
+  default: false,
+  label,
+  guard: (value, actor) => value === true && !actor.mfa,
+});
+const requiredSince = defineSetting({ key: 'security.mfa.required-since', type: 'string', default: '', label });
+const secure = defineModule({ name: 'secure', settings: [requiredForAll, requiredSince] });
+
+describeDialects('POL-05 the settings service refuses a change that locks the person out', ({ open }) => {
+  async function world() {
+    const app = await createTestApp({
+      modules: [plugin.module, secure],
+      open,
+      tenant: NIL,
+      roles: { manager: ['settings.read', 'settings.manage'] },
+    });
+    return { app, manager: await app.actingAs(app.newUser(), ['manager']) };
+  }
+
+  it('POL-05 a guard that says lock-out gives SETTINGS_SELF_LOCKOUT (409) and changes nothing', async () => {
+    const { app, manager } = await world();
+    const refused = await manager.put(`${SETTINGS}/security.mfa.required-for-all`, { value: true });
+    expect([refused.status, refused.body['code']]).toEqual([409, 'SETTINGS_SELF_LOCKOUT']);
+    expect((await manager.get(`${SETTINGS}/security.mfa.required-for-all`)).body).toMatchObject({
+      value: false,
+      hasValue: false,
+    });
+    expect((await auditOf(app)).filter((entry) => entry.action === 'settings.setting.updated')).toHaveLength(0);
+    await app.close();
+  });
+
+  it('POL-05 the same value is allowed when it does not lock the person out, and turning it off is never refused', async () => {
+    const { app, manager } = await world();
+    const service = app.services.settings;
+    await service.set(requiredForAll, true, { actorId: null });
+    expect((await manager.put(`${SETTINGS}/security.mfa.required-for-all`, { value: false })).status).toBe(200);
+    await app.close();
+  });
+
+  it('POL-02 turning the rule on stamps required-since, and turning it off clears it', async () => {
+    const { app } = await world();
+    const service = app.services.settings;
+    await service.set(requiredForAll, true, { actorId: null });
+    const since = await service.get(requiredSince);
+    expect(Number.isNaN(Date.parse(since))).toBe(false);
+    await service.set(requiredForAll, false, { actorId: null });
+    expect(await service.get(requiredSince)).toBe('');
+    await app.close();
+  });
+});

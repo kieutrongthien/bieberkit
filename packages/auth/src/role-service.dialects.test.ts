@@ -46,7 +46,14 @@ async function asActor<T>(db: Database, run: () => Promise<T>): Promise<T> {
     administrators.add(db);
     const roleId = uuid7();
     await runInUnitOfWork(db, async (em) => {
-      em.create(AuthRole, { id: roleId, tenant: NIL_TENANT, name: 'admin', system: true, requireMfa: false });
+      em.create(AuthRole, {
+        id: roleId,
+        tenant: NIL_TENANT,
+        name: 'admin',
+        system: true,
+        requireMfa: false,
+        ipRestricted: false,
+      });
       await em.flush();
       em.create(AuthUserRole, { tenant: NIL_TENANT, userId: ACTOR, roleId });
       await em.flush();

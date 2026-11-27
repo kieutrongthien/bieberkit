@@ -207,6 +207,7 @@ export async function authApp(open: AuthDialectContext['open'], options: AuthApp
         name: `role-${id}`,
         system: false,
         requireMfa: grantOptions.requireMfa ?? false,
+        ipRestricted: false,
       });
       // The tables point at each other by key and not by relation, so the role is written first.
       await em.flush();

@@ -89,6 +89,9 @@ export type {
   EnableUserInput,
   NewUser,
   UserAction,
+  ExternalDisabled,
+  ExternalIdentity,
+  ExternalUser,
   UserChange,
   UserDetail,
   UserListQuery,
@@ -132,13 +135,46 @@ export {
   AUTH_PLUGIN,
   AuthRole,
   AuthRolePermission,
+  AuthUserGroup,
   AuthUserRole,
   authEntities,
   authMigrationSteps,
   loadGrants,
+  manageScope,
+  restrictedRoleLookup,
   NIL_TENANT,
 } from './roles.ts';
-export type { AuthRolePermissionRow, AuthRoleRow, AuthUserRoleRow, GrantLoader, Grants } from './roles.ts';
+export type {
+  AuthUserGroupRow,
+  AuthRolePermissionRow,
+  AuthRoleRow,
+  AuthUserRoleRow,
+  GrantLoader,
+  Grants,
+} from './roles.ts';
+
+export {
+  DEFAULT_POLICY,
+  checkMfa,
+  checkNetwork,
+  checkSession,
+  defaultPolicyReader,
+  isCidr,
+  policyOf,
+  securitySettings,
+} from './policy.ts';
+export type {
+  MfaPolicy,
+  MfaVerdict,
+  NetworkPolicy,
+  PolicyReader,
+  SecurityPolicy,
+  SessionPolicy,
+  SessionVerdict,
+  SignInPolicy,
+} from './policy.ts';
+export { auditNetworkDenied } from './authenticator.ts';
+export type { AuthenticatorOptions } from './authenticator.ts';
 
 import type { ScopedPermission } from './ability.ts';
 import type { AuthInstance as ServiceAuth } from './better-auth.ts';

@@ -55,6 +55,15 @@ export function authMessages(mail: Mail, from?: Mailbox): Required<AuthMailOptio
         text: 'An account was made for you. Choose your password using this link, within 7 days:\n\n' + url,
       });
     },
+    sendNewDevice: async ({ to, device, ip, at }) => {
+      await send({
+        to,
+        subject: 'New sign in to your account',
+        text:
+          `Your account was signed in from a device that we have not seen before.\n\nDevice: ${device}\nAddress: ${ip === '' ? 'unknown' : ip}\nTime: ${at.toISOString()}\n\n` +
+          'If this was you, nothing more is needed. If not, change your password and sign out the other sessions.',
+      });
+    },
     sendMfaReset: async ({ to }) => {
       await send({
         to,

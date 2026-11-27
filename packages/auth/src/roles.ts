@@ -23,6 +23,7 @@
  */
 
 import { EntitySchema } from '@mikro-orm/core';
+import type { OptionalProps } from '@mikro-orm/core';
 import { isUuid, uuid7 } from '@bieberkit/data';
 import type { PluginMigrationStep } from '@bieberkit/data';
 import { runInUnitOfWork, Uuid7Type, uuidType } from '@bieberkit/data/orm';
@@ -41,6 +42,7 @@ export interface AuthRoleRow {
   name: string;
   system: boolean;
   requireMfa: boolean;
+  ipRestricted: boolean;
 }
 
 export interface AuthRolePermissionRow {
@@ -49,9 +51,18 @@ export interface AuthRolePermissionRow {
 }
 
 export interface AuthUserRoleRow {
+  [OptionalProps]?: 'scopeGroup';
   tenant: string;
   userId: string;
   roleId: string;
+  /** A group that limits the role to the users of that group (ROL-09). Empty means every user. */
+  scopeGroup?: string | null;
+}
+
+/** A group that the project put a user in, such as a department. The framework knows no organization model (ROL-09). */
+export interface AuthUserGroupRow {
+  userId: string;
+  groupId: string;
 }
 
 const uuid = <T extends object>(extra: T): { type: typeof Uuid7Type } & T => ({ type: Uuid7Type, ...extra });
@@ -66,6 +77,7 @@ export const AuthRole: EntitySchema<AuthRoleRow> = new EntitySchema<AuthRoleRow>
     name: { type: 'string', length: 120 },
     system: { type: 'boolean', onCreate: () => false },
     requireMfa: { type: 'boolean', fieldName: 'require_mfa', onCreate: () => false },
+    ipRestricted: { type: 'boolean', fieldName: 'ip_restricted', onCreate: () => false },
   },
   uniques: [{ name: 'bk_auth_roles_tenant_name_unique', properties: ['tenant', 'name'] }],
 });
@@ -88,11 +100,29 @@ export const AuthUserRole: EntitySchema<AuthUserRoleRow> = new EntitySchema<Auth
     tenant: uuid({ primary: true, fieldName: 'tenant_id' }),
     userId: uuid({ primary: true, fieldName: 'user_id' }),
     roleId: uuid({ primary: true, fieldName: 'role_id' }),
+    scopeGroup: { type: 'string', length: 120, fieldName: 'scope_group', nullable: true },
   },
   indexes: [{ name: 'bk_auth_user_roles_user_index', properties: ['tenant', 'userId'] }],
 });
 
-export const authEntities: readonly EntitySchema[] = [AuthRole, AuthRolePermission, AuthUserRole, ...authTableEntities];
+/** The groups of a user (ROL-09). */
+export const AuthUserGroup: EntitySchema<AuthUserGroupRow> = new EntitySchema<AuthUserGroupRow>({
+  name: 'bieberkit.AuthUserGroup',
+  tableName: 'bk_auth_user_groups',
+  properties: {
+    userId: uuid({ primary: true, fieldName: 'user_id' }),
+    groupId: { type: 'string', length: 120, primary: true, fieldName: 'group_id' },
+  },
+  indexes: [{ name: 'bk_auth_user_groups_group_index', properties: ['groupId'] }],
+});
+
+export const authEntities: readonly EntitySchema[] = [
+  AuthRole,
+  AuthRolePermission,
+  AuthUserRole,
+  AuthUserGroup,
+  ...authTableEntities,
+];
 
 function step(id: string, up: PluginMigrationStep['up']): PluginMigrationStep {
   return authStep('0.1.0', id, up);
@@ -162,6 +192,8 @@ export interface Grants {
   readonly roles: string[];
   /** Whether one of the roles needs a second factor (AUTH-05). */
   readonly requireMfa: boolean;
+  /** Whether one of the roles may be used only from the networks of `security.network.admin-allowlist` (POL-03). */
+  readonly ipRestricted: boolean;
 }
 
 /** Loads the grants of a user: how the ability of a request starts. A change of roles shows at the next call. */
@@ -173,7 +205,7 @@ export type GrantLoader = (db: Database, tenantId: string | undefined, userId: s
  */
 export const loadGrants: GrantLoader = async (db, tenantId, userId) => {
   const tenant = (tenantId ?? NIL_TENANT).toLowerCase();
-  const none: Grants = { permissions: new Set(), roles: [], requireMfa: false };
+  const none: Grants = { permissions: new Set(), roles: [], requireMfa: false, ipRestricted: false };
   if (!isUuid(userId) || !isUuid(tenant)) return none;
   return runInUnitOfWork(db, async (em) => {
     const assigned = await em.find(AuthUserRole, { tenant, userId: userId.toLowerCase() });
@@ -186,6 +218,49 @@ export const loadGrants: GrantLoader = async (db, tenantId, userId) => {
       permissions: new Set(granted.map((row) => row.permission)),
       roles: roles.map((role) => role.name),
       requireMfa: roles.some((role) => role.requireMfa),
+      ipRestricted: roles.some((role) => role.ipRestricted),
     };
   });
 };
+
+/**
+ * The groups that limit what a user may reach with the permissions that start with `prefix`, such as `users.` (ROL-09). `undefined`
+ * means no limit: an assignment of a role with such a permission that has no group, an administrator, or a permission that does not
+ * come from a role. Otherwise the groups of the assignments that carry one: the user reaches the users of those groups only.
+ */
+export async function manageScope(
+  db: Database,
+  input: { readonly userId: string; readonly tenantId?: string | undefined; readonly prefix: string },
+): Promise<readonly string[] | undefined> {
+  if (!isUuid(input.userId)) return undefined;
+  const tenant = (input.tenantId ?? NIL_TENANT).toLowerCase();
+  return runInUnitOfWork(db, async (em) => {
+    const assigned = await em.find(AuthUserRole, { userId: input.userId.toLowerCase(), tenant });
+    if (assigned.length === 0) return undefined;
+    const roles = await em.find(AuthRole, { id: { $in: assigned.map((row) => row.roleId) }, tenant });
+    if (roles.some((role) => role.system && role.name === 'admin')) return undefined;
+    const granting = new Set(
+      (
+        await em.find(AuthRolePermission, {
+          roleId: { $in: roles.map((role) => role.id) },
+          permission: { $like: `${input.prefix}%` },
+        })
+      ).map((row) => row.roleId),
+    );
+    const scopes = assigned.filter((row) => granting.has(row.roleId));
+    if (scopes.length === 0 || scopes.some((row) => row.scopeGroup == null)) return undefined;
+    return [...new Set(scopes.map((row) => String(row.scopeGroup)))].toSorted((a, b) => a.localeCompare(b));
+  });
+}
+
+/** Whether the user holds a role flagged `ipRestricted` in any tenant. The authenticator asks it before the tenant is known (POL-03). */
+export function restrictedRoleLookup(db: Database): (userId: string) => Promise<boolean> {
+  return async (userId) => {
+    if (!isUuid(userId)) return false;
+    return runInUnitOfWork(db, async (em) => {
+      const assigned = await em.find(AuthUserRole, { userId: userId.toLowerCase() });
+      if (assigned.length === 0) return false;
+      return (await em.count(AuthRole, { id: { $in: assigned.map((row) => row.roleId) }, ipRestricted: true })) > 0;
+    });
+  };
+}

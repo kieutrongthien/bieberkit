@@ -22,7 +22,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { createUserService, effectivePermissions } from '@bieberkit/auth';
+import { createUserService, effectivePermissions, manageScope } from '@bieberkit/auth';
 import type { UserListQuery, UserService, UserSort, UserStatus } from '@bieberkit/auth';
 import { defineRoute, HttpError } from '@bieberkit/http';
 import type { RouteContext, RouteDef } from '@bieberkit/http';
@@ -62,10 +62,16 @@ const required = [
   'createdAt',
 ] as const;
 const user = { type: 'object', properties: record, required } as const;
+const groupsSchema = { type: 'array', items: { type: 'string', minLength: 1, maxLength: 120 }, maxItems: 50 } as const;
 const detail = {
   type: 'object',
-  properties: { ...record, activeSessions: { type: 'integer' } },
-  required: [...required, 'activeSessions'],
+  properties: { ...record, activeSessions: { type: 'integer' }, groups: groupsSchema },
+  required: [...required, 'activeSessions', 'groups'],
+} as const;
+/** What `GET /users/me` adds: when a second factor is required and not yet set up, the time by which to enrol (POL-02). */
+const me = {
+  ...detail,
+  properties: { ...detail.properties, mfaEnrolBy: { type: 'string' } },
 } as const;
 const accepted = { type: 'object', properties: {}, additionalProperties: false } as const;
 const none = { type: 'null' } as const;
@@ -110,6 +116,21 @@ function selfOf(ctx: RouteContext): string {
 const tenantOf = (ctx: RouteContext): { tenantId?: string } =>
   ctx.tenantId === undefined ? {} : { tenantId: ctx.tenantId };
 const idOf = (ctx: RouteContext): string => String(ctx.params['id']);
+
+/**
+ * The tenant, and the groups that limit the caller when a role of theirs was given for some groups only (ROL-09). The same lookup
+ * that every by-id route does first, so a user outside the groups is `USERS_NOT_FOUND`.
+ */
+async function lookupOf(ctx: RouteContext): Promise<{ tenantId?: string; groupIds?: readonly string[] }> {
+  const principal = ctx.principal;
+  const groupIds =
+    principal?.kind === 'user'
+      ? await manageScope(ctx.services.database, { userId: principal.id, prefix: 'users.', tenantId: ctx.tenantId })
+      : undefined;
+  return { ...tenantOf(ctx), ...(groupIds === undefined ? {} : { groupIds }) };
+}
+/** Whether the caller may change a user that a provider manages (IDN-02). */
+const overridesExternal = (ctx: RouteContext): Promise<boolean> => ctx.can('users.override-external');
 
 function listQuery(ctx: RouteContext): UserListQuery {
   const query = ctx.query;
@@ -178,7 +199,8 @@ export const routes: readonly RouteDef[] = [
       },
     },
     async handler(ctx) {
-      const page = await usersOf(ctx).list(listQuery(ctx));
+      const { groupIds } = await lookupOf(ctx);
+      const page = await usersOf(ctx).list({ ...listQuery(ctx), ...(groupIds === undefined ? {} : { groupIds }) });
       return {
         data: page.data,
         meta: {
@@ -194,7 +216,9 @@ export const routes: readonly RouteDef[] = [
     url: `${BASE}/:id`,
     permission: 'users.read',
     schema: { params: byId, response: { 200: detail } },
-    handler: (ctx) => usersOf(ctx).get(idOf(ctx), tenantOf(ctx)),
+    async handler(ctx) {
+      return usersOf(ctx).get(idOf(ctx), await lookupOf(ctx));
+    },
   }),
   defineRoute({
     method: 'POST',
@@ -209,6 +233,7 @@ export const routes: readonly RouteDef[] = [
           password: { type: 'string', minLength: 1, maxLength: 1024 },
           invite: { type: 'boolean' },
           roles: { type: 'array', items: uuid, maxItems: 100 },
+          groups: groupsSchema,
         },
         required: ['name', 'email'],
         additionalProperties: false,
@@ -219,12 +244,16 @@ export const routes: readonly RouteDef[] = [
       const body = ctx.body;
       const password = text(field(body, 'password'));
       const roles = field(body, 'roles');
+      const groups = field(body, 'groups');
+      const { groupIds } = await lookupOf(ctx);
       const made = await usersOf(ctx).create({
         name: String(field(body, 'name')),
         email: String(field(body, 'email')),
         ...(password === undefined ? {} : { password }),
         ...(field(body, 'invite') === true ? { invite: true } : {}),
         ...(Array.isArray(roles) ? { roles: roles.map(String) } : {}),
+        ...(Array.isArray(groups) ? { groups: groups.map(String) } : {}),
+        ...(groupIds === undefined ? {} : { groupIds }),
         ...tenantOf(ctx),
         actorId: actorOf(ctx),
       });
@@ -248,14 +277,36 @@ export const routes: readonly RouteDef[] = [
       },
       response: { 200: detail },
     },
-    handler: (ctx) => {
+    handler: async (ctx) => {
       const name = text(field(ctx.body, 'name'));
       const email = text(field(ctx.body, 'email'));
+      await usersOf(ctx).get(idOf(ctx), await lookupOf(ctx));
       return usersOf(ctx).update({
+        overrideExternal: await overridesExternal(ctx),
         userId: idOf(ctx),
         ...(name === undefined ? {} : { name }),
         ...(email === undefined ? {} : { email }),
         ...tenantOf(ctx),
+        actorId: actorOf(ctx),
+      });
+    },
+  }),
+  defineRoute({
+    method: 'PUT',
+    url: `${BASE}/:id/groups`,
+    permission: 'users.manage',
+    schema: {
+      params: byId,
+      body: { type: 'object', properties: { groups: groupsSchema }, required: ['groups'], additionalProperties: false },
+      response: { 200: detail },
+    },
+    async handler(ctx) {
+      const { groupIds } = await lookupOf(ctx);
+      const groups = field(ctx.body, 'groups');
+      return usersOf(ctx).setGroups({
+        userId: idOf(ctx),
+        groups: Array.isArray(groups) ? groups.map(String) : [],
+        ...(groupIds === undefined ? {} : { groupIds }),
         actorId: actorOf(ctx),
       });
     },
@@ -276,9 +327,14 @@ export const routes: readonly RouteDef[] = [
     },
     async handler(ctx) {
       const users = usersOf(ctx);
-      await users.get(idOf(ctx), tenantOf(ctx));
-      await users.disable({ userId: idOf(ctx), reason: String(field(ctx.body, 'reason')), actorId: actorOf(ctx) });
-      return users.get(idOf(ctx), tenantOf(ctx));
+      await users.get(idOf(ctx), await lookupOf(ctx));
+      await users.disable({
+        userId: idOf(ctx),
+        reason: String(field(ctx.body, 'reason')),
+        actorId: actorOf(ctx),
+        overrideExternal: await overridesExternal(ctx),
+      });
+      return users.get(idOf(ctx), await lookupOf(ctx));
     },
   }),
   defineRoute({
@@ -288,9 +344,9 @@ export const routes: readonly RouteDef[] = [
     schema: { params: byId, response: { 200: detail } },
     async handler(ctx) {
       const users = usersOf(ctx);
-      await users.get(idOf(ctx), tenantOf(ctx));
-      await users.enable({ userId: idOf(ctx), actorId: actorOf(ctx) });
-      return users.get(idOf(ctx), tenantOf(ctx));
+      await users.get(idOf(ctx), await lookupOf(ctx));
+      await users.enable({ userId: idOf(ctx), actorId: actorOf(ctx), overrideExternal: await overridesExternal(ctx) });
+      return users.get(idOf(ctx), await lookupOf(ctx));
     },
   }),
   defineRoute({
@@ -300,7 +356,7 @@ export const routes: readonly RouteDef[] = [
     schema: { params: byId, response: { 204: none } },
     async handler(ctx) {
       const users = usersOf(ctx);
-      await users.get(idOf(ctx), tenantOf(ctx));
+      await users.get(idOf(ctx), await lookupOf(ctx));
       await users.remove({ userId: idOf(ctx), actorId: actorOf(ctx) });
       ctx.status(204);
       return undefined;
@@ -337,7 +393,7 @@ export const routes: readonly RouteDef[] = [
     },
     async handler(ctx) {
       const users = usersOf(ctx);
-      await users.get(idOf(ctx), tenantOf(ctx));
+      await users.get(idOf(ctx), await lookupOf(ctx));
       return { data: await users.sessions(idOf(ctx)) };
     },
   }),
@@ -348,7 +404,7 @@ export const routes: readonly RouteDef[] = [
     schema: { params: params({ id: uuid, sessionId: uuid }), response: { 204: none } },
     async handler(ctx) {
       const users = usersOf(ctx);
-      await users.get(idOf(ctx), tenantOf(ctx));
+      await users.get(idOf(ctx), await lookupOf(ctx));
       await users.revokeSession({
         userId: idOf(ctx),
         sessionId: String(ctx.params['sessionId']),
@@ -365,7 +421,7 @@ export const routes: readonly RouteDef[] = [
     schema: { params: byId, response: { 204: none } },
     async handler(ctx) {
       const users = usersOf(ctx);
-      await users.get(idOf(ctx), tenantOf(ctx));
+      await users.get(idOf(ctx), await lookupOf(ctx));
       await users.revokeSessions({ userId: idOf(ctx), actorId: actorOf(ctx) });
       ctx.status(204);
       return undefined;
@@ -384,7 +440,7 @@ export const routes: readonly RouteDef[] = [
       schema: { params: byId, response: { 202: accepted } },
       async handler(ctx) {
         const users = usersOf(ctx);
-        await users.get(idOf(ctx), tenantOf(ctx));
+        await users.get(idOf(ctx), await lookupOf(ctx));
         await users[action]({ userId: idOf(ctx), actorId: actorOf(ctx) });
         ctx.status(202);
         return {};
@@ -398,7 +454,7 @@ export const routes: readonly RouteDef[] = [
     schema: { params: byId, response: { 204: none } },
     async handler(ctx) {
       const users = usersOf(ctx);
-      await users.get(idOf(ctx), tenantOf(ctx));
+      await users.get(idOf(ctx), await lookupOf(ctx));
       await users.resetMfa({ userId: idOf(ctx), actorId: actorOf(ctx) });
       ctx.status(204);
       return undefined;
@@ -432,7 +488,7 @@ export const routes: readonly RouteDef[] = [
       },
     },
     async handler(ctx) {
-      await usersOf(ctx).get(idOf(ctx), tenantOf(ctx));
+      await usersOf(ctx).get(idOf(ctx), await lookupOf(ctx));
       return { data: await effectivePermissions(ctx.services.database, { userId: idOf(ctx), ...tenantOf(ctx) }) };
     },
   }),
@@ -440,8 +496,11 @@ export const routes: readonly RouteDef[] = [
     method: 'GET',
     url: '/api/v1/users/me',
     public: true,
-    schema: { response: { 200: detail } },
-    handler: (ctx) => usersOf(ctx).get(selfOf(ctx), tenantOf(ctx)),
+    schema: { response: { 200: me } },
+    handler: async (ctx) => ({
+      ...(await usersOf(ctx).get(selfOf(ctx), tenantOf(ctx))),
+      ...(ctx.principal?.mfaEnrolBy === undefined ? {} : { mfaEnrolBy: ctx.principal.mfaEnrolBy }),
+    }),
   }),
   defineRoute({
     method: 'PATCH',
@@ -456,9 +515,15 @@ export const routes: readonly RouteDef[] = [
       },
       response: { 200: detail },
     },
-    handler: (ctx) => {
+    handler: async (ctx) => {
       const id = selfOf(ctx);
-      return usersOf(ctx).update({ userId: id, name: String(field(ctx.body, 'name')), actorId: id, ...tenantOf(ctx) });
+      return usersOf(ctx).update({
+        userId: id,
+        name: String(field(ctx.body, 'name')),
+        actorId: id,
+        overrideExternal: await overridesExternal(ctx),
+        ...tenantOf(ctx),
+      });
     },
   }),
 ];

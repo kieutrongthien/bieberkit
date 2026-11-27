@@ -53,7 +53,7 @@ const plugin: PluginDef = definePlugin({
       .default(7)
       .describe('Days that an invitation link lives (USR-10)'),
   },
-  permissions: ['users.read', 'users.manage', 'users.revoke-sessions', 'users.reset-mfa'],
+  permissions: ['users.read', 'users.manage', 'users.revoke-sessions', 'users.reset-mfa', 'users.override-external'],
   routes,
   /** Makes the administrator account and gives it the administrator role. It does nothing when the account has the role already. */
   async seed(services) {

@@ -225,7 +225,10 @@ export async function createTestApp(options: TestAppOptions = {}): Promise<TestA
         authenticator: {
           authenticate: async (request): Promise<Principal | undefined> => {
             const id = first(request.headers[USER_HEADER]);
-            return id === undefined || id === '' ? undefined : { id, kind: 'user', via: 'token' };
+            if (id === undefined || id === '') return undefined;
+            // A test says that the user is in the grace of the second factor (POL-02) with this header.
+            const enrolBy = first(request.headers['x-test-mfa-enrol-by']);
+            return { id, kind: 'user', via: 'token', ...(enrolBy === undefined ? {} : { mfaEnrolBy: enrolBy }) };
           },
         },
         tenantResolver: {

@@ -39,6 +39,8 @@ import { accountKey, createRateLimiter, rulesOf } from './limits.ts';
 import type { AuthLimits, RateLimiter } from './limits.ts';
 import { isDisabledUser, userDisabledError, withEnabledSession } from './user-status.ts';
 import { AuthUser } from './tables.ts';
+import type { PolicyReader } from './policy.ts';
+import { onSessionCreated } from './session-policy.ts';
 
 export type { AuthLimits, Limit, Limit2 } from './limits.ts';
 export type { BetterAuthOptions };
@@ -70,6 +72,8 @@ export interface AuthMethods {
 
 export interface CreateAuthOptions {
   readonly db: Database;
+  /** Where the session limits and the new-device notice read their policy (ADR 0031). Without it the default policy applies. */
+  readonly policy?: PolicyReader;
   readonly dialect: Dialect;
   /** 32 characters or more. It comes from the validated config, and this function reads no environment (P8). */
   readonly secret: string;
@@ -101,6 +105,13 @@ export interface AuthMailOptions {
   readonly sendInvite?: (mail: AuthMail) => Promise<void>;
   /** Tells a user that an administrator removed their second factors (USR-11). */
   readonly sendMfaReset?: (notice: { readonly to: string }) => Promise<void>;
+  /** Tells a user that their account was used from a device not seen before (POL-04). */
+  readonly sendNewDevice?: (notice: {
+    readonly to: string;
+    readonly device: string;
+    readonly ip: string;
+    readonly at: Date;
+  }) => Promise<void>;
 }
 
 export type AuthInstance = Auth;
@@ -326,6 +337,7 @@ export function createAuth(options: CreateAuthOptions): AuthInstance {
           // Sessions are deleted on revoke and expiry, so the user row keeps the last sign in (USR-01). Sign up writes the session in
           // a transaction of Better Auth that skips the adapter above, and this hook runs on every path.
           after: async (session) => {
+            await onSessionCreated(options, session);
             await requestKysely(options.db)
               .updateTable('authUser')
               .set({ lastSignInAt: new Date() })

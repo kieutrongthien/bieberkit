@@ -23,7 +23,7 @@
  */
 
 import { requestContext } from '@bieberkit/core';
-import type { SettingDef } from '@bieberkit/core';
+import type { SettingActor, SettingDef } from '@bieberkit/core';
 import type { Cache } from '@bieberkit/cache';
 import { decodeCursor, encodeCursor, pageSize, uuid7 } from '@bieberkit/data';
 import { recordAudit, runInTransaction, runInUnitOfWork } from '@bieberkit/data/orm';
@@ -35,6 +35,8 @@ const NIL = '00000000-0000-0000-0000-000000000000';
 const TAG = 'settings';
 const TTL_MS = 5 * 60_000;
 const MASK = '********';
+const REQUIRED_FOR_ALL = 'security.mfa.required-for-all';
+const REQUIRED_SINCE = 'security.mfa.required-since';
 
 /** What a client sees of a setting: its declaration, its value (masked for a secret) and whether a stored value is in use. */
 export interface SettingView {
@@ -66,6 +68,8 @@ export interface Where {
 export interface Change extends Where {
   /** Who changes it, for the audit entry; `null` is the system. */
   readonly actorId: string | null;
+  /** The client of a person who changes it. A guard of the declaration reads it (POL-05). Without it no guard runs: a seeder is not locked out. */
+  readonly actor?: SettingActor;
 }
 
 export interface SettingsService {
@@ -73,6 +77,8 @@ export interface SettingsService {
   readonly declarations: readonly SettingDef[];
   /** The value for code: the tenant value, then the global value, then the default (SET-04, SET-05). A secret is given in clear here. */
   get<T>(setting: SettingDef<T>, where?: Where): Promise<T>;
+  /** Like `get`, but a store that cannot be read is an error and not the default. A rule that must not open on a failure reads this way (POL-03). */
+  getStrict<T>(setting: SettingDef<T>, where?: Where): Promise<T>;
   set(setting: SettingDef | string, value: unknown, change: Change): Promise<void>;
   reset(setting: SettingDef | string, change: Change): Promise<void>;
   view(setting: SettingDef | string, where?: Where): Promise<SettingView>;
@@ -134,6 +140,14 @@ function writeScope(def: SettingDef, where: Where): string {
     403,
     `${def.key} is the same for every tenant, so it is not changed from inside one.`,
     'Change it without a tenant, as a system administrator.',
+  );
+}
+function lockout(def: SettingDef): never {
+  throw new HttpError(
+    'SETTINGS_SELF_LOCKOUT',
+    409,
+    `This value of ${def.key} would lock you out.`,
+    'Change it from an address on the list, or enrol a second factor first.',
   );
 }
 function checked(def: SettingDef, value: unknown): unknown {
@@ -221,26 +235,34 @@ export function createSettingsService(input: {
     declarations,
 
     async get<T>(setting: SettingDef<T>, where?: Where): Promise<T> {
-      const def = defOf(setting);
       try {
-        const found = await effective(def, where);
-        // The declaration checked the value when it was written; the cast restores the type of the declaration (SET-05).
-        // oxlint-disable-next-line typescript/no-unsafe-type-assertion
-        return (found === null ? setting.default : found.value) as T;
-      } catch {
+        return await service.getStrict(setting, where);
+      } catch (error) {
+        if (error instanceof HttpError) throw error;
         return setting.default;
       }
+    },
+
+    async getStrict<T>(setting: SettingDef<T>, where?: Where): Promise<T> {
+      const def = defOf(setting);
+      const found = await effective(def, where);
+      // The declaration checked the value when it was written; the cast restores the type of the declaration (SET-05).
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion
+      return (found === null ? setting.default : found.value) as T;
     },
 
     async set(setting, value, change) {
       const def = defOf(setting);
       const next = checked(def, value);
       const scope = writeScope(def, change);
+      if (change.actor !== undefined && def.guard?.(next, change.actor) === true) lockout(def);
       const text = JSON.stringify(next);
+      let previous: unknown;
       await asActor(change.actorId, () =>
         runInTransaction(db, async (em) => {
           const row = await rowOf(em, scope, def.key);
           const old = row === null ? undefined : decode(def, row);
+          previous = old;
           const columns = def.secret ? { secretValue: text, value: null } : { value: text, secretValue: null };
           if (row === null) {
             // The class comes from the metadata, so its type is not known here; the columns are those of `Setting`.
@@ -260,6 +282,12 @@ export function createSettingsService(input: {
           cache.tags([TAG]).flushAfterCommit();
         }),
       );
+      // The grace period of the second factor counts from the day the rule was turned on (POL-02).
+      if (def.key === REQUIRED_FOR_ALL && byKey.has(REQUIRED_SINCE) && (next === true) !== (previous === true))
+        await service.set(REQUIRED_SINCE, next === true ? new Date().toISOString() : '', {
+          tenantId: change.tenantId,
+          actorId: change.actorId,
+        });
     },
 
     async reset(setting, change) {

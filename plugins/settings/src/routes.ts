@@ -54,7 +54,15 @@ const view = {
 const where = (ctx: RouteContext): { tenantId?: string } =>
   ctx.tenantId === undefined ? {} : { tenantId: ctx.tenantId };
 const keyOf = (ctx: RouteContext): string => String(ctx.params['key']);
-const change = (ctx: RouteContext) => ({ ...where(ctx), actorId: ctx.principal?.id ?? null });
+const clientIp = (ctx: RouteContext): string => {
+  const header = ctx.headers['x-bk-client-ip'];
+  return (Array.isArray(header) ? header[0] : header) ?? '';
+};
+const change = (ctx: RouteContext) => ({
+  ...where(ctx),
+  actorId: ctx.principal?.id ?? null,
+  actor: { ip: clientIp(ctx), mfa: ctx.principal?.mfa === true },
+});
 
 export const routes: readonly RouteDef[] = [
   defineRoute({

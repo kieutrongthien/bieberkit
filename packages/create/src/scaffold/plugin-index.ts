@@ -226,8 +226,15 @@ export const BUILTIN_PLUGIN_INDEX: PluginIndex = {
         'POST /api/v1/users/users/:id/mfa/reset',
         'POST /api/v1/users/users/:id/resend-invite',
         'POST /api/v1/users/users/:id/reset-password',
+        'PUT /api/v1/users/users/:id/groups',
       ],
-      permissions: ['users.manage', 'users.read', 'users.reset-mfa', 'users.revoke-sessions'],
+      permissions: [
+        'users.manage',
+        'users.override-external',
+        'users.read',
+        'users.reset-mfa',
+        'users.revoke-sessions',
+      ],
       admin: [],
     },
     envRows: [
