@@ -342,16 +342,16 @@ Execution order: M2.1 through M2.7, then the reviewed npm release, then M1.10 Pi
 
 ### M2.2 Admin renderer
 
-- [ ] Generic list with filters, saved views, bulk actions, export; form with `visibleWhen`, `requiredWhen`, inline child tables, relation pickers, file fields; detail with tabs (UI-03, UI-11)
-- [ ] Lazy chunks per route, per-language translations, virtualized lists, prefetch, optimistic updates (UI-12, UI-13, UI-15)
-- [ ] Mobile layout to 360 px, unsaved-change guard, local drafts, shortcuts, 412 conflict view, error boundaries, offline banner (UI-16 to UI-19)
-- [ ] Languages en, vi, zh; font stack; theme tokens (UI-05, UI-06, TOK-01 to TOK-03)
-- [ ] Hashed assets kept 24 hours after deploy; reload on chunk error (UI-22)
-- [ ] Custom widgets, replacement pages, plugin pages and dashboard widgets (UI-04)
-- [ ] `@bieberkit/tokens` compiling to Ant Design theme and CSS variables
-- [ ] Second small adapter as a test fixture to prove the contract (§26)
-- [ ] Axe checks on generic screens at WCAG 2.2 AA, admin initial JS under 400 KB (UI-07, §18.1)
-- [ ] Client errors and web vitals to the error-reporter contract (UI-21)
+- [x] Generic list with filters, saved views, bulk actions, export; form with `visibleWhen`, `requiredWhen`, inline child tables, relation pickers, file fields; detail with tabs (UI-03, UI-11). Evidence: `admin-core/src/{lists,transitions,validation,when,inline,related,files}.test.ts`, `http/src/entity-{conditions,search,inline,files}.test.ts`, `testing/src/{inline,search}.dialects.test.ts` (SQLite, PostgreSQL, MySQL), and the browser tests of `e2e/screens.spec.ts` with axe. Not tested: an upload to a real S3 or MinIO (ADR 0036); nested lines are one level and the 412 view does not merge them by id
+- [ ] Lazy chunks per route, per-language translations, virtualized lists, prefetch, optimistic updates (UI-12, UI-13, UI-15). Done (browser-tested): a lazy chunk for each screen, a chunk for each language, prefetch on intent, `fields=` from the metadata, optimistic moves with rollback, a table that draws only the rows in view over 200 rows. Blocked: invalidation of the caches from realtime events (UI-13) needs the realtime channel of M2.5 (RT-01 to RT-05), which is not built
+- [x] Mobile layout to 360 px, unsaved-change guard, local drafts, shortcuts, 412 conflict view, error boundaries, offline banner (UI-16 to UI-19). Evidence: the UI-16 to UI-19 and UI-22 cases of `e2e/screens.spec.ts` (360 px with no sideways scroll, `n` and `/`, a draft, the 412 view, the offline banner, a missing chunk, a list that fails) and the unit tests of `admin-core`
+- [x] Languages en, vi, zh; font stack; theme tokens (UI-05, UI-06, TOK-01 to TOK-03). Evidence: `admin-core/src/i18n.test.ts`, `tokens/src/theme.test.ts`, the `UI-06` cases of `server/src/admin.test.ts`; the screens are typechecked and built, and the Playwright run needs the browser of the pinned version, which this machine does not have
+- [x] Hashed assets kept 24 hours after deploy; reload on chunk error (UI-22). Evidence: `server/src/admin-assets.test.ts`, the UI-22 cases of `http/src/static.test.ts` and `server/src/boot.test.ts`; the reload on a missing chunk is `admin-antd/src/app/chunk.ts`
+- [x] Custom widgets, replacement pages, plugin pages and dashboard widgets (UI-04). Evidence: `http/src/admin-extensions.test.ts`, the UI-04 cases of `http/src/meta.test.ts`, `server/src/plugin-admin.test.ts`, and the UI-04 cases of `e2e/screens.spec.ts` and `e2e/accessibility.spec.ts`; ADR 0037. Open: `bieberkit build` for the folder `admin`
+- [x] `@bieberkit/tokens` compiling to Ant Design theme and CSS variables. Also a Tailwind theme and the `theme` key of the config; evidence: `tokens/src/theme.test.ts`, the `UI-06` cases of `server/src/admin.test.ts`
+- [x] Second small adapter as a test fixture to prove the contract (§26). Evidence: `admin-core/src/fixtures/text-adapter.ts` and `adapter.test.ts`
+- [x] Axe checks on generic screens at WCAG 2.2 AA, admin initial JS under 400 KB (UI-07, §18.1). Evidence: `e2e/accessibility.spec.ts` (nine pages, light and dark, wide and 360 px), `pnpm check:admin-size` (320 kB compressed), ADR 0035 for the dev dependency
+- [x] Client errors and web vitals to the error-reporter contract (UI-21). Evidence: `admin-core/src/reporting.test.ts`, `server/src/client-reports.test.ts`, and the UI-21 cases of `e2e/screens.spec.ts`
 
 ### M2.3 Content and public site
 

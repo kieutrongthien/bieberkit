@@ -22,12 +22,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { labelOf } from '@bieberkit/admin-core';
+import { labelOf, labelText } from '@bieberkit/admin-core';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, Outlet } from '@tanstack/react-router';
-import { Button, Layout, Menu, Result, Skeleton, Space, Typography } from 'antd';
+import { Button, Grid, Layout, Menu, Result, Select, Skeleton, Space, Typography } from 'antd';
+import { Suspense } from 'react';
 import type { JSX } from 'react';
+import { OfflineBanner } from './connection.tsx';
 import { useClient, useMeta } from './context.ts';
+import { LANGUAGE_NAMES, LOCALES, useLanguage, useT } from './language.tsx';
 import { Login } from './Login.tsx';
 
 const { Header, Sider, Content } = Layout;
@@ -36,56 +39,87 @@ function Frame(props: { readonly email: string }): JSX.Element {
   const client = useClient();
   const queries = useQueryClient();
   const meta = useMeta();
+  const t = useT();
+  const { locale, setLocale } = useLanguage();
+  const compact = Grid.useBreakpoint().md === false;
   const entities = (meta.data?.entities ?? []).filter((entity) => entity.operations.list && entity.can.read);
   return (
-    <Layout style={{ minHeight: '100vh' }}>
-      <Sider breakpoint="md" collapsedWidth={0} theme="light" width={240}>
-        <div style={{ padding: 16 }}>
-          <Typography.Title level={4} style={{ margin: 0 }}>
-            <Link to="/">Admin</Link>
-          </Typography.Title>
-        </div>
-        <Menu
-          mode="inline"
-          items={entities.map((entity) => ({
-            key: entity.path,
-            label: <Link to={`/${entity.path.replace('/api/v1/', '')}`}>{labelOf(entity, 'en')}</Link>,
-          }))}
-        />
-      </Sider>
-      <Layout>
-        <Header style={{ background: 'transparent', textAlign: 'right' }}>
-          <Space>
-            <Typography.Text>{props.email}</Typography.Text>
-            <Button
-              onClick={() => {
-                // Everything that was read as this user is dropped, and the session is asked again.
-                void client.signOut().then(() => queries.resetQueries());
-              }}
-            >
-              Sign out
-            </Button>
-          </Space>
-        </Header>
-        <Content style={{ margin: 24 }}>
-          {meta.isError ? (
-            <Result status="error" title="The menu could not be loaded" subTitle={meta.error.message} />
-          ) : (
-            <Outlet />
-          )}
-        </Content>
+    <>
+      <OfflineBanner />
+      <Layout style={{ minHeight: '100vh' }}>
+        <Sider breakpoint="md" collapsedWidth={0} theme="light" width={240}>
+          <div style={{ padding: 16 }}>
+            <Typography.Title level={4} style={{ margin: 0 }}>
+              <Link to="/">{t('app.name')}</Link>
+            </Typography.Title>
+          </div>
+          <Menu
+            mode="inline"
+            items={[
+              ...entities.map((entity) => ({
+                key: entity.path,
+                label: <Link to={`/${entity.path.replace('/api/v1/', '')}`}>{labelOf(entity, locale)}</Link>,
+              })),
+              // The menu entries that plugins add: the server leaves out those that the person may not use (UI-04).
+              ...(meta.data?.menu ?? []).map((item) => ({
+                key: item.path,
+                label: <Link to={item.path}>{labelText(item.label, locale, item.path)}</Link>,
+              })),
+            ]}
+          />
+        </Sider>
+        <Layout>
+          <Header
+            style={{
+              background: 'transparent',
+              textAlign: 'right',
+              height: 'auto',
+              lineHeight: 'normal',
+              padding: compact ? '12px 16px 12px 56px' : '12px 24px',
+            }}
+          >
+            <Space wrap style={{ justifyContent: 'flex-end' }}>
+              <Select
+                aria-label={t('language.label')}
+                value={locale}
+                onChange={(next) => setLocale(next)}
+                options={LOCALES.map((value) => ({ value, label: LANGUAGE_NAMES[value] }))}
+                style={{ width: 130 }}
+              />
+              {compact ? null : <Typography.Text>{props.email}</Typography.Text>}
+              <Button
+                onClick={() => {
+                  // Everything that was read as this user is dropped, and the session is asked again.
+                  void client.signOut().then(() => queries.resetQueries());
+                }}
+              >
+                {t('auth.signOut')}
+              </Button>
+            </Space>
+          </Header>
+          <Content style={{ margin: compact ? 12 : 24 }}>
+            {meta.isError ? (
+              <Result status="error" title={t('gate.menuError')} subTitle={meta.error.message} />
+            ) : (
+              <Suspense fallback={<Skeleton active />}>
+                <Outlet />
+              </Suspense>
+            )}
+          </Content>
+        </Layout>
       </Layout>
-    </Layout>
+    </>
   );
 }
 
 /** Asks who is signed in. Nobody gets the login page, and a user gets the frame with the screen of the route. */
 export function Gate(): JSX.Element {
+  const t = useT();
   const client = useClient();
   const session = useQuery({ queryKey: ['session'], queryFn: async () => (await client.session()) ?? null });
   if (session.isPending) return <Skeleton active style={{ padding: 24 }} />;
   if (session.isError) {
-    return <Result status="error" title="The server did not answer" subTitle={session.error.message} />;
+    return <Result status="error" title={t('gate.noAnswer')} subTitle={session.error.message} />;
   }
   // A query may not answer `undefined`, so nobody signed in is `null`.
   if (session.data === null) return <Login />;

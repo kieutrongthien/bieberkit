@@ -38,8 +38,13 @@ export interface StaticOptions {
   readonly directory: string;
   /** The `Content-Security-Policy` of the page and of every file (SEC-01). */
   readonly policy: string;
+  /**
+   * A second folder for the hashed files of `assets/`: a file that the build does not have is looked for in it. It holds the files of
+   * the releases that went before, so that a tab that was open at a deploy still finds its chunks (UI-22).
+   */
+  readonly retained?: string;
   /** The page that answers a path with no file and no extension. Defaults to `index.html`. */
-  readonly fallback?: string;
+  readonly fallback?: string | false;
   /** Changes a page (a file of type html) before it is sent, for what only the server knows, such as the place that it is served at. */
   readonly transformPage?: (html: string) => string;
 }
@@ -98,6 +103,7 @@ async function read(path: string): Promise<Buffer | undefined> {
  */
 export function serveStatic(server: HttpServer, options: StaticOptions): void {
   const fallback = options.fallback ?? 'index.html';
+  // `false` is a folder of files and no application: a path with no file is a 404, whatever it looks like.
   const root = options.prefix === '';
 
   /** The answer for a request, or `undefined` when the request is not for these files. */
@@ -115,10 +121,13 @@ export function serveStatic(server: HttpServer, options: StaticOptions): void {
     }
     const relative = relativeOf(url.pathname, options.prefix);
     if (relative === undefined) return new Response('Not found', { status: 404, headers });
-    const wanted = relative === '' ? fallback : relative;
+    const wanted = relative === '' ? (fallback === false ? '\0' : fallback) : relative;
     let file = wanted;
     let bytes = await read(join(options.directory, wanted));
-    if (bytes === undefined && extname(wanted) === '') {
+    if (bytes === undefined && options.retained !== undefined && wanted.startsWith(`assets${sep}`)) {
+      bytes = await read(join(options.retained, wanted));
+    }
+    if (bytes === undefined && extname(wanted) === '' && fallback !== false) {
       file = fallback;
       bytes = await read(join(options.directory, fallback));
     }

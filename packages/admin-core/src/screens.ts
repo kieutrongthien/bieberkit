@@ -84,6 +84,43 @@ export function bodyOf(entity: MetaEntity, values: Readonly<Record<string, unkno
   return body;
 }
 
+/**
+ * The text that names a row where a row is chosen (a relation): the field that the relation names, then the title of the entity, then the
+ * first column of its list that holds text, then the id.
+ */
+export function titleOf(entity: MetaEntity | undefined, row: Row, hint?: string): string {
+  const keys = [hint, entity?.title, ...(entity?.list ?? [])];
+  for (const key of keys) {
+    const value = key === undefined ? undefined : row[key];
+    if (typeof value === 'string' && value !== '') return value;
+    if (typeof value === 'number') return String(value);
+  }
+  const id = row['id'];
+  return typeof id === 'string' || typeof id === 'number' ? String(id) : '';
+}
+
+/** The name of the relation behind the key of a field: the API sends `accountId` and includes the row as `account`. */
+const relationName = (key: string): string => key.replace(/Id$/, '');
+
+/** The relations that the columns of the list show, to be asked for with `include=` so that a row is named and not an id (UI-11). */
+export function includeOf(entity: MetaEntity): readonly string[] {
+  return columnsOf(entity)
+    .filter((field) => field.kind === 'belongsTo' && field.target !== undefined)
+    .map((field) => relationName(field.key));
+}
+
+/**
+ * The name of the row that a relation cell points at, when the list asked for it with `include=` and the entity is known. `undefined`
+ * means that the cell shows what the API sent, the id.
+ */
+export function relationLabel(entities: readonly MetaEntity[], field: MetaField, row: Row): string | undefined {
+  if (field.kind !== 'belongsTo' || field.target === undefined) return undefined;
+  const related = row[relationName(field.key)];
+  if (typeof related !== 'object' || related === null || Array.isArray(related)) return undefined;
+  const target = entities.find((entity) => entity.name === field.target?.entity);
+  return titleOf(target, Object.fromEntries(Object.entries(related)), field.target.title);
+}
+
 /** Whether the entity has the operation and the user has the permission for it. */
 export function allows(entity: MetaEntity, action: 'create' | 'update' | 'delete'): boolean {
   return entity.operations[action] && entity.can[action];

@@ -42,8 +42,11 @@ import { createHttpServer, registerEntityRoutes, registerMeta, registerOpenApi }
 import type { HttpServer, RouteDef } from '@bieberkit/http';
 import { createScheduler, schedulesOf } from '@bieberkit/queue';
 import type { JobDef, QueueSubscription } from '@bieberkit/queue';
+import { pluginAdminOf } from './plugin-admin.ts';
+import { registerClientReports } from './client-reports.ts';
 import { ServerError } from './errors.ts';
-import { adminLocation, registerAdmin } from './admin.ts';
+import { parseTheme } from '@bieberkit/tokens';
+import { adminLocation, registerAdmin, storageOrigin } from './admin.ts';
 import { migrate } from './migrate.ts';
 import { settingsOf, settingsPolicyReader } from './policy.ts';
 import { createRuntimePlatform, permissionCatalog, registerRuntimeServices } from './services.ts';
@@ -196,10 +199,24 @@ export async function boot(options: BootOptions): Promise<Running> {
       registerAuthRoutes(server, { auth, db });
       registerEntityRoutes(server, schemas, { db });
       // What the admin reads to draw its menu, its lists and its forms (UI-02).
-      registerMeta(server, entities);
+      // What the plugins add to the admin: read and checked here, shown by `_meta`, served by `registerAdmin` (UI-04).
+      const pluginAdmin = pluginAdminOf(project);
+      registerMeta(server, entities, { extensions: pluginAdmin.extensions });
+      // What the admin tells about itself: its errors and its Core Web Vitals (UI-21).
+      registerClientReports(server, { reporter, metrics });
       for (const route of contributed<RouteDef>(modules, 'routes')) server.route(route);
       registerOpenApi(server, { title: project.config.name, version: '0.0.0' });
-      registerAdmin(server, project.root, adminLocation(env.APP_URL, env.ADMIN_URL));
+      registerAdmin(
+        server,
+        project.root,
+        adminLocation(env.APP_URL, env.ADMIN_URL),
+        parseTheme(project.config.theme),
+        // The hashed files of the releases before stay for a day, so a tab that is open at a deploy keeps working (UI-22).
+        env.ADMIN_ASSETS_DIR ?? join(project.root, 'data', 'admin-assets'),
+        // A file goes from the browser to the bucket with a signed URL, so the policy of the admin names that origin (ADR 0036).
+        storageOrigin(env),
+        pluginAdmin.folders,
+      );
       const web = server;
       lifecycle.onBoot('http', async () => {
         port = (await web.listen({ port: env.APP_PORT })).port;

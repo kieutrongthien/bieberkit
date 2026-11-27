@@ -856,3 +856,13 @@ A module gives fields to the entity of another module with `extends: { 'crm.Acco
 4. **Written.** `splitExtensionBody` separates what the entity stores from what each extension stores, and `writeExtensions` creates the extension row on the first write and changes it after. The routes write both in one flush. A change of extension fields only moves the version of the record (API-13).
 
 Tests: `schema/extend.test.ts`, `packages/testing/src/extends.dialects.test.ts` on three dialects, and the `migrate:make` case of `server/src/migrations.test.ts`.
+
+## Conditions of a field (UI-11)
+
+`.admin({ visibleWhen, requiredWhen })` on a field says when the admin shows it and when it asks for it. A condition is data (`when.ts`): `{ field, eq }`, `{ field, ne }`, `{ field, in: [...] }`, `{ field, set: true | false }`, and `all`, `any` and `not` over them, up to 8 levels. `field` is the name of a field of the entity. `evaluateWhen(when, values)` is the one evaluator of the server; `@bieberkit/admin-core` has its own copy, because the admin has no dependency, and `packages/testing/src/when.contract.test.ts` runs both over the same table. A missing value, null, an empty text and an empty list are no value (`isUnset`), zero and false are values.
+
+`defineEntity` refuses (`DATA_ENTITY_INVALID`, with the field that holds it) a condition that names an unknown field or the field itself, a field that a condition hides and that is neither optional nor has a default (a hidden field is not sent), and a field that a condition requires and that is not optional. `.admin()` itself refuses `id`, `createdAt`, `updatedAt`, `sequence`, `state`, `hasOne` and `hasMany`, a key that is not `visibleWhen`, `requiredWhen` or `widget`, and a condition of the wrong shape.
+
+## Search (UI-11, SR-01)
+
+`.searchable()` on a string or an email makes it a folded text: `compare` is `ci_ai` when the field says nothing (an email is `ci`), so it has a shadow column that holds the NFC, lower case form without diacritics, and `đ` is `d`. The field is looked up in that column with `$like`, and the text of the filter is folded the same way. A searchable text with `.index()` has its index on the shadow column. `.searchable()` on a `text` field is still only a flag for a search engine (SR-02).

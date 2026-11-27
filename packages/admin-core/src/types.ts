@@ -22,6 +22,18 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type { BulkOutcome, Filter } from './lists.ts';
+
+/** A condition over the values of a form, as `_meta` carries it (UI-11). `field` is a key of the API. */
+export type When =
+  | { readonly field: string; readonly eq: unknown }
+  | { readonly field: string; readonly ne: unknown }
+  | { readonly field: string; readonly in: readonly unknown[] }
+  | { readonly field: string; readonly set: boolean }
+  | { readonly all: readonly When[] }
+  | { readonly any: readonly When[] }
+  | { readonly not: When };
+
 /** One field of an entity as the metadata describes it. The admin draws a control from `widget` and checks with `validation`. */
 export interface MetaField {
   readonly key: string;
@@ -36,7 +48,49 @@ export interface MetaField {
   readonly default?: unknown;
   /** The choices of a `oneOf` field. */
   readonly values?: readonly string[];
+  /** For a file or an image: the media types that it takes. */
+  readonly accept?: readonly string[];
+  /** The currency of a `money` field, and the digits of a `decimal` one. */
+  readonly currency?: string;
+  readonly precision?: number;
+  readonly scale?: number;
+  /** For a relation: the entity that it points to and where its rows are. */
+  readonly target?: {
+    readonly entity: string;
+    readonly path: string;
+    /** The key of the field that names a row of the target. */ readonly title?: string;
+  };
   readonly validation?: Readonly<Record<string, unknown>>;
+  /** The field is shown when this holds, and it is not sent when it does not. */
+  readonly visibleWhen?: When;
+  /** The field is required when this holds. */
+  readonly requiredWhen?: When;
+}
+
+/** A move of the state field of an entity (MOD-06). `allowed` is whether the signed in user has its permission. */
+export interface MetaTransition {
+  readonly name: string;
+  readonly from: readonly string[];
+  readonly to: string;
+  readonly permission: string;
+  readonly allowed: boolean;
+  /** `{id}` stands for the id of the row. */
+  readonly path: string;
+  /** The JSON Schema of what the transition asks for, when it asks for something. */
+  readonly input?: Readonly<Record<string, unknown>>;
+}
+
+/** A collection of lines that a form edits with the record (MOD-09). The lines are in the body of the record, under `name`. */
+export interface MetaInline {
+  readonly name: string;
+  readonly entity: string;
+  readonly label: Readonly<Record<string, string>>;
+  readonly title?: string;
+  /** The fields of a line that a person fills in. */
+  readonly fields: readonly MetaField[];
+  readonly form: readonly string[];
+  /** What the signed in user may do with the lines. */
+  readonly can: Readonly<Record<'create' | 'update' | 'delete', boolean>>;
 }
 
 export interface MetaEntity {
@@ -49,6 +103,12 @@ export interface MetaEntity {
   readonly operations: Readonly<Record<'list' | 'get' | 'create' | 'update' | 'delete', boolean>>;
   /** What the signed in user may do with the entity. */
   readonly can: Readonly<Record<'read' | 'create' | 'update' | 'delete', boolean>>;
+  readonly features?: readonly string[];
+  /** The collections of lines that the form of this entity edits. */
+  readonly inline?: readonly MetaInline[];
+  /** The keys of the fields that `q` looks in, when the entity can be searched. */
+  readonly searchable?: readonly string[];
+  readonly transitions?: readonly MetaTransition[];
   readonly softDelete: boolean;
   readonly tenant: boolean;
   /** The field that names a row. */
@@ -61,15 +121,50 @@ export interface MetaEntity {
   readonly fields: readonly MetaField[];
 }
 
+/** A text for the screen: by language (`en`, `vi`, `zh`). */
+export type MetaLabel = Readonly<Record<string, string>>;
+
 export interface MetaMenuItem {
-  readonly label: string;
+  readonly label: MetaLabel;
+  /** A route of the admin, such as `/ext/reports/sales`. */
   readonly path: string;
   readonly permission?: string;
+}
+
+/** A page that a plugin adds, at `/ext/<plugin>/<path>`. `module` is the address of its file under the admin. */
+export interface MetaPage {
+  readonly plugin: string;
+  readonly path: string;
+  readonly module: string;
+  readonly title: MetaLabel;
+}
+
+/** A piece that a plugin draws inside a screen: the slot says where (`dashboard`, `form:<Entity>`, `field:<name>`). */
+export interface MetaWidget {
+  readonly plugin: string;
+  readonly slot: string;
+  readonly module: string;
+  readonly title: MetaLabel;
+}
+
+/** A screen that a plugin draws in place of the generic one: `list:<Entity>` or `form:<Entity>`. */
+export interface MetaScreen {
+  readonly plugin: string;
+  readonly replace: string;
+  readonly module: string;
+}
+
+export interface MetaExtensions {
+  readonly pages: readonly MetaPage[];
+  readonly widgets: readonly MetaWidget[];
+  readonly screens: readonly MetaScreen[];
 }
 
 export interface Meta {
   readonly schemaVersion: number;
   readonly entities: readonly MetaEntity[];
+  /** What the plugins add. Absent from an older server. */
+  readonly extensions?: MetaExtensions;
   readonly menu: readonly MetaMenuItem[];
   readonly permissions: readonly string[];
 }
@@ -98,4 +193,21 @@ export interface ListParams {
   readonly sort?: string;
   /** The keys to read, so that a wide entity stays fast (UI-15). Without it the API sends every field. */
   readonly fields?: readonly string[];
+  /** The relations to send with each row, by name (`account` for `accountId`), so that a list can name a row and not show its id. */
+  readonly include?: readonly string[];
+  /** A text to look for: the rows where a searchable field starts with it (UI-11). */
+  readonly q?: string;
+  /** Conditions of the list, as `filter[field][op]=value`. They are checked against the metadata before they are sent (UI-03). */
+  readonly filters?: readonly Filter[];
 }
+
+/** What a bulk call does to the rows that it names (API-14). */
+export type BulkOperation =
+  | { readonly operation: 'update'; readonly data: Row }
+  | { readonly operation: 'delete' }
+  | { readonly operation: 'transition'; readonly transition: string; readonly input?: Row };
+
+/** The answer of a bulk call: the outcome of each row, or the id of the job when the call was too large to wait for. */
+export type BulkResult =
+  | { readonly kind: 'done'; readonly outcomes: readonly BulkOutcome[] }
+  | { readonly kind: 'queued'; readonly jobId: string };

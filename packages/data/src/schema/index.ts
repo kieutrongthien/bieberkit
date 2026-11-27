@@ -49,6 +49,7 @@ export type {
 export { f, Field } from './fields.ts';
 export type {
   ColumnDef,
+  FieldAdmin,
   ComputedFn,
   FieldBuilders,
   FieldDef,
@@ -58,6 +59,8 @@ export type {
   StateOptions,
   TransitionDef,
 } from './fields.ts';
+export { evaluateWhen, isUnset, mapWhenFields, whenFields, whenProblem } from './when.ts';
+export type { When } from './when.ts';
 export { toJsonSchema } from './json-schema.ts';
 export type { JsonSchema } from './json-schema.ts';
 export { normalizeInput } from './normalize.ts';

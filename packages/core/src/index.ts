@@ -154,7 +154,7 @@ export { satisfies } from './plugins/range.ts';
 export { definePlugin, parsePluginOptions } from './plugins/define-plugin.ts';
 export type { PluginDef, PluginInput, SeedFn } from './plugins/define-plugin.ts';
 export { checkManifest, toManifest } from './plugins/manifest.ts';
-export { envPrefixOf } from './plugins/names.ts';
+export { envPrefixOf, shortNameOf } from './plugins/names.ts';
 export type { KeyCollector, Manifest, ManifestCheck } from './plugins/manifest.ts';
 export { resolvePlugins } from './plugins/resolver.ts';
 export type { Installed, ResolveContext, Resolution } from './plugins/resolver.ts';

@@ -22,7 +22,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { ListParams, Meta, MetaEntity, Page, Row, SessionUser } from './types.ts';
+import { filterParams } from './lists.ts';
+import { uploadName } from './files.ts';
+import type { MediaFile } from './files.ts';
+import { HISTORY_PATH, historyOf, historyQuery } from './related.ts';
+import type { HistoryEntry } from './related.ts';
+import type { BulkOutcome } from './lists.ts';
+import type { BulkOperation, BulkResult, ListParams, Meta, MetaEntity, Page, Row, SessionUser } from './types.ts';
 
 /** One field that the server refused, from the `errors` of a validation problem. */
 export interface FieldProblem {
@@ -37,14 +43,24 @@ export class AdminApiError extends Error {
   readonly code: string;
   readonly fix: string;
   readonly problems: readonly FieldProblem[];
+  /** On a 412: the row as it is now, so that the form can show what changed and who changed it (UI-18). */
+  readonly current: Row | undefined;
 
-  constructor(status: number, code: string, message: string, fix: string, problems: readonly FieldProblem[] = []) {
+  constructor(
+    status: number,
+    code: string,
+    message: string,
+    fix: string,
+    problems: readonly FieldProblem[] = [],
+    current?: Row,
+  ) {
     super(message);
     this.name = 'AdminApiError';
     this.status = status;
     this.code = code;
     this.fix = fix;
     this.problems = problems;
+    this.current = current;
   }
 }
 
@@ -66,6 +82,26 @@ export interface AdminClient {
   /** `version` is the version that the person read (API-13). A stale one is a 412 with the current row. */
   update(entity: MetaEntity, id: string, body: Row, version: number): Promise<Row>;
   remove(entity: MetaEntity, id: string, version: number): Promise<void>;
+  /**
+   * Sends a file to the media library and answers its record, ready to be named by a field: the record is made, the file goes straight to
+   * the storage with the signed URL, and the upload is confirmed (ADR 0036). A disk that cannot sign is an `AdminApiError` with the code
+   * `STORAGE_SIGNING_UNSUPPORTED`.
+   */
+  uploadFile(file: File): Promise<MediaFile>;
+  /** The record of a file of the media library. */
+  mediaFile(id: string): Promise<MediaFile>;
+  /** An address that shows the file for a while. */
+  mediaUrl(id: string): Promise<string>;
+  /** What the audit log says about one row, newest first. A user without the permission of the audit log gets the error of the API. */
+  history(entity: MetaEntity, id: string): Promise<readonly HistoryEntry[]>;
+  /** A move of the state field of a row. `version` is the one that was read, and `input` is what the move asks for, if it asks for something. */
+  transition(entity: MetaEntity, id: string, name: string, version: number, input?: Row): Promise<Row>;
+  /** One change to many rows. The rows are `{ id, version }`, the version that the person read. Above 100 rows the server queues a job (API-14). */
+  bulk(
+    entity: MetaEntity,
+    items: readonly { readonly id: string; readonly version: number }[],
+    change: BulkOperation,
+  ): Promise<BulkResult>;
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null;
@@ -96,6 +132,7 @@ async function failure(response: Response): Promise<AdminApiError> {
     text(problem['detail'], text(problem['message'], response.statusText)),
     text(problem['fix'], ''),
     problemsOf(problem['errors']),
+    isRecord(problem['current']) ? problem['current'] : undefined,
   );
 }
 
@@ -105,15 +142,42 @@ function userOf(body: unknown): SessionUser | undefined {
   return { id: user['id'], email: text(user['email'], ''), name: text(user['name'], '') };
 }
 
+function outcomeOf(value: Record<string, unknown>): BulkOutcome {
+  const error = isRecord(value['error']) ? value['error'] : undefined;
+  return {
+    id: text(value['id'], ''),
+    status: text(value['status'], 'invalid'),
+    ...(typeof value['version'] === 'number' ? { version: value['version'] } : {}),
+    ...(error === undefined ? {} : { error: { code: text(error['code'], ''), message: text(error['message'], '') } }),
+  };
+}
+
+const MEDIA_PATH = '/api/v1/media';
+
+function fileOf(body: unknown): MediaFile {
+  const data = isRecord(body) && isRecord(body['data']) ? body['data'] : {};
+  return {
+    id: text(data['id'], ''),
+    filename: text(data['filename'], ''),
+    contentType: text(data['contentType'], ''),
+    kind: text(data['kind'], ''),
+    size: typeof data['size'] === 'number' ? data['size'] : 0,
+    status: text(data['status'], ''),
+  };
+}
+
 const rowOf = (body: unknown): Row => (isRecord(body) && isRecord(body['data']) ? body['data'] : {});
 
-function queryOf(params: ListParams): string {
+function queryOf(entity: MetaEntity, params: ListParams): string {
   const query = new URLSearchParams();
   query.set('page', String(params.page ?? 1));
   query.set('pageSize', String(params.pageSize ?? 25));
   query.set('withTotal', 'true');
   if (params.sort !== undefined && params.sort !== '') query.set('sort', params.sort);
   if (params.fields !== undefined && params.fields.length > 0) query.set('fields', params.fields.join(','));
+  if (params.include !== undefined && params.include.length > 0) query.set('include', params.include.join(','));
+  if (params.q !== undefined && params.q.trim() !== '') query.set('q', params.q.trim());
+  for (const [name, value] of Object.entries(filterParams(entity, params.filters ?? []))) query.set(name, value);
   return `?${query.toString()}`;
 }
 
@@ -163,7 +227,7 @@ export function createAdminClient(options: AdminClientOptions = {}): AdminClient
       return body as Meta;
     },
     async list(entity, params = {}) {
-      const body = await request('GET', `${entity.path}${queryOf(params)}`);
+      const body = await request('GET', `${entity.path}${queryOf(entity, params)}`);
       const data = isRecord(body) && Array.isArray(body['data']) ? body['data'] : [];
       const meta = isRecord(body) && isRecord(body['meta']) ? body['meta'] : {};
       return {
@@ -186,6 +250,63 @@ export function createAdminClient(options: AdminClientOptions = {}): AdminClient
           headers: { 'if-match': String(version) },
         }),
       );
+    },
+    async uploadFile(file) {
+      const made = fileOf(
+        await request('POST', MEDIA_PATH, {
+          body: {
+            filename: uploadName(file.name),
+            contentType: file.type === '' ? 'application/octet-stream' : file.type,
+            size: file.size,
+          },
+        }),
+      );
+      const signed = await request('POST', `${MEDIA_PATH}/${encodeURIComponent(made.id)}/upload-url`, { body: {} });
+      const target = isRecord(signed) ? signed : {};
+      const headers = isRecord(target['headers'])
+        ? Object.fromEntries(Object.entries(target['headers']).map(([key, value]) => [key, text(value, '')]))
+        : {};
+      // The bytes go to the storage and not to this server, with the headers that were signed and no cookie.
+      const sent = await call(text(target['url'], ''), {
+        method: text(target['method'], 'PUT'),
+        headers,
+        body: file,
+        credentials: 'omit',
+      });
+      if (!sent.ok)
+        throw new AdminApiError(
+          sent.status,
+          'ADMIN_UPLOAD_REFUSED',
+          'The storage did not take the file.',
+          'Try again.',
+        );
+      await request('POST', `${MEDIA_PATH}/${encodeURIComponent(made.id)}/confirm`, { body: {} });
+      return this.mediaFile(made.id);
+    },
+    async mediaFile(id) {
+      return fileOf(await request('GET', `${MEDIA_PATH}/${encodeURIComponent(id)}`));
+    },
+    async mediaUrl(id) {
+      const answer = await request('GET', `${MEDIA_PATH}/${encodeURIComponent(id)}/url`);
+      return isRecord(answer) ? text(answer['url'], '') : '';
+    },
+    async history(entity, id) {
+      return historyOf(await request('GET', `${HISTORY_PATH}${historyQuery(entity.name, id)}`));
+    },
+    async transition(entity, id, name, version, input) {
+      return rowOf(
+        await request('POST', `${entity.path}/${encodeURIComponent(id)}/actions/${encodeURIComponent(name)}`, {
+          body: input ?? {},
+          headers: { 'if-match': String(version) },
+        }),
+      );
+    },
+    async bulk(entity, items, change) {
+      const body = await request('POST', `${entity.path}/bulk`, { body: { ...change, items } });
+      const data = isRecord(body) ? body['data'] : undefined;
+      if (Array.isArray(data)) return { kind: 'done', outcomes: data.filter(isRecord).map(outcomeOf) };
+      if (isRecord(data) && typeof data['jobId'] === 'string') return { kind: 'queued', jobId: data['jobId'] };
+      throw new AdminApiError(500, 'ADMIN_BULK_ANSWER', 'The server did not say what became of the rows.', '');
     },
     async remove(entity, id, version) {
       await request('DELETE', `${entity.path}/${encodeURIComponent(id)}`, {

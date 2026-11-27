@@ -25,7 +25,10 @@
 import { existsSync, realpathSync } from 'node:fs';
 import { join } from 'node:path';
 import { serveStatic } from '@bieberkit/http';
+import { cssVariables, DEFAULT_THEME } from '@bieberkit/tokens';
+import type { Theme } from '@bieberkit/tokens';
 import type { HttpServer } from '@bieberkit/http';
+import { retainAssets } from './admin-assets.ts';
 import { ServerError } from './errors.ts';
 
 /** The adapter that the framework maintains (UI-10). A project that installs another one sets its name in `admin.adapter` later. */
@@ -81,6 +84,44 @@ export function adminLocation(appUrl: string, adminUrl: string | undefined): Adm
  * no form that leaves the origin. `style-src` allows inline styles because Ant Design writes its tokens as style elements at run time
  * and a static file cannot carry a nonce (ADR 0025).
  */
+/**
+ * The origin of the storage that the browser reaches with a signed URL: the endpoint of an S3 disk, or the host of the bucket of AWS. The
+ * local disk has none, because the browser never talks to it. The admin may send a file there (`connect-src`) and show a picture from
+ * there (`img-src`), and nothing else is added to the policy (ADR 0036).
+ */
+export function storageOrigin(env: {
+  readonly STORAGE_DISK: string;
+  readonly S3_BUCKET: string | undefined;
+  readonly S3_REGION: string | undefined;
+  readonly S3_ENDPOINT: string | undefined;
+  readonly S3_FORCE_PATH_STYLE: boolean;
+}): string | undefined {
+  if (env.STORAGE_DISK !== 's3') return undefined;
+  try {
+    if (env.S3_ENDPOINT !== undefined) {
+      const endpoint = new URL(env.S3_ENDPOINT);
+      // A bucket in the host name (virtual hosted style) is another origin than the endpoint.
+      return env.S3_FORCE_PATH_STYLE || env.S3_BUCKET === undefined
+        ? endpoint.origin
+        : `${endpoint.protocol}//${env.S3_BUCKET}.${endpoint.host}`;
+    }
+    return env.S3_BUCKET === undefined
+      ? undefined
+      : `https://${env.S3_BUCKET}.s3.${env.S3_REGION ?? 'us-east-1'}.amazonaws.com`;
+  } catch {
+    return undefined;
+  }
+}
+
+/** The policy of the admin, with the storage origin in the two places where the browser uses it. */
+export function policyFor(storage?: string): string {
+  if (storage === undefined) return ADMIN_POLICY;
+  return ADMIN_POLICY.replace("img-src 'self' data:", `img-src 'self' data: ${storage}`).replace(
+    "connect-src 'self'",
+    `connect-src 'self' ${storage}`,
+  );
+}
+
 export const ADMIN_POLICY: string = [
   "default-src 'none'",
   "script-src 'self'",
@@ -110,25 +151,58 @@ export function adminDirectory(root: string): string | undefined {
   return undefined;
 }
 
-/** The page of the application, told where it lives: its files from the prefix, and the prefix for the router. */
-function pageAt(prefix: string): (html: string) => string {
+const escapeAttribute = (text: string): string =>
+  text.replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
+
+/**
+ * The page of the application, told where it lives and what it looks like: its files from the prefix, the prefix for the router, and
+ * the theme of the config as CSS variables (a style, which the policy allows) and as data for the adapter (UI-06, TOK-02). The theme
+ * is not in the build, so a change of the config is a restart and not a build (UI-14).
+ */
+export function pageAt(prefix: string, theme: Theme): (html: string) => string {
+  const style = `<style id="bk-theme">${cssVariables(theme)}</style>`;
+  const data = `<meta name="bk-theme" content="${escapeAttribute(JSON.stringify(theme))}" />`;
   return (html) =>
     html
       // The build writes the files as `./assets/...`, which is right at the root of a folder and wrong at a route under it.
       .replaceAll(/(["'(])\.\//g, `$1${prefix}/`)
-      .replace('</head>', `<meta name="bk-admin-base" content="${prefix}" /></head>`);
+      .replace('</head>', `<meta name="bk-admin-base" content="${prefix}" />${data}${style}</head>`);
 }
 
 /** Serves the admin where `location` says, when an adapter is installed. It answers whether it did. */
-export function registerAdmin(server: HttpServer, root: string, location: AdminLocation): boolean {
+export function registerAdmin(
+  server: HttpServer,
+  root: string,
+  location: AdminLocation,
+  theme: Theme = DEFAULT_THEME,
+  /** Where the hashed files of the releases before are kept for a day (UI-22). Without it the admin serves its own build only. */
+  retained?: string,
+  /** The origin of the storage that the browser reaches with a signed URL, when there is one. */
+  storage?: string,
+  /** The folders of the plugins that add files to the admin, each served under `/plugins/<plugin>` (UI-04). */
+  folders: readonly { readonly plugin: string; readonly directory: string }[] = [],
+): boolean {
   const directory = adminDirectory(root);
   if (directory === undefined) return false;
+  if (retained !== undefined) retainAssets({ source: directory, retained, now: Date.now() });
   serveStatic(server, {
+    ...(retained === undefined ? {} : { retained }),
     prefix: location.prefix,
     directory,
-    policy: ADMIN_POLICY,
-    transformPage: pageAt(location.prefix),
+    policy: policyFor(storage),
+    transformPage: pageAt(location.prefix, theme),
     ...(location.host === undefined ? {} : { host: location.host }),
   });
+  // The files that the plugins add: a module is a script of this origin, under the same policy as the admin. A path with no file is a 404,
+  // and never the page of the application, which is a thing of the folder of the admin only.
+  for (const folder of folders) {
+    serveStatic(server, {
+      prefix: `${location.prefix}/plugins/${folder.plugin}`,
+      directory: folder.directory,
+      policy: policyFor(storage),
+      fallback: false,
+      ...(location.host === undefined ? {} : { host: location.host }),
+    });
+  }
   return true;
 }

@@ -28,10 +28,10 @@
 Generated from the built declaration files by `pnpm api:update`. Do not edit by hand. A change here is a change to the public API and needs a changeset (spec section 22.3).
 
 ```ts
-import { A as fold, C as ResetEvery, D as f, E as TransitionDef, O as Compare, S as FieldKind, T as StateOptions, _ as ColumnDef, a as EntityDef, b as FieldBuilders, c as FieldLike, d as StandardColumn, f as TableConstraints, g as tableConstraints, h as standardColumns, i as ConstraintDef, j as nfc, k as codePointLength, l as OrmOverride, m as snake, n as AdminOptions, o as EntityOptions, p as defineEntity, r as ApiOptions, s as Feature, t as ActionDef, u as Permissions, v as ComputedFn, w as SchemaValue, x as FieldDef, y as Field } from "./define-entity-CMoIdUz2.js";
 import { A as upStatementsOfMigration, C as findStepRisks, D as DestructiveFinding, E as validateSteps, M as dataError, O as DestructiveKind, S as compareVersions, T as stepName, b as StepKind, j as DataError, k as detectDestructive, t as Database, v as PluginMigrationStep, w as orderSteps, x as StepRisk, y as StepDatabase } from "./connect-E7O4kGaH.js";
-import { a as ResolvedEntities, c as resolveExtensions, i as ExtensionRef, n as ExtensionOptions, o as ResolvedExtension, r as ExtensionPermissions, s as defineExtension, t as ExtensionDef } from "./extend-d4JXYhzj.js";
-import { a as UpdateInput, i as Row, n as EntityRegistry, t as CreateInput } from "./registry-CFbTH7iw.js";
+import { C as FieldKind, D as TransitionDef, E as StateOptions, F as Compare, I as codePointLength, L as fold, O as f, R as nfc, S as FieldDef, T as SchemaValue, _ as ColumnDef, a as EntityDef, c as FieldLike, d as StandardColumn, f as TableConstraints, g as tableConstraints, h as standardColumns, i as ConstraintDef, l as OrmOverride, m as snake, n as AdminOptions, o as EntityOptions, p as defineEntity, r as ApiOptions, s as Feature, t as ActionDef, u as Permissions, v as ComputedFn, w as ResetEvery, x as FieldBuilders, y as Field } from "./define-entity-CiRXYWez.js";
+import { a as ResolvedEntities, c as resolveExtensions, i as ExtensionRef, n as ExtensionOptions, o as ResolvedExtension, r as ExtensionPermissions, s as defineExtension, t as ExtensionDef } from "./extend-DsqQMNJN.js";
+import { a as UpdateInput, i as Row, n as EntityRegistry, t as CreateInput } from "./registry-D7gGAobK.js";
 interface Uuid7Options {
   readonly now?: () => number;
   readonly random?: (bytes: Uint8Array) => void;

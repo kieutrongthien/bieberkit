@@ -28,6 +28,8 @@ import { codePointLength } from '../text/fold.ts';
 import type { Compare } from '../text/fold.ts';
 import type { EntityDef } from './define-entity.ts';
 import { decimalPattern } from './patterns.ts';
+import { whenProblem } from './when.ts';
+import type { When } from './when.ts';
 
 export type FieldKind =
   | 'id'
@@ -71,6 +73,18 @@ export interface ColumnDef {
 
 export type ResetEvery = 'year' | 'month' | 'never';
 
+/** What a field says to the admin beyond its kind (UI-11). A condition is data (`when.ts`), so the server enforces it and any adapter evaluates it. */
+export interface FieldAdmin {
+  /** The field is shown when this holds. A field that is hidden is not sent, and is not required. */
+  readonly visibleWhen?: When;
+  /** The field is required when this holds, and it is shown. */
+  readonly requiredWhen?: When;
+  /** The control that draws the field, when it is not the one of its kind (UI-04). */
+  readonly widget?: string;
+  /** For a file or an image: the media types that it takes, such as `image/*` or `application/pdf`. */
+  readonly accept?: readonly string[];
+}
+
 /** The plain data behind a field. It holds no library object except the schema values the author passed in. */
 export interface FieldDef {
   readonly kind: FieldKind;
@@ -103,7 +117,7 @@ export interface FieldDef {
   readonly jsonSchema?: Readonly<Record<string, unknown>>;
   readonly zod?: SchemaValue;
   readonly tsType?: string;
-  readonly admin?: Readonly<Record<string, unknown>>;
+  readonly admin?: FieldAdmin;
   readonly computed?: { readonly fn: ComputedFn; readonly stored: boolean };
 }
 
@@ -118,6 +132,8 @@ interface Chain<Self> {
   localized(): Self;
   encrypted(): Self;
   pii(): Self;
+  /** Shows or requires the field by a condition over the other fields of the form (UI-11). */
+  admin(options: FieldAdmin): Self;
 }
 
 /** What `.computed()` returns: the field is calculated, so it takes no default and no second `.computed()`. */
@@ -167,8 +183,11 @@ export interface CustomOptions {
   readonly jsonSchema: Readonly<Record<string, unknown>>;
   readonly zod: SchemaValue;
   readonly tsType: string;
-  readonly admin?: Readonly<Record<string, unknown>>;
+  readonly admin?: FieldAdmin;
 }
+
+/** Every name is a field: the shape of a condition is checked when the field is made, and its names when the entity is made. */
+const ANY_FIELD = { has: (): boolean => true };
 
 const INT_MIN = -2147483648;
 const INT_MAX = 2147483647;
@@ -272,10 +291,36 @@ export class Field {
     return this.#with({ index: true });
   }
 
+  admin(options: FieldAdmin): Field {
+    const kind = this.def.kind;
+    if (typeof options !== 'object' || options === null)
+      invalid('.admin() takes an object.', 'Pass { visibleWhen, requiredWhen }.');
+    for (const key of Object.keys(options))
+      if (key !== 'visibleWhen' && key !== 'requiredWhen' && key !== 'widget' && key !== 'accept')
+        invalid(`.admin() does not know ${key}.`, 'Use visibleWhen, requiredWhen, widget or accept.');
+    if (['id', 'createdAt', 'updatedAt', 'sequence', 'state', 'hasOne', 'hasMany'].includes(kind))
+      this.#reject('.admin()');
+    for (const key of ['visibleWhen', 'requiredWhen'] as const) {
+      const when = options[key];
+      // The names of the fields are checked when the entity is made, because only then are they known; the shape is checked here.
+      const problem = when === undefined ? undefined : whenProblem(when, ANY_FIELD, '');
+      if (problem !== undefined)
+        invalid(`${key}: ${problem}`, 'Write a condition such as { field: "tier", eq: "gold" }.');
+    }
+    return this.#with({ admin: Object.freeze({ ...this.def.admin, ...options }) });
+  }
+
   searchable(): Field {
     if (!TEXT_KINDS.has(this.def.kind)) this.#reject('.searchable()');
     this.#notWhenEncrypted('.searchable()');
-    return this.#with({ searchable: true });
+    // A searched text is compared in the folded form that a shadow column keeps (SR-01, DATA-21), so a search ignores case and
+    // diacritics. A text that says nothing about how it is compared (it is `exact` by default) is `ci_ai`; one that says `ci` stays.
+    const folded = this.def.kind === 'string' || this.def.kind === 'email';
+    const compare = this.def.compare;
+    return this.#with({
+      searchable: true,
+      ...(folded && (compare === undefined || compare === 'exact') ? { compare: 'ci_ai' as const } : {}),
+    });
   }
 
   /** The field may be grouped by, or summed, in the aggregate endpoint (API-15). */
@@ -515,9 +560,32 @@ export interface FieldBuilders {
   hasMany(target: () => EntityDef<string>): HasManyField;
   state(options: StateOptions): StateField;
   custom(options: CustomOptions): CustomField;
+  /** A file of the media library: the field holds the id of a media record. `accept` limits the media types (UI-11, ADR 0036). */
+  file(options?: { accept?: readonly string[] }): StringField;
+  /** A file that is an image: `file` with `accept` of `image/*`, drawn with a preview. */
+  image(options?: { accept?: readonly string[] }): StringField;
 }
 
 /** The field builders of spec 10.1. */
+const MEDIA_TYPE = /^[a-z0-9][a-z0-9!#$&^_.+-]*\/(?:\*|[a-z0-9][a-z0-9!#$&^_.+-]*)$/;
+
+/** The field of a file: the id of a media record, 36 characters, with the widget and the types that it takes. */
+function mediaField(widget: 'file' | 'image', accept: readonly string[]): Field {
+  for (const type of accept)
+    if (typeof type !== 'string' || !MEDIA_TYPE.test(type))
+      invalid(
+        `${JSON.stringify(type)} is not a media type that f.${widget} can accept.`,
+        'Write "image/png", "image/*" or "application/pdf".',
+      );
+  return new Field({
+    kind: 'string',
+    min: 36,
+    max: 36,
+    compare: 'exact',
+    admin: Object.freeze({ widget, accept: Object.freeze([...accept]) }),
+  });
+}
+
 export const f: FieldBuilders = {
   id: () => new Field({ kind: 'id' }),
   string: (options) => {
@@ -553,6 +621,8 @@ export const f: FieldBuilders = {
     }
     return new Field({ kind: 'int', min, max });
   },
+  file: (options = {}) => mediaField('file', options.accept ?? []),
+  image: (options = {}) => mediaField('image', options.accept ?? ['image/*']),
   boolean: () => new Field({ kind: 'boolean' }),
   date: () => new Field({ kind: 'date' }),
   dateTime: () => new Field({ kind: 'dateTime' }),

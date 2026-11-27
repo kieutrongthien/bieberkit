@@ -392,8 +392,19 @@ export async function listPage(em: EntityManager, schema: OrmSchema, options: Li
   }
   if (options.locale !== undefined) assertLocale(options.locale);
 
+  // A relation that is populated is read whole (`org.*`): with only a list of fields, it would come with its key and nothing else, and the
+  // included row would not be a row of its entity.
   const fields =
-    selected === undefined ? undefined : [...new Set([...selected, 'id', ...order.map((item) => item.field.lookup)])];
+    selected === undefined
+      ? undefined
+      : [
+          ...new Set([
+            ...selected,
+            'id',
+            ...order.map((item) => item.field.lookup),
+            ...(options.populate ?? []).map((name) => `${name}.*`),
+          ]),
+        ];
   const connectionType = await readConnection(em);
   const entities = await em.find<Row>(schema, conditions.length === 0 ? {} : { $and: conditions }, {
     orderBy: order.map((item) => ({

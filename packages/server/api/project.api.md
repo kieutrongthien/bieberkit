@@ -29,11 +29,13 @@ Generated from the built declaration files by `pnpm api:update`. Do not edit by 
 
 ```ts
 import { EnvOwner, KeyCollector, PluginDef, ProjectConfigInput } from "@bieberkit/core";
+import { ThemeInput } from "@bieberkit/tokens";
 declare const COLLECTORS: readonly KeyCollector[];
 declare const CONFIG_FILE = "bieberkit.config.ts";
 interface LoadedPlugin {
   readonly def: PluginDef<unknown>;
   readonly options: unknown;
+  readonly root: string;
 }
 interface Project {
   readonly root: string;
@@ -41,6 +43,11 @@ interface Project {
   readonly config: ProjectConfigInput;
   readonly plugins: readonly LoadedPlugin[];
   readonly coreVersion: string;
+}
+declare module "@bieberkit/core" {
+  interface ConfigSections {
+    theme?: ThemeInput;
+  }
 }
 declare function findProjectRoot(from: string): string | undefined;
 declare function importFile(path: string): Promise<unknown>;

@@ -4,6 +4,8 @@
   "compilerOptions": {
     "lib": ["esnext", "dom", "dom.iterable"],
     "types": [],
-    "jsx": "react-jsx"
+    "jsx": "react-jsx",
+    "module": "esnext",
+    "moduleResolution": "bundler"
   }
 }

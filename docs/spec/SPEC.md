@@ -125,7 +125,7 @@ The baseline below is fixed for version 1. Changing any row requires an ADR (arc
 | Cache | BentoCache: memory first level, Valkey second level, tags, stampede protection, grace periods | Section 15. |
 | File storage | FlyDrive | Local disk, S3, R2, GCS and S3-compatible stores. |
 | Logging and telemetry | pino, OpenTelemetry | Section 20. |
-| Admin UI | React 19.2 (19.2.4 or later), Vite 8, TanStack Router, Query, Table and Form, Ant Design 6 | Single-page app, no server components. Ant Design is the default UI adapter (UI-10). |
+| Admin UI | React 19.2 (19.2.4 or later), Vite 8, TanStack Router and Query, Ant Design 6 | Single-page app, no server components. Ant Design is the default UI adapter (UI-10). |
 | API client | OpenAPI 3.1 and Orval | Typed client and TanStack Query hooks generated per project. |
 | Testing | Vitest 4, Testcontainers, Playwright, k6 | Section 21. |
 | Container | Docker, Docker Hardened Images `node:26` | Section 19. |
@@ -435,6 +435,7 @@ All runtime configuration comes from environment variables, validated once at bo
 | `APP_ENV` | `development`, `test`, `production` | `development` |  |
 | `APP_URL` | URL | `http://localhost:3000` | Used for links, CORS and cookies |
 | `ADMIN_URL` | URL | `APP_URL` and `/admin` | Where the admin is: a path of the application (`https://example.com/panel`), a host of its own (`https://admin.example.com`), or a path of that host. Never a path of the API (`/api`, `/health`, `/metrics`) |
+| `ADMIN_ASSETS_DIR` | path | `data/admin-assets` | Where the hashed files of the previous releases of the admin are kept for 24 hours (UI-22). The instances of a rolling deploy share it |
 | `APP_PORT` | integer | `3000` |  |
 | `APP_KEY` | 32+ random bytes, base64 | generated | Secret. Encryption and signing. Rotation supported through `APP_KEY_PREVIOUS` |
 | `AUTH_SECRET` | 32+ random bytes | generated | Secret. Session signing |
@@ -1164,21 +1165,21 @@ Projects have two user interfaces. The admin UI is a single-page app for signed-
 
 The admin UI is a React single-page app that renders most screens from entity metadata, so a new entity gets list, form and detail screens without frontend code. It calls the API like any other client, which keeps authentication and authorization in one place.
 
-- **UI-01** Stack: React 19.2 (19.2.4 or later), Vite 8, TanStack Router, Query, Table, Form and Virtual. No React Server Components. Visual components come through a UI adapter (UI-10), Ant Design 6 by default.
+- **UI-01** Stack: React 19.2 (19.2.4 or later), Vite 8, TanStack Router and Query. No React Server Components. Visual components come through a UI adapter (UI-10), Ant Design 6 by default.
 - **UI-02** The shell loads `/api/v1/_meta`, which returns the entities, fields, permissions and menu entries the current user may see.
 - **UI-03** Generic screens: list (filters, sorting, saved views, bulk actions, export), form (validation from the same schemas as the API), detail (tabs for related records, activity, audit history).
-- **UI-04** Escape hatches: a field can use a custom widget, a screen can be replaced by a custom page, and plugins add pages and dashboard widgets.
-- **UI-05** Languages en, vi and zh are bundled. Dates, numbers and currency follow the user's locale. Vietnamese and Chinese labels come from the entity `label` and plugin translation files.
-- **UI-06** Theme tokens (colors, radius, font) are set in `bieberkit.config.ts`. The default font stack covers Latin, Vietnamese and Chinese scripts.
+- **UI-04** Escape hatches: a field can use a custom widget, a screen can be replaced by a custom page, and plugins add pages and dashboard widgets. A plugin does it with the `admin` key (`pages`, `widgets`, `screens`) and ES modules in the folder `admin` of its package, which the web role serves under the admin and the admin loads with the React, the Ant Design and the client of the admin (ADR 0037).
+- **UI-05** Languages en, vi and zh are bundled. Dates, numbers and currency follow the user's locale. Vietnamese and Chinese labels come from the entity `label` and plugin translation files. The language is the one that the person chose in the header (kept in the browser), then the first language of the browser that is bundled, then English; the three dictionaries have the same keys and the same placeholders, which a test enforces. Money is formatted from the text that the API sends, so its digits are never rounded by a number.
+- **UI-06** Theme tokens (colors, radius, spacing, fonts, dark mode) are set in the `theme` key of `bieberkit.config.ts`, and every one of them is optional. The key is validated at build and at boot with every problem reported together (a color is a hex of 3 or 6 digits, the radius is 0 to 24 px, the spacing 2 to 8 px, `darkMode` is `auto`, `light` or `dark`). The server writes the resolved theme into the page of the admin as data and as CSS variables, so a change is a restart and not a build (UI-14). The default font stack covers Latin, Vietnamese and Chinese scripts.
 - **UI-07** Accessibility target: WCAG 2.2 level AA for all generic screens.
 - **UI-08** Built assets are static files with content hashes, served from a CDN or from the web role.
 - **UI-09** Reusable blocks (dashboards, approval forms, import wizards) are installed from the registry as editable source.
 
 Admin architecture, forms and performance:
 
-- **UI-10** The admin is split in two packages. `@bieberkit/admin-core` holds no visual components: metadata loading, routing, permissions, list and form state on TanStack Table and Form, data hooks, realtime. `@bieberkit/admin-antd` is the default adapter that renders it with Ant Design 6. The adapter contract is public, so other adapters (shadcn/ui, MUI) can be built without forking the core. Only the Ant Design adapter is maintained by the project.
-- **UI-11** Form metadata supports repeatable groups and inline child tables, fields shown or required by condition (`visibleWhen`, `requiredWhen`), computed read-only fields, file and image fields with direct upload, relation pickers with server search, and the block content editor (section 16.5).
-- **UI-12** Every route and every screen of a plugin is a lazy chunk. Translations load per language and per module. Lists over 200 rows render with TanStack Virtual.
+- **UI-10** The admin is split in two packages. `@bieberkit/admin-core` holds no visual components: metadata loading, routing, permissions, the logic of lists, filters, saved views, moves of a state field, forms and their checks (as functions that need no library), data hooks, realtime. `@bieberkit/admin-antd` is the default adapter that renders it with Ant Design 6. The adapter contract is public, so other adapters (shadcn/ui, MUI) can be built without forking the core. Only the Ant Design adapter is maintained by the project.
+- **UI-11** Form metadata supports repeatable groups and inline child tables, fields shown or required by condition (`visibleWhen`, `requiredWhen`, written with `.admin()` on the field as data that the server enforces and the form follows), computed read-only fields, file and image fields with direct upload (`f.file()` and `f.image()` hold the id of a media record, ADR 0036), relation pickers with server search, and the block content editor (section 16.5).
+- **UI-12** Every route and every screen of a plugin is a lazy chunk. Translations load per language and per module. A table over 200 rows draws only the rows in view (ADR 0035).
 - **UI-13** Data hooks prefetch on link hover, update optimistically for state transitions and inline edits, and invalidate caches from realtime events (RT-03).
 - **UI-14** The admin is served at the address of `ADMIN_URL` (`/admin` of the application by default) on the same origin as the API, as static files from the web role or a CDN, with its own strict Content-Security-Policy. Its address is not in the build: the server writes it in the page, so one build runs at `/admin`, at any other path, or at the root of a host of its own such as `admin.example.com`. A host of its own is the same server answering for another name (a proxy routes both names to the web role), so the session cookie, which belongs to one host, is the one of the admin and the API calls need no CORS, and the origin of the admin is trusted by the sign in.
 - **UI-15** Generic screens never fetch more than the listed fields (`fields=` from metadata), so wide entities stay fast in lists.
@@ -1188,9 +1189,9 @@ Admin architecture, forms and performance:
 * **UI-18** On a 412 conflict (API-13) the form shows who changed the record and what changed, and lets the user reload or re-apply their edits.
 * **UI-19** Every route has an error boundary with a retry action. Network errors retry with backoff and show an offline banner instead of a blank screen.
 * **UI-20** Supported browsers: the last two versions of Chrome, Edge, Firefox and Safari, including Safari on iOS. The same policy applies to the site.
-* **UI-21** Client errors and Core Web Vitals from real users are sent to the error-reporter contract (OBS-06), sampled and without personal data.
+* **UI-21** Client errors and Core Web Vitals from real users are sent to the error-reporter contract (OBS-06), sampled and without personal data. The admin sends them to the public route `POST /api/v1/_client-reports`, which takes a closed shape, hands an error to the reporter as a warning of the source `client`, and counts a vital in the metrics `bk_admin_web_vitals_total`, `bk_admin_web_vital_seconds` and `bk_admin_layout_shift`.
 
-- **UI-22** Hashed admin assets from the previous release stay available (CDN or a retained folder) for at least 24 hours after a deploy, and the admin reloads itself on a chunk-load error, so open tabs survive rolling deploys.
+- **UI-22** Hashed admin assets from the previous release stay available (CDN or a retained folder) for at least 24 hours after a deploy, and the admin reloads itself on a chunk-load error, so open tabs survive rolling deploys. The web role keeps them: at start it copies the hashed files of its build into `ADMIN_ASSETS_DIR`, marks the ones that the release before used and this one does not, serves a hashed file that its build lacks from there, and removes a file 24 hours after the release that replaced it. A CDN that keeps the files of past releases does the same without it.
 
 ### 16.2 Public site (server-side rendering)
 
@@ -1244,7 +1245,7 @@ Alternatives considered:
 ### 16.4 Design tokens
 
 - **TOK-01** Brand tokens (colors, fonts, radius, spacing, dark mode) are declared once in `bieberkit.config.ts`.
-- **TOK-02** `@bieberkit/tokens` compiles them into an Ant Design theme for the admin and CSS variables plus a Tailwind theme for the site, so both stay on brand without double configuration.
+- **TOK-02** `@bieberkit/tokens` compiles them into an Ant Design theme for the admin (`compileAntdTheme`) and CSS variables (`cssVariables`, `--bk-*`, with the dark palette under `data-theme="dark"` and the system setting) plus a Tailwind theme that points at those variables (`tailwindTheme`) for the site, so both stay on brand without double configuration. The package does not import core, because the admin imports it into the browser. The brand colors of the dark palette are those of the theme unless `dark.colors` says otherwise.
 - **TOK-03** The default font stack covers Latin, Vietnamese and Chinese.
 
 ### 16.5 Block content editor
@@ -1724,6 +1725,16 @@ Open questions:
 
 | Version | Date | Changes |
 | --- | --- | --- |
+| 0.8.35 | 2026-11-27 | ADR 0037: the `admin` key of a plugin, its modules served under the admin, the host that a module gets, and `extensions` in `_meta` (UI-04) |
+| 0.8.34 | 2026-11-27 | ADR 0036: `f.file()` and `f.image()`, the check of a file on a write, the upload of the admin to the storage with a signed URL, and the origin of the bucket in the policy of the admin (UI-11, SEC-01) |
+| 0.8.33 | 2026-11-27 | MOD-09: inline collections are in the body and the answer of a record, are saved in its transaction with the permissions of the line entity, and the form edits them as a table (UI-11) |
+| 0.8.32 | 2026-11-27 | UI-11: the search of a list with `q` over the fields that are `searchable()` (folded, a prefix of the text), relation pickers with server search, the name of a related row in a list, and `include` with `fields` |
+| 0.8.31 | 2026-11-27 | UI-11: `.admin({ visibleWhen, requiredWhen })` on a field, conditions as data that the server enforces on create, update and bulk update and that `_meta` carries to the form |
+| 0.8.30 | 2026-11-27 | ADR 0035: the admin draws tables, forms and long lists with Ant Design and keeps their logic in pure functions of `admin-core`, so UI-01, UI-10 and UI-12 no longer name TanStack Table, Form and Virtual; axe is a dev dependency of the browser tests |
+| 0.8.29 | 2026-11-27 | M2.2: the list (filters, views, bulk changes, moves of a state field, CSV, phone cards, `n` and `/`), the input of a transition in `_meta`, the check of a form, lazy languages, and the hashed files of the release before kept for a day, with `ADMIN_ASSETS_DIR` (UI-03, UI-12, UI-13, UI-16, UI-17, UI-22) |
+| 0.8.28 | 2026-11-27 | M2.2 resilience: retry and backoff, the offline state, route error boundaries, lazy screens and the 400 kB budget check, the reload on a missing chunk, the unsaved-change guard, local drafts, Ctrl+S, the 412 view with a three-way merge, and the reports of UI-21 (UI-12, UI-17 to UI-19, UI-21, UI-22; parts) |
+| 0.8.27 | 2026-11-27 | M2.2 languages: the dictionaries of en, vi and zh, the translator, the choice of a language, the formats of numbers, dates and money, and the language switch of the admin (UI-05) |
+| 0.8.26 | 2026-11-27 | M2.2 tokens: the `theme` key of the config, `@bieberkit/tokens` with the defaults, the validation, the Ant Design, CSS variable and Tailwind compilers, and the theme in the page of the admin (UI-06, TOK-01 to TOK-03) |
 | 0.8.25 | 2026-11-27 | M2.1 H2 (ADR 0033, ADR 0034): entity extensions, `extends` with `defineExtension` and a table of the extending plugin with one row for each row of the target (PLG-06); the example of 11.1 and the text of 11.3 |
 | 0.8.24 | 2026-11-27 | M2.1 H3: `bieberkit plugins` shows the graph with its edges and what each plugin owns, `make:plugin`, and `remove` that changes nothing when pnpm fails or the question is cancelled (PLG-03) |
 | 0.8.23 | 2026-11-27 | M2.1 H4: `check boundaries` for relative and `node_modules` paths into a plugin and for exports patterns (PLG-01), and the rule `plugin-tables` (PLG-02) |

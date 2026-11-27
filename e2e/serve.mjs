@@ -23,7 +23,7 @@
  */
 
 import { spawn, spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -75,6 +75,16 @@ for (const name of PLUGINS)
 symlinkSync(join(REPOSITORY, 'packages', 'data', 'node_modules', 'zod'), join(root, 'node_modules', 'zod'), 'dir');
 mkdirSync(join(root, 'data'), { recursive: true });
 writeFileSync(join(root, 'apps', 'server', 'src', 'seed.ts'), 'export default async function seed() {}\n');
+
+// A plugin with accounts and tickets, because the base plugins have no entity that the screens can create and change.
+cpSync(join(REPOSITORY, 'e2e', 'fixtures', 'crm'), join(root, 'node_modules', '@bieberkit', 'plugin-crm'), {
+  recursive: true,
+});
+const configPath = join(root, 'bieberkit.config.ts');
+writeFileSync(
+  configPath,
+  readFileSync(configPath, 'utf8').replace('plugins: [', "plugins: [\n    '@bieberkit/plugin-crm',"),
+);
 
 run(root, ['migrate:make']);
 run(root, ['migrate']);

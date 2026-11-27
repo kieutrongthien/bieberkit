@@ -40,6 +40,7 @@ export interface CoreEnvValues {
   APP_ENV: AppEnv;
   APP_URL: string;
   ADMIN_URL: string | undefined;
+  ADMIN_ASSETS_DIR: string | undefined;
   APP_PORT: number;
   APP_KEY: string | undefined;
   APP_KEY_PREVIOUS: string | undefined;
@@ -111,6 +112,12 @@ export const coreEnv: EnvSchema<CoreEnvValues> = defineEnv({
     .optional()
     .describe(
       'Public address of the admin: a path of this address (https://example.com/panel) or a host of its own (https://admin.example.com). Defaults to APP_URL and /admin',
+    ),
+  ADMIN_ASSETS_DIR: env
+    .string()
+    .optional()
+    .describe(
+      'Folder where the hashed files of the previous releases of the admin are kept for 24 hours (UI-22). Defaults to data/admin-assets in the project. Instances of a rolling deploy share it',
     ),
   APP_PORT: env.int({ min: 1, max: 65535 }).default(3000).describe('Port of the web role'),
   APP_KEY: env.base64().secret().optional().describe('Encryption and signing key, 32 or more random bytes in base64'),

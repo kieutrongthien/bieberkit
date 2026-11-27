@@ -27,6 +27,8 @@ import { createRequire } from 'node:module';
 import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { envPrefixOf, resolvePlugins, toManifest, validateConfig } from '@bieberkit/core';
+import { themeSection } from '@bieberkit/tokens';
+import type { ThemeInput } from '@bieberkit/tokens';
 import type { EnvOwner, PluginDef, ProjectConfigInput } from '@bieberkit/core';
 import { ServerError } from './errors.ts';
 import { COLLECTORS } from './manifest.ts';
@@ -37,6 +39,8 @@ export interface LoadedPlugin {
   readonly def: PluginDef<unknown>;
   /** The options that the config gave, checked by the plugin. */
   readonly options: unknown;
+  /** The folder of the package of the plugin: its `admin` folder holds the files that the browser loads (UI-04). */
+  readonly root: string;
 }
 
 export interface Project {
@@ -47,6 +51,13 @@ export interface Project {
   /** In boot order: each plugin after the ones that it requires. */
   readonly plugins: readonly LoadedPlugin[];
   readonly coreVersion: string;
+}
+
+declare module '@bieberkit/core' {
+  interface ConfigSections {
+    /** The brand tokens of the admin and the site (TOK-01, UI-06). */
+    theme?: ThemeInput;
+  }
 }
 
 /** The nearest directory at or above `from` that has a config file. */
@@ -81,7 +92,7 @@ export async function importFile(path: string): Promise<unknown> {
   return typeof loaded === 'object' && loaded !== null ? Reflect.get(loaded, 'default') : undefined;
 }
 
-async function loadPlugin(name: string, rooted: NodeJS.Require): Promise<PluginDef<unknown>> {
+async function loadPlugin(name: string, rooted: NodeJS.Require): Promise<{ def: PluginDef<unknown>; root: string }> {
   let path: string;
   try {
     path = rooted.resolve(name);
@@ -99,7 +110,13 @@ async function loadPlugin(name: string, rooted: NodeJS.Require): Promise<PluginD
       fix: 'The main file of a plugin package is `export default definePlugin({ ... })`.',
     });
   }
-  return exported;
+  let packageRoot = dirname(path);
+  try {
+    packageRoot = dirname(rooted.resolve(`${name}/package.json`));
+  } catch {
+    // A package that hides its manifest keeps the folder of its main file.
+  }
+  return { def: exported, root: packageRoot };
 }
 
 /** The env schemas of the plugins, each with the prefix that its keys must start with. */
@@ -127,7 +144,7 @@ export async function loadConfig(cwd: string): Promise<ProjectConfig> {
     });
   }
   const configPath = join(root, CONFIG_FILE);
-  return { root, configPath, config: validateConfig(await importFile(configPath)) };
+  return { root, configPath, config: validateConfig(await importFile(configPath), { sections: [themeSection] }) };
 }
 
 /**
@@ -142,7 +159,7 @@ export async function loadProject(cwd: string): Promise<Project> {
   const entries = config.plugins.map((entry) => (typeof entry === 'string' ? ([entry, undefined] as const) : entry));
   const loaded = new Map<string, LoadedPlugin>();
   for (const [name, given] of entries) {
-    const def = await loadPlugin(name, rooted);
+    const { def, root: pluginRoot } = await loadPlugin(name, rooted);
     let options: unknown;
     try {
       options = def.options.parse(given);
@@ -156,7 +173,7 @@ export async function loadProject(cwd: string): Promise<Project> {
         },
       );
     }
-    loaded.set(def.name, { def, options });
+    loaded.set(def.name, { def, options, root: pluginRoot });
   }
   const version = coreVersion();
   const { order } = resolvePlugins(

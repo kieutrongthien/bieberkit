@@ -28,5 +28,67 @@
 Generated from the built declaration files by `pnpm api:update`. Do not edit by hand. A change here is a change to the public API and needs a changeset (spec section 22.3).
 
 ```ts
+export declare const FONT_STACK: {
+  readonly sans: string;
+  readonly mono: string;
+};
+interface ThemeColors {
+  primary: string;
+  success: string;
+  warning: string;
+  danger: string;
+  info: string;
+  background: string;
+  surface: string;
+  text: string;
+  border: string;
+}
+type DarkMode = "auto" | "light" | "dark";
+interface ThemeInput {
+  readonly colors?: Partial<ThemeColors>;
+  readonly dark?: {
+    readonly colors?: Partial<ThemeColors>;
+  };
+  readonly radius?: number;
+  readonly spacing?: number;
+  readonly fonts?: {
+    readonly sans?: string;
+    readonly mono?: string;
+  };
+  readonly darkMode?: DarkMode;
+}
+interface Theme {
+  readonly colors: ThemeColors;
+  readonly dark: ThemeColors;
+  readonly radius: number;
+  readonly spacing: number;
+  readonly fonts: {
+    readonly sans: string;
+    readonly mono: string;
+  };
+  readonly darkMode: DarkMode;
+}
+export declare const DEFAULT_THEME: Theme;
+export declare const COLOR_KEYS: readonly (keyof ThemeColors)[];
+export declare function parseTheme(input: unknown): Theme;
+export declare const themeSection: {
+  readonly key: "theme";
+  readonly parser: {
+    parse(input: unknown): ThemeInput | undefined;
+  };
+};
+export declare function readTheme(text: string | null | undefined): Theme;
+export declare function modeOf(theme: Theme, systemPrefersDark: boolean): "light" | "dark";
+interface AntdTheme {
+  readonly algorithm: "default" | "dark";
+  readonly token: Readonly<Record<string, string | number>>;
+}
+export declare function compileAntdTheme(theme: Theme, mode: "light" | "dark"): AntdTheme;
+export declare function cssVariables(theme: Theme): string;
+export declare function tailwindTheme(_theme: Theme): string;
+export declare function luminanceOf(hex: string): number;
+export declare function contrastRatio(a: string, b: string): number;
+export declare function mixColors(a: string, b: string, weight: number): string;
 export declare const packageName = "@bieberkit/tokens";
+export type { AntdTheme, DarkMode, Theme, ThemeColors, ThemeInput };
 ```

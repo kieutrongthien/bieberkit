@@ -39,6 +39,7 @@ export const Person: EntityDef<'crm.Person'> = defineEntity({
   name: 'crm.Person',
   table: 'crm_people',
   api: { list: true, get: true, create: true },
+  admin: { title: 'name' },
   fields: { id: f.id(), name: f.string({ min: 1, max: 50 }) },
 });
 
@@ -50,7 +51,7 @@ export const Account: EntityDef<'crm.Account'> = defineEntity({
   fields: {
     id: f.id(),
     code: f.string({ max: 20 }).unique(),
-    name: f.string({ min: 1, max: 100, compare: 'ci_ai' }).index(),
+    name: f.string({ min: 1, max: 100, compare: 'ci_ai' }).index().searchable(),
     email: f.email().optional().unique(),
     tier: f.oneOf(['basic', 'gold', 'vip']).default('basic').index().aggregatable(),
     visits: f.int({ min: 0 }).default(0).index().aggregatable(),
@@ -58,6 +59,15 @@ export const Account: EntityDef<'crm.Account'> = defineEntity({
     active: f.boolean().default(true),
     balance: f.money({ currency: 'VND' }).optional(),
     note: f.text({ max: 500 }).optional(),
+    // Lines that are edited with the account and saved with it (MOD-09).
+    notes: f.hasMany(() => AccountNote).inline(),
+    contract: f.file({ accept: ['application/pdf'] }).optional(),
+    logo: f.image().optional(),
+    // Shown and required for an account that is not active (UI-11).
+    reason: f
+      .string({ max: 100 })
+      .optional()
+      .admin({ visibleWhen: { field: 'active', eq: false }, requiredWhen: { field: 'active', eq: false } }),
     since: f.date().optional(),
     number: f.sequence({ pattern: 'ACC-{seq:4}' }),
     status: f.state({
@@ -88,6 +98,20 @@ export const Account: EntityDef<'crm.Account'> = defineEntity({
     },
   },
   api: { list: true, get: true, create: true, update: true, delete: true },
+  admin: { title: 'name', list: ['code', 'name', 'owner', 'status'] },
+});
+
+/** A line of an account, with no routes of its own: it is edited inside the account (MOD-09). */
+export const AccountNote: EntityDef<'crm.AccountNote'> = defineEntity({
+  name: 'crm.AccountNote',
+  table: 'crm_account_notes',
+  tenant: true,
+  fields: {
+    id: f.id(),
+    account: f.belongsTo(() => Account).index(),
+    text: f.string({ min: 1, max: 50 }),
+    position: f.int({ min: 0 }).default(0),
+  },
 });
 
 /** No soft delete, and a delete route: a row is removed. */
@@ -119,7 +143,7 @@ export interface EntityApp {
 
 /** A server whose user may do everything, over a fresh in-memory SQLite database that holds the sample entities. */
 export async function entityApp(options: HttpServerOptions = {}, env?: HttpEnv): Promise<EntityApp> {
-  const schemas = compileEntities([Person, Account, Note, Hidden]);
+  const schemas = compileEntities([Person, Account, AccountNote, Note, Hidden]);
   const queries: string[] = [];
   const db = await createDatabase(
     { DB_CONNECTION: 'sqlite', DATABASE_URL: ':memory:', DATABASE_READ_URLS: [], DB_POOL_MAX: 1 },

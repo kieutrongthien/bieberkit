@@ -27,6 +27,8 @@ import { describe, expect, it } from 'vitest';
 import { Account, entityApp, Hidden, Note, Person } from './entity-app.ts';
 import type { HttpServerOptions } from './server.ts';
 import { META_SCHEMA, registerMeta } from './meta.ts';
+import { adminExtensionsOf } from './admin-extensions.ts';
+import type { AdminExtensions } from './admin-extensions.ts';
 
 interface Field {
   key: string;
@@ -40,7 +42,10 @@ interface Field {
   filterable: boolean;
   sortable: boolean;
   validation?: Record<string, unknown>;
-  target?: { entity: string; path: string };
+  accept?: string[];
+  visibleWhen?: Record<string, unknown>;
+  requiredWhen?: Record<string, unknown>;
+  target?: { entity: string; path: string; title?: string };
 }
 interface Entity {
   name: string;
@@ -49,30 +54,52 @@ interface Entity {
   operations: Record<string, boolean>;
   can: Record<string, boolean>;
   features: string[];
+  searchable?: string[];
+  inline?: {
+    name: string;
+    entity: string;
+    label: Record<string, string>;
+    fields: Field[];
+    form: string[];
+    can: Record<string, boolean>;
+  }[];
   fields: Field[];
   form: string[];
   list: string[];
   title?: string;
-  transitions: { name: string; from: string[]; to: string; permission: string; allowed: boolean; path: string }[];
+  transitions: {
+    name: string;
+    from: string[];
+    to: string;
+    permission: string;
+    allowed: boolean;
+    path: string;
+    input?: Record<string, unknown>;
+  }[];
 }
 interface Meta {
   schemaVersion: number;
   entities: Entity[];
-  menu: unknown[];
+  extensions?: {
+    pages: { plugin: string; path: string; module: string; title: Record<string, string> }[];
+    widgets: { plugin: string; slot: string; module: string }[];
+    screens: { plugin: string; replace: string; module: string }[];
+  };
+  menu: { label: Record<string, string>; path: string }[];
   dashboards: unknown[];
   permissions: string[];
 }
 
 const DEFS = [Person, Account, Note, Hidden];
 
-async function metaApp(options: HttpServerOptions = {}) {
+async function metaApp(options: HttpServerOptions = {}, extensions?: AdminExtensions) {
   const app = await entityApp(options);
-  registerMeta(app.server, DEFS);
+  registerMeta(app.server, DEFS, extensions === undefined ? {} : { extensions });
   return app;
 }
 
-async function fetchMeta(options: HttpServerOptions = {}): Promise<Meta> {
-  const app = await metaApp(options);
+async function fetchMeta(options: HttpServerOptions = {}, extensions?: AdminExtensions): Promise<Meta> {
+  const app = await metaApp(options, extensions);
   const response = await app.server.inject({ method: 'GET', url: '/api/v1/_meta' });
   expect(response.statusCode).toBe(200);
   return JSON.parse(response.body);
@@ -167,6 +194,102 @@ describe('META-02 what it describes', () => {
     expect(field(account, 'note')).toMatchObject({ filterable: false });
   });
 
+  it('MOD-09 describes the inline collections: the entity of the lines, the fields that a form edits, and what the caller may do', async () => {
+    const account = entity(await fetchMeta(), 'crm.Account');
+    expect(account.inline).toHaveLength(1);
+    const [notes] = account.inline ?? [];
+    expect(notes).toMatchObject({
+      name: 'notes',
+      entity: 'crm.AccountNote',
+      can: { create: true, update: true, delete: true },
+    });
+    // The relation back to the record is not a field of a line in a form, and the fields are the writable ones.
+    expect(notes?.fields.map((item) => item.key)).toEqual(['text', 'position']);
+    expect(notes?.form).toEqual(['text', 'position']);
+    expect(entity(await fetchMeta(), 'crm.Note').inline).toEqual([]);
+  });
+
+  it('UI-11 says which fields a search looks in, and which field names a row of a relation', async () => {
+    const meta = await fetchMeta();
+    expect(entity(meta, 'crm.Account').searchable).toEqual(['name']);
+    expect(entity(meta, 'crm.Note').searchable).toEqual([]);
+    expect(field(entity(meta, 'crm.Account'), 'ownerId').target).toEqual({
+      entity: 'crm.Person',
+      path: '/api/v1/crm/people',
+      title: 'name',
+    });
+  });
+
+  it('UI-11 a file field is drawn as a file, with the types that it takes', async () => {
+    const account = entity(await fetchMeta(), 'crm.Account');
+    expect(field(account, 'contract')).toMatchObject({ kind: 'string', widget: 'file', accept: ['application/pdf'] });
+    expect(field(account, 'logo')).toMatchObject({ widget: 'image', accept: ['image/*'] });
+    expect(field(account, 'code').accept).toBeUndefined();
+  });
+
+  describe('UI-04 the extensions of plugins', () => {
+    const extensions = adminExtensionsOf([
+      {
+        plugin: 'crm',
+        admin: {
+          pages: [
+            { path: 'reports', module: 'reports.js', title: { en: 'Reports' }, menu: true },
+            { path: 'secret', module: 'secret.js', title: 'Secret', permission: 'crm.secret.read', menu: true },
+          ],
+          widgets: [
+            { slot: 'dashboard', module: 'stats.js' },
+            { slot: 'form:crm.Account', module: 'panel.js', permission: 'crm.panel.read' },
+          ],
+          screens: [{ replace: 'list:crm.Note', module: 'notes.js', permission: 'crm.notes.view' }],
+        },
+      },
+    ]);
+
+    it('UI-04 are in the answer, which is valid against the published schema, with the menu filled from the pages', async () => {
+      const meta = await fetchMeta({}, extensions);
+      expect(meta.extensions?.pages.map((page) => page.module)).toEqual([
+        '/plugins/crm/reports.js',
+        '/plugins/crm/secret.js',
+      ]);
+      expect(meta.extensions?.widgets).toHaveLength(2);
+      expect(meta.extensions?.screens).toHaveLength(1);
+      expect(meta.menu.map((item) => item.path)).toEqual(['/ext/crm/reports', '/ext/crm/secret']);
+      const validate = createAjv().compile(META_SCHEMA);
+      expect([validate(meta), validate.errors]).toEqual([true, null]);
+    });
+
+    it('UI-04 leave out what the caller may not use, a page and its menu entry, a widget and a screen alike', async () => {
+      const meta = await fetchMeta(
+        {
+          authorizer: {
+            can: async (_p, permission) =>
+              !['crm.secret.read', 'crm.panel.read', 'crm.notes.view'].includes(permission),
+          },
+        },
+        extensions,
+      );
+      expect(meta.extensions?.pages.map((page) => page.path)).toEqual(['reports']);
+      expect(meta.menu.map((item) => item.path)).toEqual(['/ext/crm/reports']);
+      expect(meta.extensions?.widgets.map((widget) => widget.slot)).toEqual(['dashboard']);
+      expect(meta.extensions?.screens).toEqual([]);
+    });
+
+    it('UI-04 are empty when no plugin adds any', async () => {
+      const meta = await fetchMeta();
+      expect(meta.extensions).toEqual({ pages: [], widgets: [], screens: [] });
+      expect(meta.menu).toEqual([]);
+    });
+  });
+
+  it('UI-11 gives the conditions of a field, over the keys of the API', async () => {
+    const account = entity(await fetchMeta(), 'crm.Account');
+    expect(field(account, 'reason')).toMatchObject({
+      visibleWhen: { field: 'active', eq: false },
+      requiredWhen: { field: 'active', eq: false },
+    });
+    expect(field(account, 'code').visibleWhen).toBeUndefined();
+  });
+
   it('META-02 gives the validation of a field as JSON Schema', async () => {
     const account = entity(await fetchMeta(), 'crm.Account');
     expect(field(account, 'code').validation).toMatchObject({ type: 'string', maxLength: 20 });
@@ -191,9 +314,21 @@ describe('META-02 what it describes', () => {
         permission: 'crm.account.close',
         allowed: true,
         path: '/api/v1/crm/accounts/{id}/actions/close',
+        // What the transition asks for, so that a screen can ask for it (UI-03).
+        input: {
+          type: 'object',
+          properties: { reason: { type: 'string', minLength: 3 } },
+          required: ['reason'],
+        },
       },
     ]);
     expect(entity(await fetchMeta(), 'crm.Note').transitions).toEqual([]);
+  });
+
+  it('META-02 the list of the admin names fields, and a relation is listed under the key that the API sends', async () => {
+    const account = entity(await fetchMeta(), 'crm.Account');
+    expect(account.list).toEqual(['code', 'name', 'ownerId', 'status']);
+    expect(account.title).toBe('name');
   });
 
   it('META-02 takes the list and the title of the admin, and a default list otherwise', async () => {

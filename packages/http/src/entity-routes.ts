@@ -48,6 +48,10 @@ import { MAX_BULK, MAX_BULK_INLINE } from './bulk.ts';
 import type { BulkQueue } from './bulk.ts';
 import { apiFields, toJsonSchema } from '@bieberkit/data/schema';
 import type { ApiField, EntityDef, JsonSchema } from '@bieberkit/data/schema';
+import { enforceConditions } from './conditions.ts';
+import { checkFiles } from './files.ts';
+import { inlineLinksOf, readInline, takeInline, withInline, writeInline } from './inline.ts';
+import { searchableOf, searchWhere } from './search.ts';
 import { HttpError, ValidationFailed } from './problem.ts';
 import type { RouteContext, RouteDef } from './route.ts';
 import type { HttpServer } from './server.ts';
@@ -355,7 +359,7 @@ const idParams: JsonSchema = {
   additionalProperties: false,
 };
 
-function listQuery(reader: Reader, withPaging: boolean): JsonSchema {
+function listQuery(reader: Reader, withPaging: boolean, searchable = false): JsonSchema {
   const properties: Record<string, JsonSchema> = {
     include: { type: 'string' },
     fields: { type: 'string' },
@@ -369,6 +373,8 @@ function listQuery(reader: Reader, withPaging: boolean): JsonSchema {
       sort: { type: 'string', pattern: '^-?[A-Za-z][A-Za-z0-9]*(,-?[A-Za-z][A-Za-z0-9]*)*$' },
       withTotal: { type: 'boolean' },
     });
+    // The search is there only for an entity that has a field to search (UI-11).
+    if (searchable) Object.assign(properties, { q: { type: 'string', maxLength: 100 } });
   }
   return {
     type: 'object',
@@ -384,13 +390,24 @@ function listQuery(reader: Reader, withPaging: boolean): JsonSchema {
   };
 }
 
+/** Asks for the permission of the line entity before a line is made, changed or removed, and refuses the whole write when it is not given. */
+const allowLines =
+  (ctx: RouteContext) =>
+  async (permission: string): Promise<void> => {
+    if (!(await ctx.can(permission))) {
+      throw new HttpError('HTTP_FORBIDDEN', 403, 'You may not do this.', `The permission ${permission} is needed.`);
+    }
+  };
+
 /** The routes of one entity, for the operations that its `api` turns on. */
 export function entityRoutes(schema: OrmSchema, context: EntityRoutesContext): RouteDef[] {
   const def = entityOfSchema(schema);
   const reader = readerOf(def, context);
   const base = pathOf(def);
   const { db } = context;
-  const rowShape = rowSchema(def);
+  // The lines that are edited with the record (MOD-09).
+  const links = inlineLinksOf(def, context.schemas, permissionOf);
+  const rowShape = withInline(rowSchema(def), links, 'read');
   const withIncludes: JsonSchema = {
     ...rowShape,
     properties: {
@@ -486,7 +503,7 @@ export function entityRoutes(schema: OrmSchema, context: EntityRoutesContext): R
       method: 'GET',
       url: base,
       permission: permissionOf(def, 'read'),
-      schema: { query: listQuery(reader, true), response: { 200: many } },
+      schema: { query: listQuery(reader, true, searchableOf(def).length > 0), response: { 200: many } },
       handler: (ctx) =>
         runInUnitOfWork(db, async (em) => {
           const query = ctx.query;
@@ -510,12 +527,20 @@ export function entityRoutes(schema: OrmSchema, context: EntityRoutesContext): R
           const sort = sortOf(textOf(query['sort']), reader);
           const read = await need(ctx, 'read');
           const closed = closedOf(read.readable);
-          const where = whereOf(query, reader);
+          const filtered = whereOf(query, reader);
+          const search = searchWhere(def, textOf(query['q']));
+          // A person who may not read a field may not search it either.
           refuseNames(
             closed,
-            [...fields.map(nameOfKey), ...Object.keys(where), ...(sort ?? []).map((item) => item.field)],
+            [
+              ...fields.map(nameOfKey),
+              ...Object.keys(filtered),
+              ...(sort ?? []).map((item) => item.field),
+              ...(search === undefined ? [] : searchableOf(def).map((field) => field.name)),
+            ],
             'read',
           );
+          const where = search === undefined ? filtered : { ...filtered, $and: [search] };
           const result = await listPage(em, schema, {
             where,
             ...(read.scope === undefined ? {} : { scope: read.scope }),
@@ -647,6 +672,8 @@ export function entityRoutes(schema: OrmSchema, context: EntityRoutesContext): R
             ...(typeof ctx.query['locale'] === 'string' ? { locale: ctx.query['locale'] } : {}),
           });
           const data = strip(closed, shapeRow(schema, reader, found, fields, include));
+          // The lines of the record come with it, unless the caller asked for some fields only.
+          if (fields.length === 0) Object.assign(data, await readInline(em, links, String(found['id'])));
           // The version names the record, so it is the tag that a client sends back as If-Match (API-13).
           if (include.length === 0) ctx.header('etag', `W/"${String(data['version'])}"`);
           return { data };
@@ -660,25 +687,36 @@ export function entityRoutes(schema: OrmSchema, context: EntityRoutesContext): R
       url: base,
       permission: permissionOf(def, 'create'),
       idempotent: true,
-      schema: { body: toJsonSchema(def, 'create'), response: { 201: single } },
-      handler: (ctx) =>
-        runInUnitOfWork(db, async (em) => {
+      schema: { body: withInline(toJsonSchema(def, 'create'), links, 'write'), response: { 201: single } },
+      handler: async (ctx) => {
+        // The files that the body names are checked first: the media service opens a transaction of its own (UI-11).
+        await checkFiles(def, ctx, asRow(ctx.body));
+        return runInUnitOfWork(db, async (em) => {
           const write = await need(ctx, 'create');
-          const body = asRow(ctx.body);
-          checkWritable(write, body, 'create');
+          const { rest: sent, lines } = takeInline(links, asRow(ctx.body));
+          checkWritable(write, sent, 'create');
+          // A field that its condition hides is not part of the write, and one that its condition requires must have a value (UI-11).
+          const body = enforceConditions(def, defaultsOf(def), sent);
           const split = splitWrite(schema, body, 'create');
           if (!(await ctx.allows(def.name, 'create', { ...defaultsOf(def), ...split.all })))
             throw authzDenied(def.name, 'create', 'no-permission');
           const created = em.create(schema, split.own);
           await writeExtensions(em, created, split.extensions);
+          for (const [link, items] of lines) await writeInline(em, link, created, items, 'create', allowLines(ctx));
           const id = String(created['id']);
           emitEvent(em, { name: event('created'), payload: { id }, record: { entity: def.name, id, version: 1 } });
           recordAudit(em, { action: `${def.name}.create`, entity: def.name, recordId: id });
           await em.flush();
           ctx.status(201);
           ctx.header('location', `${base}/${id}`);
-          return { data: await respond(ctx, await writtenRow(em, schema, created)) };
-        }),
+          return {
+            data: {
+              ...(await respond(ctx, await writtenRow(em, schema, created))),
+              ...(await readInline(em, links, id)),
+            },
+          };
+        });
+      },
     });
   }
 
@@ -688,39 +726,57 @@ export function entityRoutes(schema: OrmSchema, context: EntityRoutesContext): R
       url: `${base}/:id`,
       requiresIfMatch: true,
       permission: permissionOf(def, 'update'),
-      schema: { params: idParams, body: toJsonSchema(def, 'update'), response: { 200: single } },
-      handler: (ctx) => {
+      schema: {
+        params: idParams,
+        body: withInline(toJsonSchema(def, 'update'), links, 'write'),
+        response: { 200: single },
+      },
+      handler: async (ctx) => {
         const id = String(ctx.params['id']);
         const expected = ifMatchOf(ctx);
+        await checkFiles(def, ctx, asRow(ctx.body));
         return withCurrent(db, schema, id, () =>
           runInUnitOfWork(db, async (em) => {
             const write = await need(ctx, 'update');
-            const body = asRow(ctx.body);
-            checkWritable(write, body, 'update');
+            const { rest: sent, lines } = takeInline(links, asRow(ctx.body));
+            checkWritable(write, sent, 'update');
             const found = await findScoped(em, schema, id, write.scope);
             if (found === null) throw recordNotFound();
             expectVersion(found, expected);
+            const body = enforceConditions(def, snapshotOf(def, found), sent);
             const split = splitWrite(schema, body, 'update');
             // The new state must be one that the caller may write: a row cannot be moved out of the rows that the caller owns.
             if (!(await ctx.allows(def.name, 'update', { ...snapshotOf(def, found), ...split.all })))
               throw authzDenied(def.name, 'update', 'no-permission');
             // A change of the extension fields only still changes the record, so its version moves (API-13).
-            em.assign(found, Object.keys(split.own).length === 0 ? { updatedAt: new Date() } : split.own);
+            // A change of the lines is a change of the record too: its version moves, so that a stale editor is told and the ETag is new.
+            em.assign(
+              found,
+              Object.keys(split.own).length === 0 || lines.size > 0
+                ? { ...split.own, updatedAt: new Date() }
+                : split.own,
+            );
             await writeExtensions(em, found, split.extensions);
+            for (const [link, items] of lines) await writeInline(em, link, found, items, 'update', allowLines(ctx));
             const next = (typeof found['version'] === 'number' ? found['version'] : 0) + 1;
             emitEvent(em, {
               name: event('updated'),
-              payload: { id, fields: Object.keys(body) },
+              payload: { id, fields: [...Object.keys(body), ...[...lines.keys()].map((link) => link.name)] },
               record: { entity: def.name, id, version: next },
             });
             recordAudit(em, {
               action: `${def.name}.update`,
               entity: def.name,
               recordId: id,
-              data: { fields: Object.keys(body) },
+              data: { fields: [...Object.keys(body), ...[...lines.keys()].map((link) => link.name)] },
             });
             await em.flush();
-            return { data: await respond(ctx, await writtenRow(em, schema, found)) };
+            return {
+              data: {
+                ...(await respond(ctx, await writtenRow(em, schema, found))),
+                ...(await readInline(em, links, id)),
+              },
+            };
           }),
         );
       },
@@ -960,7 +1016,23 @@ export function entityRoutes(schema: OrmSchema, context: EntityRoutesContext): R
         const next = (typeof row['version'] === 'number' ? row['version'] : 0) + 1;
         try {
           if (operation === 'update') {
-            const data = asRow(body['data']);
+            let data: Row;
+            try {
+              data = enforceConditions(def, snapshotOf(def, row), asRow(body['data']));
+            } catch (error) {
+              if (!(error instanceof ValidationFailed)) throw error;
+              outcomes.push({
+                id,
+                status: 'invalid',
+                error: {
+                  code: error.code,
+                  message: error.errors
+                    .map((issue) => `${issue.path.replace(/^body\./, '')} ${issue.message}`)
+                    .join('; '),
+                },
+              });
+              continue;
+            }
             const split = splitWrite(schema, data, 'update');
             if (!(await ctx.allows(def.name, 'update', { ...snapshotOf(def, row), ...split.all }))) {
               outcomes.push({

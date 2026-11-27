@@ -22,7 +22,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { request as httpRequest } from 'node:http';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -279,6 +279,30 @@ describe('section 7.1 the roles', () => {
     expect((await fetch(`${base}/api/v1/crm/ping`)).headers.get('content-security-policy')).toContain(
       "default-src 'none'",
     );
+  });
+
+  it('UI-22 a deploy keeps the hashed files of the release before for a day, so that a tab that is open still finds its chunks', async () => {
+    const fixture = makeProject();
+    fixtures.push(fixture);
+    const folder = join(fixture.root, 'node_modules/@bieberkit/admin-antd');
+    mkdirSync(join(folder, 'dist/app/assets'), { recursive: true });
+    writeFileSync(join(folder, 'package.json'), JSON.stringify({ name: '@bieberkit/admin-antd', version: '0.0.0' }));
+    writeFileSync(join(folder, 'dist/app/index.html'), '<!doctype html><title>one</title>');
+    writeFileSync(join(folder, 'dist/app/assets/chunk-one.js'), 'console.log("one")');
+    const first = await boot({ role: 'web', cwd: fixture.root, env: await testEnv(fixture.root) });
+    await first.stop();
+
+    // The next release has other files, and the old ones are not in it.
+    rmSync(join(folder, 'dist/app/assets/chunk-one.js'));
+    writeFileSync(join(folder, 'dist/app/assets/chunk-two.js'), 'console.log("two")');
+    const second = await boot({ role: 'web', cwd: fixture.root, env: await testEnv(fixture.root) });
+    running.push(second);
+    const base = `http://127.0.0.1:${String(second.port)}`;
+    expect(await (await fetch(`${base}/admin/assets/chunk-two.js`)).text()).toBe('console.log("two")');
+    const old = await fetch(`${base}/admin/assets/chunk-one.js`);
+    expect(old.status).toBe(200);
+    expect(await old.text()).toBe('console.log("one")');
+    expect((await fetch(`${base}/admin/assets/chunk-none.js`)).status).toBe(404);
   });
 
   it('UI-14 ADMIN_URL puts the admin under any path of the application, and /admin is not served then', async () => {

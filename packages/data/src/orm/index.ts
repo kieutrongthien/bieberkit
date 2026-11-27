@@ -133,6 +133,7 @@ export { Uuid7Type } from './uuid7-type.ts';
 export { BieberEntityManager } from './entity-manager.ts';
 export type { ReferenceVisibility } from './references.ts';
 export { restore, softDelete } from './softdelete.ts';
+export { childEntities, childRows, MAX_INLINE_ROWS } from './children.ts';
 export { currentTenantId, runAsTenant } from './tenant.ts';
 export { createMemoryReadYourWrites, READ_YOUR_WRITES_MS, useReadYourWrites } from './read-your-writes.ts';
 export type { MemoryReadYourWritesOptions, ReadYourWrites } from './read-your-writes.ts';
