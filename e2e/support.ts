@@ -116,9 +116,8 @@ export function mailedLink(email: string, port = 4310): string {
  */
 export const settle = (page: Page): Promise<unknown> =>
   page.evaluate(async () => {
-    const frame = (): Promise<unknown> => new Promise((resolve) => requestAnimationFrame(() => resolve(undefined)));
-    await frame();
-    await frame();
+    // Two frames: a change of the palette starts its transitions on the frame after it.
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
     await Promise.all(
       document
         .getAnimations()

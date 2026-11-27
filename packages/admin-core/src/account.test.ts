@@ -130,6 +130,16 @@ describe('UI-26 the password links', () => {
   });
 });
 
+/** One session as Better Auth lists it. */
+const entry = (id: string) => ({
+  id,
+  token: `t-${id}`,
+  userAgent: 'Firefox',
+  ipAddress: '203.0.113.1',
+  createdAt: '2026-11-01T00:00:00.000Z',
+  updatedAt: '2026-11-02T00:00:00.000Z',
+});
+
 describe('UI-26 the own account', () => {
   it('UI-26 changing the password sends the current one, and says whether to end the other sessions', async () => {
     const { client, calls } = api();
@@ -174,14 +184,6 @@ describe('UI-26 the own account', () => {
   });
 
   it('UI-26 the sessions come with this one marked', async () => {
-    const entry = (id: string) => ({
-      id,
-      token: `t-${id}`,
-      userAgent: 'Firefox',
-      ipAddress: '203.0.113.1',
-      createdAt: '2026-11-01T00:00:00.000Z',
-      updatedAt: '2026-11-02T00:00:00.000Z',
-    });
     const { client } = api({
       '/api/auth/list-sessions': () => json([entry('s1'), entry('s2')]),
       '/api/auth/get-session': () => json({ user: USER, session: { id: 's2', token: 't-s2' } }),
@@ -240,6 +242,8 @@ describe('UI-26 the own account', () => {
   });
 });
 
+const refusal = (code: string, status = 400): AdminApiError => new AdminApiError(status, code, 'English text', '');
+
 describe('UI-26 the rules of the screens', () => {
   it('UI-26 a code of six digits is sent without the spaces that an app shows', () => {
     expect(normalizeCode(' 123 456 ', 'totp')).toBe('123456');
@@ -274,8 +278,6 @@ describe('UI-26 the rules of the screens', () => {
     expect(deviceOf('curl/8.5.0')).toBe('curl/8.5.0');
     expect(deviceOf('')).toBe('');
   });
-
-  const refusal = (code: string, status = 400): AdminApiError => new AdminApiError(status, code, 'English text', '');
 
   it('AUTH-05 the two codes that ask for a second factor open the screen that sets it up', () => {
     expect(enrolmentNeeded(refusal('AUTH_MFA_REQUIRED', 403))).toBe(true);

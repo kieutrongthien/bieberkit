@@ -238,14 +238,13 @@ describeDialects('ROL the role service', ({ open }) => {
   });
 });
 
+/** Marks the account as having a second factor, which is the flag that the guard reads. */
+const withFactor = (app: AuthServer, id: string): Promise<unknown> =>
+  runInUnitOfWork(app.db, (em) => em.nativeUpdate(AuthUser, { id }, { twoFactorEnabled: true }));
+
+const flagOf = async (app: AuthServer, roleId: string): Promise<boolean> => (await getRole(app.db, roleId)).requireMfa;
+
 describeDialects('ROL-06 the second factor of a system role', ({ open }) => {
-  /** Marks the account as having a second factor, which is the flag that the guard reads. */
-  const withFactor = (app: AuthServer, id: string): Promise<unknown> =>
-    runInUnitOfWork(app.db, (em) => em.nativeUpdate(AuthUser, { id }, { twoFactorEnabled: true }));
-
-  const flagOf = async (app: AuthServer, roleId: string): Promise<boolean> =>
-    (await getRole(app.db, roleId)).requireMfa;
-
   it('ROL-06 a holder of the administrator role turns requireMfa of a system role on and off, and it is audited', async () => {
     const { app, adminRole, admin } = await world(open);
     await withFactor(app, admin.id);

@@ -52,7 +52,7 @@ export function MyAccount(): JSX.Element {
         activeKey={active}
         // A tab that is left is gone: no form of it stays on the page, and no password stays in one.
         destroyOnHidden
-        onChange={(tab) => void navigate({ to: '/account', search: { tab } as never, replace: true })}
+        onChange={(tab) => void navigate({ to: '/account', search: { tab }, replace: true })}
         items={[
           { key: 'profile', label: t('account.tab.profile'), children: <ProfileTab /> },
           { key: 'password', label: t('account.tab.password'), children: <PasswordTab /> },

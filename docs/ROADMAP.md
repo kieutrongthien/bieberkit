@@ -359,7 +359,7 @@ The admin screens of the base plugins, which M1.11 left to this milestone (`docs
 
 - [ ] Identity of the admin: default tokens, typography, sign in, empty, loading and error states, light and dark; the `theme` key still changes it; contrast, 360 px and the size budget hold (UI-23)
 - [ ] Frame of the admin: grouped navigation with icons, menu order (`admin.menu`, without it the order of `blank`), breadcrumb, go to page, account menu, permissions, and the brand of a project (UI-24, UI-33)
-- [ ] **[D]** Account screens (`auth-ui`): sign in with a second factor, forgotten and reset password, invitation, enrolment, own profile and sessions (UI-26, UI-25)
+- [x] **[D]** Account screens (`auth-ui`): sign in with a second factor, forgotten and reset password, invitation, enrolment, own profile and sessions (UI-26, UI-25). Evidence: `docs/modules/admin-account.md`, `auth/src/account.dialects.test.ts`, `auth/src/role-lifecycle.dialects.test.ts`, `server/src/account.test.ts`, `admin-core/src/account.test.ts`, the plugin tests of `users` and `roles`, and the browser tests of `e2e/account.spec.ts` with axe at both widths and both palettes. Not tested: a scan by a real authenticator app and a real mail server. Passkeys and magic link stay off
 - [ ] **[D]** Users screens (UI-27, UI-25)
 - [ ] **[D]** Roles screens and permission editor (UI-28, UI-25)
 - [ ] Settings screens, with security policies, export and import (UI-29, UI-25)

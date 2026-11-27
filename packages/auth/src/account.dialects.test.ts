@@ -136,14 +136,14 @@ describeDialects('UI-26 the password links', ({ open }) => {
   });
 });
 
-describeDialects('UI-26 the sessions of an account', ({ open }) => {
-  const resetOwnPassword = async (app: AuthServer, email: string): Promise<ServerReply> => {
-    await app.api('POST', '/request-password-reset', { payload: { email, redirectTo: RESET_PAGE } });
-    return app.api('POST', '/reset-password', {
-      payload: { token: mailOfKind(app, 'reset')?.token, newPassword: NEW_PASSWORD },
-    });
-  };
+const resetOwnPassword = async (app: AuthServer, email: string): Promise<ServerReply> => {
+  await app.api('POST', '/request-password-reset', { payload: { email, redirectTo: RESET_PAGE } });
+  return app.api('POST', '/reset-password', {
+    payload: { token: mailOfKind(app, 'reset')?.token, newPassword: NEW_PASSWORD },
+  });
+};
 
+describeDialects('UI-26 the sessions of an account', ({ open }) => {
   it('AUTH-06 a password that is set through a link ends every session of the account', async () => {
     const app = await authServer(open);
     const { first, second } = await twoSessions(app, 'an@example.vn');

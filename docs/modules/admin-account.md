@@ -27,7 +27,7 @@
 - Packages: `@bieberkit/auth`, `@bieberkit/server`, `@bieberkit/admin-core`, `@bieberkit/admin-antd`, `@bieberkit/plugin-roles`, `@bieberkit/plugin-users`
 - Layer: contracts and product
 - Spec sections: UI-26, UI-25, AUTH-01, AUTH-03 to AUTH-06, USR-09, USR-10, USR-12, ROL-06, ROL-07, POL-02, POL-05
-- Status: **Approved by the maintainer on 2026-11-28**, as one delivery with one review of the tests. A second factor is optional, and a person must set one up only when an administrator requires it (decided on 2026-11-27).
+- Status: **Implemented on 2026-11-28**, approved as one delivery with one review of the tests. A second factor is optional, and a person must set one up only when an administrator requires it (decided on 2026-11-27).
 
 ## Purpose
 
@@ -37,7 +37,7 @@ Passkeys and magic link are not turned on by this change (see "Later").
 
 ## What is there today
 
-Read from the code on 2026-11-27, not run.
+Read from the code on 2026-11-27, before this change.
 
 | Subject                    | Today                                                                                                                     |
 | -------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
@@ -145,6 +145,9 @@ me(), renameMe(name)
 // @bieberkit/auth
 createAuth({ …, pages?: { resetPassword: string } })           // behavior 5
 updateRole(db, roleId, changes)                        // behaviors 3 and 4; the actor is the one of the request
+
+// @bieberkit/http
+Principal.mfaForAll?: true                             // the rule for everyone is on, for GET /users/me
 ```
 
 `signIn` changes its answer, so the change has a changeset that says so.
@@ -167,18 +170,7 @@ One branch: all tests first, a stop for the maintainer, then all the code. The r
 
 ## Spec changes
 
-Made in the same commit as the code that they describe.
-
-- **AUTH-05:** a second factor is required only of the users that it is asked of: holders of a role with `requireMfa`, or everyone with `security.mfa.required-for-all`. No role has the flag by default, the administrator role included.
-- **AUTH-03:** TOTP is on in every project.
-- **USR-12:** `GET /users/me` carries `mfaRequired`.
-- **ROL-06:** system roles stay unchangeable, except `requireMfa`, as behaviors 3 and 4 say.
-- **AUTH-05:** turning the factor on ends the other sessions (behavior 17).
-- **USR-10:** the link leads to the reset page of the admin.
-- **AUTH-06 or a new AUTH ID:** a password reset ends the sessions.
-- Document history.
-
-[auth.md](auth.md) says that the MFA flag of a system role cannot change. It changes with the code.
+In `docs/spec/SPEC.md` 0.8.39: AUTH-03, AUTH-05, AUTH-06, ROL-06, USR-10, USR-12 and UI-26. [auth.md](auth.md) says the same of the system role.
 
 ## Tests
 
@@ -196,6 +188,13 @@ The browser tests make TOTP codes from the secret on the screen, as `auth/src/te
 - **Passkeys and magic link** need a config key, and their own design. **Magic link must not be turned on before this is solved:** Better Auth 1.7.25 asks for the second factor only after `/sign-in/email`, `/sign-in/username` and `/sign-in/phone-number`, while the authenticator sets `mfa: true` for every session of a user who has TOTP on. A session from a magic link would pass `requireMfa` without a code. This comes from reading both sources, and no test shows it yet.
 - The mails stay in English until M-02 (M2.4).
 
+## Found while building
+
+- **Colors of Ant Design.** The background that it derives for a "success" tag from the green of the theme reads at 2.7:1. The tag of the state of the factor and the one of this device use the colors of the theme.
+- **Four tabs at 360 px.** Ant Design adds a button for the tabs that do not fit, inside the list of tabs, which ARIA does not allow. The tabs of the account wrap.
+- **Sizes.** The initial JavaScript of the admin is 330.5 kB compressed, of 400 kB.
+
 ## Open questions
 
-None.
+- The hover color that Ant Design derives for a default button reads at 3.77:1 on white (the button "Add filter" of a list). This is older than this change, and it is a decision of the theme (UI-23).
+- A reset through a link while somebody else is signed in at the same browser writes `auth.password.reset` with the id of the signed-in person. This is older than this change (the audit takes the actor of the request when the answer names no user), and the page of the admin now makes the case easier to reach.

@@ -83,10 +83,10 @@ export interface AccountClient {
 
 /** What the calls need of the client: one request, with the failures of the API as errors, and the user of an answer. */
 export interface Transport {
-  request(method: string, path: string, body?: unknown): Promise<unknown>;
-  userOf(body: unknown): SessionUser;
+  readonly request: (method: string, path: string, body?: unknown) => Promise<unknown>;
+  readonly userOf: (body: unknown) => SessionUser;
   /** Whether an error of `request` is the answer 404. */
-  isNotFound(error: unknown): boolean;
+  readonly isNotFound: (error: unknown) => boolean;
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null;

@@ -47,7 +47,7 @@ export function GraceNotice(): JSX.Element | null {
       title={
         <>
           {t('grace.text', { date })}{' '}
-          <Link to="/account" search={{ tab: 'factor' } as never}>
+          <Link to="/account" search={{ tab: 'factor' }}>
             {t('grace.link')}
           </Link>
         </>
