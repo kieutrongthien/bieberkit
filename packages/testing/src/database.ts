@@ -63,7 +63,7 @@ const env = (url: string, dialect: Dialect) =>
   }) as const;
 /** The tables that the migration steps make, which the schema must not make a second time. */
 const STEP_TABLES =
-  /\bbk_(?:auth_|audit_log|migration|plugin_migrations|outbox|sequences|comments|attachments|timeline|tags|jobs|locks)/;
+  /\bbk_(?:auth_|audit_|migration|plugin_migrations|outbox|sequences|comments|attachments|timeline|tags|jobs|locks)/;
 
 const TEST_APP_KEY = Buffer.alloc(32, 7).toString('base64');
 

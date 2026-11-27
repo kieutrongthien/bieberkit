@@ -922,6 +922,12 @@ The policies of sessions, second factors and networks are settings of the group 
 - **ROL-08** A role is created, changed or assigned only with permissions that the actor holds (`ROLES_ESCALATION`, 403, audited). The administrator role is exempt, and a system role is not given by anybody else.
 - **ROL-09** A role can be given to a user for one group only (`groupId` on `POST .../roles/:id/assign`). The project puts users in groups with `PUT /api/v1/users/users/:id/groups` or `groups` on create, 1 to 50 groups of 1 to 120 characters, and the framework knows no organization model. A caller whose roles with `users.*` permissions are all limited to groups sees and changes the users of those groups only: a user outside them is `USERS_NOT_FOUND` (404), and a new user or a move must stay inside them (`USERS_OUT_OF_SCOPE`, 403). A role given without a group, the administrator role and an API key are not limited. Auth migration 0.7.0 adds `bk_auth_user_roles.scope_group` and `bk_auth_user_groups`. A change of groups is audited as `users.user.groups-changed`.
 
+### 12.9 Audit for an enterprise (slice S6, third part)
+
+- **AUD-07** `AUDIT_LOG_MIRROR=true` (default off) writes every audit entry to the outbox in the transaction that wrote it, and a worker job logs it after commit as one structured line with `audit: true`, so a log shipper delivers it to a SIEM or to storage that the database administrator cannot change. The line goes through the logger, so SEC-09 redaction applies, and the entry already had its personal data masked. The request never waits for it.
+- **AUD-08** `GET /api/v1/audit-log/entries` and `GET .../export` take `after=<entry id>` and then read oldest first, each entry once. `meta.nextAfter` is the id to resume from. `after` and `cursor` together, or an `after` that is not an id, are `AUDIT_AFTER_INVALID` (400).
+- **AUD-09** `POST /api/v1/audit-log/holds` places a hold on an entity, a record or an actor, with a reason, `GET` lists the active ones (`status=released|all` for others) and `DELETE .../holds/:id` releases one by a mark, so its row stays. Permission `audit-log.hold` to place and release, `audit-log.read` to list. A hold covers the entries that match every field it sets, in its tenant, or every tenant when placed outside one. `audit:prune` never deletes an entry under an active hold and says how many it kept (`kept` in its data and in its text). Placing and releasing are audited (`audit-log.hold.placed`, `audit-log.hold.released`). At most 200 holds are active at once (`AUDIT_HOLD_LIMIT`, 409). The table `bk_audit_holds` is a framework table (data migration step 0.5.0, ADR 0032).
+
 ## 13. HTTP API
 
 The API is REST over JSON on Fastify 5, described by an OpenAPI 3.1 document generated at build time. Entity routes are generated from `api` settings, and custom routes use the same validation and permission helpers.
@@ -1704,6 +1710,7 @@ Open questions:
 
 | Version | Date | Changes |
 | --- | --- | --- |
+| 0.8.20 | 2026-11-27 | Base plugins S6, audit: section 12.9, AUD-07 to AUD-09; the audit mirror, `after=` for a SIEM, legal holds and `kept` in `audit:prune` (ADR 0032) |
 | 0.8.19 | 2026-11-27 | Base plugins S6, managed identities: section 12.8, IDN-02, IDN-03, ROL-08 and ROL-09; `USERS_MANAGED_EXTERNALLY`, `upsertExternalUser`, `setExternalDisabled`, groups and roles limited to a group |
 | 0.8.18 | 2026-11-27 | Base plugins S6, policies: section 12.7, POL-01 to POL-05; the `PolicyReader` port (ADR 0031), the `security.*` settings, `ipRestricted` roles, known devices and the `guard` of a setting declaration |
 | 0.8.17 | 2026-11-27 | Base plugins S5: section 12.6, AUD-01 to AUD-06; audit-log filters, one entry with its actor, the export, the actions, tenant reads, and `bieberkit audit:prune` in section 5.2 |

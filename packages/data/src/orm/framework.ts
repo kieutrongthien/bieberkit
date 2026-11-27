@@ -45,6 +45,7 @@ export const ATTACHMENT_TABLE = 'bk_attachments';
 export const TIMELINE_TABLE = 'bk_timeline';
 /** The class name of the audit schema. The unit of work refuses to change an entity of this name (DATA-25). */
 export const AUDIT_ENTITY = 'bieberkit.AuditLog';
+export const AUDIT_HOLD_TABLE = 'bk_audit_holds';
 
 /** A row of the outbox. Times are epoch milliseconds, and bigint columns may come back as text. */
 export interface OutboxEntryRow {
@@ -127,6 +128,21 @@ export interface AuditLogRow {
   recordId?: string | null;
   reason?: string | null;
   data?: string | null;
+}
+
+/** A legal hold: the audit entries that match every field it sets are never pruned while it is not released (AUD-09, ADR 0032). */
+export interface AuditHoldRow {
+  id: string;
+  /** Empty means every tenant. */
+  tenant?: string | null;
+  entity?: string | null;
+  recordId?: string | null;
+  actorId?: string | null;
+  reason: string;
+  createdAt: Date;
+  createdBy?: string | null;
+  releasedAt?: Date | null;
+  releasedBy?: string | null;
 }
 
 const uuid = <T extends object>(extra: T): { type: typeof Uuid7Type } & T => ({ type: Uuid7Type, ...extra });
@@ -261,11 +277,30 @@ export const TimelineEntry: EntitySchema<TimelineEntryRow> = new EntitySchema<Ti
   indexes: [{ name: 'bk_timeline_record_index', properties: ['tenant', 'entity', 'recordId'] }],
 });
 
+export const AuditHold: EntitySchema<AuditHoldRow> = new EntitySchema<AuditHoldRow>({
+  name: 'bieberkit.AuditHold',
+  tableName: AUDIT_HOLD_TABLE,
+  properties: {
+    id: uuid({ primary: true, onCreate: () => uuid7() }),
+    tenant: uuid({ fieldName: 'tenant_id', nullable: true }),
+    entity: { type: 'string', length: 200, nullable: true },
+    recordId: uuid({ nullable: true }),
+    actorId: uuid({ nullable: true }),
+    reason: { type: 'text' },
+    createdAt: { type: DateTimeType, length: 3, onCreate: () => new Date() },
+    createdBy: uuid({ nullable: true }),
+    releasedAt: { type: DateTimeType, length: 3, nullable: true },
+    releasedBy: uuid({ nullable: true }),
+  },
+  indexes: [{ name: 'bk_audit_holds_released_index', properties: ['releasedAt'] }],
+});
+
 /** The schemas that `createDatabase` adds to the entities of the project. */
 export const frameworkEntities: readonly EntitySchema[] = [
   OutboxEntry,
   OutboxProcessed,
   AuditLog,
+  AuditHold,
   Sequence,
   Comment,
   Tag,
@@ -491,6 +526,40 @@ export const dataMigrationSteps: readonly PluginMigrationStep[] = [
       await trx.schema.alterTable(OUTBOX_TABLE).addColumn('traceparent', 'varchar(64)').execute();
     },
     '0.4.0',
+  ),
+  // The legal holds of the audit log (AUD-09, ADR 0032). A hold is released by a mark, so its row stays.
+  step(
+    'audit-holds-create',
+    'expand',
+    async (trx: Trx, dialect) => {
+      await trx.schema
+        .createTable(AUDIT_HOLD_TABLE)
+        .addColumn('id', uuidType(dialect), (c) => c.notNull())
+        .addColumn('tenant_id', uuidType(dialect))
+        .addColumn('entity', 'varchar(200)')
+        .addColumn('record_id', uuidType(dialect))
+        .addColumn('actor_id', uuidType(dialect))
+        .addColumn('reason', 'text', (c) => c.notNull())
+        .addColumn('created_at', instant(dialect), (c) => c.notNull())
+        .addColumn('created_by', uuidType(dialect))
+        .addColumn('released_at', instant(dialect))
+        .addColumn('released_by', uuidType(dialect))
+        .addPrimaryKeyConstraint(`${AUDIT_HOLD_TABLE}_pkey`, ['id'])
+        .execute();
+    },
+    '0.5.0',
+  ),
+  step(
+    'audit-holds-released-index',
+    'expand',
+    async (trx: Trx) => {
+      await trx.schema
+        .createIndex('bk_audit_holds_released_index')
+        .on(AUDIT_HOLD_TABLE)
+        .column('released_at')
+        .execute();
+    },
+    '0.5.0',
   ),
 ];
 

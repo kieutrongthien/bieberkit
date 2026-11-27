@@ -54,7 +54,7 @@ const ENV_NAME = { postgres: 'DATABASE_URL_POSTGRES', mysql: 'DATABASE_URL_MYSQL
 const env = (url: string, dialect: Dialect) =>
   ({ DB_CONNECTION: dialect, DATABASE_URL: url, DATABASE_READ_URLS: [], DB_POOL_MAX: 5 }) as const;
 const STEP_TABLES =
-  /\bbk_(?:auth_|audit_log|migration|plugin_migrations|outbox|sequences|comments|attachments|timeline|tags|jobs|locks)/;
+  /\bbk_(?:auth_|audit_|migration|plugin_migrations|outbox|sequences|comments|attachments|timeline|tags|jobs|locks)/;
 
 async function provision(dialect: 'postgres' | 'mysql', serverUrl: string) {
   const name = `bk_queue_${randomBytes(6).toString('hex')}`;

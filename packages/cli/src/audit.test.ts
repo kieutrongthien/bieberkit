@@ -76,7 +76,7 @@ describe('AUD-06 audit:prune', () => {
 
     const counted = await run(root, ['audit:prune', '--before', tomorrow, '--json']);
     expect(counted.code).toBe(0);
-    expect(counted.data).toEqual({ before: `${tomorrow}T00:00:00.000Z`, count: before.length, pruned: false });
+    expect(counted.data).toEqual({ before: `${tomorrow}T00:00:00.000Z`, count: before.length, pruned: false, kept: 0 });
     const told = await run(root, ['audit:prune', '--before', tomorrow]);
     expect(told.out).toContain(`${String(before.length)} audit entries are older than ${tomorrow}T00:00:00.000Z`);
     expect(told.out).toContain('--yes');
@@ -84,7 +84,7 @@ describe('AUD-06 audit:prune', () => {
 
     const pruned = await run(root, ['audit:prune', '--before', tomorrow, '--yes', '--json']);
     expect(pruned.code).toBe(0);
-    expect(pruned.data).toEqual({ before: `${tomorrow}T00:00:00.000Z`, count: before.length, pruned: true });
+    expect(pruned.data).toEqual({ before: `${tomorrow}T00:00:00.000Z`, count: before.length, pruned: true, kept: 0 });
     expect(await auditOf(root)).toEqual(['audit.pruned']);
   });
 

@@ -142,13 +142,42 @@ async function viewsOf(db: Database, rows: readonly AuditLogRow[]): Promise<Entr
 }
 
 /** One page, newest first. The ids are UUIDv7, so their order is the order of the writes, and a cursor on the id skips no row. */
-async function pageOf(db: Database, where: Where, size: number, cursor: string | undefined): Promise<AuditLogRow[]> {
+async function pageOf(
+  db: Database,
+  where: Where,
+  size: number,
+  cursor: string | undefined,
+  ascending = false,
+): Promise<AuditLogRow[]> {
   return runInUnitOfWork(db, (em) =>
-    em.find(AuditLog, cursor === undefined ? where : { ...where, id: { $lt: cursor } }, {
-      orderBy: { id: 'desc' },
+    em.find(AuditLog, cursor === undefined ? where : { ...where, id: { [ascending ? '$gt' : '$lt']: cursor } }, {
+      orderBy: { id: ascending ? 'asc' : 'desc' },
       limit: size,
     }),
   );
+}
+
+/**
+ * One page after an entry, oldest first, for a SIEM that polls (AUD-08). `nextAfter` is the id to resume from: the last entry of the
+ * page, or the one that was given when nothing is newer. Each entry is read once and in order.
+ */
+export async function listAfter(
+  db: Database,
+  input: { readonly where: Where; readonly size: number; readonly after: string },
+): Promise<{ data: EntryView[]; meta: { pageSize: number; nextCursor: null; nextAfter: string } }> {
+  if (!isUuid(input.after)) {
+    throw new HttpError(
+      'AUDIT_AFTER_INVALID',
+      400,
+      'after is not the id of an entry.',
+      'Give the id of the last entry read.',
+    );
+  }
+  const rows = await pageOf(db, input.where, input.size, input.after.toLowerCase(), true);
+  return {
+    data: await viewsOf(db, rows),
+    meta: { pageSize: input.size, nextCursor: null, nextAfter: rows.at(-1)?.id ?? input.after.toLowerCase() },
+  };
 }
 
 const cursorOf = (cursor: string | undefined): string | undefined =>
@@ -202,19 +231,27 @@ export async function actionsOf(db: Database, scope: string | undefined): Promis
 }
 
 /** Whether more than `max` entries match, found with one row past the limit and no count (AUD-03). */
-export async function moreThan(db: Database, where: Where, max: number): Promise<boolean> {
+export async function moreThan(db: Database, where: Where, max: number, after?: string): Promise<boolean> {
+  const bounded = after === undefined ? where : { ...where, id: { $gt: after.toLowerCase() } };
   const rows = await runInUnitOfWork(db, (em) =>
-    em.find(AuditLog, where, { orderBy: { id: 'desc' }, offset: max, limit: 1, fields: ['id'] }),
+    em.find(AuditLog, bounded, { orderBy: { id: 'desc' }, offset: max, limit: 1, fields: ['id'] }),
   );
   return rows.length > 0;
 }
 
 /** The entries of an export, page by page by keyset, at most `max` of them. */
-export async function* exportPages(db: Database, where: Where, max: number, size = 500): AsyncGenerator<EntryView[]> {
-  let cursor: string | undefined;
+export async function* exportPages(
+  db: Database,
+  where: Where,
+  max: number,
+  size = 500,
+  after?: string,
+): AsyncGenerator<EntryView[]> {
+  const ascending = after !== undefined;
+  let cursor: string | undefined = after?.toLowerCase();
   let left = max;
   while (left > 0) {
-    const rows = await pageOf(db, where, Math.min(size, left), cursor);
+    const rows = await pageOf(db, where, Math.min(size, left), cursor, ascending);
     if (rows.length === 0) return;
     yield await viewsOf(db, rows);
     left -= rows.length;

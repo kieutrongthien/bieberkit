@@ -33,15 +33,18 @@ export const BUILTIN_PLUGIN_INDEX: PluginIndex = {
       dialects: ['mysql', 'postgres', 'sqlite'],
       requires: {},
       conflicts: [],
-      env: ['AUDIT_LOG_EXPORT_MAX_ROWS'],
+      env: ['AUDIT_LOG_EXPORT_MAX_ROWS', 'AUDIT_LOG_MIRROR'],
       tables: [],
       routes: [
+        'DELETE /api/v1/audit-log/holds/:id',
         'GET /api/v1/audit-log/actions',
         'GET /api/v1/audit-log/entries',
         'GET /api/v1/audit-log/entries/:id',
         'GET /api/v1/audit-log/export',
+        'GET /api/v1/audit-log/holds',
+        'POST /api/v1/audit-log/holds',
       ],
-      permissions: ['audit-log.export', 'audit-log.read'],
+      permissions: ['audit-log.export', 'audit-log.hold', 'audit-log.read'],
       admin: [],
     },
     envRows: [
@@ -53,6 +56,15 @@ export const BUILTIN_PLUGIN_INDEX: PluginIndex = {
         secret: false,
         description:
           'The most entries that one export of the audit log holds; a longer one is cut and says so (AUD-03)',
+      },
+      {
+        key: 'AUDIT_LOG_MIRROR',
+        type: 'boolean',
+        required: false,
+        default: 'false',
+        secret: false,
+        description:
+          'Copy every audit entry to the log as one line with audit: true, after commit, for a SIEM (AUD-07)',
       },
     ],
   },

@@ -23,14 +23,28 @@
  */
 
 import { Readable } from 'node:stream';
+import * as z from 'zod/mini';
 import { definePlugin, env } from '@bieberkit/core';
 import type { PluginDef } from '@bieberkit/core';
 import { pageSize } from '@bieberkit/data';
-import { recordAudit, runInTransaction } from '@bieberkit/data/orm';
-import { defineRoute } from '@bieberkit/http';
+import { AUDIT_RECORDED_EVENT, recordAudit, runInTransaction } from '@bieberkit/data/orm';
+import { defineRoute, HttpError } from '@bieberkit/http';
 import type { RouteContext, RouteDef } from '@bieberkit/http';
+import { defineJob } from '@bieberkit/queue';
+import type { JobDef, QueueSubscription } from '@bieberkit/queue';
+import { listHolds, placeHold, releaseHold } from './holds.ts';
 import { CSV_COLUMNS, csvLine, ndjsonLine } from './csv.ts';
-import { actionsOf, exportPages, FILTER_KEYS, listEntries, moreThan, oneEntry, scopeOf, whereOf } from './entries.ts';
+import {
+  actionsOf,
+  exportPages,
+  FILTER_KEYS,
+  listAfter,
+  listEntries,
+  moreThan,
+  oneEntry,
+  scopeOf,
+  whereOf,
+} from './entries.ts';
 import type { Filters } from './entries.ts';
 
 export type { Actor, EntryView, Filters } from './entries.ts';
@@ -48,6 +62,8 @@ const filterQuery = {
   actorId: { type: 'string', format: 'uuid' },
   requestId: { type: 'string', minLength: 1, maxLength: 64 },
 } as const;
+
+const afterQuery = { after: { type: 'string', format: 'uuid' } } as const;
 
 const actor = {
   type: ['object', 'null'],
@@ -102,6 +118,7 @@ export const entries: RouteDef = defineRoute({
       type: 'object',
       properties: {
         ...filterQuery,
+        ...afterQuery,
         pageSize: { type: 'integer', minimum: 1 },
         cursor: { type: 'string', maxLength: 1024 },
         withTotal: { type: 'boolean' },
@@ -118,6 +135,7 @@ export const entries: RouteDef = defineRoute({
             properties: {
               pageSize: { type: 'integer' },
               nextCursor: { type: ['string', 'null'] },
+              nextAfter: { type: 'string' },
               total: { type: 'integer' },
             },
             required: ['pageSize', 'nextCursor'],
@@ -129,6 +147,21 @@ export const entries: RouteDef = defineRoute({
   },
   handler: (ctx) => {
     const cursor = ctx.query['cursor'];
+    const after = ctx.query['after'];
+    if (typeof after === 'string') {
+      if (typeof cursor === 'string')
+        throw new HttpError(
+          'AUDIT_AFTER_INVALID',
+          400,
+          'Send after or cursor, not both.',
+          'A SIEM resumes with after.',
+        );
+      return listAfter(ctx.services.database, {
+        where: whereFor(ctx),
+        size: pageSize(ctx.query['pageSize']),
+        after,
+      });
+    }
     return listEntries(ctx.services.database, {
       where: whereFor(ctx),
       size: pageSize(ctx.query['pageSize']),
@@ -181,7 +214,7 @@ const exported: RouteDef = defineRoute({
   schema: {
     query: {
       type: 'object',
-      properties: { ...filterQuery, format: { type: 'string', enum: ['csv', 'ndjson'] } },
+      properties: { ...filterQuery, ...afterQuery, format: { type: 'string', enum: ['csv', 'ndjson'] } },
       required: ['format'],
       additionalProperties: false,
     },
@@ -199,7 +232,8 @@ const exported: RouteDef = defineRoute({
       await em.flush();
     });
     // Headers go before the body, so whether the export is cut is known first, from one row past the limit.
-    if (await moreThan(db, where, max)) ctx.header('x-export-truncated', 'true');
+    const after = typeof ctx.query['after'] === 'string' ? ctx.query['after'] : undefined;
+    if (await moreThan(db, where, max, after)) ctx.header('x-export-truncated', 'true');
     const day = new Date().toISOString().slice(0, 10);
     ctx.header('content-type', format === 'csv' ? 'text/csv; charset=utf-8' : 'application/x-ndjson');
     ctx.header('content-disposition', `attachment; filename="audit-log-${day}.${format}"`);
@@ -207,11 +241,136 @@ const exported: RouteDef = defineRoute({
     const line = format === 'csv' ? csvLine : ndjsonLine;
     async function* body(): AsyncGenerator<string> {
       if (format === 'csv') yield `${CSV_COLUMNS.join(',')}\n`;
-      for await (const page of exportPages(db, where, max)) yield page.map(line).join('');
+      for await (const page of exportPages(db, where, max, 500, after)) yield page.map(line).join('');
     }
     return Readable.from(body());
   },
 });
+
+const hold = {
+  type: 'object',
+  properties: {
+    id: { type: 'string' },
+    tenant: { type: ['string', 'null'] },
+    entity: { type: ['string', 'null'] },
+    recordId: { type: ['string', 'null'] },
+    actorId: { type: ['string', 'null'] },
+    reason: { type: 'string' },
+    createdAt: { type: 'string' },
+    createdBy: { type: ['string', 'null'] },
+    releasedAt: { type: ['string', 'null'] },
+    releasedBy: { type: ['string', 'null'] },
+  },
+  required: ['id', 'reason', 'createdAt'],
+} as const;
+
+const holds: RouteDef = defineRoute({
+  method: 'GET',
+  url: `${BASE}/holds`,
+  permission: 'audit-log.read',
+  schema: {
+    query: {
+      type: 'object',
+      properties: { status: { type: 'string', enum: ['active', 'released', 'all'] } },
+      additionalProperties: false,
+    },
+    response: {
+      200: { type: 'object', properties: { data: { type: 'array', items: hold } }, required: ['data'] },
+    },
+  },
+  async handler(ctx) {
+    const status = ctx.query['status'] === 'released' || ctx.query['status'] === 'all' ? ctx.query['status'] : 'active';
+    return { data: await listHolds(ctx.services.database, { scope: scopeOf(ctx.tenantId), status }) };
+  },
+});
+
+const placed: RouteDef = defineRoute({
+  method: 'POST',
+  url: `${BASE}/holds`,
+  permission: 'audit-log.hold',
+  schema: {
+    body: {
+      type: 'object',
+      properties: {
+        entity: { type: 'string', minLength: 1, maxLength: 200 },
+        recordId: { type: 'string', format: 'uuid' },
+        actorId: { type: 'string', format: 'uuid' },
+        reason: { type: 'string', minLength: 1, maxLength: 1000 },
+      },
+      required: ['reason'],
+      additionalProperties: false,
+    },
+    response: { 201: hold },
+  },
+  async handler(ctx) {
+    const field = (name: string): string | undefined => {
+      const value: unknown = Reflect.get(Object(ctx.body), name);
+      return typeof value === 'string' ? value : undefined;
+    };
+    const made = await placeHold(ctx.services.database, {
+      entity: field('entity'),
+      recordId: field('recordId'),
+      actorId: field('actorId'),
+      reason: field('reason') ?? '',
+      scope: scopeOf(ctx.tenantId),
+    });
+    ctx.status(201);
+    return made;
+  },
+});
+
+const released: RouteDef = defineRoute({
+  method: 'DELETE',
+  url: `${BASE}/holds/:id`,
+  permission: 'audit-log.hold',
+  schema: {
+    params: { type: 'object', properties: { id: { type: 'string', format: 'uuid' } }, required: ['id'] },
+    response: { 204: { type: 'null' } },
+  },
+  async handler(ctx) {
+    await releaseHold(ctx.services.database, String(ctx.params['id']), scopeOf(ctx.tenantId));
+    ctx.status(204);
+    return undefined;
+  },
+});
+
+/** What the outbox event of an audit entry carries (AUD-07). */
+export interface RecordedEntry {
+  readonly id: string;
+  readonly at: string;
+  readonly action: string;
+  readonly entity: string | null;
+  readonly recordId: string | null;
+  readonly actorId: string | null;
+  readonly requestId: string | null;
+  readonly tenant: string | null;
+  readonly reason: string | null;
+  readonly data: unknown;
+}
+
+/** Copies an audit entry to the log as one structured line, after commit, for a shipper to carry to a SIEM (AUD-07). */
+export const mirrorJob: JobDef<RecordedEntry> = defineJob<RecordedEntry>({
+  name: 'audit-log.mirror',
+  input: z.object({
+    id: z.string(),
+    at: z.string(),
+    action: z.string(),
+    entity: z.nullable(z.string()),
+    recordId: z.nullable(z.string()),
+    actorId: z.nullable(z.string()),
+    requestId: z.nullable(z.string()),
+    tenant: z.nullable(z.string()),
+    reason: z.nullable(z.string()),
+    data: z.unknown(),
+  }),
+  attempts: 10,
+  handler(recorded, context) {
+    // The logger redacts secrets and the configured keys (SEC-09). The entry had its personal data masked when it was written.
+    context.log.info('audit', { audit: true, ...recorded });
+  },
+});
+
+export const subscriptions: readonly QueueSubscription[] = [{ event: AUDIT_RECORDED_EVENT, job: mirrorJob }];
 
 import pkg from '../package.json' with { type: 'json' };
 
@@ -225,9 +384,15 @@ const plugin: PluginDef = definePlugin({
       .int({ min: 1, max: 10_000_000 })
       .default(DEFAULT_EXPORT_MAX)
       .describe('The most entries that one export of the audit log holds; a longer one is cut and says so (AUD-03)'),
+    AUDIT_LOG_MIRROR: env
+      .boolean()
+      .default(false)
+      .describe('Copy every audit entry to the log as one line with audit: true, after commit, for a SIEM (AUD-07)'),
   },
-  permissions: ['audit-log.read', 'audit-log.export'],
-  routes: [entries, one, actions, exported],
+  permissions: ['audit-log.read', 'audit-log.export', 'audit-log.hold'],
+  routes: [entries, one, actions, exported, holds, placed, released],
+  jobs: [mirrorJob],
+  subscriptions,
 });
 
 export default plugin;

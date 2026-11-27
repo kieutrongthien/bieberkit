@@ -52,8 +52,10 @@
     "@bieberkit/core": "workspace:*",
     "@bieberkit/data": "workspace:*",
     "@bieberkit/http": "workspace:*",
+    "@bieberkit/queue": "workspace:*",
     "@mikro-orm/core": "7.2.9",
-    "@mikro-orm/sql": "7.2.9"
+    "@mikro-orm/sql": "7.2.9",
+    "zod": "4.6.7"
   },
   "devDependencies": {
     "@bieberkit/testing": "workspace:*"
@@ -71,17 +73,22 @@
     "requires": {},
     "conflicts": [],
     "env": [
-      "AUDIT_LOG_EXPORT_MAX_ROWS"
+      "AUDIT_LOG_EXPORT_MAX_ROWS",
+      "AUDIT_LOG_MIRROR"
     ],
     "tables": [],
     "routes": [
+      "DELETE /api/v1/audit-log/holds/:id",
       "GET /api/v1/audit-log/actions",
       "GET /api/v1/audit-log/entries",
       "GET /api/v1/audit-log/entries/:id",
-      "GET /api/v1/audit-log/export"
+      "GET /api/v1/audit-log/export",
+      "GET /api/v1/audit-log/holds",
+      "POST /api/v1/audit-log/holds"
     ],
     "permissions": [
       "audit-log.export",
+      "audit-log.hold",
       "audit-log.read"
     ],
     "admin": []

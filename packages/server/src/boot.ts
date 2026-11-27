@@ -123,6 +123,8 @@ export async function boot(options: BootOptions): Promise<Running> {
     const db = await createDatabase(env, {
       entities: [...schemas, ...authEntities],
       audit: 'table',
+      // The audit-log plugin copies each entry to the log after commit when it is asked to (AUD-07).
+      auditMirror: extra['AUDIT_LOG_MIRROR'] === true,
       // The key ring of encrypted fields, such as secret settings (SEC-08, SET-03).
       encryption: {
         current: env.APP_KEY,

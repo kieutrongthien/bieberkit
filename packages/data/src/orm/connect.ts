@@ -28,7 +28,7 @@ import { createLogger } from '@bieberkit/core';
 import type { Dialect, Logger, Metrics, Tracer } from '@bieberkit/core';
 import { observePool } from './pool-metrics.ts';
 import { dataError } from '../errors.ts';
-import { auditTableSink } from './audit.ts';
+import { auditTableSink, mirrorAudit } from './audit.ts';
 import { BieberEntityManager } from './entity-manager.ts';
 import { hasEncryptionKeys, useEncryptionKeys } from './encryption.ts';
 import type { EncryptionKeys } from './encryption.ts';
@@ -54,6 +54,8 @@ export interface DatabaseOptions {
    * Defaults to a `warn` line through `logger`, for a project that has not made them yet.
    */
   readonly audit?: AuditSink | 'table';
+  /** Also writes each audit entry to the outbox, so that a worker can copy it to the log after commit (AUD-07). */
+  readonly auditMirror?: boolean;
   /**
    * The keys of the encrypted fields (SEC-08): `APP_KEY`, and `APP_KEY_PREVIOUS` as `previous` after a rotation. A database that has
    * an encrypted field does not start without a key, here or from `useEncryptionKeys`.
@@ -288,6 +290,7 @@ export async function createDatabase(env: DatabaseEnv, options: DatabaseOptions)
     );
   }
   if (options.metrics !== undefined) observePool(options.metrics, orm);
+  if (options.auditMirror === true) mirrorAudit(orm);
   const logger = options.logger ?? createLogger({ level: 'info', role: 'data' });
   const sink: AuditSink =
     options.audit === 'table'
