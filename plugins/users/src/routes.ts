@@ -22,7 +22,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { createUserService, effectivePermissions, manageScope } from '@bieberkit/auth';
+import { createUserService, effectivePermissions, loadGrants, manageScope } from '@bieberkit/auth';
 import type { UserListQuery, UserService, UserSort, UserStatus } from '@bieberkit/auth';
 import { defineRoute, HttpError } from '@bieberkit/http';
 import type { RouteContext, RouteDef } from '@bieberkit/http';
@@ -68,10 +68,14 @@ const detail = {
   properties: { ...record, activeSessions: { type: 'integer' }, groups: groupsSchema },
   required: [...required, 'activeSessions', 'groups'],
 } as const;
-/** What `GET /users/me` adds: when a second factor is required and not yet set up, the time by which to enrol (POL-02). */
+/**
+ * What `GET /users/me` adds: whether a second factor is asked of the person, by a role or by the rule for everyone, and when it is
+ * not set up yet in the days of grace, the time by which to enrol (USR-12, AUTH-05, POL-02).
+ */
 const me = {
   ...detail,
-  properties: { ...detail.properties, mfaEnrolBy: { type: 'string' } },
+  properties: { ...detail.properties, mfaRequired: { type: 'boolean' }, mfaEnrolBy: { type: 'string' } },
+  required: [...detail.required, 'mfaRequired'],
 } as const;
 const accepted = { type: 'object', properties: {}, additionalProperties: false } as const;
 const none = { type: 'null' } as const;
@@ -503,10 +507,16 @@ export const routes: readonly RouteDef[] = [
     url: '/api/v1/users/me',
     public: true,
     schema: { response: { 200: me } },
-    handler: async (ctx) => ({
-      ...(await usersOf(ctx).get(selfOf(ctx), tenantOf(ctx))),
-      ...(ctx.principal?.mfaEnrolBy === undefined ? {} : { mfaEnrolBy: ctx.principal.mfaEnrolBy }),
-    }),
+    handler: async (ctx) => {
+      const id = selfOf(ctx);
+      const found = await usersOf(ctx).get(id, tenantOf(ctx));
+      const { requireMfa } = await loadGrants(ctx.services.database, ctx.tenantId, id);
+      return {
+        ...found,
+        mfaRequired: ctx.principal?.mfaForAll === true || requireMfa,
+        ...(ctx.principal?.mfaEnrolBy === undefined ? {} : { mfaEnrolBy: ctx.principal.mfaEnrolBy }),
+      };
+    },
   }),
   defineRoute({
     method: 'PATCH',

@@ -34,6 +34,8 @@ export interface Principal {
   readonly mfa?: boolean;
   /** When `security.mfa.required-for-all` is on and the user has no second factor yet: the ISO time by which they must enrol (POL-02). */
   readonly mfaEnrolBy?: string;
+  /** `security.mfa.required-for-all` is on, so a second factor is asked of this person, with one or without (POL-02, USR-12). */
+  readonly mfaForAll?: true;
   /** For a machine client: the permissions of its key. They replace the roles of a user, which a key has not (AUTH-07). */
   readonly grants?: readonly string[];
   /** For a machine client: the tenant of its key. It is the tenant of the request, and `X-Tenant` may not differ (DATA-19). */

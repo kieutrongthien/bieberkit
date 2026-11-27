@@ -118,7 +118,14 @@ export async function principalOfSession(
       where: [{ field: 'id', value: session.session.id }],
       update: { updatedAt: now },
     });
-  const principal: Principal = { id: session.user.id, kind: 'user', via: 'cookie', sessionId: session.session.id, mfa };
+  const principal: Principal = {
+    id: session.user.id,
+    kind: 'user',
+    via: 'cookie',
+    sessionId: session.session.id,
+    mfa,
+    ...(policy.mfa.requiredForAll ? { mfaForAll: true as const } : {}),
+  };
   return verdict.status === 'grace' ? { ...principal, mfaEnrolBy: verdict.enrolBy.toISOString() } : principal;
 }
 

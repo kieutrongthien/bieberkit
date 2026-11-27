@@ -29,7 +29,7 @@ import { emitEvent, recordAudit, runInTransaction, runInUnitOfWork } from '@bieb
 import type { Database } from '@bieberkit/data/orm';
 import { HttpError } from '@bieberkit/http';
 import type { Condition, ScopedPermission } from './ability.ts';
-import { holdersQuery, isAdminRole, keepLastAdmin, refuseSelf } from './admin-guard.ts';
+import { ADMIN_ROLE_NAME, holdersQuery, isAdminRole, keepLastAdmin, refuseSelf } from './admin-guard.ts';
 import { authError } from './errors.ts';
 import { AuthRole, AuthRolePermission, AuthUserRole, loadGrants, NIL_TENANT } from './roles.ts';
 import type { AuthRoleRow } from './roles.ts';
@@ -332,17 +332,55 @@ export async function setRolePermissions(
   });
 }
 
-/** Renames a role or changes its MFA flag. It says whether anything changed. */
+/**
+ * What a system role takes: `requireMfa` and nothing else (ROL-06). Only a holder of the administrator role may change it, so that
+ * `roles.manage` alone cannot lower the protection of the administrators, and a holder without a second factor cannot ask for one
+ * of a role of their own, as POL-05 says for the rule for everyone. The system (a seeder, the CLI) is not limited.
+ */
+async function refuseSystemChange(
+  db: Database,
+  role: AuthRoleRow,
+  changes: { readonly name?: string; readonly requireMfa?: boolean; readonly ipRestricted?: boolean },
+): Promise<void> {
+  if (changes.name !== undefined || changes.ipRestricted !== undefined || changes.requireMfa === undefined) system();
+  const actor = actorOf();
+  if (actor === undefined || !isUuid(actor)) return;
+  const userId = actor.toLowerCase();
+  const { held, factor } = await runInUnitOfWork(db, async (em) => {
+    const assigned = await em.find(AuthUserRole, { userId, tenant: { $in: [role.tenant, NIL_TENANT] } });
+    const roles =
+      assigned.length === 0 ? [] : await em.find(AuthRole, { id: { $in: assigned.map((row) => row.roleId) } });
+    return { held: roles, factor: (await em.findOne(AuthUser, { id: userId }))?.twoFactorEnabled === true };
+  });
+  if (!held.some(isAdminRole)) {
+    await runInTransaction(db, async (em) => {
+      deniedAudit(em, role.tenant, role.id, [`role:${ADMIN_ROLE_NAME}`]);
+      await em.flush();
+    });
+    escalation();
+  }
+  if (changes.requireMfa === true && !role.requireMfa && !factor && held.some((item) => item.id === role.id)) {
+    throw authError(
+      'ROLES_SELF_LOCKOUT',
+      409,
+      'You hold this role and have no second factor, so this would stop you at once.',
+      'Set up your own second factor first.',
+    );
+  }
+}
+
+/** Renames a role or changes its MFA flag. It says whether anything changed. A system role takes the MFA flag only. */
 export async function updateRole(
   db: Database,
   roleId: string,
   changes: { readonly name?: string; readonly requireMfa?: boolean; readonly ipRestricted?: boolean },
 ): Promise<boolean> {
+  const found = await runInUnitOfWork(db, (em) => em.findOne(AuthRole, { id: roleId }));
+  if (found?.system === true) await refuseSystemChange(db, found, changes);
   try {
     return await runInTransaction(db, async (em) => {
       const role = await em.findOne(AuthRole, { id: roleId });
       if (role === null) return notFound();
-      if (role.system) return system();
       const data: { name?: string; requireMfa?: boolean; ipRestricted?: boolean } = {};
       if (changes.name !== undefined) {
         const name = nameOf(changes.name);
