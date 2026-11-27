@@ -67,6 +67,7 @@ Status values: `Proposed`, `Accepted`, `Rejected`, `Superseded by NNNN`. Only th
 | [0032](0032-audit-holds.md) | Legal holds on audit entries are a framework table | Accepted |
 | [0033](0033-entity-extensions.md) | Entity extensions: fields of another plugin's entity in a 1:1 table | Accepted |
 | [0034](0034-extension-record-key.md) | The row of an extension is keyed by a unique `record`, not by the id of the target | Accepted |
+| [0035](0035-admin-tables-forms-and-checks.md) | The admin draws tables, forms and long lists with Ant Design, and checks accessibility with axe | Accepted |
 
 ## Needed for the Phase 0 gate
 

@@ -25,7 +25,7 @@
 import { columnsOf } from '@bieberkit/admin-core';
 import type { MetaEntity, Row } from '@bieberkit/admin-core';
 import { Link } from '@tanstack/react-router';
-import { Card, Checkbox, Empty, Pagination, Skeleton, Space } from 'antd';
+import { Card, Checkbox, Empty, Pagination, Skeleton, Space, theme } from 'antd';
 import type { JSX, ReactNode } from 'react';
 import { useT } from './language.tsx';
 
@@ -45,60 +45,63 @@ export function CardRows(props: {
 }): JSX.Element {
   const { entity, rows, loading, where, show, actions, selected, onSelect } = props;
   const t = useT();
+  const { token } = theme.useToken();
   const [title, ...rest] = columnsOf(entity);
   if (loading) return <Skeleton active />;
   if (rows.length === 0) return <Empty />;
   const chosen = new Set((selected ?? []).map((row) => String(row['id'])));
   return (
-    <Space direction="vertical" size="middle" style={{ width: '100%' }} role="list">
-      {rows.map((row) => {
-        const id = String(row['id']);
-        const heading = title === undefined ? id : show(row[title.key]) || id;
-        return (
-          <Card
-            key={id}
-            size="small"
-            role="listitem"
-            title={
-              <Space>
-                {selected === undefined ? null : (
-                  <Checkbox
-                    aria-label={t('list.selectRow', { name: heading })}
-                    checked={chosen.has(id)}
-                    onChange={(event) =>
-                      onSelect(
-                        event.target.checked
-                          ? [...(selected ?? []), row]
-                          : (selected ?? []).filter((item) => String(item['id']) !== id),
-                      )
-                    }
-                  />
-                )}
-                {entity.operations.get ? <Link to={`/${where}/${id}`}>{heading}</Link> : heading}
-              </Space>
-            }
-          >
-            <dl
-              style={{
-                margin: 0,
-                display: 'grid',
-                gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 2fr)',
-                gap: '4px 12px',
-              }}
+    <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+      <div role="list" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        {rows.map((row) => {
+          const id = String(row['id']);
+          const heading = title === undefined ? id : show(row[title.key]) || id;
+          return (
+            <Card
+              key={id}
+              size="small"
+              role="listitem"
+              title={
+                <Space>
+                  {selected === undefined ? null : (
+                    <Checkbox
+                      aria-label={t('list.selectRow', { name: heading })}
+                      checked={chosen.has(id)}
+                      onChange={(event) =>
+                        onSelect(
+                          event.target.checked
+                            ? [...(selected ?? []), row]
+                            : (selected ?? []).filter((item) => String(item['id']) !== id),
+                        )
+                      }
+                    />
+                  )}
+                  {entity.operations.get ? <Link to={`/${where}/${id}`}>{heading}</Link> : heading}
+                </Space>
+              }
             >
-              {rest.map((field) => (
-                <div key={field.key} style={{ display: 'contents' }}>
-                  <dt style={{ opacity: 0.65 }}>{field.key}</dt>
-                  <dd style={{ margin: 0, overflowWrap: 'anywhere' }}>{show(row[field.key])}</dd>
-                </div>
-              ))}
-            </dl>
-            <Space wrap size="small" style={{ marginTop: 12 }}>
-              {actions(row)}
-            </Space>
-          </Card>
-        );
-      })}
+              <dl
+                style={{
+                  margin: 0,
+                  display: 'grid',
+                  gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 2fr)',
+                  gap: '4px 12px',
+                }}
+              >
+                {rest.map((field) => (
+                  <div key={field.key} style={{ display: 'contents' }}>
+                    <dt style={{ color: token.colorTextDescription }}>{field.key}</dt>
+                    <dd style={{ margin: 0, overflowWrap: 'anywhere' }}>{show(row[field.key])}</dd>
+                  </div>
+                ))}
+              </dl>
+              <Space wrap size="small" style={{ marginTop: 12 }}>
+                {actions(row)}
+              </Space>
+            </Card>
+          );
+        })}
+      </div>
       <Pagination
         simple
         current={props.page}

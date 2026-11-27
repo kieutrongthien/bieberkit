@@ -24,6 +24,7 @@
 
 export { compileAntdTheme, cssVariables, tailwindTheme } from './compile.ts';
 export type { AntdTheme } from './compile.ts';
+export { contrastRatio, luminanceOf, mixColors } from './contrast.ts';
 export { COLOR_KEYS, DEFAULT_THEME, FONT_STACK, modeOf, parseTheme, readTheme, themeSection } from './theme.ts';
 export type { DarkMode, Theme, ThemeColors, ThemeInput } from './theme.ts';
 

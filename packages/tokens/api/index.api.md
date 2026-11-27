@@ -86,6 +86,9 @@ interface AntdTheme {
 export declare function compileAntdTheme(theme: Theme, mode: "light" | "dark"): AntdTheme;
 export declare function cssVariables(theme: Theme): string;
 export declare function tailwindTheme(_theme: Theme): string;
+export declare function luminanceOf(hex: string): number;
+export declare function contrastRatio(a: string, b: string): number;
+export declare function mixColors(a: string, b: string, weight: number): string;
 export declare const packageName = "@bieberkit/tokens";
 export type { AntdTheme, DarkMode, Theme, ThemeColors, ThemeInput };
 ```

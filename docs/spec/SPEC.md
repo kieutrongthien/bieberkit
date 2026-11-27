@@ -125,7 +125,7 @@ The baseline below is fixed for version 1. Changing any row requires an ADR (arc
 | Cache | BentoCache: memory first level, Valkey second level, tags, stampede protection, grace periods | Section 15. |
 | File storage | FlyDrive | Local disk, S3, R2, GCS and S3-compatible stores. |
 | Logging and telemetry | pino, OpenTelemetry | Section 20. |
-| Admin UI | React 19.2 (19.2.4 or later), Vite 8, TanStack Router, Query, Table and Form, Ant Design 6 | Single-page app, no server components. Ant Design is the default UI adapter (UI-10). |
+| Admin UI | React 19.2 (19.2.4 or later), Vite 8, TanStack Router and Query, Ant Design 6 | Single-page app, no server components. Ant Design is the default UI adapter (UI-10). |
 | API client | OpenAPI 3.1 and Orval | Typed client and TanStack Query hooks generated per project. |
 | Testing | Vitest 4, Testcontainers, Playwright, k6 | Section 21. |
 | Container | Docker, Docker Hardened Images `node:26` | Section 19. |
@@ -1165,7 +1165,7 @@ Projects have two user interfaces. The admin UI is a single-page app for signed-
 
 The admin UI is a React single-page app that renders most screens from entity metadata, so a new entity gets list, form and detail screens without frontend code. It calls the API like any other client, which keeps authentication and authorization in one place.
 
-- **UI-01** Stack: React 19.2 (19.2.4 or later), Vite 8, TanStack Router, Query, Table, Form and Virtual. No React Server Components. Visual components come through a UI adapter (UI-10), Ant Design 6 by default.
+- **UI-01** Stack: React 19.2 (19.2.4 or later), Vite 8, TanStack Router and Query. No React Server Components. Visual components come through a UI adapter (UI-10), Ant Design 6 by default.
 - **UI-02** The shell loads `/api/v1/_meta`, which returns the entities, fields, permissions and menu entries the current user may see.
 - **UI-03** Generic screens: list (filters, sorting, saved views, bulk actions, export), form (validation from the same schemas as the API), detail (tabs for related records, activity, audit history).
 - **UI-04** Escape hatches: a field can use a custom widget, a screen can be replaced by a custom page, and plugins add pages and dashboard widgets.
@@ -1177,9 +1177,9 @@ The admin UI is a React single-page app that renders most screens from entity me
 
 Admin architecture, forms and performance:
 
-- **UI-10** The admin is split in two packages. `@bieberkit/admin-core` holds no visual components: metadata loading, routing, permissions, list and form state on TanStack Table and Form, data hooks, realtime. `@bieberkit/admin-antd` is the default adapter that renders it with Ant Design 6. The adapter contract is public, so other adapters (shadcn/ui, MUI) can be built without forking the core. Only the Ant Design adapter is maintained by the project.
+- **UI-10** The admin is split in two packages. `@bieberkit/admin-core` holds no visual components: metadata loading, routing, permissions, the logic of lists, filters, saved views, moves of a state field, forms and their checks (as functions that need no library), data hooks, realtime. `@bieberkit/admin-antd` is the default adapter that renders it with Ant Design 6. The adapter contract is public, so other adapters (shadcn/ui, MUI) can be built without forking the core. Only the Ant Design adapter is maintained by the project.
 - **UI-11** Form metadata supports repeatable groups and inline child tables, fields shown or required by condition (`visibleWhen`, `requiredWhen`), computed read-only fields, file and image fields with direct upload, relation pickers with server search, and the block content editor (section 16.5).
-- **UI-12** Every route and every screen of a plugin is a lazy chunk. Translations load per language and per module. Lists over 200 rows render with TanStack Virtual.
+- **UI-12** Every route and every screen of a plugin is a lazy chunk. Translations load per language and per module. A table over 200 rows draws only the rows in view (ADR 0035).
 - **UI-13** Data hooks prefetch on link hover, update optimistically for state transitions and inline edits, and invalidate caches from realtime events (RT-03).
 - **UI-14** The admin is served at the address of `ADMIN_URL` (`/admin` of the application by default) on the same origin as the API, as static files from the web role or a CDN, with its own strict Content-Security-Policy. Its address is not in the build: the server writes it in the page, so one build runs at `/admin`, at any other path, or at the root of a host of its own such as `admin.example.com`. A host of its own is the same server answering for another name (a proxy routes both names to the web role), so the session cookie, which belongs to one host, is the one of the admin and the API calls need no CORS, and the origin of the admin is trusted by the sign in.
 - **UI-15** Generic screens never fetch more than the listed fields (`fields=` from metadata), so wide entities stay fast in lists.
@@ -1725,6 +1725,7 @@ Open questions:
 
 | Version | Date | Changes |
 | --- | --- | --- |
+| 0.8.30 | 2026-11-27 | ADR 0035: the admin draws tables, forms and long lists with Ant Design and keeps their logic in pure functions of `admin-core`, so UI-01, UI-10 and UI-12 no longer name TanStack Table, Form and Virtual; axe is a dev dependency of the browser tests |
 | 0.8.29 | 2026-11-27 | M2.2: the list (filters, views, bulk changes, moves of a state field, CSV, phone cards, `n` and `/`), the input of a transition in `_meta`, the check of a form, lazy languages, and the hashed files of the release before kept for a day, with `ADMIN_ASSETS_DIR` (UI-03, UI-12, UI-13, UI-16, UI-17, UI-22) |
 | 0.8.28 | 2026-11-27 | M2.2 resilience: retry and backoff, the offline state, route error boundaries, lazy screens and the 400 kB budget check, the reload on a missing chunk, the unsaved-change guard, local drafts, Ctrl+S, the 412 view with a three-way merge, and the reports of UI-21 (UI-12, UI-17 to UI-19, UI-21, UI-22; parts) |
 | 0.8.27 | 2026-11-27 | M2.2 languages: the dictionaries of en, vi and zh, the translator, the choice of a language, the formats of numbers, dates and money, and the language switch of the admin (UI-05) |

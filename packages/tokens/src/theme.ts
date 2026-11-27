@@ -93,23 +93,35 @@ export interface Theme {
   readonly darkMode: DarkMode;
 }
 
+// The brand colors read on the background and carry white text at level AA (4.5:1); `theme.test.ts` holds them to it (UI-07).
 const LIGHT: ThemeColors = {
-  primary: '#1677ff',
-  success: '#52c41a',
-  warning: '#faad14',
-  danger: '#ff4d4f',
-  info: '#1677ff',
+  primary: '#0958d9',
+  success: '#237804',
+  warning: '#ad4e00',
+  danger: '#cf1322',
+  info: '#0958d9',
   background: '#ffffff',
   surface: '#f5f5f5',
   text: '#1f1f1f',
   border: '#d9d9d9',
 };
 
-const DARK_NEUTRALS = { background: '#141414', surface: '#1f1f1f', text: '#f0f0f0', border: '#424242' } as const;
+// On a dark background the brand colors are the light tones of the same hues, which carry the dark text of a button.
+const DARK: ThemeColors = {
+  primary: '#4096ff',
+  success: '#73d13d',
+  warning: '#ffc53d',
+  danger: '#ff7875',
+  info: '#69b1ff',
+  background: '#141414',
+  surface: '#1f1f1f',
+  text: '#f0f0f0',
+  border: '#424242',
+};
 
 export const DEFAULT_THEME: Theme = {
   colors: LIGHT,
-  dark: { ...LIGHT, ...DARK_NEUTRALS },
+  dark: DARK,
   radius: 6,
   spacing: 4,
   fonts: { sans: FONT_STACK.sans, mono: FONT_STACK.mono },
@@ -128,6 +140,7 @@ export const COLOR_KEYS: readonly (keyof ThemeColors)[] = [
   'text',
   'border',
 ];
+const BRAND_KEYS = ['primary', 'success', 'warning', 'danger', 'info'] as const;
 const colorKeyOf = (key: string): keyof ThemeColors | undefined => COLOR_KEYS.find((name) => name === key);
 const HEX = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
 const FONT = /^[\w\s"',.-]+$/;
@@ -184,8 +197,11 @@ export function parseTheme(input: unknown): Theme {
   const colors = colorsOf(input['colors'], 'colors', DEFAULT_THEME.colors, problems);
   const darkInput = input['dark'];
   if (darkInput !== undefined && !isRecord(darkInput)) problems.push('dark: must be an object.');
-  // The brand colors of the dark palette are the brand colors of the theme; its neutrals are the dark ones.
-  const darkBase: ThemeColors = { ...colors, ...DARK_NEUTRALS };
+  // A brand color that the config sets is the brand color of the dark palette too. One that it leaves out is the light tone of the default
+  // hue, which reads on a dark background. The neutrals are the dark ones.
+  const configured = isRecord(input['colors']) ? input['colors'] : {};
+  const darkBase: ThemeColors = { ...DEFAULT_THEME.dark };
+  for (const key of BRAND_KEYS) if (key in configured) darkBase[key] = colors[key];
   const dark = colorsOf(isRecord(darkInput) ? darkInput['colors'] : undefined, 'dark.colors', darkBase, problems);
   const radius = numberOf(input['radius'], 'radius', 0, 24, DEFAULT_THEME.radius, problems);
   const spacing = numberOf(input['spacing'], 'spacing', 2, 8, DEFAULT_THEME.spacing, problems);

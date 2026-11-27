@@ -501,44 +501,47 @@ function Rows(props: { readonly entity: MetaEntity }): JSX.Element {
           />
         </Space>
       ) : (
-        <Table<Row>
-          rowKey={(row) => String(row['id'])}
-          columns={columns}
-          dataSource={list.data?.rows.map((row) => ({ ...row })) ?? []}
-          loading={list.isPending}
-          scroll={{ x: true, ...(virtual ? { y: 560 } : {}) }}
-          virtual={virtual}
-          {...(canSelect
-            ? {
-                rowSelection: {
-                  selectedRowKeys: selected.map((row) => String(row['id'])),
-                  onChange: (_keys, rows) => setSelected(rows),
-                },
-              }
-            : {})}
-          pagination={{
-            current: page,
-            pageSize,
-            total: list.data?.total ?? 0,
-            showSizeChanger: true,
-            pageSizeOptions: [...PAGE_SIZES],
-          }}
-          onChange={(pagination, _filters, sorter) => {
-            setPage(pagination.current ?? 1);
-            setPageSize(pagination.pageSize ?? pageSize);
-            const one = Array.isArray(sorter) ? sorter[0] : sorter;
-            const field = typeof one?.field === 'string' ? one.field : undefined;
-            const next =
-              field === undefined || one?.order === undefined
-                ? undefined
-                : `${one.order === 'descend' ? '-' : ''}${field}`;
-            void navigate({
-              to: '.',
-              search: viewToSearch({ name: '', filters, ...(next === undefined ? {} : { sort: next }) }),
-              replace: true,
-            });
-          }}
-        />
+        // A table wider than the screen scrolls in its own box, which the keyboard can reach. The `scroll.x` of Ant Design adds a hidden row
+        // that axe refuses (a checkbox inside `aria-hidden`), so it is used only where the rows are virtual, which needs it.
+        <div role="group" aria-label={labelOf(entity, locale)} tabIndex={0} style={{ overflowX: 'auto' }}>
+          <Table<Row>
+            rowKey={(row) => String(row['id'])}
+            columns={columns}
+            dataSource={list.data?.rows.map((row) => ({ ...row })) ?? []}
+            loading={list.isPending}
+            {...(virtual ? { scroll: { x: 'max-content', y: 560 }, virtual: true } : {})}
+            {...(canSelect
+              ? {
+                  rowSelection: {
+                    selectedRowKeys: selected.map((row) => String(row['id'])),
+                    onChange: (_keys, rows) => setSelected(rows),
+                  },
+                }
+              : {})}
+            pagination={{
+              current: page,
+              pageSize,
+              total: list.data?.total ?? 0,
+              showSizeChanger: true,
+              pageSizeOptions: [...PAGE_SIZES],
+            }}
+            onChange={(pagination, _filters, sorter) => {
+              setPage(pagination.current ?? 1);
+              setPageSize(pagination.pageSize ?? pageSize);
+              const one = Array.isArray(sorter) ? sorter[0] : sorter;
+              const field = typeof one?.field === 'string' ? one.field : undefined;
+              const next =
+                field === undefined || one?.order === undefined
+                  ? undefined
+                  : `${one.order === 'descend' ? '-' : ''}${field}`;
+              void navigate({
+                to: '.',
+                search: viewToSearch({ name: '', filters, ...(next === undefined ? {} : { sort: next }) }),
+                replace: true,
+              });
+            }}
+          />
+        </div>
       )}
     </Card>
   );

@@ -25,6 +25,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   compileAntdTheme,
+  contrastRatio,
+  mixColors,
   cssVariables,
   DEFAULT_THEME,
   FONT_STACK,
@@ -192,5 +194,49 @@ describe('UI-06 the theme in the page', () => {
     expect(modeOf(parseTheme({}), false)).toBe('light');
     expect(modeOf(parseTheme({ darkMode: 'light' }), true)).toBe('light');
     expect(modeOf(parseTheme({ darkMode: 'dark' }), false)).toBe('dark');
+  });
+});
+
+describe('UI-07 the default theme meets level AA', () => {
+  it('UI-07 the contrast ratio is the one of WCAG: white on black is 21, a color on itself is 1', () => {
+    expect(contrastRatio('#ffffff', '#000000')).toBeCloseTo(21, 5);
+    expect(contrastRatio('#777', '#777')).toBe(1);
+    expect(contrastRatio('#fff', '#000')).toBeCloseTo(21, 5);
+  });
+
+  it('UI-07 the colors of the default theme read on the background of the light palette, and white reads on each of them', () => {
+    const { colors } = DEFAULT_THEME;
+    for (const key of ['primary', 'success', 'warning', 'danger', 'info', 'text'] as const) {
+      expect(contrastRatio(colors[key], colors.background), `${key} on the background`).toBeGreaterThanOrEqual(4.5);
+    }
+    for (const key of ['primary', 'success', 'warning', 'danger', 'info'] as const) {
+      expect(contrastRatio('#ffffff', colors[key]), `white on ${key}`).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  it('UI-07 a mix is the weight of the first color and the rest of the second', () => {
+    expect(mixColors('#000000', '#ffffff', 0.5)).toBe('#808080');
+    expect(mixColors('#fff', '#000', 1)).toBe('#ffffff');
+    expect(mixColors('#fff', '#000', 0)).toBe('#000000');
+  });
+
+  it('UI-07 the placeholder and the description that Ant Design draws read on the background, in both palettes', () => {
+    for (const mode of ['light', 'dark'] as const) {
+      const token = compileAntdTheme(DEFAULT_THEME, mode).token;
+      const background = mode === 'dark' ? DEFAULT_THEME.dark.background : DEFAULT_THEME.colors.background;
+      for (const key of ['colorTextPlaceholder', 'colorTextDescription']) {
+        expect(contrastRatio(String(token[key]), background), `${key} in ${mode}`).toBeGreaterThanOrEqual(4.5);
+      }
+    }
+  });
+
+  it('UI-07 the dark palette reads on its own background, and the text of a button on its fill', () => {
+    const { dark } = DEFAULT_THEME;
+    for (const key of ['primary', 'success', 'warning', 'danger', 'info', 'text'] as const) {
+      expect(contrastRatio(dark[key], dark.background), `${key} on the dark background`).toBeGreaterThanOrEqual(4.5);
+    }
+    for (const key of ['primary', 'success', 'warning', 'danger', 'info'] as const) {
+      expect(contrastRatio('#141414', dark[key]), `dark text on ${key}`).toBeGreaterThanOrEqual(4.5);
+    }
   });
 });

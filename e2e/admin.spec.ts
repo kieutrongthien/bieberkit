@@ -76,9 +76,10 @@ test('the administrator signs in, manages a setting, and signs out', async ({ pa
   await expect(page.getByRole('cell', { name: 'Renamed' })).toBeVisible();
 
   // Delete, after the question.
-  await page.getByRole('button', { name: 'Delete' }).click();
+  const row = page.getByRole('row').filter({ has: page.getByRole('link', { name: 'A-1', exact: true }) });
+  await row.getByRole('button', { name: 'Delete' }).click();
   await page.getByRole('button', { name: 'Delete' }).last().click();
-  await expect(page.getByRole('link', { name: 'A-1' })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'A-1', exact: true })).toHaveCount(0);
 
   // A reload on a route of the application gives the application, not a 404.
   await page.reload();

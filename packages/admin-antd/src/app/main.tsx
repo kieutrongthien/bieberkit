@@ -23,6 +23,9 @@
  */
 
 import { createRoot } from 'react-dom/client';
+// The stylesheet is imported for its effect: Vite bundles it.
+// oxlint-disable-next-line import/no-unassigned-import
+import './app.css';
 import { App } from './App.tsx';
 import { reloadForChunk } from './chunk.ts';
 import { startReports } from './reports.ts';
