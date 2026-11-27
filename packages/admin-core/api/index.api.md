@@ -549,7 +549,7 @@ export declare function lineProblems(inline: MetaInline, line: Readonly<Line>): 
 export declare function linesChanged(inline: MetaInline, start: readonly Line[], now: readonly Line[]): boolean;
 export declare const newLine: (inline: MetaInline) => Line;
 export declare const extensionsOf: (meta: Meta | undefined) => MetaExtensions;
-export declare function labelText(label: MetaLabel | undefined, locale: Locale | string, fallback?: string): string;
+export declare function labelText(label: MetaLabel | undefined, locale: string, fallback?: string): string;
 export declare const pageFor: (extensions: MetaExtensions, plugin: string, path: string) => MetaPage | undefined;
 export declare const widgetsIn: (extensions: MetaExtensions, slot: string) => readonly MetaWidget[];
 export declare const fieldWidgetFor: (extensions: MetaExtensions, name: string) => MetaWidget | undefined;
