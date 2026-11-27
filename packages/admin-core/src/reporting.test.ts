@@ -23,7 +23,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { errorReport, routeShape, sampled, vitalReport } from './reporting.ts';
+import { dedupe, errorReport, ratingOf, routeShape, sampled, vitalReport } from './reporting.ts';
 
 describe('UI-21 the shape of a route', () => {
   it('UI-21 an id, a number and a token in a path become :id, so a report has no record in it', () => {
@@ -82,5 +82,36 @@ describe('UI-21 the vitals and the sample', () => {
     expect(sampled(1, () => 0.999)).toBe(true);
     expect(sampled(0.1, () => 0.05)).toBe(true);
     expect(sampled(0.1, () => 0.5)).toBe(false);
+  });
+});
+
+describe('UI-21 the rating of a vital, and the rate of the reports', () => {
+  it('UI-21 a vital is good up to its first limit, needs improvement up to its second, and is poor beyond', () => {
+    expect([ratingOf('LCP', 2500), ratingOf('LCP', 3000), ratingOf('LCP', 4001)]).toEqual([
+      'good',
+      'needs-improvement',
+      'poor',
+    ]);
+    expect([ratingOf('CLS', 0.05), ratingOf('CLS', 0.2), ratingOf('CLS', 0.3)]).toEqual([
+      'good',
+      'needs-improvement',
+      'poor',
+    ]);
+    expect([ratingOf('INP', 200), ratingOf('FCP', 1801), ratingOf('TTFB', 1801)]).toEqual([
+      'good',
+      'needs-improvement',
+      'poor',
+    ]);
+    expect(ratingOf('FID', 1)).toBe('poor');
+  });
+
+  it('UI-21 the same error is sent once, and a page sends ten at most', () => {
+    const seen = new Set<string>();
+    const report = { kind: 'TypeError', message: 'x', route: '/a' };
+    expect(dedupe(seen, report)).toBe(true);
+    expect(dedupe(seen, report)).toBe(false);
+    for (let n = 0; n < 20; n += 1) dedupe(seen, { ...report, message: String(n) });
+    expect(seen.size).toBe(10);
+    expect(dedupe(seen, { ...report, message: 'another' })).toBe(false);
   });
 });

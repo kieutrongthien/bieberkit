@@ -25,11 +25,14 @@
 import { createRoot } from 'react-dom/client';
 import { App } from './App.tsx';
 import { reloadForChunk } from './chunk.ts';
+import { startReports } from './reports.ts';
 
 // Vite says so when the file of a screen is gone: a deploy replaced it while this tab was open (UI-22).
 window.addEventListener('vite:preloadError', (event) => {
   if (reloadForChunk(new Error('Failed to fetch dynamically imported module')) === 'reload') event.preventDefault();
 });
+
+startReports();
 
 const root = document.getElementById('root');
 if (root === null) throw new Error('The page has no #root.');

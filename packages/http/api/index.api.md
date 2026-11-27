@@ -366,6 +366,7 @@ interface StaticOptions {
   readonly host?: string;
   readonly directory: string;
   readonly policy: string;
+  readonly retained?: string;
   readonly fallback?: string;
   readonly transformPage?: (html: string) => string;
 }

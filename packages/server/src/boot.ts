@@ -42,6 +42,7 @@ import { createHttpServer, registerEntityRoutes, registerMeta, registerOpenApi }
 import type { HttpServer, RouteDef } from '@bieberkit/http';
 import { createScheduler, schedulesOf } from '@bieberkit/queue';
 import type { JobDef, QueueSubscription } from '@bieberkit/queue';
+import { registerClientReports } from './client-reports.ts';
 import { ServerError } from './errors.ts';
 import { parseTheme } from '@bieberkit/tokens';
 import { adminLocation, registerAdmin } from './admin.ts';
@@ -198,6 +199,8 @@ export async function boot(options: BootOptions): Promise<Running> {
       registerEntityRoutes(server, schemas, { db });
       // What the admin reads to draw its menu, its lists and its forms (UI-02).
       registerMeta(server, entities);
+      // What the admin tells about itself: its errors and its Core Web Vitals (UI-21).
+      registerClientReports(server, { reporter, metrics });
       for (const route of contributed<RouteDef>(modules, 'routes')) server.route(route);
       registerOpenApi(server, { title: project.config.name, version: '0.0.0' });
       registerAdmin(

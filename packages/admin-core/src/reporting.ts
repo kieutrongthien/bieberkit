@@ -101,3 +101,31 @@ export function sampled(rate: number, random: () => number = Math.random): boole
   if (rate <= 0) return false;
   return rate >= 1 || random() < rate;
 }
+
+/** The limits of Core Web Vitals: up to the first a value is good, up to the second it needs improvement, beyond it is poor. */
+const LIMITS: Readonly<Record<string, readonly [number, number]>> = {
+  LCP: [2500, 4000],
+  FCP: [1800, 3000],
+  INP: [200, 500],
+  TTFB: [800, 1800],
+  CLS: [0.1, 0.25],
+};
+
+/** The rating of a Core Web Vital as web.dev gives it. A name that is not one of the five is `poor`, so it is not taken for good. */
+export function ratingOf(name: string, value: number): 'good' | 'needs-improvement' | 'poor' {
+  const limits = LIMITS[name];
+  if (limits === undefined) return 'poor';
+  return value <= limits[0] ? 'good' : value <= limits[1] ? 'needs-improvement' : 'poor';
+}
+
+/** Whether an error was already sent from this page: the same error in a loop is one report, and no page sends more than `max`. */
+export function dedupe(
+  seen: Set<string>,
+  report: { readonly kind: string; readonly message: string; readonly route: string },
+  max = 10,
+): boolean {
+  const key = `${report.kind}|${report.message}|${report.route}`;
+  if (seen.has(key) || seen.size >= max) return false;
+  seen.add(key);
+  return true;
+}

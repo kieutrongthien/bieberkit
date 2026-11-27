@@ -61,7 +61,7 @@ export { clearDraft, draftKey, isDirty, loadDraft, reapply, saveDraft } from './
 export type { Conflict, DraftStorage } from './drafts.ts';
 export { shortcutOf } from './shortcuts.ts';
 export type { KeyPress, Shortcut } from './shortcuts.ts';
-export { errorReport, routeShape, sampled, vitalReport } from './reporting.ts';
+export { dedupe, errorReport, ratingOf, routeShape, sampled, vitalReport } from './reporting.ts';
 export type { ErrorReport, Vital, VitalReport } from './reporting.ts';
 export {
   bulkSummary,

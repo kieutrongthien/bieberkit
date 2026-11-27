@@ -379,6 +379,12 @@ interface VitalReport extends Vital {
 }
 export declare function vitalReport(vital: Vital, path: string): VitalReport;
 export declare function sampled(rate: number, random?: () => number): boolean;
+export declare function ratingOf(name: string, value: number): "good" | "needs-improvement" | "poor";
+export declare function dedupe(seen: Set<string>, report: {
+  readonly kind: string;
+  readonly message: string;
+  readonly route: string;
+}, max?: number): boolean;
 export declare function stateKeyOf(entity: MetaEntity): string | undefined;
 export declare function transitionsFor(entity: MetaEntity, row: Row): readonly MetaTransition[];
 export declare function commonTransitions(entity: MetaEntity, rows: readonly Row[]): readonly MetaTransition[];

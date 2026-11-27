@@ -24,7 +24,7 @@
 
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
-import { ACCOUNTS, callApi, makeRow, signIn } from './support.ts';
+import { ACCOUNTS, callApi, makeRow, recordOf, signIn } from './support.ts';
 
 /** Opens an Ant Design select by its name and takes one option of it. */
 async function pick(page: Page, select: string | RegExp, option: string): Promise<void> {
@@ -326,4 +326,50 @@ test('UI-12 a person may take a page of 50 rows, and the list asks the API for i
   await page.locator('.ant-pagination-options .ant-select').click();
   await page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)').getByTitle('50 / page').click();
   await asked;
+});
+
+test('UI-21 an error that nothing caught is sent without the e-mail in it, with the shape of the route', async () => {
+  const page = shared;
+  await page.goto('/admin/');
+  await makeRow(page, ACCOUNTS, { code: 'REP-1', name: 'Reported' });
+  const found = await callApi(page, 'GET', `${ACCOUNTS}?filter[code][eq]=REP-1`);
+  const rows = recordOf(found.body)['data'];
+  const id = String(recordOf(Array.isArray(rows) ? rows[0] : undefined)['id']);
+  await page.goto(`/admin/crm/accounts/${id}`);
+  const sent = page.waitForRequest((request) => request.url().includes('/api/v1/_client-reports'));
+  await page.evaluate(() => {
+    setTimeout(() => {
+      throw new TypeError('Cannot read the account of ann@example.com');
+    }, 0);
+  });
+  const body = recordOf(JSON.parse((await sent).postData() ?? '{}'));
+  const error = recordOf(body['error']);
+  expect(body['kind']).toBe('error');
+  expect(error['kind']).toBe('TypeError');
+  expect(error['message']).toBe('Cannot read the account of [email]');
+  expect(error['route']).toBe('/admin/crm/accounts/:id');
+});
+
+test('UI-21 the vitals of a visit are sent when the person leaves, for a sample, and the login page may send them too', async ({
+  browser,
+  request,
+}) => {
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  // The sample is a tenth of the visits, so this one is made to be in it.
+  await page.addInitScript(() => {
+    Math.random = () => 0;
+  });
+  const count = async (): Promise<number> => {
+    const text = await (await request.get('http://127.0.0.1:4311/metrics')).text();
+    return Number(/bk_admin_web_vitals_total\{name="FCP",rating="[a-z-]+"\} (\d+)/.exec(text)?.[1] ?? 0);
+  };
+  const before = await count();
+  await page.goto('/admin/');
+  await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible();
+  await page.waitForTimeout(500);
+  // A request that a page makes as it goes is not one that the browser test can watch, so the metrics of the server are read.
+  await page.goto('about:blank');
+  await expect.poll(count, { timeout: 5000 }).toBeGreaterThan(before);
+  await context.close();
 });

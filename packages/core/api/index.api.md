@@ -150,6 +150,7 @@ interface CoreEnvValues {
   APP_ENV: AppEnv;
   APP_URL: string;
   ADMIN_URL: string | undefined;
+  ADMIN_ASSETS_DIR: string | undefined;
   APP_PORT: number;
   APP_KEY: string | undefined;
   APP_KEY_PREVIOUS: string | undefined;

@@ -351,7 +351,7 @@ Execution order: M2.1 through M2.7, then the reviewed npm release, then M1.10 Pi
 - [x] `@bieberkit/tokens` compiling to Ant Design theme and CSS variables. Also a Tailwind theme and the `theme` key of the config; evidence: `tokens/src/theme.test.ts`, the `UI-06` cases of `server/src/admin.test.ts`
 - [ ] Second small adapter as a test fixture to prove the contract (§26)
 - [ ] Axe checks on generic screens at WCAG 2.2 AA, admin initial JS under 400 KB (UI-07, §18.1). Done: `pnpm check:admin-size` (319.7 kB compressed). Open: axe (`@axe-core/playwright` needs an ADR line and the browser)
-- [ ] Client errors and web vitals to the error-reporter contract (UI-21). Done: the scrubbed report, the shape of a route and the sample, as unit-tested logic. Open: the server endpoint that forwards a report to the error reporter, and the browser side that sends it
+- [x] Client errors and web vitals to the error-reporter contract (UI-21). Evidence: `admin-core/src/reporting.test.ts`, `server/src/client-reports.test.ts`, and the UI-21 cases of `e2e/screens.spec.ts`
 
 ### M2.3 Content and public site
 

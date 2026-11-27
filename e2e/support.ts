@@ -79,3 +79,10 @@ export async function makeRow(
 }
 
 export const ACCOUNTS = '/api/v1/crm/accounts';
+
+/** A value of a JSON text that is read as a record, or an empty one: a test reads what a body holds and checks it, and does not cast it. */
+export function recordOf(value: unknown): Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+    ? Object.fromEntries(Object.entries(value))
+    : {};
+}

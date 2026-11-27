@@ -1189,7 +1189,7 @@ Admin architecture, forms and performance:
 * **UI-18** On a 412 conflict (API-13) the form shows who changed the record and what changed, and lets the user reload or re-apply their edits.
 * **UI-19** Every route has an error boundary with a retry action. Network errors retry with backoff and show an offline banner instead of a blank screen.
 * **UI-20** Supported browsers: the last two versions of Chrome, Edge, Firefox and Safari, including Safari on iOS. The same policy applies to the site.
-* **UI-21** Client errors and Core Web Vitals from real users are sent to the error-reporter contract (OBS-06), sampled and without personal data.
+* **UI-21** Client errors and Core Web Vitals from real users are sent to the error-reporter contract (OBS-06), sampled and without personal data. The admin sends them to the public route `POST /api/v1/_client-reports`, which takes a closed shape, hands an error to the reporter as a warning of the source `client`, and counts a vital in the metrics `bk_admin_web_vitals_total`, `bk_admin_web_vital_seconds` and `bk_admin_layout_shift`.
 
 - **UI-22** Hashed admin assets from the previous release stay available (CDN or a retained folder) for at least 24 hours after a deploy, and the admin reloads itself on a chunk-load error, so open tabs survive rolling deploys. The web role keeps them: at start it copies the hashed files of its build into `ADMIN_ASSETS_DIR`, marks the ones that the release before used and this one does not, serves a hashed file that its build lacks from there, and removes a file 24 hours after the release that replaced it. A CDN that keeps the files of past releases does the same without it.
 

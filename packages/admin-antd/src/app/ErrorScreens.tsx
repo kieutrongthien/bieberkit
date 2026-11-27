@@ -23,15 +23,20 @@
  */
 
 import { Button, Result } from 'antd';
-import { Component } from 'react';
+import { Component, useEffect } from 'react';
 import type { ErrorInfo, JSX, ReactNode } from 'react';
 import { reloadForChunk } from './chunk.ts';
 import { useT } from './language.tsx';
+import { reportClientError } from './reports.ts';
 
 /** What a route shows when its screen fails: the retry, or for a missing chunk the reload that a deploy needs (UI-19, UI-22). */
 export function ErrorScreen(props: { readonly error: unknown; readonly reset: () => void }): JSX.Element {
   const t = useT();
   const chunk = reloadForChunk(props.error);
+  // A route that failed is an error of the code, and a missing chunk is a deploy and not (UI-21, UI-22).
+  useEffect(() => {
+    if (chunk === 'ignore') reportClientError(props.error);
+  }, [props.error, chunk]);
   if (chunk !== 'ignore') {
     return (
       <Result
@@ -72,8 +77,8 @@ export class ErrorBoundary extends Component<{ readonly children: ReactNode }, B
     return { error, failed: true };
   }
 
-  override componentDidCatch(_error: Error, _info: ErrorInfo): void {
-    // The report of UI-21 is sent from here when the reporting is on.
+  override componentDidCatch(error: Error, _info: ErrorInfo): void {
+    reportClientError(error);
   }
 
   override render(): ReactNode {
