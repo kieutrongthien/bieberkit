@@ -69,9 +69,17 @@ describe('UI-35 what the parts make together', () => {
   });
 });
 
+/** A part that gives a control and replaces a screen. */
+const one = (name: string) =>
+  part(name, {
+    fields: [{ id: 'f', widget: 'file', load }],
+    screens: [{ id: 's', replace: 'list:crm.Deal', load }],
+  });
+
 describe('UI-36 the mistakes that stop the build', () => {
   it('UI-36 a key that is no slot: the list of slots is closed', () => {
-    const wrong = { name: 'bieberkit-plugin-x', sidebar: [] } as unknown as AdminPartInput<View>;
+    // What a plugin written in JavaScript, or against another version, can give: a key that the type does not have.
+    const wrong: AdminPartInput<View> = Object.assign({ name: 'bieberkit-plugin-x' }, { sidebar: [] });
     const { problems } = composeAdmin([base, defineAdminPlugin(wrong)]);
     expect(problems).toEqual([
       { plugin: 'bieberkit-plugin-x', code: 'unknown-key', message: expect.stringContaining('sidebar') },
@@ -79,17 +87,19 @@ describe('UI-36 the mistakes that stop the build', () => {
   });
 
   it('UI-36 an address that is not one segment, which would be taken for the list of an entity', () => {
-    for (const path of ['notes', '/a/b', '/', '/Notes', '/notes/', '/:id'])
-      expect(codes([base, part('bieberkit-plugin-x', { pages: [{ path, title: 'x.t', load }] })]), path).toEqual([
-        'bad-path',
-      ]);
+    const paths = ['notes', '/a/b', '/', '/Notes', '/notes/', '/:id'];
+    const found = paths.map((path) => [
+      path,
+      codes([base, part('bieberkit-plugin-x', { pages: [{ path, title: 'x.t', load }] })]),
+    ]);
+    expect(found).toEqual(paths.map((path) => [path, ['bad-path']]));
   });
 
   it('UI-36 an address of the shell', () => {
-    for (const path of ['/account', '/ext'])
-      expect(codes([base, part('bieberkit-plugin-x', { publicPages: [{ path, load }] })]), path).toEqual([
-        'reserved-path',
-      ]);
+    const found = ['/account', '/ext'].map((path) =>
+      codes([base, part('bieberkit-plugin-x', { publicPages: [{ path, load }] })]),
+    );
+    expect(found).toEqual([['reserved-path'], ['reserved-path']]);
   });
 
   it('UI-36 one address for two pages, with a session or without one, of two plugins', () => {
@@ -110,11 +120,6 @@ describe('UI-36 the mistakes that stop the build', () => {
   });
 
   it('UI-36 two controls for one widget, and two screens in place of one', () => {
-    const one = (name: string) =>
-      part(name, {
-        fields: [{ id: 'f', widget: 'file', load }],
-        screens: [{ id: 's', replace: 'list:crm.Deal', load }],
-      });
     expect(codes([base, one('bieberkit-plugin-a'), one('bieberkit-plugin-b')])).toEqual([
       'duplicate-field',
       'duplicate-screen',
@@ -146,13 +151,14 @@ describe('UI-36 the mistakes that stop the build', () => {
 
 const texts = (value: Readonly<Record<string, string>>) => async () => ({ default: value });
 
-describe('UI-36 every language', () => {
-  const notes = (messages: AdminPartInput<View>['messages']) =>
-    part('bieberkit-plugin-notes', {
-      pages: [{ path: '/notes', title: 'notes.title', load }],
-      ...(messages === undefined ? {} : { messages }),
-    });
+/** A plugin with one page, whose title is a key, and these texts. */
+const notes = (messages: AdminPartInput<View>['messages']) =>
+  part('bieberkit-plugin-notes', {
+    pages: [{ path: '/notes', title: 'notes.title', load }],
+    ...(messages === undefined ? {} : { messages }),
+  });
 
+describe('UI-36 every language', () => {
   it('UI-36 a plugin with the same keys in each language of the project is accepted', async () => {
     const both = notes({ en: texts({ 'notes.title': 'Notes' }), vi: texts({ 'notes.title': 'Ghi chú' }) });
     expect(await messageProblems([both], ['en', 'vi'])).toEqual([]);

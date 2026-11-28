@@ -29,7 +29,7 @@ import { lazyRouteComponent, Link, Outlet, useNavigate, useRouterState } from '@
 import { Dropdown, Grid, Layout, Menu, Result, Select, Skeleton } from 'antd';
 import { Suspense, useEffect, useState } from 'react';
 import type { JSX } from 'react';
-import { Brand, firstLetter, SETTINGS } from './Brand.tsx';
+import { Brand, firstLetter, pageSettings } from './Brand.tsx';
 import { OfflineBanner } from './connection.tsx';
 import { useClient, useMeta, useSession } from './context.ts';
 import { GoTo } from './GoTo.tsx';
@@ -123,7 +123,7 @@ function Frame(props: { readonly email: string }): JSX.Element {
   const { locale, setLocale } = useLanguage();
   const groupName = useGroupName();
   const compact = Grid.useBreakpoint().md === false;
-  const groups = meta.data === undefined ? [] : menuOf(meta.data, SETTINGS.menu);
+  const groups = meta.data === undefined ? [] : menuOf(meta.data, pageSettings().menu);
   // The address from the parts of the route, so that it is the same wherever the admin is served.
   const params = useRouterState({ select: (state) => state.matches.at(-1)?.params ?? {} });
   const read = (name: string): string | undefined => {

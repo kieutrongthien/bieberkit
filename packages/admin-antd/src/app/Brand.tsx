@@ -28,10 +28,13 @@ import type { JSX } from 'react';
 import logo from './assets/logo.svg';
 import { useLanguage, useT } from './language.tsx';
 
-/** What the server wrote in the page from the `admin` key of the config (UI-24, UI-33). */
-export const SETTINGS: AdminSettings = readAdminSettings(
-  document.querySelector('meta[name="bk-admin"]')?.getAttribute('content'),
-);
+let read: AdminSettings | undefined;
+
+/** What the server wrote in the page from the `admin` key of the config (UI-24, UI-33). Read from the page once, when first asked. */
+export function pageSettings(): AdminSettings {
+  read ??= readAdminSettings(document.querySelector('meta[name="bk-admin"]')?.getAttribute('content'));
+  return read;
+}
 
 /** The first character of a text, whole also when it is outside the basic plane, such as a rare Chinese one. */
 export const firstLetter = (text: string): string => {
@@ -42,7 +45,7 @@ export const firstLetter = (text: string): string => {
 /** Shows on the frame, so it is drawn for a dark color. */
 export function Brand(): JSX.Element {
   const t = useT();
-  const brand = SETTINGS.brand;
+  const brand = pageSettings().brand;
   if (brand?.logo !== undefined) {
     return <img className="bk-logo" src={brand.logo} alt={brand.name ?? t('app.name')} />;
   }
@@ -63,7 +66,7 @@ export function Brand(): JSX.Element {
 export function useTagline(): string {
   const t = useT();
   const { locale } = useLanguage();
-  const tagline = SETTINGS.brand?.tagline;
+  const tagline = pageSettings().brand?.tagline;
   if (tagline === undefined) return t('brand.tagline');
   return typeof tagline === 'string' ? tagline : labelText(tagline, locale, t('brand.tagline'));
 }

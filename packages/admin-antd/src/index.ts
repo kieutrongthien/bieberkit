@@ -22,7 +22,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-// Public API of @bieberkit/admin-antd. Implementation starts after the Phase 0 ADRs (docs/adr/README.md).
+// The public API of @bieberkit/admin-antd: the shell that a project builds its admin from, and what the admin part of a plugin uses.
+
+export { startAdmin } from './app/start.tsx';
+export type { AdminComponent, AdminPart, StartOptions } from './app/start.tsx';
 
 /** npm name of this package. */
-export const packageName = '@bieberkit/admin-antd';
+export const packageName: string = '@bieberkit/admin-antd';

@@ -26,6 +26,15 @@ import { defineConfig } from 'tsdown';
 
 export default defineConfig({
   entry: ['src/index.ts'],
+  // One file for each source file, in `dist/lib`: the build of a project splits them into chunks and drops what it does not use.
+  // The styles, the logo and the font stay imports, which that build resolves.
+  unbundle: true,
+  outDir: 'dist/lib',
+  deps: { neverBundle: [/\.css$/, /\.svg$/, /^@fontsource\//] },
+  copy: [
+    { from: 'src/app/app.css', to: 'dist/lib/app' },
+    { from: 'src/app/assets/logo.svg', to: 'dist/lib/app/assets' },
+  ],
   format: 'esm',
   platform: 'browser',
   target: 'es2024',

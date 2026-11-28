@@ -26,7 +26,7 @@ import { labelText, menuOf, widgetsIn } from '@bieberkit/admin-core';
 import { Link } from '@tanstack/react-router';
 import { Card, Col, Empty, Row, Skeleton, Typography } from 'antd';
 import type { JSX } from 'react';
-import { SETTINGS } from './Brand.tsx';
+import { pageSettings } from './Brand.tsx';
 import { useMeta } from './context.ts';
 import { useGroupName } from './Gate.tsx';
 import { FolderArt, Icon } from './icons.tsx';
@@ -39,7 +39,7 @@ export function Welcome(): JSX.Element {
   const { locale } = useLanguage();
   const groupName = useGroupName();
   const widgets = widgetsIn(useExtensions(), 'dashboard');
-  const groups = meta.data === undefined ? [] : menuOf(meta.data, SETTINGS.menu);
+  const groups = meta.data === undefined ? [] : menuOf(meta.data, pageSettings().menu);
   return (
     <>
       <div className="bk-page-head">

@@ -29,7 +29,7 @@ export default defineConfig({
   ...base,
   test: {
     ...base.test,
-    include: ['tools/lib/plugin-artifacts.test.ts'],
+    include: ['tools/lib/plugin-artifacts.test.ts', 'tools/lib/admin-library.test.ts'],
     exclude: [],
   },
 });
