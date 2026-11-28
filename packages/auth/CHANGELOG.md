@@ -25,6 +25,30 @@
 
 # @bieberkit/auth
 
+## 0.4.0
+
+### Minor Changes
+
+- a62b594: The admin has the account screens: the sign in with a second factor, a forgotten and a reset password, the invitation, setting up a second factor, and one's own profile, password, factor and sessions.
+
+  What changes for a project:
+
+  - A server now turns TOTP on. Nobody has to set it up unless a role or the security policy asks for it.
+  - A password that is set through a link ends every session of the account, and turning the second factor on ends every other session.
+  - With the admin installed, the links of an invitation and of a password reset by an administrator lead to `<admin>/reset-password`. Without the admin they lead where they did.
+  - A holder of the administrator role may turn `requireMfa` of a system role on and off.
+  - `GET /api/v1/users/me` also answers `mfaRequired`.
+  - **Breaking:** `AdminClient.signIn` of `@bieberkit/admin-core` answers `{ kind: 'signedIn', user }` or `{ kind: 'secondFactor' }` in place of the user.
+
+### Patch Changes
+
+- Updated dependencies [a62b594]
+- Updated dependencies [e9e15e8]
+- Updated dependencies [3d9182a]
+  - @bieberkit/http@0.4.0
+  - @bieberkit/core@0.4.0
+  - @bieberkit/data@0.4.0
+
 ## 0.3.0
 
 ### Minor Changes

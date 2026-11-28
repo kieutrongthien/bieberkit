@@ -25,6 +25,12 @@
 
 # @bieberkit/core
 
+## 0.4.0
+
+### Minor Changes
+
+- e9e15e8: `@bieberkit/content` has its first API (CNT-01 to CNT-03, CNT-05, ADR 0038): rich content as `{ version: 1, blocks }`, checked by `parse`, drawn as HTML by `html` and as React elements by `renderContent` of `@bieberkit/content/react`, with an allowlist for links, images, videos and the blocks that `defineBlock` adds. `@bieberkit/core` has the subpath `@bieberkit/core/errors`, which a browser bundle can import.
+
 ## 0.3.0
 
 ### Minor Changes

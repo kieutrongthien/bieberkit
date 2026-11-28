@@ -1,6 +1,6 @@
 {
   "name": "@bieberkit/admin-antd",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "The Ant Design shell of the admin: the frame, the generic list and form, and the slots of the admin parts of plugins. A project builds its admin from it.",
   "keywords": [
     "bieberkit"

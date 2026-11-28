@@ -25,6 +25,44 @@
 
 # create-bieberkit
 
+## 0.4.0
+
+### Minor Changes
+
+- 3d9182a: **Breaking.** Each plugin ships its own screens, and a project builds its admin from its plugins (ADR 0040). `make:plugin` makes a plugin with a page in the admin; see `docs/guides/writing-a-plugin.md`.
+
+  - There is no prebuilt admin. `@bieberkit/admin-antd` is a library: `apps/admin` calls `startAdmin(root, { parts })`, and `bieberkit build` builds it with Vite. A web role with an `apps/admin` that is not built stops with `BK_ADMIN_NOT_BUILT`.
+  - A plugin gives screens through its export `./admin` (`defineAdminPlugin`). `definePlugin({ admin })`, the folder `admin` served under `/plugins/`, and `extensions` and `menu` of `_meta` are gone. `_meta` is `schemaVersion` 2.
+  - The sign in and the account screens are in `@bieberkit/plugin-users`, the control of a file in `@bieberkit/plugin-media`, and the history tab in `@bieberkit/plugin-audit-log`, which a person needs `audit-log.read` to see.
+  - `AdminClient` lost `signIn`, the calls of the password, the second factor, the sessions and the profile, the calls of files and `history`. It gained `request()`. The related functions and message keys left `@bieberkit/admin-core`.
+  - The shell offers hooks, slot prop types and shared components to the screens of plugins.
+
+  Also fixed: `migrate:make` writes the header of the project, and the image of a new project starts (its config saw no `node_modules`).
+
+  **To upgrade a project that exists**, make a new project with `pnpm create bieberkit` at this version beside it, then:
+
+  1. Copy its `apps/admin` folder into yours, keep your name in `apps/admin/package.json`, and add every plugin of your config to its `dependencies`.
+  2. Remove `@bieberkit/admin-antd` from `apps/server/package.json`.
+  3. In `pnpm-workspace.yaml`, add `dedupePeerDependents: false`, which keeps React out of the image of the server, and list `'plugins/*'` if you hold plugins there. In the root `tsconfig.json`, add `"apps/admin"` and `"plugins/*/src/admin"` to `exclude`, and `"plugins/*/src/**/*.ts"` to `include`.
+  4. Copy its `Dockerfile` and `deploy/image.mjs`, or add their two new lines to yours.
+  5. Move the screens that a plugin of yours declared in `definePlugin({ admin })` into its `./admin` export.
+  6. Run `pnpm install`, then `pnpm bieberkit build`.
+
+  `bieberkit start web` no longer serves an admin that you did not build.
+
+### Patch Changes
+
+- f649fa2: A new project builds and migrates again:
+
+  - `bieberkit.config.ts` of a new project, and the module of `make:module`, declare the type of their default export, which `isolatedDeclarations` asks for (`TS9037`).
+  - The generated client no longer names `RequestCredentials`, a type of the DOM that a project of a server does not load.
+  - The root of a new project declares `@bieberkit/data`, which its migrations import. Without it `bieberkit migrate` failed with `Cannot find package '@bieberkit/data'`.
+
+  A project that exists adds `@bieberkit/data` to the `devDependencies` of its root, and in `bieberkit.config.ts` writes `const config: ProjectConfigInput = defineConfig({ ... }); export default config;`.
+
+- Updated dependencies [e9e15e8]
+  - @bieberkit/core@0.4.0
+
 ## 0.3.0
 
 ### Minor Changes

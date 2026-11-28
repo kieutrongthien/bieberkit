@@ -1,6 +1,6 @@
 {
   "name": "@bieberkit/plugin-media",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Media records for files in the storage: a name, a type, a size and a state, confirmed after the upload.",
   "keywords": [
     "bieberkit",

@@ -25,6 +25,22 @@
 
 # @bieberkit/testing
 
+## 0.4.0
+
+### Patch Changes
+
+- Updated dependencies [a62b594]
+- Updated dependencies [e9e15e8]
+- Updated dependencies [3d9182a]
+  - @bieberkit/auth@0.4.0
+  - @bieberkit/http@0.4.0
+  - @bieberkit/core@0.4.0
+  - @bieberkit/cache@0.4.0
+  - @bieberkit/data@0.4.0
+  - @bieberkit/mail@0.4.0
+  - @bieberkit/queue@0.4.0
+  - @bieberkit/storage@0.4.0
+
 ## 0.3.0
 
 ### Minor Changes

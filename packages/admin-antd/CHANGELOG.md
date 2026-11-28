@@ -25,6 +25,54 @@
 
 # @bieberkit/admin-antd
 
+## 0.4.0
+
+### Minor Changes
+
+- a62b594: The admin has the account screens: the sign in with a second factor, a forgotten and a reset password, the invitation, setting up a second factor, and one's own profile, password, factor and sessions.
+
+  What changes for a project:
+
+  - A server now turns TOTP on. Nobody has to set it up unless a role or the security policy asks for it.
+  - A password that is set through a link ends every session of the account, and turning the second factor on ends every other session.
+  - With the admin installed, the links of an invitation and of a password reset by an administrator lead to `<admin>/reset-password`. Without the admin they lead where they did.
+  - A holder of the administrator role may turn `requireMfa` of a system role on and off.
+  - `GET /api/v1/users/me` also answers `mfaRequired`.
+  - **Breaking:** `AdminClient.signIn` of `@bieberkit/admin-core` answers `{ kind: 'signedIn', user }` or `{ kind: 'secondFactor' }` in place of the user.
+
+- f651cd1: The admin has an identity and a new frame (UI-23, UI-24): a grouped menu whose chosen entry joins the page, a breadcrumb, a box that goes to a page (Ctrl or Cmd and K), a menu of the account, a new sign in and folder tabs, with Be Vietnam Pro bundled (ADR 0039). A project can set its name, logo and sentence, and the order of its menu, with the new `admin` key of `bieberkit.config.ts` (UI-33).
+
+  The default theme changed. The theme has two new colors, `frame` and `accent`, and the default radius is 10. A theme that sets `colors.primary` and no `colors.frame` gets a frame that is a dark tone of it. A project that built its own adapter and makes a `Theme` or a `ThemeColors` by hand has to give the two new colors.
+
+- 3d9182a: **Breaking.** Each plugin ships its own screens, and a project builds its admin from its plugins (ADR 0040). `make:plugin` makes a plugin with a page in the admin; see `docs/guides/writing-a-plugin.md`.
+
+  - There is no prebuilt admin. `@bieberkit/admin-antd` is a library: `apps/admin` calls `startAdmin(root, { parts })`, and `bieberkit build` builds it with Vite. A web role with an `apps/admin` that is not built stops with `BK_ADMIN_NOT_BUILT`.
+  - A plugin gives screens through its export `./admin` (`defineAdminPlugin`). `definePlugin({ admin })`, the folder `admin` served under `/plugins/`, and `extensions` and `menu` of `_meta` are gone. `_meta` is `schemaVersion` 2.
+  - The sign in and the account screens are in `@bieberkit/plugin-users`, the control of a file in `@bieberkit/plugin-media`, and the history tab in `@bieberkit/plugin-audit-log`, which a person needs `audit-log.read` to see.
+  - `AdminClient` lost `signIn`, the calls of the password, the second factor, the sessions and the profile, the calls of files and `history`. It gained `request()`. The related functions and message keys left `@bieberkit/admin-core`.
+  - The shell offers hooks, slot prop types and shared components to the screens of plugins.
+
+  Also fixed: `migrate:make` writes the header of the project, and the image of a new project starts (its config saw no `node_modules`).
+
+  **To upgrade a project that exists**, make a new project with `pnpm create bieberkit` at this version beside it, then:
+
+  1. Copy its `apps/admin` folder into yours, keep your name in `apps/admin/package.json`, and add every plugin of your config to its `dependencies`.
+  2. Remove `@bieberkit/admin-antd` from `apps/server/package.json`.
+  3. In `pnpm-workspace.yaml`, add `dedupePeerDependents: false`, which keeps React out of the image of the server, and list `'plugins/*'` if you hold plugins there. In the root `tsconfig.json`, add `"apps/admin"` and `"plugins/*/src/admin"` to `exclude`, and `"plugins/*/src/**/*.ts"` to `include`.
+  4. Copy its `Dockerfile` and `deploy/image.mjs`, or add their two new lines to yours.
+  5. Move the screens that a plugin of yours declared in `definePlugin({ admin })` into its `./admin` export.
+  6. Run `pnpm install`, then `pnpm bieberkit build`.
+
+  `bieberkit start web` no longer serves an admin that you did not build.
+
+### Patch Changes
+
+- Updated dependencies [a62b594]
+- Updated dependencies [f651cd1]
+- Updated dependencies [3d9182a]
+  - @bieberkit/admin-core@0.4.0
+  - @bieberkit/tokens@0.4.0
+
 ## 0.3.0
 
 ### Minor Changes

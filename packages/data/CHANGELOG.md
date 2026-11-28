@@ -25,6 +25,13 @@
 
 # @bieberkit/data
 
+## 0.4.0
+
+### Patch Changes
+
+- Updated dependencies [e9e15e8]
+  - @bieberkit/core@0.4.0
+
 ## 0.3.0
 
 ### Minor Changes

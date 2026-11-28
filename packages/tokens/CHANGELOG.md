@@ -25,6 +25,14 @@
 
 # @bieberkit/tokens
 
+## 0.4.0
+
+### Minor Changes
+
+- f651cd1: The admin has an identity and a new frame (UI-23, UI-24): a grouped menu whose chosen entry joins the page, a breadcrumb, a box that goes to a page (Ctrl or Cmd and K), a menu of the account, a new sign in and folder tabs, with Be Vietnam Pro bundled (ADR 0039). A project can set its name, logo and sentence, and the order of its menu, with the new `admin` key of `bieberkit.config.ts` (UI-33).
+
+  The default theme changed. The theme has two new colors, `frame` and `accent`, and the default radius is 10. A theme that sets `colors.primary` and no `colors.frame` gets a frame that is a dark tone of it. A project that built its own adapter and makes a `Theme` or a `ThemeColors` by hand has to give the two new colors.
+
 ## 0.3.0
 
 ### Minor Changes

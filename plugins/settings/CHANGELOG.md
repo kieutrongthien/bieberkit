@@ -25,6 +25,18 @@
 
 # @bieberkit/plugin-settings
 
+## 0.4.0
+
+### Patch Changes
+
+- Updated dependencies [a62b594]
+- Updated dependencies [e9e15e8]
+- Updated dependencies [3d9182a]
+  - @bieberkit/http@0.4.0
+  - @bieberkit/core@0.4.0
+  - @bieberkit/cache@0.4.0
+  - @bieberkit/data@0.4.0
+
 ## 0.3.0
 
 ### Minor Changes

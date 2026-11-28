@@ -25,6 +25,13 @@
 
 # @bieberkit/site-kit
 
+## 0.4.0
+
+### Patch Changes
+
+- Updated dependencies [e9e15e8]
+  - @bieberkit/content@0.4.0
+
 ## 0.3.0
 
 ### Patch Changes
