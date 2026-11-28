@@ -29,7 +29,7 @@ import type { ProjectFile } from './render.ts';
  * holds them equal: another version of React in the admin would put two copies of it in a build.
  */
 export const ADMIN_VERSIONS: Readonly<Record<'dependencies' | 'devDependencies', Readonly<Record<string, string>>>> = {
-  dependencies: { antd: '6.7.1', react: '19.3.1', 'react-dom': '19.3.1' },
+  dependencies: { '@tanstack/react-query': '5.108.0', antd: '6.7.1', react: '19.3.1', 'react-dom': '19.3.1' },
   devDependencies: {
     '@types/react': '19.3.0',
     '@types/react-dom': '19.3.0',

@@ -544,12 +544,29 @@ describe('section 5.1 the choices', () => {
       'react',
       'react-dom',
       'antd',
+      '@tanstack/react-query',
       'vite',
       '@vitejs/plugin-react',
       '@types/react',
       '@types/react-dom',
     ])
       expect([name, { ...made.dependencies, ...made.devDependencies }[name]]).toEqual([name, built[name]]);
+  });
+
+  // pnpm gives an optional peer to a package only through the one that depends on it. What a plugin asks of the admin and `apps/admin`
+  // does not declare is missing from the build of a new project, while this repository, which installs each plugin alone, builds.
+  it('UI-38 apps/admin declares every package that the admin part of a first-party plugin asks its project for', async () => {
+    const cwd = workdir();
+    await create(cwd, ['demo', '--yes', '--no-install', '--no-git']);
+    const made = JSON.parse(read(cwd, 'demo/apps/admin/package.json'));
+    const plugins = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'plugins');
+    const manifests = readdirSync(plugins, { withFileTypes: true }).filter((entry) => entry.isDirectory());
+    const asked = manifests.flatMap(({ name }) => {
+      const manifest = JSON.parse(readFileSync(join(plugins, name, 'package.json'), 'utf8'));
+      return Object.keys(manifest.peerDependencies ?? {});
+    });
+    expect(asked).toContain('@tanstack/react-query');
+    expect([...new Set(asked)].filter((name) => made.dependencies[name] === undefined)).toEqual([]);
   });
 });
 
