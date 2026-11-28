@@ -202,17 +202,17 @@ describe('ADR 0036 the policy of the admin and the storage that it uploads to', 
   });
 });
 
-describe('UI-37 DEP-06 where the admin of a project is', () => {
-  const projectWith = (...files: readonly string[]): string => {
-    const root = mkdtempSync(join(tmpdir(), 'bk-admin-at-'));
-    onTestFinished(() => rmSync(root, { recursive: true, force: true }));
-    for (const file of files) {
-      mkdirSync(join(root, file, '..'), { recursive: true });
-      writeFileSync(join(root, file), '<!doctype html>');
-    }
-    return root;
-  };
+const projectWith = (...files: readonly string[]): string => {
+  const root = mkdtempSync(join(tmpdir(), 'bk-admin-at-'));
+  onTestFinished(() => rmSync(root, { recursive: true, force: true }));
+  for (const file of files) {
+    mkdirSync(join(root, file, '..'), { recursive: true });
+    writeFileSync(join(root, file), '<!doctype html>');
+  }
+  return root;
+};
 
+describe('UI-37 DEP-06 where the admin of a project is', () => {
   it('UI-37 the build of the project is apps/admin/dist', () => {
     const root = projectWith('apps/admin/dist/index.html');
     expect(adminDirectory(root)).toBe(join(root, 'apps/admin/dist'));

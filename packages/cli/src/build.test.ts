@@ -68,6 +68,21 @@ async function run(root: string, deps: BuildDeps, argv: string[]) {
   };
 }
 
+const withAdmin = (): Fixture => {
+  const made = project();
+  writeFileSync(join(made.root, 'tsconfig.json'), '{}');
+  mkdirSync(join(made.root, 'apps/admin'), { recursive: true });
+  writeFileSync(join(made.root, 'apps/admin/package.json'), '{}');
+  writeFileSync(join(made.root, 'apps/admin/tsconfig.json'), '{}');
+  return made;
+};
+
+/** Every program ends well but Vite. */
+const failingVite: Spawn = (_file, args) => ({
+  exit: Promise.resolve(args.includes('vite') ? 1 : 0),
+  kill: () => undefined,
+});
+
 describe('section 5.2 build', () => {
   it('GEN-02 regenerates from scratch, so a generated file that a person deleted or changed comes back', async () => {
     const { root } = project();
@@ -111,15 +126,6 @@ describe('section 5.2 build', () => {
     expect(existsSync(join(root, 'apps/server/dist/standalone'))).toBe(false);
   });
 
-  const withAdmin = (): Fixture => {
-    const made = project();
-    writeFileSync(join(made.root, 'tsconfig.json'), '{}');
-    mkdirSync(join(made.root, 'apps/admin'), { recursive: true });
-    writeFileSync(join(made.root, 'apps/admin/package.json'), '{}');
-    writeFileSync(join(made.root, 'apps/admin/tsconfig.json'), '{}');
-    return made;
-  };
-
   it('UI-37 checks the types of the admin too, with its own tsconfig, and builds it with the Vite of the project', async () => {
     const { root } = withAdmin();
     const { deps, calls } = fake();
@@ -134,11 +140,7 @@ describe('section 5.2 build', () => {
 
   it('UI-37 an admin that does not build stops the build and says so', async () => {
     const { root } = withAdmin();
-    const spawn: Spawn = (_file, args) => ({
-      exit: Promise.resolve(args.includes('vite') ? 1 : 0),
-      kill: () => undefined,
-    });
-    const { code, error } = await run(root, { spawn }, ['build', '--json']);
+    const { code, error } = await run(root, { spawn: failingVite }, ['build', '--json']);
     expect([code, error['code']]).toEqual([1, 'BK_BUILD_ADMIN']);
   });
 

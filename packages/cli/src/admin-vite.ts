@@ -125,10 +125,19 @@ const line = (problem: AdminProblem): string =>
 
 /** What Vite offers to run a module in Node.js, taken from the Vite of the project, which is the one that builds. */
 interface Runner {
-  runnerImport(
+  readonly runnerImport: (
     id: string,
     config: { root: string; configFile: false; logLevel: 'silent' },
-  ): Promise<{ module: unknown }>;
+  ) => Promise<{ module: unknown }>;
+}
+
+/** The Vite at `path`, with the one thing of it that is used here. */
+async function runnerOf(path: string): Promise<Runner> {
+  const loaded: unknown = await import(/* @vite-ignore */ pathToFileURL(path).href);
+  const run: unknown = Reflect.get(Object(loaded), 'runnerImport');
+  if (typeof run !== 'function') throw new Error(`${path} has no runnerImport. The admin needs Vite 8.`);
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the function of Vite, whose types the project has
+  return { runnerImport: run as Runner['runnerImport'] };
 }
 
 export interface AdminViteOptions {
@@ -169,7 +178,7 @@ export function bieberkitAdmin(options: AdminViteOptions = {}): Plugin {
       found = listed.parts;
       const problems: AdminProblem[] = [...listed.problems];
       const vitePath = createRequire(join(adminDir, 'package.json')).resolve('vite');
-      const { runnerImport } = (await import(/* @vite-ignore */ pathToFileURL(vitePath).href)) as Runner;
+      const { runnerImport } = await runnerOf(vitePath);
       const parts: AdminPart<unknown>[] = [];
       for (const item of found) {
         const resolved = await this.resolve(item.specifier, join(adminDir, 'index.html'));
@@ -193,7 +202,7 @@ export function bieberkitAdmin(options: AdminViteOptions = {}): Plugin {
           problems.push({
             plugin: item.name,
             code: 'wrong-name',
-            message: `Its admin part says that it is "${String(part.name)}". The name is the one of the package.`,
+            message: `Its admin part says that it is "${part.name}". The name is the one of the package.`,
           });
         parts.push(part);
       }

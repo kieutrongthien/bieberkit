@@ -82,8 +82,8 @@ function project(plugins: readonly PluginFixture[], options: FixtureOptions = {}
   for (const plugin of plugins) {
     if (plugin.admin === undefined) continue;
     const manifest = join(root, 'node_modules', plugin.name, 'package.json');
-    const read = JSON.parse(readFileSync(manifest, 'utf8')) as { exports: Record<string, string> };
-    read.exports['./admin'] = './admin/index.js';
+    const read: Record<string, unknown> = JSON.parse(readFileSync(manifest, 'utf8'));
+    read['exports'] = { ...Object(read['exports']), './admin': './admin/index.js' };
     writeFileSync(manifest, JSON.stringify(read));
   }
   const modules = join(root, 'apps/admin/node_modules');
@@ -98,15 +98,17 @@ function project(plugins: readonly PluginFixture[], options: FixtureOptions = {}
 
 /** Builds the admin of a project as `bieberkit build` does, and answers the JavaScript of the build. */
 async function build(admin: string): Promise<{ scripts: string }> {
-  const vite = (await import(/* @vite-ignore */ pathToFileURL(join(VITE, 'dist/node/index.js')).href)) as {
-    build(config: unknown): Promise<unknown>;
-  };
-  await vite.build({
-    root: admin,
-    configFile: false,
-    logLevel: 'silent',
-    plugins: [bieberkitAdmin({ requireSignIn: true })],
-  });
+  const vite: unknown = await import(/* @vite-ignore */ pathToFileURL(join(VITE, 'dist/node/index.js')).href);
+  const run: unknown = Reflect.get(Object(vite), 'build');
+  if (typeof run !== 'function') throw new Error('Expected the build of Vite.');
+  await Reflect.apply(run, undefined, [
+    {
+      root: admin,
+      configFile: false,
+      logLevel: 'silent',
+      plugins: [bieberkitAdmin({ requireSignIn: true })],
+    },
+  ]);
   const assets = join(admin, 'dist/assets');
   return {
     scripts: readdirSync(assets)
