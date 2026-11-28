@@ -24,7 +24,7 @@
 
 # 0037. A plugin adds code to the admin as modules that the web role serves and the admin loads
 
-- Status: Accepted
+- Status: Superseded by 0040
 - Date: 2026-11-27
 - Deciders: Bieber Kieu
 - Requirements: UI-04, UI-10, UI-14, UI-19, UI-21, PLG-01, PLG-07, SEC-01, P1, P9

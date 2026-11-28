@@ -1748,7 +1748,7 @@ Open questions:
 
 | Version | Date | Changes |
 | --- | --- | --- |
-| 0.8.40 | 2026-11-28 | ADR 0040 (Proposed) and `docs/modules/plugin-admin.md`: a plugin ships its own admin UI in fixed slots and a project builds its admin from its plugins (UI-34 to UI-38); no `auth-ui` plugin, the account screens are of `users` (12, UI-26); UI-03, UI-04, UI-10, UI-11, UI-24 to UI-32, the CLI table, 11.1 and 11.3 follow. The code still follows ADR 0025 and 0037 until the items of M2.2 land |
+| 0.8.40 | 2026-11-28 | ADR 0040 (accepted the same day by delegation) and `docs/modules/plugin-admin.md`: a plugin ships its own admin UI in fixed slots and a project builds its admin from its plugins (UI-34 to UI-38); no `auth-ui` plugin, the account screens are of `users` (12, UI-26); UI-03, UI-04, UI-10, UI-11, UI-24 to UI-32, the CLI table, 11.1 and 11.3 follow. The code still follows ADR 0025 and 0037 until the items of M2.2 land |
 | 0.8.39 | 2026-11-28 | UI-26 and `docs/modules/admin-account.md`: a second factor is optional unless it is asked for (AUTH-05), TOTP is always on (AUTH-03), a password set by a link ends the sessions (AUTH-06), the links lead to the admin (USR-10), `mfaRequired` (USR-12) and `requireMfa` of a system role (ROL-06) |
 | 0.8.38 | 2026-11-27 | ADR 0039 and `docs/modules/admin-identity.md`: the colors `frame` and `accent` and the bundled font (UI-23), the order of the menu and the box that goes to a page (UI-24), and `admin.brand` (UI-33) |
 | 0.8.37 | 2026-11-27 | ADR 0038: content is `{ version: 1, blocks }`, the HTML serializer and the React renderer draw one checked element tree, and there is no raw HTML block (CNT-01, CNT-03) |

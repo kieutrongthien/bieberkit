@@ -24,7 +24,7 @@
 
 # 0025. The admin stack of the first slice: React, Ant Design, TanStack Query and Router, Vite, Playwright
 
-- Status: Accepted
+- Status: Accepted. In part replaced by [0040](0040-plugin-owned-admin.md) on 2026-11-28: a project builds its admin from its plugins
 - Accepted: 2026-11-24, by delegation: the maintainer asked the engineer to settle every open decision, and the spec already names the stack (UI-01, UI-10).
 - Date: 2026-11-24
 - Deciders: Bieber Kieu

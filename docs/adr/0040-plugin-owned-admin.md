@@ -24,7 +24,8 @@
 
 # 0040. A plugin ships its own admin UI, and a project builds its admin from its plugins
 
-- Status: Proposed. The maintainer chose the direction on 2026-11-28; the evidence of the spike is missing.
+- Status: Accepted
+- Accepted: 2026-11-28, by delegation: the maintainer chose the direction and then asked the engineer to approve the record and carry it out ("duyệt giùm tôi rồi thực hiện đi"). Approved after the spike below passed.
 - Date: 2026-11-28
 - Deciders: Bieber Kieu
 - Requirements: UI-34 to UI-38, UI-04, UI-10, UI-12, UI-14, UI-25, DEP-06, PLG-01, PLG-03, PLG-05, PLG-07, P1, P9
@@ -61,15 +62,21 @@ The shape of the API is in [plugin-admin.md](../modules/plugin-admin.md). Its na
 - Measured on the build of 2026-11-28: the chunk `Plugins` of the admin is **235 kB** compressed (the initial JavaScript is 330.5 kB). Its source imports the whole of Ant Design (`import * as AntD`) to hand it to modules, which is the likely reason; the chunk was not taken apart. Under B, a sign in that a plugin draws would need what this chunk holds.
 - Read in the code, not run, what a plugin of a new project meets today: `make:plugin` writes to `plugins/`, but the workspace of `create` lists `apps/*` and `packages/*`; the build script of the plugin calls `tsdown`, which neither declares; the server resolves a plugin to its `dist`; there is no admin part.
 - The browser tests link the packages of the repository into the project, so they cannot find those.
-- **Missing, the spike:** from packed tarballs, in a new project outside the repository, show that (1) Node runs the `.ts` backend of a local plugin through its workspace link, (2) Vite builds one admin from published and local admin parts with one copy of React, under the policy of UI-14, and (3) an edit of a local screen shows with no manual build. If one of them fails, this record changes before it is accepted.
+- **The spike, passed on 2026-11-28** (Node 26, pnpm 12.21.0; sources in `bieberkit-spikes/plugin-admin-spike`, outside the repository). All 26 packages were packed, and a project was created outside the repository from the tarballs alone. A stand-in shell took the place of `@bieberkit/admin-antd` as a library, which does not exist yet.
+  1. Node ran the `.ts` backend of the local plugin through its workspace link, with no `dist`: its route answered 401 without a session, and an unknown route 404.
+  2. Vite built one admin from a published admin part (built TSX, packed) and a local one (TSX source): one copy each of React, ReactDOM, Ant Design and the shell, and a lazy chunk for each page. Under the policy of UI-14, word for word, a browser drew both pages, both used the context of the shell and their hooks, and the console had no error.
+  3. In `vite dev`, an edit of the local screen showed after **78 ms**, with no full reload and the state of the component kept.
+- **Found by the spike, and binding on the build:** with a plugin that asks for React 19.3.0 beside 19.3.1, Vite put **two copies of React** in the build; with `resolve.dedupe` it put one. A plugin in a project must export its source, and `publishConfig` must turn the exports to `dist` (shown for a packed plugin). A plugin whose peer dependencies are `*` with no dev dependencies made pnpm fetch the placeholder `0.0.0-stage` from npm.
+- **Not shown:** the real `@bieberkit/admin-antd` as a library (its CSS, fonts and size), and whether `bieberkit dev` restarts the server and regenerates the types after an edit in `plugins/`. The spike turned `blockExoticSubdeps` off in its own project only, because tarballs stood in for the registry.
+- **Also found, and fixed apart from this decision:** every new project failed `bieberkit build` on two type errors, and `bieberkit migrate` because its root did not declare `@bieberkit/data`.
 
 ## Consequences
 
 - **Easier.** A screen of a plugin is ordinary React with types. A feature is added or removed in one place. The shared packages stop growing with each plugin.
-- **Harder.** A project has a frontend build. The admin API of plugins is public and needs versions. A plugin screen is written for the Ant Design adapter; another adapter (UI-10) needs its own screens, so a plugin keeps its logic free of UI libraries.
+- **Harder.** The build keeps one copy of React, Ant Design and the shell (`resolve.dedupe`) and fails when it cannot. A project has a frontend build. The admin API of plugins is public and needs versions. A plugin screen is written for the Ant Design adapter; another adapter (UI-10) needs its own screens, so a plugin keeps its logic free of UI libraries.
 - **Dependencies.** A project gains `vite` and `@vitejs/plugin-react` as dev dependencies, the versions that ADR 0025 approved (VoidZero and the Vite team, MIT).
 - **Ruled out.** Screens of one plugin in a shared package, a second way for first-party plugins, and code of a plugin loaded at run time from outside the build.
-- **On acceptance** ADR 0037 becomes `Superseded by 0040`. Of ADR 0025, "one built application and no build in the project" is replaced; the stack stays. Until then both keep their status.
+- **ADR 0037** is `Superseded by 0040`. Of ADR 0025, "one built application and no build in the project" is replaced; the stack stays. The code follows both until the items of M2.2 land.
 
 ## Spec changes
 

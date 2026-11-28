@@ -27,7 +27,7 @@
 - Packages: `@bieberkit/admin-core`, `@bieberkit/admin-antd`, `bieberkit`, `create-bieberkit`, `@bieberkit/server`, the plugins
 - Layer: product and tools
 - Spec sections: UI-34 to UI-38, UI-04, UI-10, UI-12, UI-14, UI-25, section 11, 16.6, DEP-06. ADR 0040
-- Status: **Draft.** The maintainer chose the direction and the control of the shell on 2026-11-28. Not built. The names of the API are proposals, and the public API of `definePlugin` is the maintainer's to approve.
+- Status: **Approved on 2026-11-28, by delegation of the maintainer** (ADR 0040, after its spike). Not built. The shape of the API below is approved; its exact types are fixed by the tests of the contract.
 
 ## Purpose
 
@@ -83,7 +83,7 @@ The shell has no sign in of its own, so the admin needs the `users` plugin. With
 5. **Mistakes are loud.** A repeated address, an unknown slot or a missing text stops the build with all the problems and a stable code.
 6. **One door.** A first-party plugin uses nothing that a plugin of a person cannot use.
 
-## Public API (proposal)
+## Public API
 
 ```ts
 // plugins/notes/src/admin/index.ts
@@ -101,6 +101,8 @@ The other slots are keys of the same object (`headerActions`, `notices`, `record
 
 ## How a project builds its admin (UI-37)
 
+- The build keeps one copy of React, Ant Design and the shell with `resolve.dedupe`, and fails when it finds two. The spike of ADR 0040 built two copies of React without it.
+- A plugin in a project exports its source; `publishConfig` turns its exports to `dist`. It declares React, Ant Design and the shell as peer dependencies with a range, and as dev dependencies with the versions of the project, so pnpm fetches nothing else.
 - `apps/admin` is the application of the project (spec 16.6). Its list of admin parts is **generated** from `plugins` of the config. Its own pages, widgets and texts go in `apps/admin/src`.
 - `bieberkit dev` runs the admin with hot reload; `bieberkit build` writes `apps/admin/dist`, which the web role serves with the policy of UI-14 (DEP-06). `theme`, `admin.brand`, `admin.menu` and `ADMIN_URL` stay settings of a restart.
 - One copy of React and of Ant Design: they are peer dependencies of an admin part.
@@ -121,7 +123,7 @@ Seen in the code on 2026-11-28 and not run, each to be fixed here: the workspace
 
 ## Order of work
 
-1. The spike of ADR 0040. Then the maintainer accepts the record and the API.
+1. The spike of ADR 0040, then the acceptance of the record. Done on 2026-11-28.
 2. The contract and the slots, with `@bieberkit/admin-antd` as a library.
 3. The build of the project, then the path of the author, then the test with packed tarballs.
 4. The screens move: `users` first (the account screens of UI-26, with the account calls of `admin-core`), then `media` (the control of a file) and `audit-log` (the history tab). The behavior and the browser tests of [admin-account.md](admin-account.md) stay and must keep passing.

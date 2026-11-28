@@ -69,10 +69,10 @@ Status values: `Proposed`, `Accepted`, `Rejected`, `Superseded by NNNN`. Only th
 | [0034](0034-extension-record-key.md) | The row of an extension is keyed by a unique `record`, not by the id of the target | Accepted |
 | [0035](0035-admin-tables-forms-and-checks.md) | The admin draws tables, forms and long lists with Ant Design, and checks accessibility with axe | Accepted |
 | [0036](0036-file-fields.md) | A file field holds the id of a media record, and the browser sends the file to the storage | Accepted |
-| [0037](0037-plugin-admin-code.md) | A plugin adds code to the admin as modules that the web role serves and the admin loads | Accepted |
+| [0037](0037-plugin-admin-code.md) | A plugin adds code to the admin as modules that the web role serves and the admin loads | Superseded by 0040 |
 | [0038](0038-content-tree-and-block-format.md) | Content is versioned blocks, drawn through one element tree | Accepted |
 | [0039](0039-admin-font.md) | The admin bundles the font Be Vietnam Pro | Proposed |
-| [0040](0040-plugin-owned-admin.md) | A plugin ships its own admin UI, and a project builds its admin from its plugins | Proposed |
+| [0040](0040-plugin-owned-admin.md) | A plugin ships its own admin UI, and a project builds its admin from its plugins | Accepted |
 
 ## Needed for the Phase 0 gate
 
