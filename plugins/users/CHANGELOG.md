@@ -25,6 +25,23 @@
 
 # @bieberkit/plugin-users
 
+## 0.4.1
+
+### Patch Changes
+
+- 4b6de6f: Every file of a module and of a plugin is now in the folder of its kind (`entities/`, `services/`, `routes/`, `jobs/`, `events/`, and in `admin/` the folders `pages/`, `tabs/`, `fields/`, `components/`, `lib/`, `messages/`). The base plugins and the shell of the admin were reorganized with no change of their public API.
+
+  - `bieberkit check layout` warns about a file of a module or a plugin that is out of place. It does not fail the check.
+  - `make:plugin` writes the new layout, and the `AGENTS.md` of a new project says it.
+
+- Updated dependencies [4b6de6f]
+  - @bieberkit/admin-antd@0.4.1
+  - @bieberkit/admin-core@0.4.1
+  - @bieberkit/auth@0.4.1
+  - @bieberkit/core@0.4.1
+  - @bieberkit/data@0.4.1
+  - @bieberkit/http@0.4.1
+
 ## 0.4.0
 
 ### Minor Changes

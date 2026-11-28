@@ -111,6 +111,8 @@ Release preparation on 2026-11-27: the base plugin, M2.1 and M2.2 changesets pro
 
 Release preparation on 2026-11-28: the plugin-owned admin, the account screens, the admin identity, the content blocks and the fixes of a new project produce the fixed **0.4.0** train across all 26 packages and plugins, with npm tag **beta** and intended git tag **v0.4.0-beta**. [Release notes](releases/0.4.0-beta.md) record scope, breaking changes, the upgrade and the publication handoff. This preparation does not tick the GitHub dry-run or publication gates.
 
+Release preparation on 2026-11-28, after it: the file layout of modules, plugins and the admin shell (MOD-19) produces the fixed **0.4.1** patch, with npm tag **beta** and intended git tag **v0.4.1-beta**, to be published after 0.4.0. [Release notes](releases/0.4.1-beta.md). This preparation does not tick the GitHub dry-run or publication gates.
+
 Done when: the header checker and trusted publishing work end to end (spec §25 gate text).
 
 ### Phase 0 gate **[M]**

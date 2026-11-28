@@ -25,6 +25,22 @@
 
 # @bieberkit/server
 
+## 0.4.1
+
+### Patch Changes
+
+- @bieberkit/admin-core@0.4.1
+  - @bieberkit/auth@0.4.1
+  - @bieberkit/cache@0.4.1
+  - @bieberkit/core@0.4.1
+  - @bieberkit/data@0.4.1
+  - @bieberkit/http@0.4.1
+  - @bieberkit/log@0.4.1
+  - @bieberkit/mail@0.4.1
+  - @bieberkit/queue@0.4.1
+  - @bieberkit/storage@0.4.1
+  - @bieberkit/tokens@0.4.1
+
 ## 0.4.0
 
 ### Minor Changes

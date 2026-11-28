@@ -1,6 +1,6 @@
 {
   "name": "bieberkit-monorepo",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "private": true,
   "description": "BieberKit framework monorepo.",
   "license": "Apache-2.0",

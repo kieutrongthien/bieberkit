@@ -25,6 +25,12 @@
 
 # @bieberkit/data
 
+## 0.4.1
+
+### Patch Changes
+
+- @bieberkit/core@0.4.1
+
 ## 0.4.0
 
 ### Patch Changes

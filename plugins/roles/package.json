@@ -1,6 +1,6 @@
 {
   "name": "@bieberkit/plugin-roles",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Roles and their permissions: the list, the permission catalogue, create, change, assign, and the base roles of the seed.",
   "keywords": [
     "bieberkit",

@@ -1,6 +1,6 @@
 {
   "name": "@bieberkit/admin-core",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Headless admin: metadata, routing and state.",
   "keywords": [
     "bieberkit"
