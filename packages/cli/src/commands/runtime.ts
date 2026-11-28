@@ -32,6 +32,7 @@ import type { Command } from '../command.ts';
 import { CliError, usageError } from '../errors.ts';
 import { generateFiles, writeFiles } from '../generate/files.ts';
 import { loadApp } from '../app.ts';
+import { localPlugins } from '../project.ts';
 import { realSpawn, supervise } from '../processes.ts';
 import type { Child } from '../processes.ts';
 import type { Spawn } from '../processes.ts';
@@ -116,12 +117,15 @@ export function devCommand(deps: RuntimeDeps = {}): Command {
       }
       // Generated files follow the code, a moment after the last change (GEN-02).
       let timer: NodeJS.Timeout | undefined;
-      const stopWatching = existsSync(join(root, 'apps/server/src'))
-        ? watcher(join(root, 'apps/server/src'), () => {
-            clearTimeout(timer);
-            timer = setTimeout(() => void regenerate(), 300);
-          })
-        : () => undefined;
+      const changed = (): void => {
+        clearTimeout(timer);
+        timer = setTimeout(() => void regenerate(), 300);
+      };
+      // The server of the application, and the plugins that the project holds, whose entities the generated files hold too.
+      const stops = ['apps/server/src', ...localPlugins(root).map((plugin) => `${plugin}/src`)]
+        .map((folder) => join(root, folder))
+        .filter((folder) => existsSync(folder))
+        .map((folder) => watcher(folder, changed));
       // The admin is served by Vite from its source. The server is told its address as ADMIN_URL, so that the sign in trusts it,
       // and the links that are mailed lead to it. The file is read by Node.js: a value that the real environment has wins.
       let admin: Child | undefined;
@@ -144,7 +148,7 @@ export function devCommand(deps: RuntimeDeps = {}): Command {
       } finally {
         admin?.kill('SIGTERM');
         clearTimeout(timer);
-        stopWatching();
+        for (const stop of stops) stop();
       }
     },
   };

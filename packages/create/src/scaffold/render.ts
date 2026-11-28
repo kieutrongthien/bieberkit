@@ -214,6 +214,7 @@ function renderWorkspace(choices: Choices, plan: Plan): string {
   return `${header('hash', choices, plan, 'pnpm-workspace.yaml', 'The workspace and the supply chain settings of the project (SEC-11).')}packages:
   - 'apps/*'
   - 'packages/*'
+  - 'plugins/*'
 
 # New versions become installable 7 days after publication. Do not relax these to make an install pass: report the failure.
 minimumReleaseAge: 10080
@@ -338,9 +339,15 @@ export function renderProject(choices: Choices, plan: Plan): ProjectFile[] {
           noEmit: true,
           skipLibCheck: true,
         },
-        include: ['bieberkit.config.ts', 'apps/**/*.ts', 'packages/**/*.ts', '.bieberkit/types/*.d.ts'],
-        // The admin has a tsconfig of its own: it needs the DOM and JSX, which the server must not see.
-        ...(choices.admin ? { exclude: ['apps/admin'] } : {}),
+        include: [
+          'bieberkit.config.ts',
+          'apps/**/*.ts',
+          'packages/**/*.ts',
+          'plugins/*/src/**/*.ts',
+          '.bieberkit/types/*.d.ts',
+        ],
+        // The admin and the screens of a plugin have a tsconfig of their own: they need the DOM and JSX, which the server must not see.
+        exclude: [...(choices.admin ? ['apps/admin'] : []), 'plugins/*/src/admin'],
       }),
     },
     { path: 'bieberkit.config.ts', content: renderConfig(choices, plan) },

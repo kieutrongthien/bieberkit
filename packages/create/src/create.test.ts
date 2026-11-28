@@ -270,6 +270,16 @@ describe('section 6 the files of a new project', () => {
     }
   });
 
+  it('UI-38 the workspace holds the plugins of the project, and its type check reads their sources, the screens apart', async () => {
+    const cwd = workdir();
+    await create(cwd, ['demo', '--yes', '--no-install', '--no-git']);
+    expect(read(cwd, 'demo/pnpm-workspace.yaml')).toContain("  - 'plugins/*'\n");
+    const config = JSON.parse(read(cwd, 'demo/tsconfig.json'));
+    expect(config.include).toContain('plugins/*/src/**/*.ts');
+    // The screens of a plugin need the DOM and JSX: each has a tsconfig of its own.
+    expect(config.exclude).toContain('plugins/*/src/admin');
+  });
+
   it('6 a scoped name makes a folder without the scope, and the packages pin the version of the framework', async () => {
     const cwd = workdir();
     await create(cwd, ['@team/crm-app', '--yes', '--no-install', '--no-git']);

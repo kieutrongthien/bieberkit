@@ -33,6 +33,7 @@ export { renderEnvExample } from './scaffold/env-example.ts';
 export { checkProjectName } from './scaffold/names.ts';
 export { planProject } from './scaffold/plan.ts';
 export type { PlanDeps, Planned } from './scaffold/plan.ts';
+export { ADMIN_VERSIONS } from './scaffold/admin.ts';
 export { renderProject } from './scaffold/render.ts';
 export type { Plan, ProjectFile } from './scaffold/render.ts';
 export { scaffold } from './scaffold/run.ts';

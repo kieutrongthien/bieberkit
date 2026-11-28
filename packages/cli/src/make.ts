@@ -200,6 +200,74 @@ export interface NewPlugin {
   readonly author: string;
   readonly license: string;
   readonly year: number;
+  /** Whether the plugin gets screens: a project without an admin gets none. */
+  readonly admin: boolean;
+  /** The exact version of every package that it asks for. */
+  readonly versions: Readonly<Record<string, string>>;
+}
+
+/** What a plugin needs beside the backend, and what its screens need on top. Each is a development dependency at one version. */
+const BACKEND = ['@bieberkit/core', '@bieberkit/data'];
+const SCREENS = ['@bieberkit/admin-antd', '@bieberkit/admin-core', '@tanstack/react-query', 'antd', 'react'];
+const BUILDERS = ['bieberkit', 'tsdown', 'typescript', 'vitest'];
+
+const sorted = <T>(entries: readonly (readonly [string, T])[]): Record<string, T> =>
+  Object.fromEntries(entries.toSorted(([a], [b]) => a.localeCompare(b)));
+
+const entryOf = (source: string): Record<string, string> => ({
+  types: `./dist/${source}.d.ts`,
+  default: `./dist/${source}.js`,
+});
+
+function manifestOf(plugin: NewPlugin): string {
+  const { admin } = plugin;
+  const versionOf = (name: string): string => {
+    const version = plugin.versions[name];
+    if (version === undefined) throw new Error(`No version of ${name} is known.`);
+    return version;
+  };
+  const peers = admin ? [...BACKEND, ...SCREENS] : BACKEND;
+  // React and Ant Design need these beside them: the DOM, and its types.
+  const developed = [...peers, ...BUILDERS, ...(admin ? ['@types/react', 'react-dom'] : [])];
+  return `${JSON.stringify(
+    {
+      name: plugin.name,
+      version: '0.1.0',
+      description: `The ${plugin.short} plugin for BieberKit.`,
+      keywords: ['bieberkit', 'bieberkit-plugin'],
+      license: plugin.license,
+      author: plugin.author,
+      type: 'module',
+      sideEffects: false,
+      files: ['dist'],
+      // In the project the source is what runs and what the admin is built from. The published package has its build.
+      exports: {
+        '.': './src/index.ts',
+        ...(admin ? { './admin': './src/admin/index.ts' } : {}),
+        './package.json': './package.json',
+      },
+      publishConfig: {
+        exports: {
+          '.': entryOf('index'),
+          ...(admin ? { './admin': entryOf('admin/index') } : {}),
+          './package.json': './package.json',
+        },
+        access: 'public',
+      },
+      scripts: {
+        build: `tsdown && ${admin ? 'tsdown -c tsdown.admin.config.ts && ' : ''}bieberkit build`,
+        typecheck: `tsc --noEmit -p tsconfig.json${admin ? ' && tsc --noEmit -p src/admin/tsconfig.json' : ''}`,
+        test: 'vitest run',
+      },
+      peerDependencies: sorted(peers.map((name) => [name, `^${versionOf(name)}`])),
+      // A server installs the plugin without the packages of its screens.
+      ...(admin ? { peerDependenciesMeta: sorted(SCREENS.map((name) => [name, { optional: true }])) } : {}),
+      devDependencies: sorted(developed.map((name) => [name, versionOf(name)])),
+      bieberkit: pluginManifest(plugin),
+    },
+    null,
+    2,
+  )}\n`;
 }
 
 const pascal = (kebabCase: string): string =>
@@ -227,37 +295,8 @@ export function pluginFiles(plugin: NewPlugin): MadeFile[] {
     projectHeader({ author: plugin.author, license: plugin.license, name }, `${dir}/${file}`, description, year);
   const table = `${snake(short)}_items`;
   const entity = `${short}.Item`;
-  const manifest = JSON.stringify(
-    {
-      name,
-      version: '0.1.0',
-      description: `The ${short} plugin for BieberKit.`,
-      keywords: ['bieberkit', 'bieberkit-plugin'],
-      license: plugin.license,
-      author: plugin.author,
-      type: 'module',
-      sideEffects: false,
-      files: ['dist'],
-      exports: {
-        '.': { '@bieberkit/source': './src/index.ts', types: './dist/index.d.ts', default: './dist/index.js' },
-        './package.json': './package.json',
-      },
-      publishConfig: {
-        exports: {
-          '.': { types: './dist/index.d.ts', default: './dist/index.js' },
-          './package.json': './package.json',
-        },
-        access: 'public',
-      },
-      scripts: { build: 'tsdown && bieberkit build', typecheck: 'tsc --noEmit -p tsconfig.json', test: 'vitest run' },
-      peerDependencies: { '@bieberkit/core': '*', '@bieberkit/data': '*' },
-      bieberkit: pluginManifest(plugin),
-    },
-    null,
-    2,
-  );
   return [
-    { path: `${dir}/package.json`, content: `${manifest}\n` },
+    { path: `${dir}/package.json`, content: manifestOf(plugin) },
     {
       path: `${dir}/tsconfig.json`,
       content: `${JSON.stringify(
@@ -274,6 +313,8 @@ export function pluginFiles(plugin: NewPlugin): MadeFile[] {
             skipLibCheck: true,
           },
           include: ['src'],
+          // The screens need the DOM and JSX, which the server must not see: they have a tsconfig of their own.
+          ...(plugin.admin ? { exclude: ['src/admin'] } : {}),
         },
         null,
         2,
@@ -355,8 +396,135 @@ describe('${name}', () => {
 The ${short} plugin for BieberKit.
 
 - \`pnpm build\` builds it and writes its static manifest into \`package.json\` (PLG-07). \`bieberkit build --check\` verifies the manifest without writing.
-- Add it to a project with \`bieberkit add ${name}\`, and take it out with \`bieberkit remove ${name}\`.
+- Add it to another project with \`bieberkit add ${name}\`, and take it out with \`bieberkit remove ${name}\`.
 - It owns the table \`${table}\`. Other plugins reach it through what this package exports, and never through its tables (PLG-01, PLG-02).
+`,
+    },
+    ...(plugin.admin ? adminFiles(plugin, header) : []),
+  ];
+}
+
+/** The admin part of a made plugin: one page that lists its items, with its menu entry and its texts (UI-34, UI-35). */
+function adminFiles(plugin: NewPlugin, header: (file: string, description: string) => string): MadeFile[] {
+  const { name, short, dir } = plugin;
+  const title = pascal(short);
+  const page = `${title}Page`;
+  const entity = `${short}.Item`;
+  const texts: Readonly<Record<'en' | 'vi' | 'zh', readonly [string, Readonly<Record<string, string>>]>> = {
+    en: ['English', { title, all: 'All items', name: 'Title', empty: 'No items yet' }],
+    vi: ['Vietnamese', { title, all: 'Tất cả mục', name: 'Tiêu đề', empty: 'Chưa có mục nào' }],
+    zh: ['Chinese', { title, all: '全部条目', name: '标题', empty: '暂无条目' }],
+  };
+  return [
+    {
+      path: `${dir}/src/admin/index.ts`,
+      content: `${header('src/admin/index.ts', `The admin part of the ${short} plugin: what it adds to the admin of a project (UI-34).`)}import { defineAdminPlugin } from '@bieberkit/admin-core';
+import type { AdminPart, AdminView } from '@bieberkit/admin-core';
+
+// The slots are a closed list: menu, pages, headerActions, notices, recordTabs, fields, homeBlocks, accountTabs, publicPages,
+// signIn, gates and screens. This module is read when the admin is built, so it imports no screen: each is loaded when it is drawn.
+const part: AdminPart<AdminView> = defineAdminPlugin({
+  name: '${name}',
+  menu: [{ page: '/${short}' }],
+  pages: [
+    { path: '/${short}', title: '${short}.title', permission: '${short}.read', load: () => import('./${page}.tsx') },
+  ],
+  messages: {
+    en: () => import('./messages/en.ts'),
+    vi: () => import('./messages/vi.ts'),
+    zh: () => import('./messages/zh.ts'),
+  },
+});
+
+export default part;
+`,
+    },
+    {
+      path: `${dir}/src/admin/${page}.tsx`,
+      content: `${header(`src/admin/${page}.tsx`, `The page of the ${short} plugin: its items, read with the client of the admin.`)}import { AdminLink, useAdminClient, useMeta, useText } from '@bieberkit/admin-antd';
+import { useQuery } from '@tanstack/react-query';
+import { Alert, Skeleton, Table } from 'antd';
+import type { JSX } from 'react';
+
+export default function ${page}(): JSX.Element {
+  const text = useText();
+  const client = useAdminClient();
+  const entity = useMeta()?.entities.find((candidate) => candidate.name === '${entity}');
+  const items = useQuery({
+    queryKey: ['${short}', 'items'],
+    queryFn: async () => (entity === undefined ? null : client.list(entity, { pageSize: 10, sort: 'title' })),
+    enabled: entity !== undefined,
+  });
+  if (items.isError) return <Alert type="error" showIcon title={items.error.message} />;
+  if (items.data === undefined || items.data === null) return <Skeleton active />;
+  return (
+    <>
+      <p>
+        <AdminLink to="/${short}/items">{text('${short}.all')}</AdminLink>
+      </p>
+      <Table
+        rowKey={(row) => String(row['id'])}
+        columns={[{ title: text('${short}.name'), dataIndex: 'title', key: 'title' }]}
+        dataSource={items.data.rows.map((row) => ({ ...row }))}
+        locale={{ emptyText: text('${short}.empty') }}
+        pagination={false}
+      />
+    </>
+  );
+}
+`,
+    },
+    ...Object.entries(texts).map(([language, [called, words]]) => ({
+      path: `${dir}/src/admin/messages/${language}.ts`,
+      content: `${header(`src/admin/messages/${language}.ts`, `The ${called} texts of the ${short} plugin. Each key begins with "${short}.".`)}const texts: Readonly<Record<string, string>> = {
+${Object.entries(words)
+  .map(([key, word]) => `  '${short}.${key}': '${word}',`)
+  .join('\n')}
+};
+
+export default texts;
+`,
+    })),
+    {
+      path: `${dir}/src/admin/tsconfig.json`,
+      content: `${JSON.stringify(
+        {
+          compilerOptions: {
+            target: 'esnext',
+            module: 'esnext',
+            moduleResolution: 'bundler',
+            lib: ['esnext', 'dom', 'dom.iterable'],
+            types: [],
+            jsx: 'react-jsx',
+            strict: true,
+            noUncheckedIndexedAccess: true,
+            exactOptionalPropertyTypes: true,
+            verbatimModuleSyntax: true,
+            allowImportingTsExtensions: true,
+            noEmit: true,
+            skipLibCheck: true,
+          },
+          include: ['.'],
+        },
+        null,
+        2,
+      )}\n`,
+    },
+    {
+      path: `${dir}/tsdown.admin.config.ts`,
+      content: `${header('tsdown.admin.config.ts', `The build of the admin part of ${name}: one file out for each file in, for the build of a project.`)}import { defineConfig } from 'tsdown';
+
+export default defineConfig({
+  entry: ['src/admin/index.ts'],
+  outDir: 'dist/admin',
+  unbundle: true,
+  format: 'esm',
+  platform: 'neutral',
+  dts: true,
+  tsconfig: 'src/admin/tsconfig.json',
+  fixedExtension: false,
+  clean: true,
+});
 `,
     },
   ];

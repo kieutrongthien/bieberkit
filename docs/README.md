@@ -30,6 +30,7 @@
 | `ROADMAP.md`   | Phase by phase checklist to 1.0. Agents tick items as work lands             |
 | `adr/`         | Architecture decision records. Changes to the technology baseline start here |
 | `modules/`     | Short specs for modules and packages, written before their code              |
+| `guides/`      | How-to guides for the people who build with BieberKit                        |
 
 Requirement IDs (for example `PKG-01`, `DATA-19`, `SEC-11`) are stable. Code, tests, ADRs and commit messages refer to them.
 

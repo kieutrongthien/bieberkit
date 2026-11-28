@@ -22,5 +22,18 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { existsSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
+
 export { CONFIG_FILE, envOwnersOf, findProjectRoot, importFile, loadConfig, loadProject } from '@bieberkit/server';
 export type { LoadedPlugin, Project, ProjectConfig } from '@bieberkit/server';
+
+/** The plugins that the project holds in `plugins/`, as folders from its root, in the order of their names. */
+export function localPlugins(root: string): readonly string[] {
+  const folder = join(root, 'plugins');
+  if (!existsSync(folder)) return [];
+  return readdirSync(folder)
+    .map((name) => `plugins/${name}`)
+    .filter((path) => existsSync(join(root, path, 'src')))
+    .toSorted((a, b) => a.localeCompare(b));
+}

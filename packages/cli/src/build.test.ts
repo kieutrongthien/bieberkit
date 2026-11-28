@@ -138,6 +138,24 @@ describe('section 5.2 build', () => {
     expect(data['steps']).toEqual(['generate', 'typecheck', 'standalone', 'admin']);
   });
 
+  it('UI-38 checks the types of the screens of each plugin of the project, with its tsconfig', async () => {
+    const { root } = withAdmin();
+    for (const plugin of ['tags', 'notes']) {
+      mkdirSync(join(root, 'plugins', plugin, 'src/admin'), { recursive: true });
+      writeFileSync(join(root, 'plugins', plugin, 'src/admin/tsconfig.json'), '{}');
+    }
+    // A plugin with no screens has no such file.
+    mkdirSync(join(root, 'plugins/plain/src'), { recursive: true });
+    const { deps, calls } = fake();
+    await run(root, deps, ['build']);
+    expect(calls.filter((call) => call.args.includes('tsc')).map((call) => call.args.at(-1))).toEqual([
+      'tsconfig.json',
+      'apps/admin/tsconfig.json',
+      'plugins/notes/src/admin/tsconfig.json',
+      'plugins/tags/src/admin/tsconfig.json',
+    ]);
+  });
+
   it('UI-37 an admin that does not build stops the build and says so', async () => {
     const { root } = withAdmin();
     const { code, error } = await run(root, { spawn: failingVite }, ['build', '--json']);

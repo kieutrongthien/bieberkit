@@ -27,6 +27,7 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { writeStandalone } from '@bieberkit/data/build';
 import { loadApp } from '../app.ts';
+import { localPlugins } from '../project.ts';
 import type { Command } from '../command.ts';
 import { CliError } from '../errors.ts';
 import { generateFiles, writeFiles } from '../generate/files.ts';
@@ -77,8 +78,12 @@ export function buildCommand(deps: BuildDeps = {}): Command {
       if (context.args.flags['typecheck'] !== false && existsSync(join(root, 'tsconfig.json'))) {
         context.log('tsc --noEmit');
         // The admin has a tsconfig of its own: its screens need the types of the DOM and of JSX, which the server must not have.
-        const configs = ['tsconfig.json'];
-        if (admin && existsSync(join(root, ADMIN_APP, 'tsconfig.json'))) configs.push(`${ADMIN_APP}/tsconfig.json`);
+        // So have the screens of each plugin of the project.
+        const screens = [
+          ...(admin ? [ADMIN_APP] : []),
+          ...localPlugins(root).map((folder) => `${folder}/src/admin`),
+        ].map((folder) => `${folder}/tsconfig.json`);
+        const configs = ['tsconfig.json', ...screens.filter((config) => existsSync(join(root, config)))];
         for (const config of configs) {
           const code = await supervise(spawn('pnpm', ['exec', 'tsc', '--noEmit', '-p', config], { cwd: root }));
           if (code !== 0) {

@@ -22,13 +22,19 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { execFileSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { composeAdmin, messageProblems } from '@bieberkit/admin-core';
+import type { AdminPart } from '@bieberkit/admin-core';
+import { createRunner } from 'create-bieberkit/kit';
 import { resolvePlugins } from '@bieberkit/core';
 import { dirname, join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
+import { pluginMaker } from './commands/make.ts';
+import { PINNED } from './make-versions.ts';
+import type { Spawn } from './processes.ts';
 import { runCli } from './run.ts';
 import { makeProject } from './testing/project.ts';
 import type { Fixture } from './testing/project.ts';
@@ -231,7 +237,7 @@ describe('PLG-03 make:plugin', () => {
     expect(pkg).toMatchObject({
       name: NAME,
       keywords: expect.arrayContaining(['bieberkit-plugin']),
-      exports: { '.': { '@bieberkit/source': './src/index.ts' } },
+      exports: { '.': './src/index.ts' },
       scripts: { build: 'tsdown && bieberkit build' },
       bieberkit: { core: '*', requires: {}, tables: ['notes_items'], permissions: ['notes.manage', 'notes.read'] },
     });
@@ -301,5 +307,237 @@ describe('PLG-03 make:plugin', () => {
     } finally {
       rmSync(empty, { recursive: true, force: true });
     }
+  });
+});
+
+const NOTES = 'bieberkit-plugin-notes';
+
+/** What `create` leaves in a project with an admin, as far as a made plugin reads and changes it. */
+const NEW_PROJECT: Readonly<Record<string, string>> = {
+  'package.json': JSON.stringify({
+    name: 'demo',
+    devDependencies: {
+      '@bieberkit/core': '0.7.1',
+      '@bieberkit/data': '0.7.1',
+      bieberkit: '0.7.1',
+      typescript: '7.0.2',
+      vitest: '4.1.12',
+    },
+  }),
+  'apps/server/package.json': JSON.stringify({ name: 'demo-server', dependencies: { zod: '4.6.7' } }),
+  'apps/admin/package.json': JSON.stringify({
+    name: 'demo-admin',
+    dependencies: {
+      '@bieberkit/admin-antd': '0.7.1',
+      '@bieberkit/admin-core': '0.7.1',
+      '@tanstack/react-query': '5.108.0',
+      antd: '6.7.1',
+      react: '19.3.1',
+      'react-dom': '19.3.1',
+    },
+    devDependencies: { '@types/react': '19.3.0' },
+  }),
+  'pnpm-workspace.yaml': "packages:\n  - 'apps/*'\n  - 'packages/*'\n\nminimumReleaseAge: 10080\n",
+};
+
+function newProject(files: Readonly<Record<string, string>> = NEW_PROJECT): Fixture {
+  const made = makeProject({ files });
+  fixtures.push(made);
+  return made;
+}
+
+const jsonOf = (root: string, path: string): Record<string, unknown> => JSON.parse(read(root, path));
+
+const ADMIN_FILES = [
+  'plugins/notes/src/admin/NotesPage.tsx',
+  'plugins/notes/src/admin/index.ts',
+  'plugins/notes/src/admin/messages/en.ts',
+  'plugins/notes/src/admin/messages/vi.ts',
+  'plugins/notes/src/admin/messages/zh.ts',
+  'plugins/notes/src/admin/tsconfig.json',
+  'plugins/notes/tsdown.admin.config.ts',
+];
+
+describe('UI-38 make:plugin in a project with an admin', () => {
+  it('UI-38 makes the admin part beside the backend, each file with the header of the project', async () => {
+    const { root } = newProject();
+    const { code, data } = await run(root, ['make:plugin', NOTES, '--no-install', '--json']);
+    expect(code).toBe(0);
+    expect(data.files).toEqual(expect.arrayContaining(ADMIN_FILES));
+    for (const file of ADMIN_FILES.filter((path) => !path.endsWith('.json')))
+      expect(read(root, file)).toContain(`@file        ${file}`);
+  });
+
+  it('UI-38 exports its source here and its build when published, and asks for no version that the project has not', async () => {
+    const { root } = newProject();
+    await run(root, ['make:plugin', NOTES, '--no-install']);
+    const pkg = jsonOf(root, 'plugins/notes/package.json');
+    expect(pkg['exports']).toEqual({
+      '.': './src/index.ts',
+      './admin': './src/admin/index.ts',
+      './package.json': './package.json',
+    });
+    expect(Object(pkg['publishConfig'])['exports']).toEqual({
+      '.': { types: './dist/index.d.ts', default: './dist/index.js' },
+      './admin': { types: './dist/admin/index.d.ts', default: './dist/admin/index.js' },
+      './package.json': './package.json',
+    });
+    expect(pkg['peerDependencies']).toEqual({
+      '@bieberkit/admin-antd': '^0.7.1',
+      '@bieberkit/admin-core': '^0.7.1',
+      '@bieberkit/core': '^0.7.1',
+      '@bieberkit/data': '^0.7.1',
+      '@tanstack/react-query': '^5.108.0',
+      antd: '^6.7.1',
+      react: '^19.3.1',
+    });
+    // A server installs the plugin without React: only the admin asks for the packages of the screens.
+    expect(Object.keys(Object(pkg['peerDependenciesMeta'])).toSorted((a, b) => a.localeCompare(b))).toEqual([
+      '@bieberkit/admin-antd',
+      '@bieberkit/admin-core',
+      '@tanstack/react-query',
+      'antd',
+      'react',
+    ]);
+    expect(pkg['devDependencies']).toEqual({
+      '@bieberkit/admin-antd': '0.7.1',
+      '@bieberkit/admin-core': '0.7.1',
+      '@bieberkit/core': '0.7.1',
+      '@bieberkit/data': '0.7.1',
+      '@tanstack/react-query': '5.108.0',
+      '@types/react': '19.3.0',
+      antd: '6.7.1',
+      bieberkit: '0.7.1',
+      react: '19.3.1',
+      'react-dom': '19.3.1',
+      tsdown: PINNED.tsdown,
+      typescript: '7.0.2',
+      vitest: '4.1.12',
+    });
+    expect(pkg['scripts']).toMatchObject({
+      build: 'tsdown && tsdown -c tsdown.admin.config.ts && bieberkit build',
+      typecheck: 'tsc --noEmit -p tsconfig.json && tsc --noEmit -p src/admin/tsconfig.json',
+    });
+  });
+
+  it('UI-38 wires the plugin into the project: the workspace, the server, the admin and the config', async () => {
+    const { root } = newProject();
+    const { data } = await run(root, ['make:plugin', NOTES, '--no-install', '--json']);
+    expect(data.todo).toEqual([]);
+    expect(read(root, 'pnpm-workspace.yaml')).toContain("packages:\n  - 'plugins/*'\n  - 'apps/*'");
+    for (const app of ['server', 'admin'])
+      expect(Object(jsonOf(root, `apps/${app}/package.json`)['dependencies'])[NOTES]).toBe('workspace:*');
+    expect(read(root, 'bieberkit.config.ts')).toContain(`'${NOTES}'`);
+  });
+
+  it('UI-38 installs the workspace after it wired the plugin, and says how to run it when that fails', async () => {
+    const { root } = newProject();
+    const calls: (readonly string[])[] = [];
+    const exit = { code: 0 };
+    const spawn: Spawn = (file, args, where) => {
+      calls.push([file, ...args, where.cwd]);
+      return { exit: Promise.resolve(exit.code), kill: () => undefined };
+    };
+    const make = async (name: string) => {
+      const out: string[] = [];
+      const runner = createRunner({ name: 'bieberkit', version: '0.0.0', commands: [pluginMaker({ spawn })] });
+      const code = await runner(['make:plugin', name, '--json'], {
+        stdout: (text) => out.push(text),
+        stderr: () => undefined,
+        cwd: root,
+      });
+      return { code, answer: JSON.parse(out.join('')) };
+    };
+    expect((await make(NOTES)).code).toBe(0);
+    expect(calls).toEqual([['pnpm', 'install', root]]);
+    exit.code = 1;
+    const failed = await make('bieberkit-plugin-tags');
+    expect(failed.code).toBe(0);
+    expect(failed.answer.data.todo).toEqual([expect.stringContaining('pnpm install')]);
+  });
+
+  it('UI-38 says what it could not wire, and does the rest', async () => {
+    const { root } = newProject({ ...NEW_PROJECT, 'pnpm-workspace.yaml': 'minimumReleaseAge: 10080\n' });
+    const { code, data, out } = await run(root, ['make:plugin', NOTES, '--no-install', '--json']);
+    expect(code).toBe(0);
+    expect(data.todo).toEqual([expect.stringContaining("'plugins/*'")]);
+    expect(out).toContain('plugins/*');
+    expect(read(root, 'bieberkit.config.ts')).toContain(`'${NOTES}'`);
+  });
+
+  it('UI-38 a project without an admin gets a plugin with no admin part and no React', async () => {
+    const { 'apps/admin/package.json': _admin, ...files } = NEW_PROJECT;
+    const { root } = newProject(files);
+    const { data } = await run(root, ['make:plugin', NOTES, '--no-install', '--json']);
+    expect(data.todo).toEqual([]);
+    expect(existsSync(join(root, 'plugins/notes/src/admin'))).toBe(false);
+    const pkg = read(root, 'plugins/notes/package.json');
+    expect(pkg).not.toContain('react');
+    expect(pkg).not.toContain('./admin');
+  });
+
+  it('UI-36 the made admin part composes with no mistake of its own, in every language of the admin', async () => {
+    const { root } = newProject();
+    await run(root, ['make:plugin', NOTES, '--no-install']);
+    mkdirSync(join(root, 'plugins/notes/node_modules/@bieberkit'), { recursive: true });
+    symlinkSync(
+      join(REPOSITORY, 'packages/admin-core'),
+      join(root, 'plugins/notes/node_modules/@bieberkit/admin-core'),
+      'dir',
+    );
+    const loaded: { default: AdminPart<unknown> } = await import(
+      /* @vite-ignore */ pathToFileURL(join(root, 'plugins/notes/src/admin/index.ts')).href
+    );
+    const part = loaded.default;
+    expect(composeAdmin([part]).problems.map((problem) => problem.code)).toEqual(['no-sign-in']);
+    expect(await messageProblems([part], ['en', 'vi', 'zh'])).toEqual([]);
+    expect(part.pages?.map((page) => [page.path, page.permission])).toEqual([['/notes', 'notes.read']]);
+  });
+
+  it('UI-38 the made files pass the strict type check of a project, backend and admin', async () => {
+    const { root } = newProject();
+    await run(root, ['make:plugin', NOTES, '--no-install']);
+    const modules = join(root, 'plugins/notes/node_modules');
+    // What `pnpm install` gives the plugin, from where this repository has it.
+    const from: Readonly<Record<string, string>> = {
+      '@bieberkit/admin-antd': 'packages/admin-antd',
+      '@bieberkit/admin-core': 'packages/admin-core',
+      '@tanstack/react-query': 'packages/admin-antd/node_modules/@tanstack/react-query',
+      '@types/react': 'packages/admin-antd/node_modules/@types/react',
+      antd: 'packages/admin-antd/node_modules/antd',
+      react: 'packages/admin-antd/node_modules/react',
+      vitest: 'node_modules/vitest',
+    };
+    for (const [name, folder] of Object.entries(from)) {
+      mkdirSync(dirname(join(modules, name)), { recursive: true });
+      symlinkSync(join(REPOSITORY, folder), join(modules, name), 'dir');
+    }
+    const tsc = join(REPOSITORY, 'node_modules/typescript/bin/tsc');
+    const checkTypes = (config: string): string => {
+      try {
+        return execFileSync(process.execPath, [tsc, '--noEmit', '-p', config], { cwd: root, encoding: 'utf8' });
+      } catch (error) {
+        return String(Reflect.get(Object(error), 'stdout'));
+      }
+    };
+    expect(checkTypes('plugins/notes/tsconfig.json')).toBe('');
+    expect(checkTypes('plugins/notes/src/admin/tsconfig.json')).toBe('');
+  }, 120_000);
+
+  it('23.7 the made plugin with its admin part passes every rule of bieberkit check', async () => {
+    const { root } = newProject();
+    await run(root, ['make:plugin', NOTES, '--no-install']);
+    for (const rule of ['headers', 'boundaries', 'env-access', 'plugin-tables'])
+      expect((await run(root, ['check', rule, '--json'])).data.violations).toEqual([]);
+  });
+
+  it('UI-38 pins the version of the builder of the repository', () => {
+    const rootManifest: { devDependencies: Record<string, string> } = JSON.parse(
+      readFileSync(join(REPOSITORY, 'package.json'), 'utf8'),
+    );
+    // The lowest version that the repository takes.
+    expect([PINNED.tsdown, PINNED.typescript, PINNED.vitest]).toEqual(
+      ['tsdown', 'typescript', 'vitest'].map((name) => rootManifest.devDependencies[name]?.replace(/^\^/, '')),
+    );
   });
 });

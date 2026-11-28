@@ -39,6 +39,11 @@ import {
 } from '../make.ts';
 import { findProjectRoot, loadConfig } from '../project.ts';
 import { usageError } from '../errors.ts';
+import { ADMIN_APP } from '../admin-app.ts';
+import { versionsOf } from '../make-versions.ts';
+import { realSpawn, supervise } from '../processes.ts';
+import type { Spawn } from '../processes.ts';
+import { wirePlugin } from '../wire-plugin.ts';
 
 const made = (files: readonly string[]): { data: unknown; text: string } => ({
   data: { files },
@@ -101,53 +106,86 @@ export const makeJobCommand: Command = {
   },
 };
 
-export const makePluginCommand: Command = {
-  name: 'make:plugin',
-  summary:
-    'Make a plugin package with one entity, its permissions, a test and its static manifest: bieberkit make:plugin bieberkit-plugin-notes.',
-  positionals: [{ name: 'name', required: true }],
-  flags: [
-    {
-      name: 'dir',
-      type: 'string',
-      description: 'The folder of the package, from the project root. Defaults to plugins/<name>.',
+export interface MakePluginDeps {
+  readonly spawn?: Spawn;
+}
+
+export function pluginMaker(deps: MakePluginDeps = {}): Command {
+  const spawn = deps.spawn ?? realSpawn;
+  return {
+    name: 'make:plugin',
+    summary:
+      'Make a plugin package with one entity and one page of the admin, and put it into the project: bieberkit make:plugin bieberkit-plugin-notes.',
+    positionals: [{ name: 'name', required: true }],
+    flags: [
+      {
+        name: 'dir',
+        type: 'string',
+        description: 'The folder of the package, from the project root. Defaults to plugins/<name>.',
+      },
+      {
+        name: 'first-party',
+        type: 'boolean',
+        description: 'The plugin is one of the framework: @bieberkit/plugin-<name>.',
+      },
+      {
+        name: 'author',
+        type: 'string',
+        description: 'The author of the files, "Name <email>". Defaults to the one of the project.',
+      },
+      {
+        name: 'license',
+        type: 'string',
+        description: 'The license of the package. Defaults to the one of the project.',
+      },
+      { name: 'install', type: 'boolean', description: 'Run pnpm install (default). --no-install skips it.' },
+    ],
+    async run(context) {
+      const flags = context.args.flags;
+      const name = context.args.positionals[0] ?? '';
+      const short = checkPluginName(name, flags['first-party'] === true);
+      const project = await loadConfig(context.cwd).catch(() => undefined);
+      const author = typeof flags['author'] === 'string' ? flags['author'] : project?.config.author;
+      const license =
+        typeof flags['license'] === 'string' ? flags['license'] : (project?.config.license ?? 'Apache-2.0');
+      if (author === undefined) {
+        throw usageError(
+          'BK_MAKE_AUTHOR_MISSING',
+          'There is no project here to take the author from.',
+          'Pass --author "Name <email>", or run it inside a project.',
+        );
+      }
+      const root = project?.root ?? findProjectRoot(context.cwd) ?? context.cwd;
+      const dir = (typeof flags['dir'] === 'string' ? flags['dir'] : `plugins/${short}`).replace(/\/+$/, '');
+      // An application has its server in apps/server, which the plugin is wired into. With no project the package is made on its own,
+      // with its screens, and a project without apps/admin gets none.
+      const application = project !== undefined && existsSync(join(root, 'apps/server/package.json'));
+      const admin = project === undefined || existsSync(join(root, ADMIN_APP, 'package.json'));
+      const files = pluginFiles({ name, short, dir, author, license, year: year(), admin, versions: versionsOf(root) });
+      writeNew(root, files);
+      const todo = application ? wirePlugin(root, { name, dir }) : [];
+      let installed = false;
+      if (application && todo.length === 0 && flags['install'] !== false) {
+        context.log('pnpm install');
+        installed = (await supervise(spawn('pnpm', ['install'], { cwd: root }))) === 0;
+        if (!installed) todo.push('Run pnpm install in the project, and read its message: the one here failed.');
+      }
+      const next = application
+        ? [
+            ...(installed || todo.length > 0 ? [] : ['Run pnpm install.']),
+            'Then: pnpm bieberkit migrate:make, pnpm bieberkit migrate, and pnpm dev.',
+          ]
+        : [`Next: add ${name} to the dependencies of a project, then bieberkit build in ${dir} to check the manifest.`];
+      return {
+        data: { plugin: name, dir, files: files.map((file) => file.path), todo },
+        text: [
+          ...files.map((file) => `Wrote ${file.path}`),
+          ...(todo.length === 0 ? [] : ['Left for you to do:', ...todo.map((left) => `  - ${left}`)]),
+          ...next,
+        ].join('\n'),
+      };
     },
-    {
-      name: 'first-party',
-      type: 'boolean',
-      description: 'The plugin is one of the framework: @bieberkit/plugin-<name>.',
-    },
-    {
-      name: 'author',
-      type: 'string',
-      description: 'The author of the files, "Name <email>". Defaults to the one of the project.',
-    },
-    { name: 'license', type: 'string', description: 'The license of the package. Defaults to the one of the project.' },
-  ],
-  async run(context) {
-    const flags = context.args.flags;
-    const name = context.args.positionals[0] ?? '';
-    const short = checkPluginName(name, flags['first-party'] === true);
-    const project = await loadConfig(context.cwd).catch(() => undefined);
-    const author = typeof flags['author'] === 'string' ? flags['author'] : project?.config.author;
-    const license = typeof flags['license'] === 'string' ? flags['license'] : (project?.config.license ?? 'Apache-2.0');
-    if (author === undefined) {
-      throw usageError(
-        'BK_MAKE_AUTHOR_MISSING',
-        'There is no project here to take the author from.',
-        'Pass --author "Name <email>", or run it inside a project.',
-      );
-    }
-    const root = project?.root ?? findProjectRoot(context.cwd) ?? context.cwd;
-    const dir = (typeof flags['dir'] === 'string' ? flags['dir'] : `plugins/${short}`).replace(/\/+$/, '');
-    const files = pluginFiles({ name, short, dir, author, license, year: year() });
-    writeNew(root, files);
-    return {
-      data: { plugin: name, dir, files: files.map((file) => file.path) },
-      text: [
-        ...files.map((file) => `Wrote ${file.path}`),
-        `Next: add ${name} to the dependencies of the project, then bieberkit build in ${dir} to check the manifest.`,
-      ].join('\n'),
-    };
-  },
-};
+  };
+}
+
+export const makePluginCommand: Command = pluginMaker();

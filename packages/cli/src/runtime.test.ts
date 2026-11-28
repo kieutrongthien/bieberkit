@@ -320,4 +320,17 @@ describe('section 6 a project that was made starts', () => {
       child.kill('SIGKILL');
     }
   }, 40_000);
+
+  it('UI-38 follows the code of the plugins of the project too, whose entities the generated files hold', async () => {
+    const { root } = project({ 'plugins/notes/src/entity.ts': '', 'plugins/empty/README.md': '' });
+    const watched: string[] = [];
+    let stopped = 0;
+    const { spawn } = fake({});
+    await run(root, { spawn, watch: (folder) => (watched.push(folder), () => void (stopped += 1)) }, [
+      'dev',
+      '--no-services',
+    ]);
+    expect(watched).toEqual([join(root, 'apps/server/src'), join(root, 'plugins/notes/src')]);
+    expect(stopped).toBe(2);
+  });
 });
