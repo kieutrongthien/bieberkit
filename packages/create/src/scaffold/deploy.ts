@@ -66,9 +66,12 @@ RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm fetch
 COPY . .
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --offline --frozen-lockfile
 RUN pnpm exec bieberkit build
+# The plugins of the project, which the image runs as they are published: from their build.
+RUN pnpm --recursive --filter './plugins/*' run build
 # A self-contained folder with no development dependencies (DEP-02). The config and the migrations sit beside it, where the server looks.
 RUN pnpm deploy --filter=${folder}-server --prod /out/apps/server
 RUN mkdir -p /out/migrations && cp bieberkit.config.ts package.json /out/ && cp -r migrations/. /out/migrations/
+RUN node deploy/image.mjs /out
 ${admin}
 FROM ${IMAGES.node} AS runtime
 ENV NODE_ENV=production
@@ -360,6 +363,40 @@ done
 }
 
 /** `head` writes a block comment: the file is JavaScript, which has no `#` comment. */
+/**
+ * What `pnpm deploy` does not do. A JavaScript file of the project, because the image has no tool that reads TypeScript here.
+ */
+export function renderImageScript(head: Head): string {
+  return `${head('deploy/image.mjs', 'Makes the folder of the image runnable: the config and the migrations see the packages of the server, and the plugins of the project run from their build.')}// Usage: node deploy/image.mjs <the folder of the image>, after pnpm deploy. The Dockerfile runs it.
+import { existsSync, readdirSync, readFileSync, renameSync, symlinkSync, writeFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+
+const out = resolve(process.argv[2] ?? '');
+const modules = 'apps/server/node_modules';
+
+// The config and the migrations lie at the root of the image, and what they import is installed beside the server.
+symlinkSync(modules, join(out, 'node_modules'));
+
+// A plugin of the project exports its source, and Node.js runs no TypeScript from node_modules: here it exports its build, as the
+// published package does.
+for (const folder of existsSync('plugins') ? readdirSync('plugins') : []) {
+  const source = join('plugins', folder, 'package.json');
+  if (!existsSync(source)) continue;
+  const { name } = JSON.parse(readFileSync(source, 'utf8'));
+  const installed = join(out, modules, name, 'package.json');
+  if (!existsSync(installed)) continue;
+  const manifest = JSON.parse(readFileSync(installed, 'utf8'));
+  const published = manifest.publishConfig?.exports;
+  if (published === undefined) continue;
+  if (!existsSync(join(dirname(installed), 'dist')))
+    throw new Error(\`\${name} is not built. Run its build script before pnpm deploy.\`);
+  // A new file in the place of the old one, which pnpm may have linked to the source.
+  writeFileSync(\`\${installed}.new\`, JSON.stringify({ ...manifest, exports: published }, null, 2));
+  renameSync(\`\${installed}.new\`, installed);
+}
+`;
+}
+
 export function renderSqliteBackupScript(head: Head): string {
   return `${head('deploy/backup.mjs', 'The backup of the SQLite database: a copy every day, encrypted as openssl enc does, kept as DEP-07 says (7 daily, 4 weekly, 6 monthly).')}import { createCipheriv, pbkdf2Sync, randomBytes } from 'node:crypto';
 import { existsSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';

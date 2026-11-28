@@ -22,11 +22,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { readFileSync, writeFileSync } from 'node:fs';
 import { relative } from 'node:path';
 import { findProjectRoot, makeMigration, migrationStatus, rollbackMigration, runMigrations } from '@bieberkit/server';
 import type { MigrationsOptions } from '@bieberkit/server';
 import type { Command, CommandContext } from '../command.ts';
 import { usageError } from '../errors.ts';
+import { projectHeader } from '../make.ts';
+import { loadConfig } from '../project.ts';
 
 const list = (title: string, names: readonly string[]): string =>
   `${title}${names.length === 0 ? ' none' : `\n${names.map((name) => `  ${name}`).join('\n')}`}`;
@@ -50,6 +53,15 @@ export const migrateMakeCommand: Command = {
     if (made === null) return { data: { made: false }, text: 'Nothing to make: the entities and the snapshot agree.' };
     const root = findProjectRoot(context.cwd) ?? context.cwd;
     const file = relative(root, made.path).split('\\').join('/');
+    // The file is code of the project, which bieberkit check holds to the header like the rest (section 23.7).
+    const { config } = await loadConfig(context.cwd);
+    const header = projectHeader(
+      config,
+      file,
+      'A migration: what the entities changed since the one before.',
+      new Date().getFullYear(),
+    );
+    writeFileSync(made.path, `${header}${readFileSync(made.path, 'utf8')}`);
     return {
       data: { made: true, name: made.name, file, destructive: made.destructive },
       text: [

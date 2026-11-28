@@ -24,7 +24,17 @@
 
 import { execFileSync } from 'node:child_process';
 import { createDecipheriv, pbkdf2Sync } from 'node:crypto';
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import {
+  linkSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  readlinkSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
@@ -38,6 +48,7 @@ import {
   renderComposeProduction,
   renderDockerfile,
   renderDockerignore,
+  renderImageScript,
   renderProductionEnv,
   renderSqliteBackupScript,
   renderUploadScript,
@@ -62,6 +73,17 @@ describe('DEP-01 the image', () => {
   it('DEP-01 fetches the lockfile before the source, and DEP-02 deploys the server without development dependencies', () => {
     expect(dockerfile.indexOf('pnpm fetch')).toBeLessThan(dockerfile.indexOf('COPY . .'));
     expect(dockerfile).toContain('pnpm deploy --filter=shop-server --prod /out/apps/server');
+  });
+
+  it('UI-38 builds the plugins of the project before it deploys the server, and then makes the folder runnable', () => {
+    const order = [
+      'RUN pnpm exec bieberkit build',
+      "RUN pnpm --recursive --filter './plugins/*' run build",
+      'RUN pnpm deploy --filter=shop-server --prod /out/apps/server',
+      'RUN node deploy/image.mjs /out',
+    ].map((line) => dockerfile.indexOf(line));
+    expect(order.every((at) => at >= 0)).toBe(true);
+    expect(order).toEqual(order.toSorted((a, b) => a - b));
   });
 
   it('DEP-06 keeps the built admin in public/admin, where the web role serves it, and a project without an admin has none', () => {
@@ -304,5 +326,55 @@ describe('DEP-07 the retention of the backup', () => {
     const upload = renderUploadScript(head);
     expect(upload).toContain('rclone sync /backups');
     expect(upload).toContain('BACKUP_S3_ENDPOINT');
+  });
+});
+
+/** A project with one plugin of its own, and what `pnpm deploy` leaves of its server, with the plugin as it was written. */
+function deployed(built: boolean): { readonly root: string; readonly out: string } {
+  const root = mkdtempSync(join(tmpdir(), 'bk-image-'));
+  folders.push(root);
+  const out = join(root, 'out');
+  const manifest = JSON.stringify({
+    name: 'bieberkit-plugin-notes',
+    exports: { '.': './src/index.ts' },
+    publishConfig: { exports: { '.': './dist/index.js' } },
+  });
+  const installed = join(out, 'apps/server/node_modules/bieberkit-plugin-notes');
+  mkdirSync(join(root, 'plugins/notes'), { recursive: true });
+  mkdirSync(join(root, 'deploy'));
+  mkdirSync(installed, { recursive: true });
+  writeFileSync(join(root, 'deploy/image.mjs'), renderImageScript(blockHead));
+  writeFileSync(join(root, 'plugins/notes/package.json'), manifest);
+  // pnpm links the files of a deployed package, so the one of the image may be the one of the source.
+  linkSync(join(root, 'plugins/notes/package.json'), join(installed, 'package.json'));
+  if (built) mkdirSync(join(installed, 'dist'));
+  return { root, out };
+}
+
+const makeImage = (root: string, out: string): string =>
+  execFileSync(process.execPath, [join(root, 'deploy/image.mjs'), out], { cwd: root, encoding: 'utf8', stdio: 'pipe' });
+
+const manifestAt = (path: string): { exports: unknown } => JSON.parse(readFileSync(path, 'utf8'));
+
+describe('UI-38 the folder of the image', () => {
+  it('UI-38 runs the build of a plugin of the project, for Node.js runs no TypeScript from node_modules', () => {
+    const { root, out } = deployed(true);
+    makeImage(root, out);
+    expect(manifestAt(join(out, 'apps/server/node_modules/bieberkit-plugin-notes/package.json')).exports).toEqual({
+      '.': './dist/index.js',
+    });
+    // The source of the project is as it was.
+    expect(manifestAt(join(root, 'plugins/notes/package.json')).exports).toEqual({ '.': './src/index.ts' });
+  });
+
+  it('gives the config and the migrations beside the server the packages that the server has', () => {
+    const { root, out } = deployed(true);
+    makeImage(root, out);
+    expect(readlinkSync(join(out, 'node_modules'))).toBe('apps/server/node_modules');
+  });
+
+  it('UI-38 stops on a plugin that has no build, and says which', () => {
+    const { root, out } = deployed(false);
+    expect(() => makeImage(root, out)).toThrow(/bieberkit-plugin-notes is not built/);
   });
 });

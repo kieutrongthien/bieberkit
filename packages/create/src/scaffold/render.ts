@@ -32,6 +32,7 @@ import {
   renderComposeProduction,
   renderDockerfile,
   renderDockerignore,
+  renderImageScript,
   renderProductionEnv,
   renderSqliteBackupScript,
   renderUploadScript,
@@ -384,6 +385,7 @@ export function renderProject(choices: Choices, plan: Plan): ProjectFile[] {
     { path: '.env.production.example', content: renderProductionEnv(choices.dialect, folder, head) },
     { path: 'deploy/Caddyfile', content: renderCaddyfile(head) },
     { path: 'deploy/upload.sh', content: renderUploadScript(head) },
+    { path: 'deploy/image.mjs', content: renderImageScript(blockHead) },
     choices.dialect === 'sqlite'
       ? { path: 'deploy/backup.mjs', content: renderSqliteBackupScript(blockHead) }
       : { path: 'deploy/backup.sh', content: renderBackupScript(choices.dialect, head) },

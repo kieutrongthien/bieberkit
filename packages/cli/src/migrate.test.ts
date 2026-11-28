@@ -22,6 +22,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { runCli } from './run.ts';
@@ -63,6 +64,18 @@ describe('section 5.2 migrate', () => {
     const again = await run(root, ['migrate:make']);
     expect(again.code).toBe(0);
     expect(again.out).toContain('Nothing to make');
+  });
+
+  it('23.7 migrate:make writes the file with the header of the project, so that bieberkit check passes on it', async () => {
+    const { root } = fresh();
+    const made = await run(root, ['migrate:make', '--json']);
+    const file = String(Reflect.get(Object(made.data), 'file'));
+    const text = readFileSync(join(root, file), 'utf8');
+    expect(text.startsWith('/**\n * demo\n')).toBe(true);
+    expect(text).toContain(` * @file        ${file}\n`);
+    const checked = await run(root, ['check', 'headers', '--json']);
+    const violations: readonly { readonly file: string }[] = Reflect.get(Object(checked.data), 'violations');
+    expect(violations.filter((found) => found.file.startsWith('migrations/'))).toEqual([]);
   });
 
   it('5.2 migrate runs the steps and the files, says what ran, and runs nothing the second time', async () => {

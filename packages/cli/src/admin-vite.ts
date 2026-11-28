@@ -210,11 +210,11 @@ export function bieberkitAdmin(): Plugin {
       const parts: AdminPart<unknown>[] = [];
       try {
         for (const item of found) {
-          const resolved = await this.resolve(item.specifier, join(adminDir, 'index.html'));
           let value: unknown;
           try {
-            if (resolved === null) throw new Error(`${item.specifier} cannot be found.`);
-            value = Reflect.get(Object(await runner.import(resolved.id)), 'default');
+            // The runner resolves the name itself, from apps/admin. What this build resolves a name to is not asked: in dev it is
+            // the file that Vite packed for the browser, which Node.js cannot load.
+            value = Reflect.get(Object(await runner.import(item.specifier)), 'default');
             if (typeof value !== 'object' || value === null)
               throw new Error('It has no default export. Write: export default defineAdminPlugin({ ... }).');
           } catch (error) {

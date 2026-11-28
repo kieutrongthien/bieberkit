@@ -206,6 +206,37 @@ describe('UI-37 the admin of a project is built from its plugins', () => {
   }, 60_000);
 });
 
+describe('UI-37 the admin in dev', () => {
+  // In dev Vite packs the dependencies before it serves them, and resolves an installed plugin to that packed file, which Node.js
+  // cannot load. The parts are read from the package itself.
+  it('UI-37 reads the part of an installed plugin that Vite packs for the browser, and starts', async () => {
+    const { admin } = project([{ name: 'bieberkit-plugin-a', admin: part('bieberkit-plugin-a', SIGN_IN) }]);
+    const vite: unknown = await import(/* @vite-ignore */ pathToFileURL(join(VITE, 'dist/node/index.js')).href);
+    const create: unknown = Reflect.get(Object(vite), 'createServer');
+    if (typeof create !== 'function') throw new Error('Expected the dev server of Vite.');
+    const server: unknown = await Reflect.apply(create, undefined, [
+      {
+        root: admin,
+        configFile: false,
+        logLevel: 'silent',
+        plugins: [bieberkitAdmin()],
+        optimizeDeps: { include: ['bieberkit-plugin-a/admin'], force: true },
+        server: { port: 0, host: '127.0.0.1' },
+      },
+    ]);
+    const call = async (name: string): Promise<unknown> => {
+      const method: unknown = Reflect.get(Object(server), name);
+      if (typeof method !== 'function') throw new Error(`Expected ${name}.`);
+      return await Reflect.apply(method, server, []);
+    };
+    try {
+      await expect(call('listen')).resolves.toBeDefined();
+    } finally {
+      await call('close');
+    }
+  }, 60_000);
+});
+
 describe('UI-37 one copy of each shared package', () => {
   it('UI-37 finds a package that a build takes from two folders, and none that it takes from one', () => {
     const one = '/p/node_modules/.pnpm/react@19.3.1/node_modules/react';
