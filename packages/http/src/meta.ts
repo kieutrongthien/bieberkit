@@ -29,10 +29,10 @@ import type { ApiField, EntityDef, FieldDef, JsonSchema } from '@bieberkit/data/
 import { HttpError } from './problem.ts';
 import { pathOf, permissionOf } from './entity-routes.ts';
 import { searchableOf } from './search.ts';
-import type { AdminExtensions } from './admin-extensions.ts';
 import type { HttpServer } from './server.ts';
 
-export const META_SCHEMA_VERSION = 1;
+/** 2: the pages, widgets, screens and menu entries of plugins left the answer, for a project builds them into its admin (ADR 0040). */
+export const META_SCHEMA_VERSION = 2;
 
 const text: JsonSchema = { type: 'string' };
 const strings: JsonSchema = { type: 'array', items: text };
@@ -46,7 +46,7 @@ const flags = (names: readonly string[]): JsonSchema => ({
 /** The JSON Schema of the answer of `/api/v1/_meta`, published so that other adapters can check against it (META-05). */
 export const META_SCHEMA: JsonSchema = {
   type: 'object',
-  required: ['schemaVersion', 'entities', 'extensions', 'menu', 'dashboards', 'permissions'],
+  required: ['schemaVersion', 'entities', 'dashboards', 'permissions'],
   properties: {
     schemaVersion: { type: 'integer', enum: [META_SCHEMA_VERSION] },
     entities: {
@@ -155,17 +155,6 @@ export const META_SCHEMA: JsonSchema = {
         additionalProperties: false,
       },
     },
-    extensions: {
-      type: 'object',
-      required: ['pages', 'widgets', 'screens'],
-      properties: {
-        pages: { type: 'array', items: { type: 'object', additionalProperties: true } },
-        widgets: { type: 'array', items: { type: 'object', additionalProperties: true } },
-        screens: { type: 'array', items: { type: 'object', additionalProperties: true } },
-      },
-      additionalProperties: false,
-    },
-    menu: { type: 'array', items: { type: 'object', additionalProperties: true } },
     dashboards: { type: 'array', items: { type: 'object', additionalProperties: true } },
     permissions: strings,
   },
@@ -359,7 +348,6 @@ export function registerMeta(
   server: HttpServer,
   entities: readonly EntityDef<string>[],
   options: {
-    readonly extensions?: AdminExtensions;
     /**
      * Every permission of the project. The answer says which of them the caller holds, so that the admin part of a plugin knows what
      * to draw (UI-36). It hides nothing that the server would give: every route checks its own permission.
@@ -367,7 +355,6 @@ export function registerMeta(
     readonly permissions?: readonly string[];
   } = {},
 ): void {
-  const extensions = options.extensions ?? { pages: [], widgets: [], screens: [], menu: [] };
   const prepared = entities
     .filter((def) => Object.values(def.api).some((on) => on === true))
     .map(staticOf)
@@ -389,12 +376,6 @@ export function registerMeta(
         const answer = await ctx.can(permission);
         answers.set(permission, answer);
         return answer;
-      };
-      /** What the caller may use: a contribution with no permission is for everyone who is signed in. */
-      const allowed = async <T extends { readonly permission?: string }>(items: readonly T[]): Promise<T[]> => {
-        const kept: T[] = [];
-        for (const item of items) if (item.permission === undefined || (await can(item.permission))) kept.push(item);
-        return kept;
       };
       const out: unknown[] = [];
       for (const entity of prepared) {
@@ -478,12 +459,6 @@ export function registerMeta(
       return {
         schemaVersion: META_SCHEMA_VERSION,
         entities: out,
-        extensions: {
-          pages: await allowed(extensions.pages),
-          widgets: await allowed(extensions.widgets),
-          screens: await allowed(extensions.screens),
-        },
-        menu: await allowed(extensions.menu),
         dashboards: [],
         permissions: [...answers]
           .filter(([, granted]) => granted)

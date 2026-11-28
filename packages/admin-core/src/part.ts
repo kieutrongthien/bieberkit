@@ -108,7 +108,7 @@ export function defineAdminPlugin<C = AdminView>(input: AdminPartInput<NoInfer<C
   return input;
 }
 
-/** The name that the texts of a plugin begin with: `@bieberkit/plugin-users` is `users`, `bieberkit-plugin-notes` is `notes`. */
+/** The name that the texts of a plugin begin with: `@acme/plugin-crm` is `crm`, `bieberkit-plugin-notes` is `notes`. */
 export function shortNameOf(name: string): string {
   const bare = name.startsWith('@') ? name.slice(name.indexOf('/') + 1) : name;
   return bare.replace(/^bieberkit-plugin-/, '').replace(/^plugin-/, '');

@@ -24,6 +24,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { TextAdmin } from './fixtures/text-adapter.ts';
+import { defineAdminPlugin } from './part.ts';
 import type { DraftStorage } from './drafts.ts';
 import type { Meta, MetaEntity, MetaField, Row } from './types.ts';
 
@@ -82,19 +83,8 @@ const TICKET: MetaEntity = {
 };
 
 const META: Meta = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   entities: [TICKET],
-  extensions: {
-    pages: [
-      { plugin: 'reports', path: 'sales', module: '/plugins/reports/sales.js', title: { en: 'Sales', vi: 'Doanh số' } },
-    ],
-    widgets: [
-      { plugin: 'reports', slot: 'dashboard', module: '/plugins/reports/stats.js', title: { en: 'Stats' } },
-      { plugin: 'reports', slot: 'field:rating', module: '/plugins/reports/rating.js', title: { en: 'Rating' } },
-    ],
-    screens: [{ plugin: 'reports', replace: 'list:crm.Ticket', module: '/plugins/reports/tickets.js' }],
-  },
-  menu: [{ label: { en: 'Sales', vi: 'Doanh số' }, path: '/ext/reports/sales' }],
   permissions: [],
 };
 
@@ -217,6 +207,9 @@ async function admin(locale: 'en' | 'vi' = 'en'): Promise<TextAdmin> {
   return one;
 }
 
+/** A component of this adapter: a name that it writes. */
+const load = async (): Promise<{ default: string }> => ({ default: 'drawn as text' });
+
 describe('UI-10 a second adapter over admin-core alone', () => {
   it('UI-10 draws the menu, the list, the filters, the sort and the page from the metadata, in the language', async () => {
     const one = await admin();
@@ -240,14 +233,27 @@ describe('UI-10 a second adapter over admin-core alone', () => {
     expect(one.paramsOf(ticket)).toEqual({ 'filter[priority][eq]': 'high' });
   });
 
-  it('UI-04 reads what the plugins add through the same functions: the menu, the widgets of a slot, a replaced screen and a control', async () => {
+  it('UI-10, UI-35 reads what the admin parts of plugins add through admin-core alone: pages, blocks, a replaced screen and a control', async () => {
     const one = await admin();
-    expect(one.pluginMenu()).toEqual(['Sales -> /ext/reports/sales']);
-    expect(one.widgetModules('dashboard')).toEqual(['/plugins/reports/stats.js']);
-    expect(one.replacedBy('list', 'crm.Ticket')).toBe('/plugins/reports/tickets.js');
+    const problems = one.use([
+      defineAdminPlugin<string>({
+        name: 'bieberkit-plugin-reports',
+        signIn: { load },
+        pages: [
+          { path: '/sales', title: 'reports.sales', load },
+          { path: '/secret', title: 'reports.secret', permission: 'reports.secret', load },
+        ],
+        homeBlocks: [{ id: 'stats', title: 'reports.stats', load }],
+        fields: [{ id: 'stars', widget: 'rating', load }],
+        screens: [{ id: 'tickets', replace: 'list:crm.Ticket', load }],
+      }),
+    ]);
+    expect(problems).toEqual([]);
+    expect(one.pluginMenu()).toEqual(['reports.sales -> /sales']);
+    expect(one.homeBlocks()).toEqual(['stats']);
+    expect(one.replacedBy('list', 'crm.Ticket')).toBe('tickets');
     expect(one.replacedBy('form', 'crm.Ticket')).toBeUndefined();
-    expect(one.fieldWidget('rating')).toBe('/plugins/reports/rating.js');
-    expect((await admin('vi')).pluginMenu()).toEqual(['Doanh số -> /ext/reports/sales']);
+    expect(one.fieldWidget('rating')).toBe('stars');
   });
 
   it('UI-10 refuses a filter that the API would refuse, and says why, before any call', async () => {

@@ -49,7 +49,7 @@ export function useSession(): UseQueryResult<SessionUser | null> {
   return useQuery({ queryKey: ['session'], queryFn: async () => (await client.session()) ?? null });
 }
 
-/** The entity that the address names (`/admin/settings/settings` is `/api/v1/settings/settings`), once the metadata is there. */
+/** The entity that the address names (`/admin/crm/accounts` is `/api/v1/crm/accounts`), once the metadata is there. */
 export function useEntity(): { entity: MetaEntity | undefined; loading: boolean } {
   const params = useParams({ strict: false });
   const meta = useMeta();

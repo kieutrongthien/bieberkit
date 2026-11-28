@@ -41,15 +41,6 @@ export type { BulkInput, BulkQueue } from './bulk.ts';
 export { entityRoutes, pathOf as entityPath, registerEntityRoutes } from './entity-routes.ts';
 export type { EntityRoutesContext } from './entity-routes.ts';
 export { META_SCHEMA, registerMeta } from './meta.ts';
-export { adminExtensionsOf, extensionProblems, moduleUrl } from './admin-extensions.ts';
-export type {
-  AdminContribution,
-  AdminExtensions,
-  AdminPage,
-  AdminScreen,
-  AdminWidget,
-  Label,
-} from './admin-extensions.ts';
 export { openApiDocument, registerOpenApi } from './openapi.ts';
 export type { OpenApiDocument, OpenApiInfo } from './openapi.ts';
 export { registerHttp } from './lifecycle.ts';
@@ -84,13 +75,10 @@ export type {
 } from './server.ts';
 
 import type { RouteDef as ModuleRouteDef } from './route.ts';
-import type { AdminContribution } from './admin-extensions.ts';
 
 declare module '@bieberkit/core' {
   interface ModuleContributions {
     /** The routes of the module that no entity makes. They are added to the server with the routes of the entities (MOD-02). */
     routes?: readonly ModuleRouteDef[];
-    /** What the plugin adds to the admin: pages, menu entries, widgets and replaced screens (UI-04, ADR 0037). */
-    admin?: AdminContribution;
   }
 }

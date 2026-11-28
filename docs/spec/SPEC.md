@@ -1167,7 +1167,7 @@ Projects have two user interfaces. The admin UI is a single-page app for signed-
 The admin UI is a React single-page app that renders most screens from entity metadata, so a new entity gets list, form and detail screens without frontend code. It calls the API like any other client, which keeps authentication and authorization in one place.
 
 - **UI-01** Stack: React 19.2 (19.2.4 or later), Vite 8, TanStack Router and Query. No React Server Components. Visual components come through a UI adapter (UI-10), Ant Design 6 by default.
-- **UI-02** The shell loads `/api/v1/_meta`, which returns the entities, fields, permissions and menu entries the current user may see.
+- **UI-02** The shell loads `/api/v1/_meta`, which returns the entities, fields and permissions the current user may see. The shell draws its menu from these entities and from the admin parts of the build that the person may open (UI-35).
 - **UI-03** Generic screens: list (filters, sorting, saved views, bulk actions, export), form (validation from the same schemas as the API), detail (tabs for related records, activity, audit history; the history tab comes from the `audit-log` plugin, UI-34).
 - **UI-04** Escape hatches: a field can use a custom widget, a generic screen can be replaced by a custom page, and plugins add pages and dashboard widgets. A plugin does it in its admin part (UI-34), in the slots of UI-35; the pages and widgets of a project are in `apps/admin/src` (section 16.6).
 - **UI-05** Languages en, vi and zh are bundled. Dates, numbers and currency follow the user's locale. Vietnamese and Chinese labels come from the entity `label` and plugin translation files. The language is the one that the person chose in the header (kept in the browser), then the first language of the browser that is bundled, then English; the three dictionaries have the same keys and the same placeholders, which a test enforces. Money is formatted from the text that the API sends, so its digits are never rounded by a number.
@@ -1307,7 +1307,7 @@ apps/site/src/
 `/api/v1/_meta` is the contract between the server and every admin UI adapter. Adapters learn about entities from this document and nothing else.
 
 - **META-01** The response carries a `schemaVersion`. A breaking change to its shape bumps the version, and admin-core supports the current and the previous version.
-- **META-02** It describes entities (fields with type, label per locale, validation, widget hints, visibility rules), actions and transitions, list and form layouts, menus, dashboards, enabled features, and the permissions of the current user.
+- **META-02** It describes entities (fields with type, label per locale, validation, widget hints, visibility rules), actions and transitions, list and form layouts, dashboards, enabled features, and the permissions of the current user. Menu entries of plugins are not in it: they are in their admin parts, which the build of the project holds (UI-35).
 - **META-03** It is computed per tenant, role set and deployment version, cached with an ETag, and invalidated when roles, plugins or the deployment change.
 - **META-04** It never contains data rows, secrets or fields the user cannot read.
 - **META-05** Its JSON Schema is published with every release, so third-party adapters and tools can validate against it.
@@ -1748,6 +1748,7 @@ Open questions:
 
 | Version | Date | Changes |
 | --- | --- | --- |
+| 0.8.41 | 2026-11-28 | `schemaVersion` 2 of `_meta`: the pages, widgets, screens and menu entries of plugins left it (UI-02, META-02), and the loader of ADR 0037 is gone; admin-core still reads version 1 |
 | 0.8.40 | 2026-11-28 | ADR 0040 (accepted the same day by delegation) and `docs/modules/plugin-admin.md`: a plugin ships its own admin UI in fixed slots and a project builds its admin from its plugins (UI-34 to UI-38); no `auth-ui` plugin, the account screens are of `users` (12, UI-26); UI-03, UI-04, UI-10, UI-11, UI-24 to UI-32, the CLI table, 11.1 and 11.3 follow. The code still follows ADR 0025 and 0037 until the items of M2.2 land |
 | 0.8.39 | 2026-11-28 | UI-26 and `docs/modules/admin-account.md`: a second factor is optional unless it is asked for (AUTH-05), TOTP is always on (AUTH-03), a password set by a link ends the sessions (AUTH-06), the links lead to the admin (USR-10), `mfaRequired` (USR-12) and `requireMfa` of a system role (ROL-06) |
 | 0.8.38 | 2026-11-27 | ADR 0039 and `docs/modules/admin-identity.md`: the colors `frame` and `accent` and the bundled font (UI-23), the order of the menu and the box that goes to a page (UI-24), and `admin.brand` (UI-33) |

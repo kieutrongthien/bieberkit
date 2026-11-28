@@ -44,11 +44,14 @@ const entity = (name: string, label: string, more: Partial<MetaEntity> = {}): Me
   };
 };
 
-const meta = (entities: readonly MetaEntity[], menu: Meta['menu'] = []): Meta => ({
-  schemaVersion: 1,
-  entities,
-  menu,
-  permissions: [],
+const meta = (entities: readonly MetaEntity[]): Meta => ({ schemaVersion: 2, entities, permissions: [] });
+
+const page = (path: string, module: string, group?: string) => ({
+  path,
+  module,
+  label: { en: path.slice(1) },
+  icons: [module],
+  ...(group === undefined ? {} : { group }),
 });
 
 const shape = (groups: readonly MenuGroup[]): [string, string[]][] =>
@@ -86,14 +89,12 @@ describe('UI-24 the groups of the menu', () => {
 
   it('UI-24 an order of the config names an entity, a module or a page of a plugin, in the order of its items', () => {
     const groups = menuOf(
-      meta(
-        [entity('shop.Item', 'Items'), entity('shop.Order', 'Orders'), entity('crm.Deal', 'Deals')],
-        [{ label: { en: 'Sales' }, path: '/ext/reports/sales' }],
-      ),
-      [{ id: 'sales', label: { en: 'Sales' }, items: ['/ext/reports/sales', 'shop.Order', 'shop'] }],
+      meta([entity('shop.Item', 'Items'), entity('shop.Order', 'Orders'), entity('crm.Deal', 'Deals')]),
+      [{ id: 'sales', label: { en: 'Sales' }, items: ['/sales', 'shop.Order', 'shop'] }],
+      [page('/sales', 'reports')],
     );
     expect(shape(groups)).toEqual([
-      ['sales', ['/ext/reports/sales', 'shop.Order', 'shop.Item']],
+      ['sales', ['/sales', 'shop.Order', 'shop.Item']],
       // What no group names is not lost: it goes to `app`, at the end when the order has none.
       ['app', ['crm.Deal']],
     ]);
@@ -109,15 +110,12 @@ describe('UI-24 the groups of the menu', () => {
   });
 
   it('UI-24 an entry knows its address and the names of its icon, the one of the entity first', () => {
-    const [group] = menuOf(
-      meta(
-        [entity('shop.Order', 'Orders', { icon: 'bell' })],
-        [{ label: { en: 'Sales' }, path: '/ext/reports/sales' }],
-      ),
-    );
+    const [group] = menuOf(meta([entity('shop.Order', 'Orders', { icon: 'bell' })]), DEFAULT_MENU, [
+      page('/sales', 'reports'),
+    ]);
     expect(group?.entries.map((entry) => [entry.path, entry.icons])).toEqual([
       ['/shop/orders', ['bell', 'shop']],
-      ['/ext/reports/sales', ['reports']],
+      ['/sales', ['reports']],
     ]);
   });
 });
@@ -141,34 +139,21 @@ describe('UI-24 go to a page', () => {
 });
 
 describe('UI-24 the entry of an address', () => {
-  const groups = menuOf(
-    meta(
-      [entity('shop.Order', 'Orders')],
-      [
-        { label: { en: 'A' }, path: '/ext/reports/a' },
-        { label: { en: 'A2' }, path: '/ext/reports/a2' },
-      ],
-    ),
-  );
+  const groups = menuOf(meta([entity('shop.Order', 'Orders')]), DEFAULT_MENU, [
+    page('/a', 'reports'),
+    page('/a2', 'reports'),
+  ]);
 
   it('UI-24 the list, a record and a new record are the entry of the list', () => {
     for (const path of ['/shop/orders', '/shop/orders/new', '/shop/orders/0198'])
       expect(currentEntry(groups, path)?.entry.key).toBe('shop.Order');
-    expect(currentEntry(groups, '/ext/reports/a2')?.entry.key).toBe('/ext/reports/a2');
+    expect(currentEntry(groups, '/a2')?.entry.key).toBe('/a2');
   });
 
   it('UI-24 an address of no entry has none', () => {
     expect(currentEntry(groups, '/')).toBeUndefined();
     expect(currentEntry(groups, '/shop/ordersx')).toBeUndefined();
   });
-});
-
-const page = (path: string, module: string, group?: string) => ({
-  path,
-  module,
-  label: { en: path.slice(1) },
-  icons: [module],
-  ...(group === undefined ? {} : { group }),
 });
 
 describe('UI-35 the pages of plugins in the menu', () => {

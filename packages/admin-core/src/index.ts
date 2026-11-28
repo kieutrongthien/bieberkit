@@ -74,14 +74,9 @@ export type {
   ListParams,
   Meta,
   MetaEntity,
-  MetaExtensions,
   MetaField,
   MetaInline,
   MetaLabel,
-  MetaPage,
-  MetaScreen,
-  MetaWidget,
-  MetaMenuItem,
   MetaTransition,
   When,
   Page,
@@ -130,8 +125,7 @@ export { prefillOf, readOnlyOf, relatedDefaults, relatedFilter, relatedOf } from
 export type { Related } from './related.ts';
 export { editableInline, initialLines, lineProblems, linesBody, linesChanged, MAX_LINES, newLine } from './inline.ts';
 export type { Line } from './inline.ts';
-export { extensionsOf, fieldWidgetFor, labelText, moduleSrc, pageFor, screenFor, widgetsIn } from './extensions.ts';
-export type { AdminHost } from './extensions.ts';
+export { labelText } from './labels.ts';
 export { adminSection, BUILTIN_MENU_GROUPS, parseAdminSettings, readAdminSettings } from './settings.ts';
 export type { AdminSettings, BrandSettings, MenuGroupSettings } from './settings.ts';
 export { currentEntry, DEFAULT_MENU, menuOf, searchMenu } from './menu.ts';

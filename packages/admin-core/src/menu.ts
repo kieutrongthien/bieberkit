@@ -73,7 +73,7 @@ interface Found extends MenuEntry {
   readonly home: string;
 }
 
-/** The entities that the person may list, and the pages that plugins add. `_meta` left out what the person may not use. */
+/** The entities that the person may list. `_meta` left out what the person may not use. */
 function entriesOf(meta: Meta): Found[] {
   const entities = meta.entities
     .filter((entity) => entity.operations.list && entity.can.read)
@@ -89,13 +89,7 @@ function entriesOf(meta: Meta): Found[] {
         home: REST,
       };
     });
-  const pages = meta.menu.map((item): Found => {
-    // An address of a page of a plugin is `/ext/<plugin>/<path>`.
-    const plugin = item.path.split('/')[2] ?? '';
-    const { path, label } = item;
-    return { key: path, module: '', path, label, name: path, icons: [plugin], home: REST };
-  });
-  return [...entities, ...pages];
+  return entities;
 }
 
 const entryOf = ({ module: _module, home: _home, ...entry }: Found): MenuEntry => entry;

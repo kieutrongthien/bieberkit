@@ -27,8 +27,6 @@ import { describe, expect, it } from 'vitest';
 import { Account, entityApp, Hidden, Note, Person } from './entity-app.ts';
 import type { HttpServerOptions } from './server.ts';
 import { META_SCHEMA, registerMeta } from './meta.ts';
-import { adminExtensionsOf } from './admin-extensions.ts';
-import type { AdminExtensions } from './admin-extensions.ts';
 
 interface Field {
   key: string;
@@ -92,14 +90,14 @@ interface Meta {
 
 const DEFS = [Person, Account, Note, Hidden];
 
-async function metaApp(options: HttpServerOptions = {}, extensions?: AdminExtensions) {
+async function metaApp(options: HttpServerOptions = {}) {
   const app = await entityApp(options);
-  registerMeta(app.server, DEFS, extensions === undefined ? {} : { extensions });
+  registerMeta(app.server, DEFS);
   return app;
 }
 
-async function fetchMeta(options: HttpServerOptions = {}, extensions?: AdminExtensions): Promise<Meta> {
-  const app = await metaApp(options, extensions);
+async function fetchMeta(options: HttpServerOptions = {}): Promise<Meta> {
+  const app = await metaApp(options);
   const response = await app.server.inject({ method: 'GET', url: '/api/v1/_meta' });
   expect(response.statusCode).toBe(200);
   return JSON.parse(response.body);
@@ -122,11 +120,15 @@ describe('META-01 the shape', () => {
     expect((await app.server.inject({ method: 'GET', url: '/api/v1/_meta' })).statusCode).toBe(401);
   });
 
-  it('META-01 carries a schemaVersion, and empty menus and dashboards until plugins fill them', async () => {
+  it('META-01 is version 2, which carries no screens or menu entries of plugins, and empty dashboards', async () => {
     const meta = await fetchMeta();
-    expect(meta.schemaVersion).toBe(1);
-    expect(meta.menu).toEqual([]);
-    expect(meta.dashboards).toEqual([]);
+    expect(meta.schemaVersion).toBe(2);
+    expect(Object.keys(meta).toSorted((a, b) => a.localeCompare(b))).toEqual([
+      'dashboards',
+      'entities',
+      'permissions',
+      'schemaVersion',
+    ]);
   });
 
   it('META-05 the answer is valid against the published JSON Schema', async () => {
@@ -225,60 +227,6 @@ describe('META-02 what it describes', () => {
     expect(field(account, 'contract')).toMatchObject({ kind: 'string', widget: 'file', accept: ['application/pdf'] });
     expect(field(account, 'logo')).toMatchObject({ widget: 'image', accept: ['image/*'] });
     expect(field(account, 'code').accept).toBeUndefined();
-  });
-
-  describe('UI-04 the extensions of plugins', () => {
-    const extensions = adminExtensionsOf([
-      {
-        plugin: 'crm',
-        admin: {
-          pages: [
-            { path: 'reports', module: 'reports.js', title: { en: 'Reports' }, menu: true },
-            { path: 'secret', module: 'secret.js', title: 'Secret', permission: 'crm.secret.read', menu: true },
-          ],
-          widgets: [
-            { slot: 'dashboard', module: 'stats.js' },
-            { slot: 'form:crm.Account', module: 'panel.js', permission: 'crm.panel.read' },
-          ],
-          screens: [{ replace: 'list:crm.Note', module: 'notes.js', permission: 'crm.notes.view' }],
-        },
-      },
-    ]);
-
-    it('UI-04 are in the answer, which is valid against the published schema, with the menu filled from the pages', async () => {
-      const meta = await fetchMeta({}, extensions);
-      expect(meta.extensions?.pages.map((page) => page.module)).toEqual([
-        '/plugins/crm/reports.js',
-        '/plugins/crm/secret.js',
-      ]);
-      expect(meta.extensions?.widgets).toHaveLength(2);
-      expect(meta.extensions?.screens).toHaveLength(1);
-      expect(meta.menu.map((item) => item.path)).toEqual(['/ext/crm/reports', '/ext/crm/secret']);
-      const validate = createAjv().compile(META_SCHEMA);
-      expect([validate(meta), validate.errors]).toEqual([true, null]);
-    });
-
-    it('UI-04 leave out what the caller may not use, a page and its menu entry, a widget and a screen alike', async () => {
-      const meta = await fetchMeta(
-        {
-          authorizer: {
-            can: async (_p, permission) =>
-              !['crm.secret.read', 'crm.panel.read', 'crm.notes.view'].includes(permission),
-          },
-        },
-        extensions,
-      );
-      expect(meta.extensions?.pages.map((page) => page.path)).toEqual(['reports']);
-      expect(meta.menu.map((item) => item.path)).toEqual(['/ext/crm/reports']);
-      expect(meta.extensions?.widgets.map((widget) => widget.slot)).toEqual(['dashboard']);
-      expect(meta.extensions?.screens).toEqual([]);
-    });
-
-    it('UI-04 are empty when no plugin adds any', async () => {
-      const meta = await fetchMeta();
-      expect(meta.extensions).toEqual({ pages: [], widgets: [], screens: [] });
-      expect(meta.menu).toEqual([]);
-    });
   });
 
   it('UI-11 gives the conditions of a field, over the keys of the API', async () => {

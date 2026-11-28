@@ -69,7 +69,7 @@ const HIDDEN = entity(
     can: { read: false, create: false, update: false, delete: false },
   },
 );
-const META: Meta = { schemaVersion: 1, entities: [ACCOUNT, TICKET, NOTE, HIDDEN], menu: [], permissions: [] };
+const META: Meta = { schemaVersion: 2, entities: [ACCOUNT, TICKET, NOTE, HIDDEN], permissions: [] };
 
 describe('UI-11 the child tables of a detail screen', () => {
   it('UI-11 are the entities that the user may list and that point at the row by a relation that the API can filter by', () => {

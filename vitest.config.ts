@@ -38,7 +38,8 @@ export default defineConfig({
   test: {
     include: ['packages/*/src/**/*.test.{ts,tsx}', 'plugins/*/src/**/*.test.{ts,tsx}', 'tools/**/*.test.ts'],
     // Artifact checks require built output and run explicitly through pnpm test:artifacts.
-    exclude: ['tools/lib/plugin-artifacts.test.ts'],
+    // These pack the packages and install them in projects of their own, after a build: `pnpm test:artifacts`.
+    exclude: ['tools/lib/plugin-artifacts.test.ts', 'tools/lib/admin-library.test.ts'],
     passWithNoTests: true,
     // The plugins that tests write into the `node_modules` of a temporary `bk-*` project go through Vite like the rest. Without
     // this, Node imports them itself, follows `@bieberkit/source` into `packages/*/src` and strips the types: V8 then has two

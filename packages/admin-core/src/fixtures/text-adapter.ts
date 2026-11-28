@@ -38,7 +38,9 @@ import {
   viewsKey,
 } from '../lists.ts';
 import type { Filter, SavedView } from '../lists.ts';
-import { extensionsOf, fieldWidgetFor, labelText, screenFor, widgetsIn } from '../extensions.ts';
+import { allowed, composeAdmin } from '../compose.ts';
+import type { AdminProblem, AdminRegistry } from '../compose.ts';
+import type { AdminPart } from '../part.ts';
 import { allows, bodyOf, columnsOf, formFieldsOf, initialValues, labelOf, listFields } from '../screens.ts';
 import { commonTransitions, inputFieldsOf, patchRow, transitionPatch, transitionsFor } from '../transitions.ts';
 import type { DraftStorage } from '../drafts.ts';
@@ -88,21 +90,30 @@ export class TextAdmin {
     this.t = translator(await loadMessages(locale));
   }
 
-  /** What the plugins add: the pages as lines of the menu, and how many widgets a slot has (UI-04). */
-  pluginMenu(): string[] {
-    return (this.meta?.menu ?? []).map((item) => `${labelText(item.label, this.locale, item.path)} -> ${item.path}`);
+  /** What the admin parts of plugins add. This adapter draws a component as its name, which is a text. */
+  private added: AdminRegistry<string> = composeAdmin<string>([]).admin;
+
+  use(parts: readonly AdminPart<string>[]): readonly AdminProblem[] {
+    const { admin, problems } = composeAdmin(parts);
+    this.added = admin;
+    return problems;
   }
 
-  widgetModules(slot: string): string[] {
-    return widgetsIn(extensionsOf(this.meta), slot).map((widget) => widget.module);
+  /** The pages of plugins that the person may open, as lines of the menu. */
+  pluginMenu(): string[] {
+    return allowed(this.added.pages, new Set(this.meta?.permissions)).map((page) => `${page.title} -> ${page.path}`);
+  }
+
+  homeBlocks(): string[] {
+    return this.added.homeBlocks.map((block) => block.id);
   }
 
   replacedBy(kind: 'list' | 'form', entity: string): string | undefined {
-    return screenFor(extensionsOf(this.meta), kind, entity)?.module;
+    return this.added.screens.find((screen) => screen.replace === `${kind}:${entity}`)?.id;
   }
 
   fieldWidget(name: string): string | undefined {
-    return fieldWidgetFor(extensionsOf(this.meta), name)?.module;
+    return this.added.fields.find((field) => field.widget === name)?.id;
   }
 
   /** The menu: the entities that the user may read and list, by their label in the language. */
