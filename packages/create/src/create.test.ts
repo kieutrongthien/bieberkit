@@ -22,7 +22,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -275,6 +284,13 @@ describe('section 6 the files of a new project', () => {
     expect(root.devDependencies['@bieberkit/core']).toBe('1.2.3');
     expect(root.devDependencies['@types/node']).toMatch(/^\d+\.\d+\.\d+$/);
     expect(JSON.parse(read(cwd, 'demo/tsconfig.json')).compilerOptions.types).toEqual(['node']);
+  });
+
+  it('UI-38 the root declares data, which a made migration imports from the migrations folder of the root', async () => {
+    const cwd = workdir();
+    await create(cwd, ['demo', '--yes', '--no-install', '--no-git']);
+    // A migration begins with `import { Migration } from '@bieberkit/data/migration'`, and pnpm resolves nothing undeclared.
+    expect(JSON.parse(read(cwd, 'demo/package.json')).devDependencies['@bieberkit/data']).toBe('1.2.3');
   });
 
   it('23.7 a known license writes its LICENSE with the year and the holder, UNLICENSED and an unknown one write none', async () => {
@@ -633,4 +649,40 @@ describe('section 6 steps 8 and 11: install and the first commit', () => {
     expect(tracked).not.toContain('.env');
     expect(git('status', '--porcelain')).toBe('');
   });
+});
+
+describe('UI-38 the project that create writes', () => {
+  const repository = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
+
+  it('UI-38 passes the type check that bieberkit build runs, with the compiler options of its own tsconfig', async () => {
+    const cwd = workdir();
+    await create(cwd, ['demo', '--yes', '--no-install', '--no-git', '--author', AUTHOR]);
+    const root = join(cwd, 'demo');
+    // What pnpm install leaves for the config: core, here from its source, and the types of Node.js.
+    mkdirSync(join(root, 'node_modules', '@bieberkit'), { recursive: true });
+    symlinkSync(join(repository, 'packages', 'core'), join(root, 'node_modules', '@bieberkit', 'core'), 'dir');
+    writeFileSync(
+      join(root, 'tsconfig.check.json'),
+      JSON.stringify({
+        extends: './tsconfig.json',
+        compilerOptions: {
+          customConditions: ['@bieberkit/source'],
+          typeRoots: [join(repository, 'node_modules', '@types')],
+        },
+        // The entry point of the processes needs every package of the server, which is not what this checks.
+        include: ['bieberkit.config.ts'],
+      }),
+    );
+    let output = '';
+    try {
+      execFileSync(join(repository, 'node_modules', '.bin', 'tsc'), ['--noEmit', '-p', 'tsconfig.check.json'], {
+        cwd: root,
+        encoding: 'utf8',
+        stdio: 'pipe',
+      });
+    } catch (error) {
+      output = String(Reflect.get(Object(error), 'stdout'));
+    }
+    expect(output).toBe('');
+  }, 60_000);
 });

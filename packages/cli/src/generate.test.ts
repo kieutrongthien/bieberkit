@@ -37,6 +37,7 @@ afterEach(() => {
 });
 
 const MODULE = 'apps/server/src/modules/crm/module.ts';
+const TYPE_ROOTS = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'node_modules', '@types');
 const TSC = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'node_modules', '.bin', 'tsc');
 
 function project(options: FixtureOptions = {}): Fixture {
@@ -279,8 +280,13 @@ describe('API-07 the typed client', () => {
           'esnext',
           '--moduleResolution',
           'bundler',
+          // The libraries of a project that create makes: no DOM, and the types of Node.js.
           '--lib',
-          'esnext,dom',
+          'esnext',
+          '--types',
+          'node',
+          '--typeRoots',
+          TYPE_ROOTS,
           '--skipLibCheck',
           join(root, 'packages/client/src/index.ts'),
         ],

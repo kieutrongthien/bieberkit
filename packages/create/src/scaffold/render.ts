@@ -140,8 +140,10 @@ function renderConfig(choices: Choices, plan: Plan): string {
   const locales = template.locales ?? { default: 'en', supported: ['en'] };
   const plugins = plan.plugins.map((plugin) => `    '${plugin.name}',`).join('\n');
   return `${header('block', choices, plan, 'bieberkit.config.ts', 'The configuration of the project: its plugins, its database and its languages.')}import { defineConfig } from '@bieberkit/core';
+import type { ProjectConfigInput } from '@bieberkit/core';
 
-export default defineConfig({
+// The type is written: the project has isolatedDeclarations, which does not infer the type of an export.
+const config: ProjectConfigInput = defineConfig({
   name: '${choices.project.name}',
   author: '${choices.author}',
   license: '${choices.license}',
@@ -150,6 +152,8 @@ export default defineConfig({
   locales: { default: '${locales.default}', supported: [${locales.supported.map((tag) => `'${tag}'`).join(', ')}] },
   plugins: [${plugins === '' ? '' : `\n${plugins}\n  `}],
 });
+
+export default config;
 `;
 }
 
@@ -286,9 +290,10 @@ export function renderProject(choices: Choices, plan: Plan): ProjectFile[] {
           check: 'bieberkit check',
           test: 'bieberkit test',
         },
-        // bieberkit.config.ts sits at the root and imports core, so the root declares it: pnpm resolves nothing it does not declare.
+        // bieberkit.config.ts sits at the root and imports core, and the migrations there import data, so the root declares both:
+        // pnpm resolves nothing that a package does not declare.
         devDependencies: {
-          ...pins(['bieberkit', '@bieberkit/core', '@bieberkit/testing']),
+          ...pins(['bieberkit', '@bieberkit/core', '@bieberkit/data', '@bieberkit/testing']),
           '@types/node': '24.19.2',
           typescript: '7.0.2',
           vitest: '4.1.12',

@@ -147,7 +147,7 @@ export interface ClientOptions {
   readonly fetch?: typeof fetch;
   /** Headers for every call, read at each call: a token, a tenant. */
   readonly headers?: () => Readonly<Record<string, string>> | Promise<Readonly<Record<string, string>>>;
-  readonly credentials?: RequestCredentials;
+  readonly credentials?: RequestInit['credentials'];
 }
 
 interface CallInput {

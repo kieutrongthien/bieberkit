@@ -24,12 +24,16 @@
 
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
+import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { resolvePlugins } from '@bieberkit/core';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { runCli } from './run.ts';
 import { makeProject } from './testing/project.ts';
 import type { Fixture } from './testing/project.ts';
+
+const REPOSITORY = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 
 const fixtures: Fixture[] = [];
 afterEach(() => {
@@ -103,6 +107,50 @@ describe('section 5.2 make:entity', () => {
     expect(module.match(/bieberkit:imports/g)).toHaveLength(1);
     expect((await run(root, ['routes', '--json'])).data.routes.length).toBeGreaterThan(8);
   });
+
+  it('UI-38 the module that it writes passes the type check of a project, which wants declared types on exports', async () => {
+    const { root } = project();
+    await run(root, ['make:module', 'crm']);
+    await run(root, ['make:entity', 'crm.Deal']);
+    await run(root, ['make:job', 'crm.send-welcome']);
+    writeFileSync(
+      join(root, 'tsconfig.check.json'),
+      JSON.stringify({
+        compilerOptions: {
+          target: 'esnext',
+          module: 'esnext',
+          moduleResolution: 'bundler',
+          customConditions: ['@bieberkit/source'],
+          lib: ['esnext'],
+          types: ['node'],
+          typeRoots: [join(REPOSITORY, 'node_modules', '@types')],
+          strict: true,
+          exactOptionalPropertyTypes: true,
+          verbatimModuleSyntax: true,
+          allowImportingTsExtensions: true,
+          erasableSyntaxOnly: true,
+          resolveJsonModule: true,
+          isolatedDeclarations: true,
+          declaration: true,
+          noEmit: true,
+          skipLibCheck: true,
+        },
+        include: ['apps/server/src/modules/**/*.ts'],
+      }),
+    );
+    let output = '';
+    try {
+      execFileSync(join(REPOSITORY, 'node_modules', '.bin', 'tsc'), ['-p', 'tsconfig.check.json'], {
+        cwd: root,
+        encoding: 'utf8',
+        stdio: 'pipe',
+      });
+    } catch (error) {
+      output = String(Reflect.get(Object(error), 'stdout'));
+    }
+    // Only what the recipes wrote: the sources of the framework are checked by the framework.
+    expect(output.split('\n').filter((line) => line.startsWith('apps/'))).toEqual([]);
+  }, 60_000);
 
   it('5.2 the files that it writes pass bieberkit check, and generate works on them', async () => {
     const { root } = project();

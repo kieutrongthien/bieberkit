@@ -78,9 +78,10 @@ export function moduleFile(config: ProjectConfigInput, name: string, year: numbe
   return {
     path,
     content: `${projectHeader(config, path, `The ${name} module: what it publishes to the rest of the application.`, year)}import { defineModule } from '@bieberkit/core';
+import type { ModuleDef } from '@bieberkit/core';
 ${IMPORTS}
 
-export default defineModule({
+const definition: ModuleDef = defineModule({
   name: '${name}',
   entities: [
     ${ENTITIES}
@@ -89,6 +90,8 @@ export default defineModule({
     ${JOBS}
   ],
 });
+
+export default definition;
 `,
   };
 }
