@@ -72,6 +72,7 @@ Status values: `Proposed`, `Accepted`, `Rejected`, `Superseded by NNNN`. Only th
 | [0037](0037-plugin-admin-code.md) | A plugin adds code to the admin as modules that the web role serves and the admin loads | Accepted |
 | [0038](0038-content-tree-and-block-format.md) | Content is versioned blocks, drawn through one element tree | Accepted |
 | [0039](0039-admin-font.md) | The admin bundles the font Be Vietnam Pro | Proposed |
+| [0040](0040-plugin-owned-admin.md) | A plugin ships its own admin UI, and a project builds its admin from its plugins | Proposed |
 
 ## Needed for the Phase 0 gate
 

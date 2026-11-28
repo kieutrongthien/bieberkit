@@ -24,7 +24,7 @@
 
 # The base plugins
 
-- Packages: `@bieberkit/plugin-users`, `-roles`, `-settings`, `-audit-log`, `-notifications`, `-media` (folders `plugins/<name>`). `auth-ui` joins them with the admin.
+- Packages: `@bieberkit/plugin-users`, `-roles`, `-settings`, `-audit-log`, `-notifications`, `-media` (folders `plugins/<name>`). There is no `auth-ui` plugin: the account screens belong to `users`. Each plugin gets an admin part, `src/admin/`, exported as `./admin` ([plugin-admin.md](plugin-admin.md), ADR 0040).
 - Layer: plugins (they may import every other layer, and nothing imports them)
 - Spec sections: 11, 12, AUTH-01, AUTH-04, AUTHZ-01, AUTHZ-05, OBS-05, S-01, S-02, DATA-24
 - Status: **Done in M1.8.**

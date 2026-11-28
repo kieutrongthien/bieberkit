@@ -26,11 +26,13 @@
 
 - Packages: `@bieberkit/admin-core` (headless, no dependency), `@bieberkit/admin-antd` (React, Ant Design, the built application), and `serveStatic` of `@bieberkit/http` and `registerAdmin` of `@bieberkit/server`.
 - Spec sections: UI-01, UI-02, UI-03, UI-08, UI-10, UI-14, UI-15, UI-18, SEC-01, section 21. ADR 0025.
-- Status: **Done in M1.8.** The login is what the roadmap calls `auth-ui`.
+- Status: **Done in M1.8.** There is no `auth-ui` plugin: the sign in and the account screens belong to the `users` plugin (UI-26, UI-34).
 
 The account screens since M2.2 (the second factor, the password links, the own account) are in [admin-account.md](admin-account.md).
 
 The look and the frame of the admin since M2.2 (the grouped menu, the box that goes to a page, the sign in, the brand of a project) are in [admin-identity.md](admin-identity.md).
+
+> **Direction changed on 2026-11-28** ([ADR 0040](../adr/0040-plugin-owned-admin.md), [plugin-admin.md](plugin-admin.md)). This document describes the code as it is. What changes: the project builds its admin from its plugins, so "one built application in the package, no build in the project" (decision 1) is replaced, and the screens of a plugin leave `@bieberkit/admin-antd` and `@bieberkit/admin-core`: the account screens, the control of a file and the history tab. The loader of plugin modules (ADR 0037) is removed once the new slots serve it.
 
 ## What it does
 

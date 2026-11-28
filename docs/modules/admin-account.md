@@ -27,7 +27,7 @@
 - Packages: `@bieberkit/auth`, `@bieberkit/server`, `@bieberkit/admin-core`, `@bieberkit/admin-antd`, `@bieberkit/plugin-roles`, `@bieberkit/plugin-users`
 - Layer: contracts and product
 - Spec sections: UI-26, UI-25, AUTH-01, AUTH-03 to AUTH-06, USR-09, USR-10, USR-12, ROL-06, ROL-07, POL-02, POL-05
-- Status: **Implemented on 2026-11-28**, approved as one delivery with one review of the tests. A second factor is optional, and a person must set one up only when an administrator requires it (decided on 2026-11-27).
+- Status: **Implemented on 2026-11-28, in the wrong packages.** The behaviors below stand. The screens and their calls move to the `users` plugin (ADR 0040, [plugin-admin.md](plugin-admin.md)). A second factor is optional, and a person must set one up only when an administrator requires it (decided on 2026-11-27).
 
 ## Purpose
 
@@ -50,13 +50,9 @@ Read from the code on 2026-11-27, before this change.
 
 ## Approaches
 
-| Approach                                                                                       | Trade-off                                                                                              |
-| ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| **A. Logic in `admin-core`, lazy screens in `admin-antd`, on the Better Auth routes (chosen)** | The theme, the three languages and the axe tests apply. USR-12 and P1 hold: no route is copied         |
-| B. A plugin `auth-ui` that adds pages (ADR 0037)                                               | The pages of a plugin come from `_meta`, which needs a session, so it cannot draw anything for sign in |
-| C. Pages that the auth package renders on the server                                           | A second user interface, without the theme, the languages or the policy of the admin                   |
+Where the screens live was decided again on 2026-11-28. The first version of this document put them in `admin-core` and `admin-antd`, ruled out a plugin because the mechanism of ADR 0037 cannot draw a page without a session, and called `auth-ui` a name and not a package. The maintainer was not asked to pick between those approaches on their own, and the limit of a mechanism was no reason to rule the plugin out. The decision is now [ADR 0040](../adr/0040-plugin-owned-admin.md): the screens belong to the `users` plugin, and there is no `auth-ui` plugin.
 
-`auth-ui` stays a name for these screens and is not a package, as [admin.md](admin.md) says.
+What stays from the first version: the screens call the routes of Better Auth directly, so no route is copied (USR-12, P1), and the server renders no page of its own.
 
 ## Behavior
 

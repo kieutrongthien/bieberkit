@@ -53,7 +53,7 @@ Goals:
 
 Non-goals (each has its own milestone or needs its own design):
 
-- Admin screens for these plugins (M2.2, with UI-04).
+- Admin screens for these plugins (M2.2: each in its own plugin, UI-34, [plugin-admin.md](plugin-admin.md)).
 - Impersonation, and the OAuth, OIDC, SAML and SCIM providers themselves (an own design, `[D]`). The hooks that they will plug into are in this work (IDN-01 to IDN-03).
 - Realtime push of notifications (M2.4, RT-01 to RT-03). This work only emits the event.
 - `privacy` features: consent, data requests, crypto-shredded audit (M2.4, PDP).
@@ -112,7 +112,7 @@ The logic is a `user-service` in `@bieberkit/auth`, next to `role-service`. The 
 - **USR-09** `POST .../:id/reset-password` sends a reset link by mail through the queue. An administrator never sets or sees another person's password. Limited per target user and per administrator (AUTH-06).
 - **USR-10** Invitation: `POST /api/v1/users/users` with `invite: true` (and no `password`) makes the account with an unusable password and sends a mail with a link to set one. `POST .../:id/resend-invite` sends it again, and an invitation link expires after 7 days. This is the only invitation path (P1); `saas` invitations to a tenant build on it.
 - **USR-11** `POST .../:id/mfa/reset` removes the TOTP secret and the passkeys of a user who lost them, and revokes the sessions. Permission `users.reset-mfa`, never on oneself, always audited, and the user is told by mail.
-- **USR-12** `GET /api/v1/users/me` and `PATCH .../me` for the signed-in person. Changing the password, the second factor and one's own sessions stay on the Better Auth endpoints that `auth-ui` already uses; the plugin does not copy them (P1).
+- **USR-12** `GET /api/v1/users/me` and `PATCH .../me` for the signed-in person. Changing the password, the second factor and one's own sessions stay on the Better Auth endpoints that the account screens of this plugin use (UI-26); the plugin does not copy them (P1).
 
 Permissions: `users.read`, `users.manage`, `users.revoke-sessions`, `users.reset-mfa`. The seed adds them to the administrator role.
 
