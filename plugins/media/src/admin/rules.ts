@@ -1,8 +1,8 @@
 /**
  * BieberKit
  *
- * @file        packages/admin-core/src/files.ts
- * @description The files that a form holds: which media types a field takes, what is wrong with a file that was picked, and what a screen shows for a file that was uploaded (UI-11, ADR 0036).
+ * @file        plugins/media/src/admin/rules.ts
+ * @description The rules of the control of a file that need no screen: the types that a field takes, what is wrong with a picked file, the name that it is sent under and how its size reads (UI-11).
  * @author      Bieber Kieu <kieutrongthien@gmail.com>
  * @copyright   Copyright (c) 2026 Bieber Kieu
  * @license     Apache-2.0
@@ -22,7 +22,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { MetaField } from './types.ts';
+import type { MetaField } from '@bieberkit/admin-core';
 
 /** A media record as the media routes answer it. */
 export interface MediaFile {

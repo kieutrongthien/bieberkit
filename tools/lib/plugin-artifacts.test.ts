@@ -63,6 +63,11 @@ it('PLG-07 all packed first-party plugins retain their canonical static metadata
     expect(files).toContain('package/dist/index.d.ts');
     expect(files).toContain('package/LICENSE');
     expect(files).toContain('package/README.md');
+    // An admin part that a plugin declares is built and shipped (UI-37).
+    const admin = Object.hasOwn(Object(source['exports']), './admin')
+      ? ['package/dist/admin/index.js', 'package/dist/admin/index.d.ts']
+      : [];
+    expect(files.split('\n')).toEqual(expect.arrayContaining(admin));
   }
 }, 30_000);
 

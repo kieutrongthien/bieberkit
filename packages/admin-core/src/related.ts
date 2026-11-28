@@ -75,51 +75,6 @@ export function prefillOf(
   return values;
 }
 
-/** The path of the audit log for one row, newest first. */
-export const HISTORY_PATH = '/api/v1/audit-log/entries';
-
-export const historyQuery = (entity: string, id: string, pageSize = 20): string =>
-  `?entity=${encodeURIComponent(entity)}&recordId=${encodeURIComponent(id)}&pageSize=${String(pageSize)}`;
-
-/** One entry of the history of a row, as the screen shows it. */
-export interface HistoryEntry {
-  readonly id: string;
-  readonly at: string;
-  readonly action: string;
-  readonly who: string;
-  /** The fields that the entry says changed, when it says. */
-  readonly fields: readonly string[];
-}
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value);
-
-/** The entries of an answer of the audit log. What is not an entry is left out, and a missing actor is `-`. */
-export function historyOf(body: unknown): HistoryEntry[] {
-  const data = isRecord(body) && Array.isArray(body['data']) ? body['data'] : [];
-  return data.filter(isRecord).flatMap((entry) => {
-    const { id, at, action } = entry;
-    if (typeof id !== 'string' || typeof at !== 'string' || typeof action !== 'string') return [];
-    const actor = isRecord(entry['actor']) ? entry['actor'] : undefined;
-    const name =
-      typeof actor?.['name'] === 'string' ? actor['name'] : typeof actor?.['email'] === 'string' ? actor['email'] : '-';
-    const detail = isRecord(entry['data']) ? entry['data']['fields'] : undefined;
-    return [
-      {
-        id,
-        at,
-        action,
-        who: name,
-        fields: Array.isArray(detail) ? detail.filter((item): item is string => typeof item === 'string') : [],
-      },
-    ];
-  });
-}
-
-/** A short line for an entry: what was done, and the fields that changed. */
-export const historyLine = (entry: HistoryEntry): string =>
-  `${entry.action.split('.').at(-1) ?? entry.action}${entry.fields.length === 0 ? '' : ` (${entry.fields.join(', ')})`}`;
-
 /** The fields of a row that the form does not edit, with their values: what a detail screen shows beside the form (computed and state fields). */
 export function readOnlyOf(entity: MetaEntity, row: Row): { readonly key: string; readonly value: unknown }[] {
   return entity.fields

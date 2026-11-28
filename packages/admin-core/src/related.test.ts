@@ -23,16 +23,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import {
-  historyLine,
-  historyOf,
-  historyQuery,
-  prefillOf,
-  readOnlyOf,
-  relatedDefaults,
-  relatedFilter,
-  relatedOf,
-} from './related.ts';
+import { prefillOf, readOnlyOf, relatedDefaults, relatedFilter, relatedOf } from './related.ts';
 import type { Meta, MetaEntity, MetaField } from './types.ts';
 
 const field = (key: string, kind: string, extra: Partial<MetaField> = {}): MetaField => ({
@@ -106,36 +97,6 @@ describe('UI-11 the child tables of a detail screen', () => {
     expect(prefillOf(form, { accountId: 'a1', title: 't', other: 'x' })).toEqual({ accountId: 'a1', title: 't' });
     expect(prefillOf(form, { accountId: ['a'], title: '' })).toEqual({});
     expect(prefillOf(form, {})).toEqual({});
-  });
-});
-
-describe('UI-03 the history of a row', () => {
-  it('UI-03 asks the audit log for the entity and the record, newest first, with a page size', () => {
-    expect(historyQuery('crm.Account', 'a 1')).toBe('?entity=crm.Account&recordId=a%201&pageSize=20');
-  });
-
-  it('UI-03 reads the entries of the answer, with the name of the actor, and the fields that changed', () => {
-    const entries = historyOf({
-      data: [
-        {
-          id: 'e1',
-          at: '2026-03-05T10:00:00.000Z',
-          action: 'crm.Account.update',
-          actor: { name: 'Ann', email: 'a@x.co' },
-          data: { fields: ['name', 'note'] },
-        },
-        { id: 'e2', at: '2026-03-04T10:00:00.000Z', action: 'crm.Account.create', actor: { email: 'b@x.co' } },
-        { id: 'e3', at: '2026-03-03T10:00:00.000Z', action: 'crm.Account.delete', actor: null },
-        { nothing: true },
-      ],
-    });
-    expect(entries.map((entry) => [entry.id, entry.who, historyLine(entry)])).toEqual([
-      ['e1', 'Ann', 'update (name, note)'],
-      ['e2', 'b@x.co', 'create'],
-      ['e3', '-', 'delete'],
-    ]);
-    expect(historyOf(undefined)).toEqual([]);
-    expect(historyOf({ data: 'x' })).toEqual([]);
   });
 });
 

@@ -23,14 +23,14 @@
  */
 
 import { problemOf } from '@bieberkit/admin-core';
-import { FileControl } from './FileControl.tsx';
 import type { FieldProps } from './slot-props.ts';
 import { Slot, useAllowed, useRegistry } from './slots.tsx';
 import { RelationSelect } from './RelationSelect.tsx';
 import type { MetaField, MessageKey } from '@bieberkit/admin-core';
 import type { Rule } from 'antd/es/form';
-import { Input, InputNumber, Select, Switch } from 'antd';
+import { Input, InputNumber, Select, Switch, Typography } from 'antd';
 import type { ChangeEvent, JSX } from 'react';
+import { useT } from './language.tsx';
 
 /** The value of a field as its control holds it: a `datetime-local` input wants `YYYY-MM-DDTHH:mm`. */
 export function toControl(field: MetaField, value: unknown): unknown {
@@ -54,6 +54,20 @@ export interface ControlProps {
   readonly onChange?: (value: unknown) => void;
   /** The name that a screen reader gives the control when no label points at it, as in a table. */
   readonly label?: string;
+}
+
+function HeldFile(props: {
+  readonly id?: string;
+  readonly 'aria-label'?: string;
+  readonly value: string | undefined;
+}): JSX.Element {
+  const t = useT();
+  return (
+    <div>
+      <Input {...props} readOnly />
+      <Typography.Text type="secondary">{t('field.noControl')}</Typography.Text>
+    </div>
+  );
 }
 
 export function Control(props: ControlProps): JSX.Element {
@@ -100,17 +114,10 @@ export function Control(props: ControlProps): JSX.Element {
           onChange={(value) => onChange?.(value)}
         />
       );
+    // A plugin gives the control of a file. Without one the value that is held is shown, and a save leaves it as it is.
     case 'file':
     case 'image':
-      return (
-        <FileControl
-          field={field}
-          id={id}
-          value={props.value}
-          onChange={onChange}
-          {...(props.label === undefined ? {} : { label: props.label })}
-        />
-      );
+      return <HeldFile {...identity} value={text} />;
     case 'relation':
       return (
         <RelationSelect

@@ -30,6 +30,11 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
+    "./admin": {
+      "@bieberkit/source": "./src/admin/index.ts",
+      "types": "./dist/admin/index.d.ts",
+      "default": "./dist/admin/index.js"
+    },
     "./package.json": "./package.json"
   },
   "publishConfig": {
@@ -38,13 +43,17 @@
         "types": "./dist/index.d.ts",
         "default": "./dist/index.js"
       },
+      "./admin": {
+        "types": "./dist/admin/index.d.ts",
+        "default": "./dist/admin/index.js"
+      },
       "./package.json": "./package.json"
     },
     "access": "public"
   },
   "scripts": {
-    "build": "tsdown && node --conditions=@bieberkit/source ../../tools/plugin-manifests.ts --write --plugin .",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "build": "tsdown && tsdown -c tsdown.admin.config.ts && node --conditions=@bieberkit/source ../../tools/plugin-manifests.ts --write --plugin .",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p src/admin/tsconfig.json"
   },
   "dependencies": {
     "@bieberkit/auth": "workspace:*",
@@ -58,7 +67,38 @@
     "zod": "4.6.7"
   },
   "devDependencies": {
-    "@bieberkit/testing": "workspace:*"
+    "@bieberkit/admin-antd": "workspace:*",
+    "@bieberkit/admin-core": "workspace:*",
+    "@bieberkit/testing": "workspace:*",
+    "@tanstack/react-query": "5.108.0",
+    "@types/react": "19.3.0",
+    "antd": "6.7.1",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  },
+  "peerDependencies": {
+    "@bieberkit/admin-antd": "workspace:^",
+    "@bieberkit/admin-core": "workspace:^",
+    "@tanstack/react-query": "^5.108.0",
+    "antd": "^6.0.0",
+    "react": "^19.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@bieberkit/admin-antd": {
+      "optional": true
+    },
+    "@bieberkit/admin-core": {
+      "optional": true
+    },
+    "@tanstack/react-query": {
+      "optional": true
+    },
+    "antd": {
+      "optional": true
+    },
+    "react": {
+      "optional": true
+    }
   },
   "engines": {
     "node": ">=24.12"

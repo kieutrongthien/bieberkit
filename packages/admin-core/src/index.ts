@@ -126,22 +126,10 @@ export { problemOf } from './validation.ts';
 export { conditionalFields, evaluateWhen, isUnset, statesOf, visibleValues } from './when.ts';
 export type { FieldStates } from './when.ts';
 export type { ValueProblem } from './validation.ts';
-export {
-  historyLine,
-  historyOf,
-  historyQuery,
-  HISTORY_PATH,
-  prefillOf,
-  readOnlyOf,
-  relatedDefaults,
-  relatedFilter,
-  relatedOf,
-} from './related.ts';
-export type { HistoryEntry, Related } from './related.ts';
+export { prefillOf, readOnlyOf, relatedDefaults, relatedFilter, relatedOf } from './related.ts';
+export type { Related } from './related.ts';
 export { editableInline, initialLines, lineProblems, linesBody, linesChanged, MAX_LINES, newLine } from './inline.ts';
 export type { Line } from './inline.ts';
-export { acceptAttribute, acceptsType, fileProblem, isPicture, sizeText, uploadName } from './files.ts';
-export type { MediaFile } from './files.ts';
 export { extensionsOf, fieldWidgetFor, labelText, moduleSrc, pageFor, screenFor, widgetsIn } from './extensions.ts';
 export type { AdminHost } from './extensions.ts';
 export { adminSection, BUILTIN_MENU_GROUPS, parseAdminSettings, readAdminSettings } from './settings.ts';

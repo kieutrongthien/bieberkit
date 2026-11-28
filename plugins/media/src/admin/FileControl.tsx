@@ -1,8 +1,8 @@
 /**
  * BieberKit
  *
- * @file        packages/admin-antd/src/app/FileControl.tsx
- * @description The control of a file or an image field: it shows the file that is held, picks another from the disk of the person, sends it to the media library with the signed URL, and holds the id of the record (UI-11, ADR 0036).
+ * @file        plugins/media/src/admin/FileControl.tsx
+ * @description The control of a file or an image field: the person picks a file, it goes to the media library, and the field holds its id (UI-11, UI-35, slot 6).
  * @author      Bieber Kieu <kieutrongthien@gmail.com>
  * @copyright   Copyright (c) 2026 Bieber Kieu
  * @license     Apache-2.0
@@ -22,29 +22,26 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { acceptAttribute, AdminApiError, fileProblem, isPicture, sizeText } from '@bieberkit/admin-core';
-import type { MediaFile, MetaField } from '@bieberkit/admin-core';
+import { useAdminClient, useText } from '@bieberkit/admin-antd';
+import type { FieldProps } from '@bieberkit/admin-antd';
+import { AdminApiError } from '@bieberkit/admin-core';
 import { useQuery } from '@tanstack/react-query';
 import { Alert, Button, Space, Spin } from 'antd';
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import type { JSX } from 'react';
-import { useClient } from './context.ts';
-import { useT } from './language.tsx';
+import { mediaApi } from './api.ts';
+import { acceptAttribute, fileProblem, isPicture, sizeText } from './rules.ts';
+import type { MediaFile } from './rules.ts';
 
 /**
  * The value is the id of a media record, or nothing. A file that is picked is sent at once, and the field holds its id when the storage
  * has it and the upload is confirmed, so that a save never names a file that is not there. The record is read to name what is held.
  */
-export function FileControl(props: {
-  readonly field: MetaField;
-  readonly id?: string | undefined;
-  readonly value?: unknown;
-  readonly onChange?: ((value: unknown) => void) | undefined;
-  readonly label?: string;
-}): JSX.Element {
+export function FileControl(props: FieldProps): JSX.Element {
   const { field, id, onChange } = props;
-  const client = useClient();
-  const t = useT();
+  const client = useAdminClient();
+  const api = useMemo(() => mediaApi(client), [client]);
+  const t = useText();
   const input = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | undefined>();
@@ -53,14 +50,14 @@ export function FileControl(props: {
 
   const file = useQuery<MediaFile>({
     queryKey: ['media-file', held],
-    queryFn: () => client.mediaFile(held ?? ''),
+    queryFn: () => api.mediaFile(held ?? ''),
     enabled: held !== undefined,
     retry: false,
   });
   const picture = file.data !== undefined && isPicture(file.data);
   const preview = useQuery({
     queryKey: ['media-url', held],
-    queryFn: () => client.mediaUrl(held ?? ''),
+    queryFn: () => api.mediaUrl(held ?? ''),
     enabled: picture && held !== undefined,
     retry: false,
   });
@@ -69,21 +66,23 @@ export function FileControl(props: {
     if (chosen === undefined) return;
     const wrong = fileProblem(field, chosen);
     if (wrong !== undefined) {
-      setProblem(t(wrong === 'empty' ? 'file.empty' : 'file.type', { types: (field.accept ?? []).join(', ') }));
+      setProblem(
+        t(wrong === 'empty' ? 'media.file.empty' : 'media.file.type', { types: (field.accept ?? []).join(', ') }),
+      );
       return;
     }
     setProblem(undefined);
     setBusy(true);
     try {
-      const sent = await client.uploadFile(chosen);
+      const sent = await api.uploadFile(chosen);
       onChange?.(sent.id);
     } catch (error) {
       setProblem(
         error instanceof AdminApiError && error.code === 'STORAGE_SIGNING_UNSUPPORTED'
-          ? t('file.noSigning')
+          ? t('media.file.noSigning')
           : error instanceof Error
             ? error.message
-            : t('file.failed'),
+            : t('media.file.failed'),
       );
     } finally {
       setBusy(false);
@@ -105,7 +104,7 @@ export function FileControl(props: {
         onChange={(event) => void pick(event.target.files?.[0])}
         style={{ maxWidth: '100%' }}
       />
-      {busy ? <Spin size="small" tip={t('file.sending')} /> : null}
+      {busy ? <Spin size="small" tip={t('media.file.sending')} /> : null}
       {held === undefined ? null : (
         <Space wrap>
           {picture && preview.data !== undefined ? (
@@ -116,12 +115,12 @@ export function FileControl(props: {
             />
           ) : null}
           <span>{file.data === undefined ? held : `${file.data.filename} (${sizeText(file.data.size)})`}</span>
-          <Button size="small" onClick={() => onChange?.(null)} aria-label={t('file.removeNamed', { name })}>
-            {t('file.remove')}
+          <Button size="small" onClick={() => onChange?.(null)} aria-label={t('media.file.removeNamed', { name })}>
+            {t('media.file.remove')}
           </Button>
         </Space>
       )}
-      {problem === undefined ? null : <Alert type="error" showIcon role="alert" message={problem} />}
+      {problem === undefined ? null : <Alert type="error" showIcon role="alert" title={problem} />}
     </Space>
   );
 }

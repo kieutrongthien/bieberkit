@@ -2,7 +2,7 @@
  * BieberKit
  *
  * @file        packages/admin-antd/src/app/Related.tsx
- * @description The tabs of a detail screen beside its form: the child tables, which are the rows of the entities that point at this row with a button for a new one, and the history of the row from the audit log (UI-03, UI-11).
+ * @description The tabs of a detail screen beside its form: the child tables, which are the rows of the entities that point at this row with a button for a new one, (UI-11). A plugin adds its own tabs.
  * @author      Bieber Kieu <kieutrongthien@gmail.com>
  * @copyright   Copyright (c) 2026 Bieber Kieu
  * @license     Apache-2.0
@@ -22,20 +22,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
-  allows,
-  columnsOf,
-  formatDateTime,
-  historyLine,
-  labelOf,
-  listFields,
-  relatedDefaults,
-  relatedFilter,
-} from '@bieberkit/admin-core';
-import type { MetaEntity, Related as RelatedEntity, Row } from '@bieberkit/admin-core';
+import { allows, columnsOf, labelOf, listFields, relatedDefaults, relatedFilter } from '@bieberkit/admin-core';
+import type { Related as RelatedEntity, Row } from '@bieberkit/admin-core';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
-import { Button, Empty, Result, Skeleton, Table, Timeline } from 'antd';
+import { Button, Empty, Result, Table } from 'antd';
 import { useState } from 'react';
 import type { JSX } from 'react';
 import { useClient } from './context.ts';
@@ -107,36 +98,5 @@ export function RelatedRows(props: { readonly related: RelatedEntity; readonly i
         }}
       />
     </>
-  );
-}
-
-/** What the audit log says about a row. A user who may not read the audit log is told so and nothing else. */
-export function History(props: { readonly entity: MetaEntity; readonly id: string }): JSX.Element {
-  const { entity, id } = props;
-  const client = useClient();
-  const t = useT();
-  const { locale } = useLanguage();
-  const history = useQuery({
-    queryKey: ['history', entity.name, id],
-    queryFn: () => client.history(entity, id),
-    retry: false,
-  });
-  if (history.isPending) return <Skeleton active />;
-  if (history.isError)
-    return <Result status="warning" title={t('detail.historyDenied')} subTitle={history.error.message} />;
-  if (history.data.length === 0) return <Empty description={t('detail.noHistory')} />;
-  return (
-    <Timeline
-      items={history.data.map((entry) => ({
-        key: entry.id,
-        content: (
-          <>
-            <strong>{historyLine(entry)}</strong>
-            <br />
-            <span>{`${entry.who} · ${formatDateTime(locale, entry.at)}`}</span>
-          </>
-        ),
-      }))}
-    />
   );
 }

@@ -57,7 +57,7 @@ import { Control, fromControl, rulesOf, toControl } from './controls.tsx';
 import { useClient, useEntity, useMeta } from './context.ts';
 import { RowMoves } from './moves.tsx';
 import { LinesEditor } from './Lines.tsx';
-import { History, RelatedRows } from './Related.tsx';
+import { RelatedRows } from './Related.tsx';
 import { usePluginText } from './hooks.ts';
 import { useLanguage, useT } from './language.tsx';
 import type { RecordTabProps, ScreenProps } from './slot-props.ts';
@@ -216,7 +216,6 @@ function Editor(props: {
       await queries.invalidateQueries({ queryKey: ['list', entity.name] });
       // A cached row is shown first when it is opened again, so it is dropped and not only marked stale.
       queries.removeQueries({ queryKey: ['row', entity.name] });
-      queries.removeQueries({ queryKey: ['history', entity.name] });
       clearTimeout(timer.current);
       clearDraft(window.localStorage, key);
       leaving.current = true;
@@ -440,7 +439,6 @@ function Editor(props: {
                 />
               ),
             })),
-            { key: 'history', label: t('detail.history'), children: <History entity={entity} id={id} /> },
           ]}
         />
       )}

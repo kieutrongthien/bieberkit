@@ -1,8 +1,8 @@
 /**
  * BieberKit
  *
- * @file        packages/admin-core/src/files.test.ts
- * @description Tests of the files that a form holds: the types that a field takes, what is wrong with a picked file, and the names (UI-11, ADR 0036).
+ * @file        plugins/media/src/admin/rules.test.ts
+ * @description The rules of the control of a file: the types that a field takes, a file that was picked, its name and its size (UI-11).
  * @author      Bieber Kieu <kieutrongthien@gmail.com>
  * @copyright   Copyright (c) 2026 Bieber Kieu
  * @license     Apache-2.0
@@ -22,10 +22,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type { MetaField } from '@bieberkit/admin-core';
 import { describe, expect, it } from 'vitest';
-import { acceptAttribute, acceptsType, fileProblem, isPicture, sizeText, uploadName } from './files.ts';
-import type { MediaFile } from './files.ts';
-import type { MetaField } from './types.ts';
+import { acceptAttribute, acceptsType, fileProblem, isPicture, sizeText, uploadName } from './rules.ts';
+import type { MediaFile } from './rules.ts';
 
 const field = (accept?: string[]): MetaField => ({
   key: 'logo',
