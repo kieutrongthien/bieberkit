@@ -46,7 +46,14 @@ export const HEAP_MB = 768;
 /** The time that a container gets to stop: the drain (5 s) and the shutdown (20 s) of section 19.4, and a margin. */
 export const STOP_GRACE = '40s';
 
-export function renderDockerfile(folder: string, head: Head): string {
+export function renderDockerfile(
+  folder: string,
+  head: Head,
+  options: { readonly admin?: boolean } = { admin: true },
+): string {
+  // The server image holds the built admin, which the web role serves when no CDN does (DEP-06).
+  const admin =
+    options.admin === false ? '' : 'RUN mkdir -p /out/public/admin && cp -r apps/admin/dist/. /out/public/admin/\n';
   return `${head('Dockerfile', 'The image of the server: one image that runs as web, worker, scheduler or migrate (spec section 19.1).')}# syntax=docker/dockerfile:1
 FROM ${IMAGES.node} AS build
 ENV PNPM_HOME=/pnpm
@@ -62,7 +69,7 @@ RUN pnpm exec bieberkit build
 # A self-contained folder with no development dependencies (DEP-02). The config and the migrations sit beside it, where the server looks.
 RUN pnpm deploy --filter=${folder}-server --prod /out/apps/server
 RUN mkdir -p /out/migrations && cp bieberkit.config.ts package.json /out/ && cp -r migrations/. /out/migrations/
-
+${admin}
 FROM ${IMAGES.node} AS runtime
 ENV NODE_ENV=production
 WORKDIR /app

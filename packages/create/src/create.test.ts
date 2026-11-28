@@ -131,6 +131,12 @@ describe('section 6 the files of a new project', () => {
         'AGENTS.md',
         'CLAUDE.md',
         'Dockerfile',
+        'apps/admin/index.html',
+        'apps/admin/package.json',
+        'apps/admin/src/admin.d.ts',
+        'apps/admin/src/main.tsx',
+        'apps/admin/tsconfig.json',
+        'apps/admin/vite.config.ts',
         'apps/server/package.json',
         'apps/server/src/main.ts',
         'bieberkit.config.ts',
@@ -149,7 +155,7 @@ describe('section 6 the files of a new project', () => {
       name: 'demo',
       dialect: 'sqlite',
       template: 'blank',
-      files: 20,
+      files: 26,
       installed: false,
       git: 'skipped',
       next: ['cd demo', 'pnpm install', 'pnpm dev'],
@@ -487,17 +493,63 @@ describe('section 5.1 the choices', () => {
     expect((await create(cwd, ['demo', '--yes', '--no-install', '--no-git'])).code).toBe(0);
   });
 
-  it('5.1 --site is accepted and the result says that its app is not part of this version, and the admin is a dependency of the server app', async () => {
+  it('5.1 --site is accepted and the result says that its app is not part of this version', async () => {
     const cwd = workdir();
     const { data } = await create(cwd, ['demo', '--yes', '--site', '--no-install', '--no-git', '--json']);
     expect(data.notes).toEqual([expect.stringContaining('site app')]);
     expect(read(cwd, 'demo/.env')).toContain('SITE_SERVICE_TOKEN=secret-');
-    expect(JSON.parse(read(cwd, 'demo/apps/server/package.json')).dependencies).toHaveProperty('@bieberkit/admin-antd');
-    const bare = workdir();
-    await create(bare, ['demo', '--yes', '--no-admin', '--no-install', '--no-git']);
-    expect(JSON.parse(read(bare, 'demo/apps/server/package.json')).dependencies).not.toHaveProperty(
+  });
+
+  it('UI-37 a project with an admin has apps/admin, which builds the admin from the plugins with Vite', async () => {
+    const cwd = workdir();
+    await create(cwd, ['demo', '--yes', '--no-install', '--no-git', '--author', AUTHOR]);
+    const admin = JSON.parse(read(cwd, 'demo/apps/admin/package.json'));
+    expect(admin).toMatchObject({ name: 'demo-admin', private: true, type: 'module' });
+    expect(admin.dependencies).toMatchObject({ '@bieberkit/admin-antd': '1.2.3', '@bieberkit/admin-core': '1.2.3' });
+    expect(admin.devDependencies).toMatchObject({ bieberkit: '1.2.3' });
+    // The admin gives each plugin its React, so every plugin of the server is a dependency of the admin too.
+    const server = JSON.parse(read(cwd, 'demo/apps/server/package.json'));
+    expect(server.dependencies).not.toHaveProperty('@bieberkit/admin-antd');
+    for (const name of Object.keys(server.dependencies).filter((item) => item.includes('plugin-')))
+      expect(admin.dependencies).toHaveProperty(name);
+    expect(read(cwd, 'demo/apps/admin/vite.config.ts')).toContain(
+      "import { bieberkitAdmin } from 'bieberkit/admin-vite';",
+    );
+    expect(read(cwd, 'demo/apps/admin/src/main.tsx')).toContain('startAdmin(root, { parts });');
+    expect(read(cwd, 'demo/apps/admin/src/admin.d.ts')).toContain("declare module 'virtual:bieberkit/admin'");
+    expect(read(cwd, 'demo/apps/admin/index.html')).toContain('<script type="module" src="./src/main.tsx"></script>');
+    expect(JSON.parse(read(cwd, 'demo/apps/admin/tsconfig.json')).compilerOptions.jsx).toBe('react-jsx');
+    // The server's type check has no DOM and no JSX, so it leaves the admin to the tsconfig of the admin.
+    expect(JSON.parse(read(cwd, 'demo/tsconfig.json')).exclude).toContain('apps/admin');
+  });
+
+  it('UI-37 --no-admin makes no apps/admin', async () => {
+    const cwd = workdir();
+    await create(cwd, ['demo', '--yes', '--no-admin', '--no-install', '--no-git']);
+    expect(existsSync(join(cwd, 'demo/apps/admin'))).toBe(false);
+    expect(JSON.parse(read(cwd, 'demo/apps/server/package.json')).dependencies).not.toHaveProperty(
       '@bieberkit/admin-antd',
     );
+  });
+
+  it('UI-37 pins React, Ant Design and Vite at the versions that the library of the admin is built with', async () => {
+    const cwd = workdir();
+    await create(cwd, ['demo', '--yes', '--no-install', '--no-git']);
+    const made = JSON.parse(read(cwd, 'demo/apps/admin/package.json'));
+    const library = JSON.parse(
+      readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'admin-antd', 'package.json'), 'utf8'),
+    );
+    const built = { ...library.dependencies, ...library.devDependencies };
+    for (const name of [
+      'react',
+      'react-dom',
+      'antd',
+      'vite',
+      '@vitejs/plugin-react',
+      '@types/react',
+      '@types/react-dom',
+    ])
+      expect([name, { ...made.dependencies, ...made.devDependencies }[name]]).toEqual([name, built[name]]);
   });
 });
 

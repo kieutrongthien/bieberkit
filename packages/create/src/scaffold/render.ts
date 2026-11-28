@@ -22,6 +22,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { adminFiles } from './admin.ts';
 import { coreEnv, describeEnv } from '@bieberkit/core';
 import type { Dialect, EnvDescription } from '@bieberkit/core';
 import type { Choices } from './choices.ts';
@@ -311,8 +312,6 @@ export function renderProject(choices: Choices, plan: Plan): ProjectFile[] {
         type: 'module',
         dependencies: {
           ...pins(['@bieberkit/core', '@bieberkit/data', '@bieberkit/http', '@bieberkit/queue', '@bieberkit/server']),
-          // The admin is the application of this package, served by the web role under /admin/ (UI-14).
-          ...(choices.admin ? pins(['@bieberkit/admin-antd']) : {}),
           ...pluginPins,
           zod: '4.6.7',
         },
@@ -340,6 +339,8 @@ export function renderProject(choices: Choices, plan: Plan): ProjectFile[] {
           skipLibCheck: true,
         },
         include: ['bieberkit.config.ts', 'apps/**/*.ts', 'packages/**/*.ts', '.bieberkit/types/*.d.ts'],
+        // The admin has a tsconfig of its own: it needs the DOM and JSX, which the server must not see.
+        ...(choices.admin ? { exclude: ['apps/admin'] } : {}),
       }),
     },
     { path: 'bieberkit.config.ts', content: renderConfig(choices, plan) },
@@ -356,11 +357,21 @@ export function renderProject(choices: Choices, plan: Plan): ProjectFile[] {
       content: `${header('hash', choices, plan, '.gitignore', 'What git leaves out: installed packages, builds, the environment, and what is generated and not committed.')}node_modules\ndist\ncoverage\n.env\n.bieberkit\nstorage\ndata/*.db\n.turbo\n`,
     },
   ];
+  if (choices.admin) {
+    files.push(
+      ...adminFiles({
+        folder,
+        pins,
+        plugins: pluginPins,
+        header: (style, path, description) => header(style, choices, plan, path, description),
+      }),
+    );
+  }
   const head = (path: string, description: string): string => header('hash', choices, plan, path, description);
   // A JavaScript file cannot begin with a `#` comment.
   const blockHead = (path: string, description: string): string => header('block', choices, plan, path, description);
   files.push(
-    { path: 'Dockerfile', content: renderDockerfile(folder, head) },
+    { path: 'Dockerfile', content: renderDockerfile(folder, head, { admin: choices.admin }) },
     { path: '.dockerignore', content: renderDockerignore(head) },
     { path: 'compose.prod.yaml', content: renderComposeProduction(choices.dialect, folder, head) },
     { path: '.env.production.example', content: renderProductionEnv(choices.dialect, folder, head) },

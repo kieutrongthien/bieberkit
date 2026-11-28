@@ -64,6 +64,13 @@ describe('DEP-01 the image', () => {
     expect(dockerfile).toContain('pnpm deploy --filter=shop-server --prod /out/apps/server');
   });
 
+  it('DEP-06 keeps the built admin in public/admin, where the web role serves it, and a project without an admin has none', () => {
+    expect(renderDockerfile('shop', head, { admin: true })).toContain(
+      'RUN mkdir -p /out/public/admin && cp -r apps/admin/dist/. /out/public/admin/',
+    );
+    expect(renderDockerfile('shop', head, { admin: false })).not.toContain('public/admin');
+  });
+
   it('DEP-03 runs node and not a package manager, as a user that is not root, and the role is the command (DEP-05)', () => {
     expect(dockerfile).toContain('ENTRYPOINT ["node", "apps/server/src/main.ts"]');
     expect(dockerfile).toContain('USER node');
