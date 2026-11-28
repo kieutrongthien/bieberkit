@@ -764,12 +764,33 @@ importers:
         specifier: workspace:*
         version: link:../../packages/http
     devDependencies:
+      '@bieberkit/admin-antd':
+        specifier: workspace:*
+        version: link:../../packages/admin-antd
+      '@bieberkit/admin-core':
+        specifier: workspace:*
+        version: link:../../packages/admin-core
       '@bieberkit/plugin-roles':
         specifier: workspace:*
         version: link:../roles
       '@bieberkit/testing':
         specifier: workspace:*
         version: link:../../packages/testing
+      '@tanstack/react-query':
+        specifier: 5.108.0
+        version: 5.108.0(@types/react@19.3.0)(react@19.3.1)
+      '@types/react':
+        specifier: 19.3.0
+        version: 19.3.0
+      antd:
+        specifier: 6.7.1
+        version: 6.7.1(luxon@3.7.2)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+      react:
+        specifier: 19.3.1
+        version: 19.3.1
+      react-dom:
+        specifier: 19.3.1
+        version: 19.3.1(react@19.3.1)
 
 packages:
 

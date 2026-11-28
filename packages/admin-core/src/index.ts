@@ -22,13 +22,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-// Public API of @bieberkit/admin-core: headless, with no dependency (ADR 0025). The screens are in an adapter such as @bieberkit/admin-antd (UI-10).
+// Public API of @bieberkit/admin-core: headless, with no dependency (ADR 0025), and nothing of one plugin (UI-34). The screens are in an adapter such as @bieberkit/admin-antd (UI-10).
 
 /** npm name of this package. */
 export const packageName = '@bieberkit/admin-core';
 
 export { AdminApiError, createAdminClient } from './client.ts';
-export type { AdminClient, AdminClientOptions, FieldProblem, RequestInput, SignInResult } from './client.ts';
+export type { AdminClient, AdminClientOptions, FieldProblem, RequestInput } from './client.ts';
 export { defineAdminPlugin, shortNameOf } from './part.ts';
 export type {
   AdminPart,
@@ -43,22 +43,6 @@ export type {
 } from './part.ts';
 export { allowed, composeAdmin, messageProblems } from './compose.ts';
 export type { AdminProblem, AdminRegistry, Owned } from './compose.ts';
-export type { AccountClient, AdminSession, CodeKind, Me, TotpEnrolment } from './account-client.ts';
-export {
-  authMessageKey,
-  deviceOf,
-  enrolmentNeeded,
-  normalizeCode,
-  PASSWORD_ADVISED,
-  PASSWORD_MAX,
-  PASSWORD_MIN,
-  passwordIsShort,
-  passwordProblem,
-  resetSearchOf,
-  secretOfUri,
-  stepExpired,
-} from './account.ts';
-export type { ResetSearch } from './account.ts';
 export {
   fillText,
   formatDate,

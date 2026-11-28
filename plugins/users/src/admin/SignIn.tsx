@@ -1,8 +1,8 @@
 /**
  * BieberKit
  *
- * @file        packages/admin-antd/src/app/Login.tsx
- * @description The sign in page: the brand and the sentence of the project, the email and the password of a local account, and for an account with a second factor the step that asks for the code (UI-14, UI-23, UI-26, AUTH-05).
+ * @file        plugins/users/src/admin/SignIn.tsx
+ * @description The sign in of the admin: the email and the password, then for an account with a second factor the code (UI-26, AUTH-05, slot 9).
  * @author      Bieber Kieu <kieutrongthien@gmail.com>
  * @copyright   Copyright (c) 2026 Bieber Kieu
  * @license     Apache-2.0
@@ -22,20 +22,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { ENGLISH, normalizeCode, stepExpired } from '@bieberkit/admin-core';
-import type { CodeKind, MessageKey } from '@bieberkit/admin-core';
-import { useQueryClient } from '@tanstack/react-query';
-import { Link } from '@tanstack/react-router';
+import { AdminLink, AuthLinks, AuthShell, CodeInput, useNotice, useText } from '@bieberkit/admin-antd';
+import type { SignInProps } from '@bieberkit/admin-antd';
 import { Alert, Button, Form, Input } from 'antd';
 import { useState } from 'react';
 import type { JSX } from 'react';
-import { useAuthError } from './authError.ts';
-import { AuthShell } from './AuthShell.tsx';
-import { useClient } from './context.ts';
-import { useT } from './language.tsx';
-import { useNotice } from './notice.ts';
-
-const isShellKey = (key: string): key is MessageKey => Object.hasOwn(ENGLISH, key);
+import { normalizeCode, stepExpired } from './rules.ts';
+import type { CodeKind } from './api.ts';
+import { useAccountApi, useAuthError } from './useAccount.ts';
 
 interface Values {
   readonly email: string;
@@ -47,8 +41,8 @@ function CodeStep(props: {
   readonly onDone: () => Promise<void>;
   readonly onBack: (failure?: string) => void;
 }): JSX.Element {
-  const t = useT();
-  const client = useClient();
+  const t = useText();
+  const api = useAccountApi();
   const sentence = useAuthError();
   const [kind, setKind] = useState<CodeKind>('totp');
   const [failure, setFailure] = useState<string | undefined>();
@@ -59,7 +53,7 @@ function CodeStep(props: {
     setBusy(true);
     setFailure(undefined);
     try {
-      await client.verifySecondFactor(normalizeCode(values.code, kind), kind);
+      await api.verifySecondFactor(normalizeCode(values.code, kind), kind);
       await props.onDone();
     } catch (error) {
       if (stepExpired(error)) props.onBack(sentence(error));
@@ -76,7 +70,10 @@ function CodeStep(props: {
   };
 
   return (
-    <AuthShell title={t('auth.code.title')} text={t(kind === 'totp' ? 'auth.code.text' : 'auth.code.backupText')}>
+    <AuthShell
+      title={t('users.auth.code.title')}
+      text={t(kind === 'totp' ? 'users.auth.code.text' : 'users.auth.code.backupText')}
+    >
       {failure === undefined ? null : <Alert type="error" showIcon title={failure} style={{ marginBottom: 16 }} />}
       <Form
         form={form}
@@ -87,38 +84,36 @@ function CodeStep(props: {
         requiredMark={false}
       >
         <Form.Item
-          label={t(kind === 'totp' ? 'auth.code.label' : 'auth.code.backupLabel')}
+          label={t(kind === 'totp' ? 'users.auth.code.label' : 'users.auth.code.backupLabel')}
           name="code"
           rules={[{ required: true }]}
         >
-          <Input
+          <CodeInput
             key={kind}
             autoFocus
             autoComplete={kind === 'totp' ? 'one-time-code' : 'off'}
             inputMode={kind === 'totp' ? 'numeric' : 'text'}
-            className="bk-code-input"
           />
         </Form.Item>
         <Button type="primary" htmlType="submit" loading={busy} block>
-          {t('auth.code.verify')}
+          {t('users.auth.code.verify')}
         </Button>
       </Form>
-      <div className="bk-auth-links">
+      <AuthLinks>
         <Button type="link" onClick={() => change(kind === 'totp' ? 'backup' : 'totp')}>
-          {t(kind === 'totp' ? 'auth.code.useBackup' : 'auth.code.useApp')}
+          {t(kind === 'totp' ? 'users.auth.code.useBackup' : 'users.auth.code.useApp')}
         </Button>
         <Button type="link" onClick={() => props.onBack()}>
-          {t('auth.code.back')}
+          {t('users.auth.code.back')}
         </Button>
-      </div>
+      </AuthLinks>
     </AuthShell>
   );
 }
 
-export function Login(): JSX.Element {
-  const t = useT();
-  const client = useClient();
-  const queries = useQueryClient();
+export function SignIn(props: SignInProps): JSX.Element {
+  const t = useText();
+  const api = useAccountApi();
   const sentence = useAuthError();
   const { notice, setNotice } = useNotice();
   const [step, setStep] = useState<'password' | 'code'>('password');
@@ -127,14 +122,14 @@ export function Login(): JSX.Element {
 
   const signedIn = async (): Promise<void> => {
     setNotice(undefined);
-    await queries.invalidateQueries();
+    await props.onSignedIn();
   };
 
   const submit = async (values: Values): Promise<void> => {
     setBusy(true);
     setFailure(undefined);
     try {
-      const result = await client.signIn(values.email, values.password);
+      const result = await api.signIn(values.email, values.password);
       if (result.kind === 'secondFactor') setStep('code');
       else await signedIn();
     } catch (error) {
@@ -157,10 +152,8 @@ export function Login(): JSX.Element {
   }
 
   return (
-    <AuthShell title={t('auth.signIn.title')} text={t('auth.signIn.subtitle')}>
-      {notice === undefined || !isShellKey(notice) ? null : (
-        <Alert type="success" showIcon title={t(notice)} style={{ marginBottom: 16 }} />
-      )}
+    <AuthShell title={t('users.auth.signIn.title')} text={t('users.auth.signIn.subtitle')}>
+      {notice === undefined ? null : <Alert type="success" showIcon title={t(notice)} style={{ marginBottom: 16 }} />}
       {failure === undefined ? null : <Alert type="error" showIcon title={failure} style={{ marginBottom: 16 }} />}
       <Form<Values>
         name="bk-sign-in"
@@ -169,19 +162,19 @@ export function Login(): JSX.Element {
         onFinish={(values) => void submit(values)}
         requiredMark={false}
       >
-        <Form.Item label={t('auth.email')} name="email" rules={[{ required: true, type: 'email' }]}>
+        <Form.Item label={t('users.auth.email')} name="email" rules={[{ required: true, type: 'email' }]}>
           <Input autoComplete="username" autoFocus />
         </Form.Item>
-        <Form.Item label={t('auth.password')} name="password" rules={[{ required: true }]}>
+        <Form.Item label={t('users.auth.password')} name="password" rules={[{ required: true }]}>
           <Input.Password autoComplete="current-password" />
         </Form.Item>
         <Button type="primary" htmlType="submit" loading={busy} block>
-          {t('auth.signIn')}
+          {t('users.auth.signIn')}
         </Button>
       </Form>
-      <div className="bk-auth-links">
-        <Link to="/forgot-password">{t('auth.forgot')}</Link>
-      </div>
+      <AuthLinks>
+        <AdminLink to="/forgot-password">{t('users.auth.forgot')}</AdminLink>
+      </AuthLinks>
     </AuthShell>
   );
 }

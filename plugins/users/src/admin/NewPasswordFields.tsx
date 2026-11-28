@@ -1,7 +1,7 @@
 /**
  * BieberKit
  *
- * @file        packages/admin-antd/src/app/NewPasswordFields.tsx
+ * @file        plugins/users/src/admin/NewPasswordFields.tsx
  * @description The two fields of a new password inside a form, with the rules of the server said early and the advice of a longer one (AUTH-04, UI-26).
  * @author      Bieber Kieu <kieutrongthien@gmail.com>
  * @copyright   Copyright (c) 2026 Bieber Kieu
@@ -22,10 +22,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { passwordIsShort, passwordProblem } from '@bieberkit/admin-core';
+import { useText } from '@bieberkit/admin-antd';
 import { Form, Input } from 'antd';
 import type { JSX } from 'react';
-import { useT } from './language.tsx';
+import { passwordIsShort, passwordProblem } from './rules.ts';
 
 /** The names of the two fields. The form that holds them reads `password`. */
 export interface NewPassword {
@@ -34,21 +34,21 @@ export interface NewPassword {
 }
 
 export function NewPasswordFields(): JSX.Element {
-  const t = useT();
+  const t = useText();
   const form = Form.useFormInstance<NewPassword>();
   const typed = Form.useWatch<string | undefined>('password', form) ?? '';
   return (
     <>
       <Form.Item
-        label={t('password.new')}
+        label={t('users.password.new')}
         name="password"
-        extra={passwordIsShort(typed) ? t('password.advice') : undefined}
+        extra={passwordIsShort(typed) ? t('users.password.advice') : undefined}
         rules={[
           { required: true },
           {
             validator: async (_rule, value: unknown) => {
               const problem = typeof value === 'string' && value !== '' ? passwordProblem(value) : undefined;
-              if (problem !== undefined) throw new Error(t(`password.${problem}`));
+              if (problem !== undefined) throw new Error(t(`users.password.${problem}`));
             },
           },
         ]}
@@ -56,7 +56,7 @@ export function NewPasswordFields(): JSX.Element {
         <Input.Password autoComplete="new-password" />
       </Form.Item>
       <Form.Item
-        label={t('password.repeat')}
+        label={t('users.password.repeat')}
         name="repeat"
         dependencies={['password']}
         rules={[
@@ -64,7 +64,7 @@ export function NewPasswordFields(): JSX.Element {
           {
             validator: async (_rule, value: unknown) => {
               if (value !== undefined && value !== '' && value !== form.getFieldValue('password'))
-                throw new Error(t('password.mismatch'));
+                throw new Error(t('users.password.mismatch'));
             },
           },
         ]}

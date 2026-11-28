@@ -107,20 +107,10 @@ describe('UI-02 the client of the admin', () => {
     expect(await createAdminClient({ fetch: none.fetch }).session()).toBeUndefined();
   });
 
-  it('signs in with the email and the password, and signs out', async () => {
-    const { fetch: fetcher, calls } = fake((call) =>
-      call.url.endsWith('sign-in/email')
-        ? json({ user: { id: 'u1', email: 'a@b.co', name: 'Ann' } })
-        : json({ success: true }),
-    );
-    const client = createAdminClient({ fetch: fetcher });
-    expect(await client.signIn('a@b.co', 'secret')).toMatchObject({ kind: 'signedIn', user: { id: 'u1' } });
-    await client.signOut();
-    expect(calls.map((call) => [call.method, call.url])).toEqual([
-      ['POST', '/api/auth/sign-in/email'],
-      ['POST', '/api/auth/sign-out'],
-    ]);
-    expect(calls[0]?.body).toEqual({ email: 'a@b.co', password: 'secret' });
+  it('signs out', async () => {
+    const { fetch: fetcher, calls } = fake(() => json({ success: true }));
+    await createAdminClient({ fetch: fetcher }).signOut();
+    expect(calls.map((call) => [call.method, call.url])).toEqual([['POST', '/api/auth/sign-out']]);
   });
 
   it('lists a page with the paging and the sort that were asked, and the total', async () => {
@@ -392,7 +382,7 @@ describe('UI-02 the client of the admin', () => {
     const auth = fake(() => json({ code: 'INVALID_EMAIL_OR_PASSWORD', message: 'Invalid email or password' }, 401));
     expect(
       await createAdminClient({ fetch: auth.fetch })
-        .signIn('a', 'b')
+        .request('POST', '/api/auth/sign-in/email', { body: {} })
         .catch((error: unknown) => error),
     ).toMatchObject({
       status: 401,

@@ -25,7 +25,8 @@
 import { fillText } from '@bieberkit/admin-core';
 import type { AdminClient, Locale, Meta, SessionUser } from '@bieberkit/admin-core';
 import { useNavigate } from '@tanstack/react-router';
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
+import { adminBase } from './base.ts';
 import { useClient, useMeta as useMetaQuery, useSession as useSessionQuery } from './context.ts';
 import { useLanguage as useShellLanguage } from './language.tsx';
 import { useNotice as useShellNotice } from './notice.ts';
@@ -87,6 +88,11 @@ export function useAdminNavigate(): (to: string, options?: NavigateOptions) => v
       }),
     [navigate],
   );
+}
+
+/** The whole address of a route of the admin, for a link that leaves the browser, such as one that is mailed. */
+export function useAdminAddress(): (path: string) => string {
+  return useCallback((path) => `${window.location.origin}${adminBase()}${path}`, []);
 }
 
 export interface AdminNotice {

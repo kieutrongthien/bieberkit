@@ -1,8 +1,8 @@
 /**
  * BieberKit
  *
- * @file        packages/admin-core/src/account-client.ts
- * @description The calls of the account screens: the second factor, the password links, the password, the sessions and the own profile, on the routes of Better Auth and of the users plugin (UI-26, USR-12).
+ * @file        plugins/users/src/admin/api.ts
+ * @description The calls of the account screens: the routes of Better Auth for the sign in, the password, the second factor and the sessions, and the profile of the users plugin (UI-26, USR-12, AUTH-05).
  * @author      Bieber Kieu <kieutrongthien@gmail.com>
  * @copyright   Copyright (c) 2026 Bieber Kieu
  * @license     Apache-2.0
@@ -22,7 +22,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { SessionUser } from './types.ts';
+import { AdminApiError } from '@bieberkit/admin-core';
+import type { AdminClient, SessionUser } from '@bieberkit/admin-core';
+
+/** What a right password gives: the session, or for an account with a second factor the step that asks for the code. */
+export type SignInResult =
+  | { readonly kind: 'signedIn'; readonly user: SessionUser }
+  | { readonly kind: 'secondFactor' };
 
 /** What the code step takes: the six digits of the app, or one of the backup codes. */
 export type CodeKind = 'totp' | 'backup';
@@ -56,7 +62,8 @@ export interface TotpEnrolment {
   readonly backupCodes: readonly string[];
 }
 
-export interface AccountClient {
+export interface AccountApi {
+  signIn(email: string, password: string): Promise<SignInResult>;
   /** The code after the password. It makes the session (AUTH-05). */
   verifySecondFactor(code: string, kind: CodeKind): Promise<SessionUser>;
   /** Asks for a link. The answer is the same for an address with and without an account (AUTH-06). */
@@ -81,14 +88,6 @@ export interface AccountClient {
   renameMe(name: string): Promise<void>;
 }
 
-/** What the calls need of the client: one request, with the failures of the API as errors, and the user of an answer. */
-export interface Transport {
-  readonly request: (method: string, path: string, body?: unknown) => Promise<unknown>;
-  readonly userOf: (body: unknown) => SessionUser;
-  /** Whether an error of `request` is the answer 404. */
-  readonly isNotFound: (error: unknown) => boolean;
-}
-
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null;
 const text = (value: unknown): string => (typeof value === 'string' ? value : '');
 const texts = (value: unknown): string[] => (Array.isArray(value) ? value.map(text).filter((item) => item !== '') : []);
@@ -98,15 +97,32 @@ const field = (value: unknown, name: string): unknown => (isRecord(value) ? valu
 const AUTH = '/api/auth';
 const ME = '/api/v1/users/me';
 
-export function accountClient(transport: Transport): AccountClient {
-  const { request } = transport;
-  const post = (path: string, body: unknown): Promise<unknown> => request('POST', `${AUTH}${path}`, body);
-  const get = (path: string): Promise<unknown> => request('GET', `${AUTH}${path}`);
+function signedInUser(body: unknown): SessionUser {
+  const user = field(body, 'user');
+  if (!isRecord(user) || typeof user['id'] !== 'string')
+    throw new AdminApiError(500, 'ADMIN_SIGN_IN_ANSWER', 'The server did not say who signed in.', '');
+  return {
+    id: user['id'],
+    email: text(user['email']),
+    name: text(user['name']),
+    ...(user['twoFactorEnabled'] === true ? { twoFactorEnabled: true as const } : {}),
+  };
+}
+
+/** The calls of the account, over the client of the admin, which carries the session and reads each refusal as an `AdminApiError`. */
+export function accountApi(client: Pick<AdminClient, 'request'>): AccountApi {
+  const post = (path: string, body: unknown): Promise<unknown> => client.request('POST', `${AUTH}${path}`, { body });
+  const get = (path: string): Promise<unknown> => client.request('GET', `${AUTH}${path}`);
 
   return {
+    async signIn(email, password) {
+      const body = await post('/sign-in/email', { email, password });
+      if (field(body, 'twoFactorRedirect') === true) return { kind: 'secondFactor' };
+      return { kind: 'signedIn', user: signedInUser(body) };
+    },
     async verifySecondFactor(code, kind) {
       const path = kind === 'totp' ? '/two-factor/verify-totp' : '/two-factor/verify-backup-code';
-      return transport.userOf(await post(path, { code }));
+      return signedInUser(await post(path, { code }));
     },
     async requestPasswordReset(email, redirectTo) {
       await post('/request-password-reset', { email, redirectTo });
@@ -155,9 +171,9 @@ export function accountClient(transport: Transport): AccountClient {
     async me() {
       let body: unknown;
       try {
-        body = await request('GET', ME);
+        body = await client.request('GET', ME);
       } catch (error) {
-        if (transport.isNotFound(error)) return undefined;
+        if (error instanceof AdminApiError && error.status === 404) return undefined;
         throw error;
       }
       const enrolBy = text(field(body, 'mfaEnrolBy'));
@@ -171,7 +187,7 @@ export function accountClient(transport: Transport): AccountClient {
       };
     },
     async renameMe(name) {
-      await request('PATCH', ME, { name });
+      await client.request('PATCH', ME, { body: { name } });
     },
   };
 }

@@ -1,7 +1,7 @@
 /**
  * BieberKit
  *
- * @file        packages/admin-antd/src/app/account/TwoFactor.tsx
+ * @file        plugins/users/src/admin/tabs/TwoFactor.tsx
  * @description One's own second factor: setting it up, new backup codes and turning it off, each after the password. Where it is asked of the person, turning it off is not offered. The server stays the authority (UI-26, AUTH-05, POL-02, IDN-02).
  * @author      Bieber Kieu <kieutrongthien@gmail.com>
  * @copyright   Copyright (c) 2026 Bieber Kieu
@@ -22,13 +22,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { useSession, useText } from '@bieberkit/admin-antd';
 import { useQueryClient } from '@tanstack/react-query';
 import { Alert, Button, Flex, Skeleton, Tag, Typography } from 'antd';
 import { useState } from 'react';
 import type { JSX } from 'react';
-import { useClient, useHasPassword, useMe, useSession } from '../context.ts';
-import { useT } from '../language.tsx';
+import styles from '../account.module.css';
 import { BackupCodes, PasswordPrompt, TwoFactorSetup } from '../TwoFactorSetup.tsx';
+import { useAccountApi, useHasPassword, useMe } from '../useAccount.ts';
 
 type Step =
   | { readonly name: 'idle' }
@@ -40,17 +41,17 @@ type Step =
 const IDLE: Step = { name: 'idle' };
 
 export function TwoFactorTab(): JSX.Element {
-  const t = useT();
-  const client = useClient();
+  const t = useText();
+  const api = useAccountApi();
   const queries = useQueryClient();
   const session = useSession();
   const me = useMe();
   const has = useHasPassword();
   const [step, setStep] = useState<Step>(IDLE);
 
-  if (session.isPending || me.isPending || has.isPending) return <Skeleton active />;
-  if (has.data === false) return <Alert type="info" showIcon title={t('account.provider')} />;
-  const on = session.data?.twoFactorEnabled === true;
+  if (session === undefined || me.isPending || has.isPending) return <Skeleton active />;
+  if (has.data === false) return <Alert type="info" showIcon title={t('users.account.provider')} />;
+  const on = session?.twoFactorEnabled === true;
   const required = me.data?.mfaRequired === true;
   const cancel = (): void => setStep(IDLE);
   /** Reads again what the factor changes: who is signed in, what is asked of them, and the sessions. */
@@ -63,8 +64,8 @@ export function TwoFactorTab(): JSX.Element {
   if (step.name === 'renew') {
     return (
       <PasswordPrompt
-        text={t('factor.askPassword')}
-        onPassword={async (password) => setStep({ name: 'codes', codes: await client.renewBackupCodes(password) })}
+        text={t('users.factor.askPassword')}
+        onPassword={async (password) => setStep({ name: 'codes', codes: await api.renewBackupCodes(password) })}
         onCancel={cancel}
       />
     );
@@ -72,9 +73,9 @@ export function TwoFactorTab(): JSX.Element {
   if (step.name === 'off') {
     return (
       <PasswordPrompt
-        text={t('factor.askPassword')}
+        text={t('users.factor.askPassword')}
         onPassword={async (password) => {
-          await client.disableTotp(password);
+          await api.disableTotp(password);
           await refresh();
           cancel();
         }}
@@ -86,28 +87,28 @@ export function TwoFactorTab(): JSX.Element {
   return (
     <Flex vertical gap="middle" align="flex-start">
       <Flex gap="small" align="center" wrap>
-        <Typography.Title level={2} className="bk-step-title">
-          {t('account.tab.factor')}
+        <Typography.Title level={2} className={styles.stepTitle}>
+          {t('users.account.tab.factor')}
         </Typography.Title>
         {/* Colors of the theme: the ones that Ant Design derives from a dark green do not read. */}
-        <Tag className={on ? 'bk-state-on' : ''}>{t(on ? 'factor.on' : 'factor.off')}</Tag>
+        <Tag className={on ? styles.stateOn : ''}>{t(on ? 'users.factor.on' : 'users.factor.off')}</Tag>
       </Flex>
-      <Typography.Paragraph style={{ margin: 0 }}>{t('factor.explain')}</Typography.Paragraph>
+      <Typography.Paragraph style={{ margin: 0 }}>{t('users.factor.explain')}</Typography.Paragraph>
       {on ? (
         <Flex gap="small" wrap>
-          <Button onClick={() => setStep({ name: 'renew' })}>{t('factor.newCodes')}</Button>
+          <Button onClick={() => setStep({ name: 'renew' })}>{t('users.factor.newCodes')}</Button>
           {required ? null : (
             <Button danger onClick={() => setStep({ name: 'off' })}>
-              {t('factor.turnOff')}
+              {t('users.factor.turnOff')}
             </Button>
           )}
         </Flex>
       ) : (
         <Button type="primary" onClick={() => setStep({ name: 'setup' })}>
-          {t('factor.setUp')}
+          {t('users.factor.setUp')}
         </Button>
       )}
-      {on && required ? <Alert type="info" showIcon title={t('factor.required')} /> : null}
+      {on && required ? <Alert type="info" showIcon title={t('users.factor.required')} /> : null}
     </Flex>
   );
 }

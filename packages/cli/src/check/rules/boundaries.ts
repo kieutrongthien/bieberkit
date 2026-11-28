@@ -50,6 +50,9 @@ const DRIVERS = new Set([
   '@sentry/node',
 ]);
 const TOOLS = new Set(['bieberkit', 'create-bieberkit', '@bieberkit/mcp']);
+/** The one entry of a tool that a project imports: the Vite plugin, which only the build of an application reads (UI-37). */
+const BUILD_ENTRY = 'bieberkit/admin-vite';
+const BUILD_CONFIG = /(?:^|\/)vite\.config\.[cm]?[jt]s$/;
 const MODULES = /^(.*?\/modules\/)([^/]+)\//;
 
 /** The package of a specifier, and the part after it. `@scope/name/sub` is `@scope/name` and `sub`. */
@@ -121,6 +124,7 @@ export const boundariesRule: Rule = {
           continue;
         }
         const { name, sub } = split(specifier);
+        if (specifier === BUILD_ENTRY && BUILD_CONFIG.test(file.path)) continue;
         if (TOOLS.has(name)) {
           add(
             'BK_BOUNDARY_TOOLS',

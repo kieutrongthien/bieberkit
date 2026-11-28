@@ -25,12 +25,14 @@
 import { AxeBuilder } from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
-import { ACCOUNTS, makeRow, signIn } from './support.ts';
+import { ACCOUNTS, makeRow, settle, signIn } from './support.ts';
 
 const RULES = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'];
 
 /** What axe finds on the page now, as short lines that say which rule, which element and how bad. */
 async function violations(page: Page): Promise<string[]> {
+  // A dialog that is fading in has colors half way, which axe would read.
+  await settle(page);
   const result = await new AxeBuilder({ page }).withTags(RULES).analyze();
   return result.violations.map(
     (violation) =>

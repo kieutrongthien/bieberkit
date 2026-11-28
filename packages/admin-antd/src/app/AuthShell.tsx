@@ -22,7 +22,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Typography } from 'antd';
+import { Input, Typography } from 'antd';
+import type { InputProps } from 'antd';
 import type { JSX, ReactNode } from 'react';
 import { Brand, useTagline } from './Brand.tsx';
 
@@ -56,4 +57,14 @@ export function AuthShell(props: {
       </main>
     </div>
   );
+}
+
+/** The links under a form before sign in, such as the way to a forgotten password. */
+export function AuthLinks(props: { readonly children: ReactNode }): JSX.Element {
+  return <div className="bk-auth-links">{props.children}</div>;
+}
+
+/** The field of a code that a person types from another device: large, spaced and centered. */
+export function CodeInput(props: InputProps): JSX.Element {
+  return <Input {...props} className="bk-code-input" />;
 }

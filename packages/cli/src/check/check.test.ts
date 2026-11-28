@@ -244,6 +244,23 @@ describe('MOD-01 the boundaries rule', () => {
     expect(codes).toEqual(['BK_BOUNDARY_TOOLS', 'BK_BOUNDARY_DRIVER', 'BK_BOUNDARY_DRIVER']);
   });
 
+  it('UI-37 only the vite.config of an application imports the Vite plugin of the CLI, and nothing else of a tool', async () => {
+    const uses = "import { bieberkitAdmin } from 'bieberkit/admin-vite';";
+    const built = await check(entries(source('apps/admin/vite.config.ts', uses)), ['boundaries']);
+    expect(built.codes).toEqual([]);
+    const { violations } = await check(
+      entries(
+        source('apps/admin/src/main.ts', uses),
+        source('apps/admin/vite.config.ts', "import { runCli } from 'bieberkit';"),
+      ),
+      ['boundaries'],
+    );
+    expect(violations.map((found) => `${found.file} ${found.code}`).toSorted((a, b) => a.localeCompare(b))).toEqual([
+      'apps/admin/src/main.ts BK_BOUNDARY_TOOLS',
+      'apps/admin/vite.config.ts BK_BOUNDARY_TOOLS',
+    ]);
+  });
+
   it('PLG-01 a plugin is imported at its entry or at a subpath that it exports, and not into its files', async () => {
     const files = {
       ...entries(

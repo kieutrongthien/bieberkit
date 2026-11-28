@@ -1,7 +1,7 @@
 {
   "name": "@bieberkit/plugin-users",
   "version": "0.3.0",
-  "description": "The users of the application: a list, an invitation with a password, and the administrator account of the seed.",
+  "description": "The users of the application: a list, an invitation with a password, the administrator account of the seed, and in the admin the sign in and the screens of one's own account.",
   "keywords": [
     "bieberkit",
     "bieberkit-plugin"
@@ -23,12 +23,19 @@
     "CHANGELOG.md"
   ],
   "type": "module",
-  "sideEffects": false,
+  "sideEffects": [
+    "**/*.css"
+  ],
   "exports": {
     ".": {
       "@bieberkit/source": "./src/index.ts",
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./admin": {
+      "@bieberkit/source": "./src/admin/index.ts",
+      "types": "./dist/admin/index.d.ts",
+      "default": "./dist/admin/index.js"
     },
     "./package.json": "./package.json"
   },
@@ -38,13 +45,17 @@
         "types": "./dist/index.d.ts",
         "default": "./dist/index.js"
       },
+      "./admin": {
+        "types": "./dist/admin/index.d.ts",
+        "default": "./dist/admin/index.js"
+      },
       "./package.json": "./package.json"
     },
     "access": "public"
   },
   "scripts": {
-    "build": "tsdown && node --conditions=@bieberkit/source ../../tools/plugin-manifests.ts --write --plugin .",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "build": "tsdown && tsdown -c tsdown.admin.config.ts && node --conditions=@bieberkit/source ../../tools/plugin-manifests.ts --write --plugin .",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p src/admin/tsconfig.json"
   },
   "dependencies": {
     "@bieberkit/auth": "workspace:*",
@@ -53,8 +64,39 @@
     "@bieberkit/http": "workspace:*"
   },
   "devDependencies": {
+    "@bieberkit/admin-antd": "workspace:*",
+    "@bieberkit/admin-core": "workspace:*",
     "@bieberkit/plugin-roles": "workspace:*",
-    "@bieberkit/testing": "workspace:*"
+    "@bieberkit/testing": "workspace:*",
+    "@tanstack/react-query": "5.108.0",
+    "@types/react": "19.3.0",
+    "antd": "6.7.1",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  },
+  "peerDependencies": {
+    "@bieberkit/admin-antd": "workspace:^",
+    "@bieberkit/admin-core": "workspace:^",
+    "@tanstack/react-query": "^5.108.0",
+    "antd": "^6.0.0",
+    "react": "^19.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@bieberkit/admin-antd": {
+      "optional": true
+    },
+    "@bieberkit/admin-core": {
+      "optional": true
+    },
+    "@tanstack/react-query": {
+      "optional": true
+    },
+    "antd": {
+      "optional": true
+    },
+    "react": {
+      "optional": true
+    }
   },
   "engines": {
     "node": ">=24.12"

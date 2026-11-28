@@ -106,7 +106,7 @@ async function build(admin: string): Promise<{ scripts: string }> {
       root: admin,
       configFile: false,
       logLevel: 'silent',
-      plugins: [bieberkitAdmin({ requireSignIn: true })],
+      plugins: [bieberkitAdmin()],
     },
   ]);
   const assets = join(admin, 'dist/assets');

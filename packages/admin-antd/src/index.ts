@@ -29,6 +29,7 @@ export type { AdminComponent, AdminPart, StartOptions } from './app/start.tsx';
 
 // What the screens of a plugin use (UI-38).
 export {
+  useAdminAddress,
   useAdminClient,
   useAdminNavigate,
   useCan,
@@ -39,7 +40,9 @@ export {
   usePluginText as useText,
 } from './app/hooks.ts';
 export type { AdminLanguage, AdminNotice, NavigateOptions, Text } from './app/hooks.ts';
-export { AuthShell } from './app/AuthShell.tsx';
+export { AdminLink } from './app/AdminLink.tsx';
+export { AuthLinks, AuthShell, CodeInput } from './app/AuthShell.tsx';
+export { GateShell } from './app/GateShell.tsx';
 export { FolderArt, Icon } from './app/icons.tsx';
 export type { FieldProps, GateProps, NoticeProps, RecordTabProps, ScreenProps, SignInProps } from './app/slot-props.ts';
 

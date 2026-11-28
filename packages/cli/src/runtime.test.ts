@@ -286,6 +286,9 @@ describe('section 6 a project that was made starts', () => {
       symlinkSync(join(packages, name), join(root, 'node_modules/@bieberkit', name), 'dir');
     symlinkSync(join(packages, 'data', 'node_modules', 'zod'), join(root, 'node_modules/zod'), 'dir');
     linkBasePlugins(root);
+    // What `bieberkit build` leaves of the admin of the project, without which the web role does not start (UI-37).
+    mkdirSync(join(root, 'apps/admin/dist'), { recursive: true });
+    writeFileSync(join(root, 'apps/admin/dist/index.html'), '<!doctype html><html><head></head><body></body></html>\n');
     const port = await freePort();
     const metrics = await freePort();
     const child = nodeSpawn(process.execPath, [join(root, 'apps/server/src/main.ts'), 'web'], {

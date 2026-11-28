@@ -1,8 +1,8 @@
 /**
  * BieberKit
  *
- * @file        packages/admin-core/src/account.ts
- * @description The rules of the account screens, with no UI: the password, the code, the address of the reset page, and what a refusal of authentication means (UI-26, AUTH-04, AUTH-05).
+ * @file        plugins/users/src/admin/rules.ts
+ * @description The rules of the account screens that need no screen: the password of AUTH-04, the codes, the device of a session, the address of the reset page and the sentence of a refusal (UI-26).
  * @author      Bieber Kieu <kieutrongthien@gmail.com>
  * @copyright   Copyright (c) 2026 Bieber Kieu
  * @license     Apache-2.0
@@ -22,7 +22,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { AdminApiError } from './client.ts';
+import { AdminApiError } from '@bieberkit/admin-core';
 import type { MessageKey } from './messages/en.ts';
 
 /** The rules of AUTH-04. The server enforces them: these only say early what it would refuse, and advise. */
@@ -114,20 +114,20 @@ export function stepExpired(error: unknown): boolean {
 }
 
 const SENTENCES: Readonly<Record<string, MessageKey>> = {
-  INVALID_EMAIL_OR_PASSWORD: 'auth.error.credentials',
-  INVALID_CODE: 'auth.error.code',
-  INVALID_BACKUP_CODE: 'auth.error.backupCode',
-  INVALID_PASSWORD: 'auth.error.currentPassword',
-  INVALID_TOKEN: 'auth.error.link',
-  AUTH_USER_DISABLED: 'auth.error.disabled',
-  AUTH_NETWORK_DENIED: 'auth.error.network',
-  ACCOUNT_TEMPORARILY_LOCKED: 'auth.error.locked',
-  INVALID_TWO_FACTOR_COOKIE: 'auth.error.stepExpired',
-  TOO_MANY_ATTEMPTS_REQUEST_NEW_CODE: 'auth.error.stepExpired',
+  INVALID_EMAIL_OR_PASSWORD: 'users.auth.error.credentials',
+  INVALID_CODE: 'users.auth.error.code',
+  INVALID_BACKUP_CODE: 'users.auth.error.backupCode',
+  INVALID_PASSWORD: 'users.auth.error.currentPassword',
+  INVALID_TOKEN: 'users.auth.error.link',
+  AUTH_USER_DISABLED: 'users.auth.error.disabled',
+  AUTH_NETWORK_DENIED: 'users.auth.error.network',
+  ACCOUNT_TEMPORARILY_LOCKED: 'users.auth.error.locked',
+  INVALID_TWO_FACTOR_COOKIE: 'users.auth.error.stepExpired',
+  TOO_MANY_ATTEMPTS_REQUEST_NEW_CODE: 'users.auth.error.stepExpired',
 };
 
 /** The sentence of a refusal in the language of the person. A refusal that is not known keeps the text of the server. */
 export function authMessageKey(error: AdminApiError): MessageKey | undefined {
-  if (error.status === 429) return 'auth.error.tooMany';
+  if (error.status === 429) return 'users.auth.error.tooMany';
   return SENTENCES[error.code];
 }

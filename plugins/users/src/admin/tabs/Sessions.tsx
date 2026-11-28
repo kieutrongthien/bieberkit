@@ -1,7 +1,7 @@
 /**
  * BieberKit
  *
- * @file        packages/admin-antd/src/app/account/Sessions.tsx
+ * @file        plugins/users/src/admin/tabs/Sessions.tsx
  * @description The sessions of one's own account: the device, the address and the times of each, this one marked, and ending one or all the others (UI-26, AUTH-02).
  * @author      Bieber Kieu <kieutrongthien@gmail.com>
  * @copyright   Copyright (c) 2026 Bieber Kieu
@@ -22,28 +22,29 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { deviceOf, formatDateTime } from '@bieberkit/admin-core';
+import { useLanguage, useText } from '@bieberkit/admin-antd';
+import { formatDateTime } from '@bieberkit/admin-core';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Alert, Button, Skeleton, Tag } from 'antd';
 import { useState } from 'react';
 import type { JSX } from 'react';
-import { useAuthError } from '../authError.ts';
-import { useClient } from '../context.ts';
-import { useLanguage, useT } from '../language.tsx';
+import styles from '../account.module.css';
+import { deviceOf } from '../rules.ts';
+import { useAccountApi, useAuthError } from '../useAccount.ts';
 
 export function SessionsTab(): JSX.Element {
-  const t = useT();
+  const t = useText();
   const { locale } = useLanguage();
-  const client = useClient();
+  const api = useAccountApi();
   const queries = useQueryClient();
   const sentence = useAuthError();
-  const list = useQuery({ queryKey: ['sessions'], queryFn: () => client.sessions() });
+  const list = useQuery({ queryKey: ['sessions'], queryFn: () => api.sessions() });
   const [failure, setFailure] = useState<string | undefined>();
   const [busy, setBusy] = useState(false);
 
   if (list.isPending) return <Skeleton active />;
   if (list.isError)
-    return <Alert type="error" showIcon title={t('account.loadError')} description={sentence(list.error)} />;
+    return <Alert type="error" showIcon title={t('users.account.loadError')} description={sentence(list.error)} />;
 
   const end = async (call: () => Promise<void>): Promise<void> => {
     setBusy(true);
@@ -68,17 +69,17 @@ export function SessionsTab(): JSX.Element {
   return (
     <>
       {failure === undefined ? null : <Alert type="error" showIcon title={failure} style={{ marginBottom: 16 }} />}
-      <ul className="bk-sessions">
+      <ul className={styles.sessions}>
         {sessions.map((session, index) => (
           <li key={session.token}>
             <div>
               <p id={`bk-session-${String(index)}`}>
-                <strong>{deviceOf(session.userAgent) || t('sessions.unknownDevice')}</strong>
-                {session.current ? <Tag className="bk-state-here">{t('sessions.thisDevice')}</Tag> : null}
+                <strong>{deviceOf(session.userAgent) || t('users.sessions.unknownDevice')}</strong>
+                {session.current ? <Tag className={styles.stateHere}>{t('users.sessions.thisDevice')}</Tag> : null}
               </p>
-              <p className="bk-session-detail">
-                {t('sessions.detail', {
-                  ip: session.ip || t('sessions.unknownAddress'),
+              <p className={styles.sessionDetail}>
+                {t('users.sessions.detail', {
+                  ip: session.ip || t('users.sessions.unknownAddress'),
                   created: at(session.createdAt),
                   used: at(session.lastUsedAt),
                 })}
@@ -88,17 +89,17 @@ export function SessionsTab(): JSX.Element {
               <Button
                 disabled={busy}
                 aria-describedby={`bk-session-${String(index)}`}
-                onClick={() => void end(() => client.revokeSession(session.token))}
+                onClick={() => void end(() => api.revokeSession(session.token))}
               >
-                {t('sessions.end')}
+                {t('users.sessions.end')}
               </Button>
             )}
           </li>
         ))}
       </ul>
       {sessions.some((session) => !session.current) ? (
-        <Button danger loading={busy} onClick={() => void end(() => client.revokeOtherSessions())}>
-          {t('sessions.endOthers')}
+        <Button danger loading={busy} onClick={() => void end(() => api.revokeOtherSessions())}>
+          {t('users.sessions.endOthers')}
         </Button>
       ) : null}
     </>

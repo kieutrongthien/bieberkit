@@ -176,15 +176,7 @@ async function openRunner(vitePath: string, root: string): Promise<Runner> {
   };
 }
 
-export interface AdminViteOptions {
-  /**
-   * Stop when no plugin gives the sign in (UI-26).
-   * @default false until the account screens are in the users plugin
-   */
-  readonly requireSignIn?: boolean;
-}
-
-export function bieberkitAdmin(options: AdminViteOptions = {}): Plugin {
+export function bieberkitAdmin(): Plugin {
   let adminDir = process.cwd();
   let root = adminDir;
   let serving = false;
@@ -243,12 +235,7 @@ export function bieberkitAdmin(options: AdminViteOptions = {}): Plugin {
           parts.push(part);
         }
         const { config } = await loadConfig(root);
-        problems.push(
-          ...composeAdmin(parts).problems.filter(
-            (problem) => options.requireSignIn === true || problem.code !== 'no-sign-in',
-          ),
-          ...(await messageProblems(parts, config.locales.supported)),
-        );
+        problems.push(...composeAdmin(parts).problems, ...(await messageProblems(parts, config.locales.supported)));
       } finally {
         await runner.close();
       }

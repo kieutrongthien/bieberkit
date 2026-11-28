@@ -57,8 +57,8 @@ export interface NoticeProps {
 
 /** Slot 9: the sign in. */
 export interface SignInProps {
-  /** Call it when there is a session: the shell reads everything again and opens the admin. */
-  readonly onSignedIn: () => void;
+  /** Call it when there is a session: the shell reads everything again and opens the admin. It ends when that is read. */
+  readonly onSignedIn: () => Promise<void>;
 }
 
 /** Slot 10: a screen that stands in place of the admin. */

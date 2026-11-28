@@ -72,14 +72,9 @@ export function createApp(admin: Registry): () => JSX.Element {
   const welcome = lazyRouteComponent(() => import('./Welcome.tsx'), 'Welcome');
   const listScreen = lazyRouteComponent(() => import('./ListScreen.tsx'), 'ListScreen');
   const formScreen = lazyRouteComponent(() => import('./FormScreen.tsx'), 'FormScreen');
-  const forgotPassword = lazyRouteComponent(() => import('./ForgotPassword.tsx'), 'ForgotPassword');
-  const resetPassword = lazyRouteComponent(() => import('./ResetPassword.tsx'), 'ResetPassword');
   const myAccount = lazyRouteComponent(() => import('./MyAccount.tsx'), 'MyAccount');
   const index = createRoute({ getParentRoute: () => root, path: '/', component: welcome });
-  // The account screens (UI-26). An address of one segment cannot be the list of an entity, which has two. The two pages of a
-  // password open without a session: the gate draws them on their own.
-  const forgot = createRoute({ getParentRoute: () => root, path: 'forgot-password', component: forgotPassword });
-  const resetPage = createRoute({ getParentRoute: () => root, path: 'reset-password', component: resetPassword });
+  // "My account", whose tabs the plugins give (UI-26). An address of one segment cannot be the list of an entity, which has two.
   const account = createRoute({ getParentRoute: () => root, path: 'account', component: myAccount });
   // The pages that plugins add, with a session and without one (UI-35). Each is one segment, which no list of an entity is.
   const pluginPages = [
@@ -109,7 +104,7 @@ export function createApp(admin: Registry): () => JSX.Element {
   const served = adminBase();
 
   const router = createRouter({
-    routeTree: root.addChildren([index, forgot, resetPage, account, ...pluginPages, list, create, edit]),
+    routeTree: root.addChildren([index, account, ...pluginPages, list, create, edit]),
     basepath: served === '' ? '/' : served,
     defaultPreload: 'intent',
     // Each route has its own boundary with a retry, so one screen that fails does not take the frame with it (UI-19).

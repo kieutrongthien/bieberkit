@@ -115,3 +115,9 @@ describe('UI-21 the rating of a vital, and the rate of the reports', () => {
     expect(dedupe(seen, { ...report, message: 'another' })).toBe(false);
   });
 });
+
+describe('UI-21 the page of a password link', () => {
+  it('UI-21 a report of an error on the reset page carries no token', () => {
+    expect(routeShape('/reset-password?token=tok-1&invite=1')).toBe('/reset-password');
+  });
+});

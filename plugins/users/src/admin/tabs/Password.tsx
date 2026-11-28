@@ -1,7 +1,7 @@
 /**
  * BieberKit
  *
- * @file        packages/admin-antd/src/app/account/Password.tsx
+ * @file        plugins/users/src/admin/tabs/Password.tsx
  * @description Changing one's own password, with the other sessions signed out unless the person says no (UI-26, AUTH-04, IDN-02).
  * @author      Bieber Kieu <kieutrongthien@gmail.com>
  * @copyright   Copyright (c) 2026 Bieber Kieu
@@ -22,15 +22,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { useText } from '@bieberkit/admin-antd';
 import { useQueryClient } from '@tanstack/react-query';
 import { Alert, App as AntApp, Button, Checkbox, Form, Input, Skeleton } from 'antd';
 import { useState } from 'react';
 import type { JSX } from 'react';
-import { useAuthError } from '../authError.ts';
-import { useClient, useHasPassword } from '../context.ts';
-import { useT } from '../language.tsx';
+import styles from '../account.module.css';
 import { NewPasswordFields } from '../NewPasswordFields.tsx';
 import type { NewPassword } from '../NewPasswordFields.tsx';
+import { useAccountApi, useAuthError, useHasPassword } from '../useAccount.ts';
 
 interface Values extends NewPassword {
   readonly current: string;
@@ -38,8 +38,8 @@ interface Values extends NewPassword {
 }
 
 export function PasswordTab(): JSX.Element {
-  const t = useT();
-  const client = useClient();
+  const t = useText();
+  const api = useAccountApi();
   const queries = useQueryClient();
   const sentence = useAuthError();
   const { message } = AntApp.useApp();
@@ -49,20 +49,20 @@ export function PasswordTab(): JSX.Element {
   const [form] = Form.useForm<Values>();
 
   if (has.isPending) return <Skeleton active />;
-  if (has.data === false) return <Alert type="info" showIcon title={t('account.provider')} />;
+  if (has.data === false) return <Alert type="info" showIcon title={t('users.account.provider')} />;
 
   const change = async (values: Values): Promise<void> => {
     setBusy(true);
     setFailure(undefined);
     try {
-      await client.changePassword({
+      await api.changePassword({
         current: values.current,
         next: values.password,
         signOutOthers: values.signOutOthers,
       });
       form.resetFields();
       await queries.invalidateQueries({ queryKey: ['sessions'] });
-      void message.success(t('account.password.changed'));
+      void message.success(t('users.account.password.changed'));
     } catch (error) {
       setFailure(sentence(error));
     } finally {
@@ -71,7 +71,7 @@ export function PasswordTab(): JSX.Element {
   };
 
   return (
-    <div className="bk-narrow">
+    <div className={styles.narrow}>
       {failure === undefined ? null : <Alert type="error" showIcon title={failure} style={{ marginBottom: 16 }} />}
       <Form<Values>
         form={form}
@@ -81,15 +81,15 @@ export function PasswordTab(): JSX.Element {
         onFinish={(values) => void change(values)}
         requiredMark={false}
       >
-        <Form.Item label={t('password.current')} name="current" rules={[{ required: true }]}>
+        <Form.Item label={t('users.password.current')} name="current" rules={[{ required: true }]}>
           <Input.Password autoComplete="current-password" />
         </Form.Item>
         <NewPasswordFields />
         <Form.Item name="signOutOthers" valuePropName="checked">
-          <Checkbox>{t('account.password.signOutOthers')}</Checkbox>
+          <Checkbox>{t('users.account.password.signOutOthers')}</Checkbox>
         </Form.Item>
         <Button type="primary" htmlType="submit" loading={busy}>
-          {t('account.password.change')}
+          {t('users.account.password.change')}
         </Button>
       </Form>
     </div>

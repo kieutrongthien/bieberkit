@@ -23,7 +23,7 @@
  */
 
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -31,24 +31,78 @@ import { afterAll, expect, it } from 'vitest';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const TEMP = mkdtempSync(join(tmpdir(), 'bk-admin-library-'));
-const PACKAGES = ['tokens', 'admin-core', 'admin-antd'];
 
 afterAll(() => rmSync(TEMP, { recursive: true, force: true }));
 
-function pack(name: string): string {
-  const destination = join(TEMP, 'packs', name);
-  mkdirSync(destination, { recursive: true });
-  execFileSync('pnpm', ['pack', '--pack-destination', destination], {
-    cwd: join(ROOT, 'packages', name),
-    stdio: 'pipe',
-  });
-  return join(destination, readdirSync(destination).find((file) => file.endsWith('.tgz')) ?? '');
+function pack(folder: string): string {
+  const destination = join(TEMP, 'packs', folder);
+  const packed = (): string | undefined =>
+    existsSync(destination) ? readdirSync(destination).find((file) => file.endsWith('.tgz')) : undefined;
+  if (packed() === undefined) {
+    mkdirSync(destination, { recursive: true });
+    execFileSync('pnpm', ['pack', '--pack-destination', destination], { cwd: join(ROOT, folder), stdio: 'pipe' });
+  }
+  return join(destination, packed() ?? '');
 }
 
-const put = (path: string, text: string): void => {
-  mkdirSync(join(TEMP, 'consumer', path, '..'), { recursive: true });
-  writeFileSync(join(TEMP, 'consumer', path), text);
+const folderOf = (name: string): string => {
+  const bare = name.replace('@bieberkit/', '');
+  return bare.startsWith('plugin-') ? `plugins/${bare.slice('plugin-'.length)}` : `packages/${bare}`;
 };
+
+/** The packages of this repository that installing `names` can ask for: their dependencies and their peers, and theirs. */
+function closureOf(names: readonly string[]): readonly string[] {
+  const found = new Set<string>();
+  const queue = [...names];
+  for (let name = queue.pop(); name !== undefined; name = queue.pop()) {
+    if (found.has(name)) continue;
+    found.add(name);
+    const manifest: Record<string, unknown> = JSON.parse(
+      readFileSync(join(ROOT, folderOf(name), 'package.json'), 'utf8'),
+    );
+    const asked = { ...Object(manifest['dependencies']), ...Object(manifest['peerDependencies']) };
+    queue.push(...Object.keys(asked).filter((dependency) => dependency.startsWith('@bieberkit/')));
+  }
+  return [...found].toSorted();
+}
+
+/** A project of its own, whose packages of this repository are tarballs. */
+function consumer(
+  folder: string,
+  dependencies: readonly string[],
+  devDependencies: Readonly<Record<string, string>> = {},
+): { readonly cwd: string; readonly put: (path: string, text: string) => void } {
+  const cwd = join(TEMP, folder);
+  const put = (path: string, text: string): void => {
+    mkdirSync(join(cwd, path, '..'), { recursive: true });
+    writeFileSync(join(cwd, path), text);
+  };
+  const packed = new Map(closureOf(dependencies).map((name) => [name, `file:${pack(folderOf(name))}`]));
+  put(
+    'package.json',
+    JSON.stringify({
+      name: folder,
+      private: true,
+      type: 'module',
+      dependencies: Object.fromEntries(dependencies.map((name) => [name, packed.get(name)])),
+      devDependencies,
+    }),
+  );
+  // The tarballs stand for the registry, which is why this temporary project alone lets a dependency name a file. The one build
+  // script of the dependencies is denied, as in this repository and in a new project (ADR 0020): no script runs.
+  put(
+    'pnpm-workspace.yaml',
+    `packages: []\nminimumReleaseAge: 10080\nblockExoticSubdeps: false\nallowBuilds:\n  msgpackr-extract: false\noverrides:\n${[...packed].map(([name, file]) => `  '${name}': '${file}'\n`).join('')}`,
+  );
+  return { cwd, put };
+}
+
+const install = (cwd: string): void =>
+  void execFileSync('pnpm', ['install', '--reporter=silent'], { cwd, stdio: 'pipe' });
+
+const BUILD_TOOLS = { vite: '8.3.8', '@vitejs/plugin-react': '6.3.0' };
+const PAGE =
+  '<!doctype html><html lang="en"><body><div id="root"></div><script type="module" src="./main.js"></script></body></html>\n';
 
 const MAIN = `import { startAdmin } from '@bieberkit/admin-antd';
 
@@ -80,30 +134,11 @@ export default defineConfig({ base: './', plugins: [react(), copies], build: { m
 `;
 
 it('UI-37 a project with the packed packages builds the admin from the library, with its styles, font and logo', () => {
-  const overrides = PACKAGES.map((name) => [`@bieberkit/${name}`, `file:${pack(name)}`] as const);
-  put(
-    'package.json',
-    JSON.stringify({
-      name: 'consumer',
-      private: true,
-      type: 'module',
-      dependencies: { '@bieberkit/admin-antd': overrides.at(-1)?.[1] },
-      devDependencies: { vite: '8.3.8', '@vitejs/plugin-react': '6.3.0' },
-    }),
-  );
-  // The tarballs stand for the registry, which is why this temporary project alone lets a dependency name a file.
-  put(
-    'pnpm-workspace.yaml',
-    `packages: []\nminimumReleaseAge: 10080\nblockExoticSubdeps: false\noverrides:\n${overrides.map(([name, file]) => `  '${name}': '${file}'\n`).join('')}`,
-  );
-  put(
-    'index.html',
-    '<!doctype html><html lang="en"><body><div id="root"></div><script type="module" src="./main.js"></script></body></html>\n',
-  );
+  const { cwd, put } = consumer('consumer', ['@bieberkit/admin-antd'], BUILD_TOOLS);
+  put('index.html', PAGE);
   put('main.js', MAIN);
   put('vite.config.js', CONFIG);
-  const cwd = join(TEMP, 'consumer');
-  execFileSync('pnpm', ['install', '--reporter=silent'], { cwd, stdio: 'pipe' });
+  install(cwd);
   execFileSync('pnpm', ['exec', 'vite', 'build'], { cwd, stdio: 'pipe' });
   const assets = readdirSync(join(cwd, 'dist', 'assets'));
   expect(assets.filter((file) => file.endsWith('.css')).length).toBeGreaterThan(0);
@@ -115,6 +150,58 @@ it('UI-37 a project with the packed packages builds the admin from the library, 
     .join('\n');
   expect(css).toContain('Be Vietnam Pro');
   expect(css).toContain('.bk-rail');
+  expect(JSON.parse(readFileSync(join(cwd, 'copies.json'), 'utf8'))).toEqual({
+    react: 1,
+    'react-dom': 1,
+    antd: 1,
+    '@bieberkit/admin-core': 1,
+  });
+}, 600_000);
+
+it('UI-37 the packed users plugin ships its admin part, and installing it for a server brings no React', () => {
+  const files = execFileSync('tar', ['-tf', pack('plugins/users')], { encoding: 'utf8' }).split('\n');
+  for (const file of ['admin/index.js', 'admin/index.d.ts', 'admin/SignIn.js', 'admin/account.module.css'])
+    expect(files).toContain(`package/dist/${file}`);
+  expect(files.filter((file) => file.startsWith('package/src/'))).toEqual([]);
+  const { cwd } = consumer('server', ['@bieberkit/plugin-users']);
+  install(cwd);
+  const installed = readdirSync(join(cwd, 'node_modules', '.pnpm'));
+  expect(installed.filter((folder) => /^(react|react-dom|antd|@tanstack\+react-query)@/.test(folder))).toEqual([]);
+}, 600_000);
+
+const WITH_USERS = `import { startAdmin } from '@bieberkit/admin-antd';
+import users from '@bieberkit/plugin-users/admin';
+
+const root = document.getElementById('root');
+if (root !== null) startAdmin(root, { parts: [users] });
+`;
+
+it('UI-37 an admin builds with the screens of the packed users plugin, their styles and one copy of React', () => {
+  const { cwd, put } = consumer('with-users', ['@bieberkit/admin-antd', '@bieberkit/plugin-users'], BUILD_TOOLS);
+  // The optional peers of the plugin, which `apps/admin` of a project names with the versions of the shell.
+  const manifest: Record<string, unknown> = JSON.parse(readFileSync(join(cwd, 'package.json'), 'utf8'));
+  manifest['dependencies'] = {
+    ...Object(manifest['dependencies']),
+    '@bieberkit/admin-core': `file:${pack('packages/admin-core')}`,
+    '@tanstack/react-query': '5.108.0',
+    antd: '6.7.1',
+    react: '19.3.1',
+    'react-dom': '19.3.1',
+  };
+  put('package.json', JSON.stringify(manifest));
+  put('index.html', PAGE);
+  put('main.js', WITH_USERS);
+  put('vite.config.js', CONFIG);
+  install(cwd);
+  execFileSync('pnpm', ['exec', 'vite', 'build'], { cwd, stdio: 'pipe' });
+  const assets = readdirSync(join(cwd, 'dist', 'assets'));
+  expect(assets.some((file) => /^SignIn-.*\.js$/.test(file))).toBe(true);
+  const css = assets
+    .filter((file) => file.endsWith('.css'))
+    .map((file) => readFileSync(join(cwd, 'dist', 'assets', file), 'utf8'))
+    .join('\n');
+  // A rule of the CSS module of the account screens, whose class names the build makes its own.
+  expect(css).toMatch(/grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/);
   expect(JSON.parse(readFileSync(join(cwd, 'copies.json'), 'utf8'))).toEqual({
     react: 1,
     'react-dom': 1,

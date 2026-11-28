@@ -22,8 +22,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { accountClient } from './account-client.ts';
-import type { AccountClient } from './account-client.ts';
 import { filterParams } from './lists.ts';
 import { uploadName } from './files.ts';
 import type { MediaFile } from './files.ts';
@@ -76,17 +74,12 @@ export interface AdminClientOptions {
   readonly fetch?: typeof fetch;
 }
 
-/** What a right password gives: the session, or for an account with a second factor the step that asks for the code. */
-export type SignInResult =
-  | { readonly kind: 'signedIn'; readonly user: SessionUser }
-  | { readonly kind: 'secondFactor' };
-
 export interface RequestInput {
   readonly body?: unknown;
   readonly headers?: Readonly<Record<string, string>>;
 }
 
-export interface AdminClient extends AccountClient {
+export interface AdminClient {
   /**
    * A call of the API, with the session of the browser: how the admin part of a plugin reaches its own routes. It answers the body,
    * or `undefined` for an empty one, and a failure is an `AdminApiError` like that of every other call.
@@ -94,7 +87,6 @@ export interface AdminClient extends AccountClient {
   request(method: string, path: string, input?: RequestInput): Promise<unknown>;
   /** The user of the session, or `undefined` when nobody is signed in. */
   session(): Promise<SessionUser | undefined>;
-  signIn(email: string, password: string): Promise<SignInResult>;
   signOut(): Promise<void>;
   meta(): Promise<Meta>;
   list(entity: MetaEntity, params?: ListParams): Promise<Page>;
@@ -176,13 +168,6 @@ function userOf(body: unknown): SessionUser | undefined {
   };
 }
 
-function signedInUser(body: unknown): SessionUser {
-  const user = userOf(body);
-  if (user === undefined)
-    throw new AdminApiError(500, 'ADMIN_SIGN_IN_ANSWER', 'The server did not say who signed in.', '');
-  return user;
-}
-
 function outcomeOf(value: Record<string, unknown>): BulkOutcome {
   const error = isRecord(value['error']) ? value['error'] : undefined;
   return {
@@ -250,18 +235,8 @@ export function createAdminClient(options: AdminClientOptions = {}): AdminClient
 
   return {
     request: (method, path, input) => request(method, path, input),
-    ...accountClient({
-      request: (method, path, body) => request(method, path, body === undefined ? {} : { body }),
-      userOf: signedInUser,
-      isNotFound: (error) => error instanceof AdminApiError && error.status === 404,
-    }),
     async session() {
       return userOf(await request('GET', '/api/auth/get-session'));
-    },
-    async signIn(email, password) {
-      const body = await request('POST', '/api/auth/sign-in/email', { body: { email, password } });
-      if (isRecord(body) && body['twoFactorRedirect'] === true) return { kind: 'secondFactor' };
-      return { kind: 'signedIn', user: signedInUser(body) };
     },
     async signOut() {
       await request('POST', '/api/auth/sign-out', { body: {} });

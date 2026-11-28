@@ -1,7 +1,7 @@
 /**
  * BieberKit
  *
- * @file        packages/admin-antd/src/app/GraceNotice.tsx
+ * @file        plugins/users/src/admin/GraceNotice.tsx
  * @description The notice of the days of grace: by when the second factor has to be set up, with a link to it. It can be closed until the next load (POL-02, UI-26).
  * @author      Bieber Kieu <kieutrongthien@gmail.com>
  * @copyright   Copyright (c) 2026 Bieber Kieu
@@ -22,34 +22,31 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { AdminLink, useLanguage, useText } from '@bieberkit/admin-antd';
+import type { NoticeProps } from '@bieberkit/admin-antd';
 import { formatDateTime } from '@bieberkit/admin-core';
-import { Link } from '@tanstack/react-router';
 import { Alert } from 'antd';
-import { useState } from 'react';
 import type { JSX } from 'react';
-import { useMe } from './context.ts';
-import { useLanguage, useT } from './language.tsx';
+import { useMe } from './useAccount.ts';
 
-export function GraceNotice(): JSX.Element | null {
-  const t = useT();
+export function GraceNotice(props: NoticeProps): JSX.Element | null {
+  const t = useText();
   const { locale } = useLanguage();
   const me = useMe();
-  const [closed, setClosed] = useState(false);
   const by = me.data?.mfaEnrolBy;
-  if (by === undefined || closed) return null;
+  if (by === undefined) return null;
   const date = formatDateTime(locale, by, Intl.DateTimeFormat().resolvedOptions().timeZone);
   return (
     <Alert
-      className="bk-grace"
       type="warning"
       showIcon
-      closable={{ 'aria-label': t('common.close'), onClose: () => setClosed(true) }}
+      closable={{ 'aria-label': t('users.close'), onClose: props.close }}
       title={
         <>
-          {t('grace.text', { date })}{' '}
-          <Link to="/account" search={{ tab: 'factor' }}>
-            {t('grace.link')}
-          </Link>
+          {t('users.grace.text', { date })}{' '}
+          <AdminLink to="/account" search={{ tab: 'factor' }}>
+            {t('users.grace.link')}
+          </AdminLink>
         </>
       }
     />

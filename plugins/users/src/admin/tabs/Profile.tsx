@@ -1,7 +1,7 @@
 /**
  * BieberKit
  *
- * @file        packages/admin-antd/src/app/account/Profile.tsx
+ * @file        plugins/users/src/admin/tabs/Profile.tsx
  * @description The own profile: the email, and the name that the person may change through the users plugin (USR-12, UI-26).
  * @author      Bieber Kieu <kieutrongthien@gmail.com>
  * @copyright   Copyright (c) 2026 Bieber Kieu
@@ -22,17 +22,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { useSession, useText } from '@bieberkit/admin-antd';
 import { useQueryClient } from '@tanstack/react-query';
 import { Alert, App as AntApp, Button, Descriptions, Form, Input, Skeleton } from 'antd';
 import { useState } from 'react';
 import type { JSX } from 'react';
-import { useAuthError } from '../authError.ts';
-import { useClient, useMe, useSession } from '../context.ts';
-import { useT } from '../language.tsx';
+import styles from '../account.module.css';
+import { useAccountApi, useAuthError, useMe } from '../useAccount.ts';
 
 export function ProfileTab(): JSX.Element {
-  const t = useT();
-  const client = useClient();
+  const t = useText();
+  const api = useAccountApi();
   const queries = useQueryClient();
   const sentence = useAuthError();
   const { message } = AntApp.useApp();
@@ -41,11 +41,11 @@ export function ProfileTab(): JSX.Element {
   const [failure, setFailure] = useState<string | undefined>();
   const [busy, setBusy] = useState(false);
 
-  if (me.isPending || session.isPending) return <Skeleton active />;
+  if (me.isPending || session === undefined) return <Skeleton active />;
   if (me.isError)
-    return <Alert type="error" showIcon title={t('account.loadError')} description={sentence(me.error)} />;
-  const email = me.data?.email ?? session.data?.email ?? '';
-  const name = me.data?.name ?? session.data?.name ?? '';
+    return <Alert type="error" showIcon title={t('users.account.loadError')} description={sentence(me.error)} />;
+  const email = me.data?.email ?? session?.email ?? '';
+  const name = me.data?.name ?? session?.name ?? '';
   // Without the users plugin there is no route that renames the person.
   const editable = me.data !== null;
 
@@ -53,9 +53,9 @@ export function ProfileTab(): JSX.Element {
     setBusy(true);
     setFailure(undefined);
     try {
-      await client.renameMe(values.name);
+      await api.renameMe(values.name);
       await queries.invalidateQueries({ queryKey: ['me'] });
-      void message.success(t('account.saved'));
+      void message.success(t('users.account.saved'));
     } catch (error) {
       setFailure(sentence(error));
     } finally {
@@ -64,8 +64,8 @@ export function ProfileTab(): JSX.Element {
   };
 
   return (
-    <div className="bk-narrow">
-      <Descriptions column={1} items={[{ key: 'email', label: t('auth.email'), children: email }]} />
+    <div className={styles.narrow}>
+      <Descriptions column={1} items={[{ key: 'email', label: t('users.auth.email'), children: email }]} />
       {failure === undefined ? null : <Alert type="error" showIcon title={failure} style={{ marginBottom: 16 }} />}
       <Form
         name="bk-profile"
@@ -75,16 +75,16 @@ export function ProfileTab(): JSX.Element {
         requiredMark={false}
       >
         <Form.Item
-          label={t('account.name')}
+          label={t('users.account.name')}
           name="name"
           rules={[{ required: true, max: 120 }]}
-          extra={editable ? undefined : t('account.nameReadOnly')}
+          extra={editable ? undefined : t('users.account.nameReadOnly')}
         >
           <Input autoComplete="name" readOnly={!editable} />
         </Form.Item>
         {editable ? (
           <Button type="primary" htmlType="submit" loading={busy}>
-            {t('account.save')}
+            {t('users.account.save')}
           </Button>
         ) : null}
       </Form>

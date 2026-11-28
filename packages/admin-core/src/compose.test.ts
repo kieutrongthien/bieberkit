@@ -60,6 +60,16 @@ describe('UI-35 what the parts make together', () => {
     expect(admin.recordTabs).toHaveLength(1);
   });
 
+  it('UI-26 the tabs of the account of the plugin that gives the sign in come first, whatever the order of the plugins', () => {
+    const tab = (id: string) => ({ id, title: `x.${id}`, load });
+    const { admin } = composeAdmin([
+      part('bieberkit-plugin-a', { accountTabs: [tab('tokens')] }),
+      part('@bieberkit/plugin-users', { signIn: { load }, accountTabs: [tab('profile'), tab('sessions')] }),
+      part('bieberkit-plugin-z', { accountTabs: [tab('keys')] }),
+    ]);
+    expect(admin.accountTabs.map((item) => item.id)).toEqual(['profile', 'sessions', 'tokens', 'keys']);
+  });
+
   it('UI-36 the short name of a plugin, which its texts begin with, is the one without the marks of a plugin', () => {
     expect(shortNameOf('@bieberkit/plugin-audit-log')).toBe('audit-log');
     expect(shortNameOf('bieberkit-plugin-notes')).toBe('notes');

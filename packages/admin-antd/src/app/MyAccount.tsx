@@ -2,7 +2,7 @@
  * BieberKit
  *
  * @file        packages/admin-antd/src/app/MyAccount.tsx
- * @description The page of one's own account, at `/account`: the profile, the password, the second factor and the sessions, each in a folder tab that the address names (UI-26, USR-12).
+ * @description The page of one's own account, at `/account`: the tabs that the plugins give, each in a folder tab that the address names (UI-26, UI-35, slot 8).
  * @author      Bieber Kieu <kieutrongthien@gmail.com>
  * @copyright   Copyright (c) 2026 Bieber Kieu
  * @license     Apache-2.0
@@ -24,12 +24,9 @@
 
 import { shortNameOf } from '@bieberkit/admin-core';
 import { useNavigate, useRouterState } from '@tanstack/react-router';
-import { Tabs, Typography } from 'antd';
+import { Result, Skeleton, Tabs, Typography } from 'antd';
 import type { JSX } from 'react';
-import { PasswordTab } from './account/Password.tsx';
-import { ProfileTab } from './account/Profile.tsx';
-import { SessionsTab } from './account/Sessions.tsx';
-import { TwoFactorTab } from './account/TwoFactor.tsx';
+import { useMeta } from './context.ts';
 import { usePluginText } from './hooks.ts';
 import { useT } from './language.tsx';
 import { Slot, useAllowed, useRegistry } from './slots.tsx';
@@ -39,14 +36,10 @@ export function MyAccount(): JSX.Element {
   const navigate = useNavigate();
   const asked = useRouterState({ select: (state): string => String(Reflect.get(state.location.search, 'tab') ?? '') });
   const text = usePluginText();
+  const meta = useMeta();
   const added = useAllowed(useRegistry().accountTabs);
-  const items = [
-    { key: 'profile', label: t('account.tab.profile'), children: <ProfileTab /> },
-    { key: 'password', label: t('account.tab.password'), children: <PasswordTab /> },
-    { key: 'factor', label: t('account.tab.factor'), children: <TwoFactorTab /> },
-    { key: 'sessions', label: t('account.tab.sessions'), children: <SessionsTab /> },
-  ];
-  // The address names a tab by its id, and by the name of its plugin too when another tab has that id.
+  const items: { key: string; label: string; children: JSX.Element }[] = [];
+  // The address names a tab by its id, and by the name of its plugin too when a tab before it has that id.
   for (const tab of added) {
     const taken = items.some((item) => item.key === tab.id);
     items.push({
@@ -55,7 +48,7 @@ export function MyAccount(): JSX.Element {
       children: <Slot name={`${tab.plugin}/${tab.id}`} load={tab.load} />,
     });
   }
-  const active = items.some((item) => item.key === asked) ? asked : 'profile';
+  const active = items.some((item) => item.key === asked) ? asked : items[0]?.key;
   return (
     <>
       <div className="bk-page-head">
@@ -63,15 +56,22 @@ export function MyAccount(): JSX.Element {
           {t('account.mine')}
         </Typography.Title>
       </div>
-      <Tabs
-        type="card"
-        className="bk-tabs bk-tabs-wrap"
-        activeKey={active}
-        // A tab that is left is gone: no form of it stays on the page, and no password stays in one.
-        destroyOnHidden
-        onChange={(tab) => void navigate({ to: '/account', search: { tab }, replace: true })}
-        items={items}
-      />
+      {/* What a person may see is not known until the metadata is read. */}
+      {meta.isPending ? (
+        <Skeleton active />
+      ) : active === undefined ? (
+        <Result status="403" title={t('page.closed')} />
+      ) : (
+        <Tabs
+          type="card"
+          className="bk-tabs bk-tabs-wrap"
+          activeKey={active}
+          // A tab that is left is gone: no form of it stays on the page, and no password stays in one.
+          destroyOnHidden
+          onChange={(tab) => void navigate({ to: '/account', search: { tab }, replace: true })}
+          items={items}
+        />
+      )}
     </>
   );
 }

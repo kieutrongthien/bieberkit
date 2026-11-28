@@ -161,7 +161,10 @@ export function composeAdmin<C>(parts: readonly AdminPart<C>[]): {
       recordTabs: owned((part) => part.recordTabs),
       fields: owned((part) => part.fields),
       homeBlocks: owned((part) => part.homeBlocks),
-      accountTabs: owned((part) => part.accountTabs),
+      // The plugin that gives the sign in owns the account: its tabs come first, so "My account" opens on one of them.
+      accountTabs: owned((part) => part.accountTabs).toSorted(
+        (a, b) => Number(b.plugin === signIns[0]?.plugin) - Number(a.plugin === signIns[0]?.plugin),
+      ),
       publicPages: owned((part) => part.publicPages),
       signIn: signIns[0],
       gates: owned((part) => part.gates),

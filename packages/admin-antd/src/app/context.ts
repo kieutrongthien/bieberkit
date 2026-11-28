@@ -22,7 +22,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { AdminClient, Me, Meta, MetaEntity, SessionUser } from '@bieberkit/admin-core';
+import type { AdminClient, Meta, MetaEntity, SessionUser } from '@bieberkit/admin-core';
 import { useQuery } from '@tanstack/react-query';
 import type { UseQueryResult } from '@tanstack/react-query';
 import { useParams } from '@tanstack/react-router';
@@ -47,18 +47,6 @@ export function useMeta(): UseQueryResult<Meta> {
 export function useSession(): UseQueryResult<SessionUser | null> {
   const client = useClient();
   return useQuery({ queryKey: ['session'], queryFn: async () => (await client.session()) ?? null });
-}
-
-/** The profile of the signed-in person, or `null` in a project without the users plugin (USR-12). */
-export function useMe(): UseQueryResult<Me | null> {
-  const client = useClient();
-  return useQuery({ queryKey: ['me'], queryFn: async () => (await client.me()) ?? null, staleTime: 60_000 });
-}
-
-/** Whether the account has a password of its own. One that an identity provider made has none (IDN-02). */
-export function useHasPassword(): UseQueryResult<boolean> {
-  const client = useClient();
-  return useQuery({ queryKey: ['has-password'], queryFn: () => client.hasPassword(), staleTime: 60_000 });
 }
 
 /** The entity that the address names (`/admin/settings/settings` is `/api/v1/settings/settings`), once the metadata is there. */

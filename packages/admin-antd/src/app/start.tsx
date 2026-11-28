@@ -61,8 +61,7 @@ export function startAdmin(root: HTMLElement, options: StartOptions): void {
   startReports();
   // The build of the project stops on a mistake in a part. What reaches a browser anyway is reported, and the rest is drawn.
   const { admin, problems } = composeAdmin(options.parts);
-  for (const problem of problems)
-    if (problem.code !== 'no-sign-in') reportClientError(new Error(`${problem.plugin}: ${problem.message}`));
+  for (const problem of problems) reportClientError(new Error(`${problem.plugin}: ${problem.message}`));
   const App = createApp(admin);
   createRoot(root).render(<App />);
 }
