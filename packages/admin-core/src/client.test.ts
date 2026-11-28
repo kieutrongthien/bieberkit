@@ -410,3 +410,27 @@ describe('UI-02 the client of the admin', () => {
     });
   });
 });
+
+describe('UI-34 the request of a plugin', () => {
+  it('UI-34 a plugin calls its own routes through the client, which sends and fails like every other call', async () => {
+    const answered = fake((call) =>
+      call.url.endsWith('/fail') ? json({ code: 'X_NO', detail: 'No.', fix: 'Ask.' }, 409) : json({ data: [1] }),
+    );
+    const client = createAdminClient({ fetch: answered.fetch });
+    expect(
+      await client.request('POST', '/api/v1/notes/items', { body: { a: 1 }, headers: { 'if-match': '2' } }),
+    ).toEqual({ data: [1] });
+    expect(answered.calls[0]).toMatchObject({
+      method: 'POST',
+      url: '/api/v1/notes/items',
+      body: { a: 1 },
+      headers: { 'if-match': '2', 'content-type': 'application/json' },
+    });
+    await expect(client.request('GET', '/api/v1/notes/fail')).rejects.toMatchObject({
+      name: 'AdminApiError',
+      status: 409,
+      code: 'X_NO',
+      fix: 'Ask.',
+    });
+  });
+});

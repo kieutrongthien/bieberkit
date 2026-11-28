@@ -81,7 +81,17 @@ export type SignInResult =
   | { readonly kind: 'signedIn'; readonly user: SessionUser }
   | { readonly kind: 'secondFactor' };
 
+export interface RequestInput {
+  readonly body?: unknown;
+  readonly headers?: Readonly<Record<string, string>>;
+}
+
 export interface AdminClient extends AccountClient {
+  /**
+   * A call of the API, with the session of the browser: how the admin part of a plugin reaches its own routes. It answers the body,
+   * or `undefined` for an empty one, and a failure is an `AdminApiError` like that of every other call.
+   */
+  request(method: string, path: string, input?: RequestInput): Promise<unknown>;
   /** The user of the session, or `undefined` when nobody is signed in. */
   session(): Promise<SessionUser | undefined>;
   signIn(email: string, password: string): Promise<SignInResult>;
@@ -239,6 +249,7 @@ export function createAdminClient(options: AdminClientOptions = {}): AdminClient
   }
 
   return {
+    request: (method, path, input) => request(method, path, input),
     ...accountClient({
       request: (method, path, body) => request(method, path, body === undefined ? {} : { body }),
       userOf: signedInUser,
