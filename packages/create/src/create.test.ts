@@ -281,6 +281,14 @@ describe('section 6 the files of a new project', () => {
     expect(config.exclude).toContain('plugins/*/src/admin');
   });
 
+  // pnpm otherwise gives the server the instance of a plugin that apps/admin resolved, with React and Ant Design, which then go into
+  // the image of the server. `pnpm test:acceptance` shows the image without them.
+  it('UI-38 keeps the packages of the screens out of the server: pnpm does not join its plugins with those of the admin', async () => {
+    const cwd = workdir();
+    await create(cwd, ['demo', '--yes', '--no-install', '--no-git']);
+    expect(read(cwd, 'demo/pnpm-workspace.yaml')).toContain('\ndedupePeerDependents: false\n');
+  });
+
   it('6 a scoped name makes a folder without the scope, and the packages pin the version of the framework', async () => {
     const cwd = workdir();
     await create(cwd, ['@team/crm-app', '--yes', '--no-install', '--no-git']);

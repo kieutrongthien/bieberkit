@@ -286,6 +286,12 @@ function imageFolder(root) {
   cpSync(join(root, 'package.json'), join(out, 'package.json'));
   cpSync(join(root, 'migrations'), join(out, 'migrations'), { recursive: true });
   run(process.execPath, ['deploy/image.mjs', out], root);
+  // The server holds no package of the screens, although the plugin of the project asks for them as optional peers.
+  const installed = readdirSync(join(out, 'apps/server/node_modules/.pnpm'));
+  const screens = installed.filter((folder) =>
+    /^(react|react-dom|antd|@tanstack\+react-query|@bieberkit\+admin-antd)@/.test(folder),
+  );
+  check(screens.length === 0, `the server of the image holds no package of the screens: ${screens.join(', ')}`);
   cpSync(join(root, 'apps/admin/dist'), join(out, 'public/admin'), { recursive: true });
   return out;
 }

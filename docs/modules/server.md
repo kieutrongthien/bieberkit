@@ -60,8 +60,6 @@ contributedRecord<T>(modules, key)                        // what each module gi
 
 `boot.test.ts` (the roles start, serve and stop; the metrics on their own port and not on the public one; the migrate role makes the tables; dev; stop frees the port; an invalid environment, no project and a taken port), `seed-doctor.test.ts` (plugin seeds in order, the seed of the project, each doctor check). The CLI tests run a project that `create` made, through `main.ts` in a real process, and stop it with SIGTERM.
 
-> **Direction changed on 2026-11-28** ([ADR 0040](../adr/0040-plugin-owned-admin.md), [plugin-admin.md](plugin-admin.md)). The next section describes the code as it is. This loader is replaced by the admin build of the project (UI-37).
+## The admin of a project (UI-37)
 
-## What plugins add to the admin (UI-04, ADR 0037)
-
-`plugin-admin.ts`: `pluginAdminOf(project)` reads the `admin` key of every plugin, checks it with `extensionProblems` and checks that each file that it names is in the folder `admin` of the package (`LoadedPlugin.root` is that package), and stops the boot with every problem together (`BK_ADMIN_CONTRIBUTION_INVALID`). `boot` passes the extensions to `registerMeta` and the folders to `registerAdmin`, which serves each at `<admin>/plugins/<short name>/` with the policy of the admin, and nothing outside it.
+`admin.ts`: `adminDirectory(root)` is `public/admin` (the image) or else `apps/admin/dist` when it has an `index.html`; `hasAdmin(root)` says whether the project has an admin at all, which the password links of mail use even before a build. The web role stops with `BK_ADMIN_NOT_BUILT` when the project has an admin and no build; the role of `bieberkit dev` does not, for Vite serves the admin. `adminPageOf(config, prefix)` writes the page with the theme, the brand, the menu and the address, and the dev server of the admin writes its page with it too. `_meta` is told every permission of the project, so that it says which of them the caller holds (UI-36). The loader of ADR 0037 is gone.

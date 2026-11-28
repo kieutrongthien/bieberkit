@@ -81,7 +81,7 @@ function run(cwd, args) {
   }
 }
 
-if (!existsSync(CLI) || !existsSync(join(REPOSITORY, 'packages', 'admin-antd', 'dist', 'lib', 'index.js'))) {
+if (!existsSync(CLI) || !existsSync(join(REPOSITORY, 'packages', 'admin-antd', 'dist', 'index.js'))) {
   process.stderr.write('Run `pnpm build` first: the browser test uses the built packages and the built admin.\n');
   process.exit(1);
 }

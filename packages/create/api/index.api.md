@@ -127,6 +127,7 @@ interface CreateDeps {
 }
 export declare function createCommand(deps?: CreateDeps): Command;
 export declare function renderEnvExample(rows: readonly EnvDescription[]): string;
+export declare const ADMIN_VERSIONS: Readonly<Record<"dependencies" | "devDependencies", Readonly<Record<string, string>>>>;
 export declare const packageName = "create-bieberkit";
 export type { Choices, CreateDeps, Exec, Plan, PlanDeps, Planned, PluginIndex, PluginIndexEntry, ProjectFile, Scaffolded, Template };
 ```

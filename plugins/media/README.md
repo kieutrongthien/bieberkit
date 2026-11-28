@@ -26,6 +26,7 @@
 
 Media records for files in the storage: a name, a type, a size and a state, confirmed after the upload.
 
+- In the admin it gives the control of every file and image field, through its export `./admin` (UI-34). React and Ant Design are optional peers, so a server installs it without them.
 - A first-party plugin of the `blank` template (spec section 12). It is a dependency of the project and is never copied into it (PLG-01).
 - Status: in progress (M1.8). The design is in [the specification](../../docs/spec/SPEC.md) and in [docs/modules/plugins.md](../../docs/modules/plugins.md).
 

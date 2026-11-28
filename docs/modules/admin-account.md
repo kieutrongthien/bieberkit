@@ -123,10 +123,12 @@ Pictures of each screen go to the maintainer before the screens are implemented.
 
 Names are proposals. The tests fix them.
 
+The calls and the rules are in the admin part of the `users` plugin (`plugins/users/src/admin/api.ts` and `rules.ts`), over `AdminClient.request` of `admin-core`, which keeps the session and the sign out. They are not exported by a shared package (UI-34).
+
 ```ts
-// @bieberkit/admin-core
+// plugins/users/src/admin
 type SignInResult = { kind: 'signedIn'; user: SessionUser } | { kind: 'secondFactor' }
-signIn(email, password): Promise<SignInResult>                 // was Promise<SessionUser>
+signIn(email, password): Promise<SignInResult>
 verifySecondFactor(code, kind: 'totp' | 'backup'): Promise<SessionUser>
 requestPasswordReset(email, redirectTo): Promise<void>
 resetPassword(token, password): Promise<void>
@@ -146,7 +148,7 @@ updateRole(db, roleId, changes)                        // behaviors 3 and 4; the
 Principal.mfaForAll?: true                             // the rule for everyone is on, for GET /users/me
 ```
 
-`signIn` changes its answer, so the change has a changeset that says so.
+`signIn` and these calls left `AdminClient`, so the change has a changeset that says so.
 
 ## Errors
 

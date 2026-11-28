@@ -27,7 +27,7 @@
 - Packages: `@bieberkit/admin-core`, `@bieberkit/admin-antd`, `bieberkit`, `create-bieberkit`, `@bieberkit/server`, the plugins
 - Layer: product and tools
 - Spec sections: UI-34 to UI-38, UI-04, UI-10, UI-12, UI-14, UI-25, section 11, 16.6, DEP-06. ADR 0040
-- Status: **Approved on 2026-11-28, by delegation of the maintainer** (ADR 0040, after its spike). Not built. The shape of the API below is approved; its exact types are fixed by the tests of the contract.
+- Status: **Approved on 2026-11-28, by delegation of the maintainer** (ADR 0040, after its spike). **Built the same day** on branch `feat/plugin-owned-admin`; the acceptance is `pnpm test:acceptance`. How an author uses it: [writing-a-plugin.md](../guides/writing-a-plugin.md).
 
 ## Purpose
 
@@ -85,19 +85,22 @@ The shell has no sign in of its own, so the admin needs the `users` plugin. With
 
 ## Public API
 
+The contract is `defineAdminPlugin` of `@bieberkit/admin-core` (`part.ts`), with `composeAdmin` and `messageProblems` (`compose.ts`), which have no UI library.
+
 ```ts
 // plugins/notes/src/admin/index.ts
-import { defineAdminPlugin } from '@bieberkit/admin-core';
-
-export default defineAdminPlugin({
+const part: AdminPart<AdminView> = defineAdminPlugin({
   name: 'bieberkit-plugin-notes',
-  menu: [{ page: '/notes', group: 'content', permission: 'notes.read' }],
-  pages: [{ path: '/notes', load: () => import('./NotesPage.tsx') }],
+  menu: [{ page: '/notes', group: 'content' }],
+  pages: [{ path: '/notes', title: 'notes.title', permission: 'notes.read', load: () => import('./NotesPage.tsx') }],
   messages: { en: () => import('./messages/en.ts'), vi: () => import('./messages/vi.ts') },
 });
+export default part;
 ```
 
-The other slots are keys of the same object (`headerActions`, `notices`, `recordTabs`, `fields`, `homeBlocks`, `account`, `publicPages`, `gates`, `screens`). What a screen is given (the client, the signed-in person, the language, navigation) comes from hooks of `@bieberkit/admin-antd`, with types. The exact types are written with the tests of this work and approved before the code.
+The other slots are keys of the same object: `headerActions`, `notices`, `recordTabs`, `fields`, `homeBlocks`, `accountTabs`, `publicPages`, `signIn`, `gates`, and `screens` for a replaced list or form. The type of a component is not inferred from the first slot (`defineAdminPlugin<C = AdminView>`), so one part holds components with the props of each slot, and a key that no slot has is a type error. The tabs of the part that gives the sign in come first in "My account".
+
+What a screen is given comes from `@bieberkit/admin-antd`: `useAdminClient`, `useSession`, `useMeta`, `useCan`, `useText`, `useLanguage`, `useAdminNavigate`, `useAdminAddress`, `useNotice`; the components `AdminLink`, `AuthShell`, `AuthLinks`, `CodeInput`, `GateShell`, `FolderArt`, `Icon`; and the prop types `RecordTabProps`, `FieldProps`, `ScreenProps`, `NoticeProps`, `SignInProps`, `GateProps`. For a screen of its own, a plugin styles with a CSS module and the variables of the theme.
 
 ## How a project builds its admin (UI-37)
 
@@ -106,6 +109,7 @@ The other slots are keys of the same object (`headerActions`, `notices`, `record
 - `apps/admin` is the application of the project (spec 16.6). Its list of admin parts is **generated** from `plugins` of the config. Its own pages, widgets and texts go in `apps/admin/src`.
 - `bieberkit dev` runs the admin with hot reload; `bieberkit build` writes `apps/admin/dist`, which the web role serves with the policy of UI-14 (DEP-06). `theme`, `admin.brand`, `admin.menu` and `ADMIN_URL` stay settings of a restart.
 - One copy of React and of Ant Design: they are peer dependencies of an admin part.
+- They are optional peers, and a new project sets `dedupePeerDependents: false`: without it pnpm gives the server the instance of a plugin that `apps/admin` resolved, and the image of the server carried React and Ant Design (found by the acceptance, which now checks it).
 - The budget of section 18.1 is checked on the built project.
 
 ## For the author of a plugin (UI-38)
@@ -119,20 +123,15 @@ pnpm build
 
 A plugin in the project is compiled from its source. The same package, published, ships built JavaScript and types for both exports; another project installs it and names it in `plugins`.
 
-Seen in the code on 2026-11-28 and not run, each to be fixed here: the workspace of a new project does not list `plugins/*`; the made plugin calls `tsdown`, which nothing declares; the server resolves a plugin to its `dist`; the made plugin has no admin part.
+What a new project met before this work, each fixed and proven by the acceptance: the workspace did not list `plugins/*`; the made plugin called `tsdown`, which nothing declared, and asked for `*` as peer versions; the server resolved a plugin to its `dist`; the made plugin had no admin part; `apps/admin` declared no `@tanstack/react-query`; `dev` did not start the admin of installed plugins; `migrate:make` wrote a file that `bieberkit check` refused; and the image of the project could not start (see [deploy.md](deploy.md)).
 
 ## Order of work
 
-1. The spike of ADR 0040, then the acceptance of the record. Done on 2026-11-28.
-2. The contract and the slots, with `@bieberkit/admin-antd` as a library.
-3. The build of the project, then the path of the author, then the test with packed tarballs.
-4. The screens move: `users` first (the account screens of UI-26, with the account calls of `admin-core`), then `media` (the control of a file) and `audit-log` (the history tab). The behavior and the browser tests of [admin-account.md](admin-account.md) stay and must keep passing.
-5. The loader of ADR 0037 is removed when its slots are served by the new contract, and its fixture plugin is rewritten.
-6. Only then the screens of UI-27 to UI-32, each in its plugin.
+Done on 2026-11-28, in the order of the plan `docs/superpowers/plans/2026-11-28-plugin-owned-admin.md`: the contract and the library, the build of a project, the slots, the screens of `users`, `media` and `audit-log`, the removal of the loader of ADR 0037, the path of the author and the acceptance. Next: the screens of UI-27 to UI-32, each in its plugin.
 
 ## Errors
 
-Codes for a wrong admin part, each a `BkError` with a fix (AI-02), are named with the tests. They take the place of `BK_ADMIN_CONTRIBUTION_INVALID`.
+A wrong admin part stops the build with `BK_ADMIN_PART_INVALID`, which lists every problem with its plugin: `unknown-key`, `bad-path`, `reserved-path`, `duplicate-path`, `duplicate-id`, `duplicate-field`, `duplicate-screen`, `menu-without-page`, `no-sign-in`, `two-sign-ins`, `message-missing`, `message-extra`, `message-prefix`, `wrong-name` and `not-in-admin`. Two copies of a shared package are `BK_ADMIN_TWO_COPIES`, and a web role with an admin that is not built is `BK_ADMIN_NOT_BUILT`. They take the place of `BK_ADMIN_CONTRIBUTION_INVALID`.
 
 ## Configuration
 
@@ -147,7 +146,12 @@ No new environment variable. No new config key is planned.
 | UI-37        | A built project: one React, the policy with no violation, the size budget                                                                          |
 | UI-38        | Packed tarballs, a new project outside the repository, `make:plugin`, `dev` and an edit, `build`, and a browser that sees the screen of the plugin |
 
-## Open questions
+## Answers
 
-- Whether `create --no-admin` projects keep any admin build file.
-- Whether a plugin may declare an admin part for a language that the project does not have (today: it is ignored).
+- A `--no-admin` project keeps no file of an admin build, and `make:plugin` there makes no admin part.
+- A language that the project does not have is not asked of a part, and its texts are ignored.
+
+## Not done
+
+- No real `docker build` of a project: `@bieberkit/*` is not installable from a registry here. The acceptance runs the steps of the Dockerfile without Docker.
+- A CI job for `pnpm test:acceptance` is a change of `.github/workflows/`, which waits for the maintainer.

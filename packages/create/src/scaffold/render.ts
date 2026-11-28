@@ -217,6 +217,10 @@ function renderWorkspace(choices: Choices, plan: Plan): string {
   - 'packages/*'
   - 'plugins/*'
 
+# A plugin that the server and the admin both use is installed for each with what it asks for: joined, the server would carry the
+# React and the Ant Design of the screens into its image.
+dedupePeerDependents: false
+
 # New versions become installable 7 days after publication. Do not relax these to make an install pass: report the failure.
 minimumReleaseAge: 10080
 trustPolicy: no-downgrade

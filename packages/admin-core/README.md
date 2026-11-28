@@ -24,11 +24,11 @@
 
 # @bieberkit/admin-core
 
-Headless admin: metadata, routing and state.
+The headless admin, with no dependency: the client of the API, the logic of the generic screens, the menu and the languages, and the contract of the admin part of a plugin (`defineAdminPlugin`, `composeAdmin`). It holds nothing of one plugin.
 
 - Product layer. Imports contracts and foundation, never tools.
 - Workspace dependencies: none.
-- Status: placeholder. The design is in [the specification](../../docs/spec/SPEC.md).
+- The design is in [the specification](../../docs/spec/SPEC.md), section 16, and in [docs/modules/plugin-admin.md](../../docs/modules/plugin-admin.md).
 
 ## License
 

@@ -166,6 +166,10 @@ interface CreateAuthOptions {
   readonly apiKeys?: AuthApiKeys;
   readonly methods?: AuthMethods;
   readonly mail?: AuthMailOptions;
+  readonly pages?: AuthPages;
+}
+interface AuthPages {
+  readonly resetPassword?: string;
 }
 interface AuthMailOptions {
   readonly sendVerification?: (mail: AuthMail) => Promise<void>;
@@ -183,6 +187,7 @@ interface AuthMailOptions {
 }
 type AuthInstance = Auth;
 type AuthSecondaryStorage = NonNullable<BetterAuthOptions["secondaryStorage"]>;
+export declare function pagesOf(auth: AuthInstance): AuthPages;
 export declare function mailOf(auth: AuthInstance): AuthMailOptions;
 export declare function limiterOf(auth: AuthInstance): RateLimiter | undefined;
 export declare function createAuth(options: CreateAuthOptions): AuthInstance;
@@ -598,5 +603,5 @@ declare module "@bieberkit/core" {
     permissions: readonly string[];
   }
 }
-export { AUTH_PLUGIN, type Ability, type AbilityInput, type AbilityUser, type AccessAnswer, type AccessAuthorizer, type Action, type ApiKeyInput, type Assignment, type AuthAccountRow, type AuthApiKeyRow, type AuthApiKeys, type AuthInstance, type AuthLimits, type AuthMail, type AuthMailOptions, type AuthPasskeyRow, type AuthRateLimitRow, AuthRole, AuthRolePermission, type AuthRolePermissionRow, type AuthRoleRow, type AuthRoutesOptions, type AuthSecondaryStorage, type AuthSessionRow, type AuthTwoFactorRow, AuthUserGroup, type AuthUserGroupRow, AuthUserRole, type AuthUserRoleRow, type AuthUserRow, type AuthVerificationRow, type AuthenticatorOptions, type AuthorizerOptions, type BatchAssignment, type BatchResult, type BetterAuthOptions, type Condition, type ConditionFinding, type CreateAuthOptions, type CreatedApiKey, type DisableUserInput, type DriftEntity, type DriftProperty, type EffectivePermission, type EnableUserInput, type EntityShape, type ExternalDisabled, type ExternalIdentity, type ExternalUser, type GrantLoader, type Grants, type ImpersonationEntry, type Limit, type Limit2, type MaskedField, type MemberPage, type MfaPolicy, type MfaVerdict, NIL_TENANT, type NetworkPolicy, type NewRole, type NewUser, type PermissionEntry, type PermissionRegistry, type PolicyReader, type RoleMember, type RoleView, type ScopedPermission, type SecurityPolicy, type SessionPolicy, type SessionVerdict, type SignInPolicy, type TenantResolverOptions, type UserAction, type UserChange, type UserDetail, type UserListQuery, type UserPage, type UserRecord, type UserService, type UserServiceOptions, type UserSession, type UserSort, type UserStatus, authEntities, authMigrationSteps, buildAbility, buildPermissionRegistry, createAuthorizer, explainCondition, loadGrants, manageScope, restrictedRoleLookup };
+export { AUTH_PLUGIN, type Ability, type AbilityInput, type AbilityUser, type AccessAnswer, type AccessAuthorizer, type Action, type ApiKeyInput, type Assignment, type AuthAccountRow, type AuthApiKeyRow, type AuthApiKeys, type AuthInstance, type AuthLimits, type AuthMail, type AuthMailOptions, type AuthPages, type AuthPasskeyRow, type AuthRateLimitRow, AuthRole, AuthRolePermission, type AuthRolePermissionRow, type AuthRoleRow, type AuthRoutesOptions, type AuthSecondaryStorage, type AuthSessionRow, type AuthTwoFactorRow, AuthUserGroup, type AuthUserGroupRow, AuthUserRole, type AuthUserRoleRow, type AuthUserRow, type AuthVerificationRow, type AuthenticatorOptions, type AuthorizerOptions, type BatchAssignment, type BatchResult, type BetterAuthOptions, type Condition, type ConditionFinding, type CreateAuthOptions, type CreatedApiKey, type DisableUserInput, type DriftEntity, type DriftProperty, type EffectivePermission, type EnableUserInput, type EntityShape, type ExternalDisabled, type ExternalIdentity, type ExternalUser, type GrantLoader, type Grants, type ImpersonationEntry, type Limit, type Limit2, type MaskedField, type MemberPage, type MfaPolicy, type MfaVerdict, NIL_TENANT, type NetworkPolicy, type NewRole, type NewUser, type PermissionEntry, type PermissionRegistry, type PolicyReader, type RoleMember, type RoleView, type ScopedPermission, type SecurityPolicy, type SessionPolicy, type SessionVerdict, type SignInPolicy, type TenantResolverOptions, type UserAction, type UserChange, type UserDetail, type UserListQuery, type UserPage, type UserRecord, type UserService, type UserServiceOptions, type UserSession, type UserSort, type UserStatus, authEntities, authMigrationSteps, buildAbility, buildPermissionRegistry, createAuthorizer, explainCondition, loadGrants, manageScope, restrictedRoleLookup };
 ```

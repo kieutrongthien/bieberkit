@@ -181,38 +181,9 @@ interface MetaEntity {
   readonly fields: readonly MetaField[];
 }
 type MetaLabel = Readonly<Record<string, string>>;
-interface MetaMenuItem {
-  readonly label: MetaLabel;
-  readonly path: string;
-  readonly permission?: string;
-}
-interface MetaPage {
-  readonly plugin: string;
-  readonly path: string;
-  readonly module: string;
-  readonly title: MetaLabel;
-}
-interface MetaWidget {
-  readonly plugin: string;
-  readonly slot: string;
-  readonly module: string;
-  readonly title: MetaLabel;
-}
-interface MetaScreen {
-  readonly plugin: string;
-  readonly replace: string;
-  readonly module: string;
-}
-interface MetaExtensions {
-  readonly pages: readonly MetaPage[];
-  readonly widgets: readonly MetaWidget[];
-  readonly screens: readonly MetaScreen[];
-}
 interface Meta {
   readonly schemaVersion: number;
   readonly entities: readonly MetaEntity[];
-  readonly extensions?: MetaExtensions;
-  readonly menu: readonly MetaMenuItem[];
   readonly permissions: readonly string[];
 }
 type Row = Readonly<Record<string, unknown>>;
@@ -226,6 +197,7 @@ interface SessionUser {
   readonly id: string;
   readonly email: string;
   readonly name: string;
+  readonly twoFactorEnabled?: true;
 }
 interface ListParams {
   readonly page?: number;
@@ -253,47 +225,6 @@ type BulkResult = {
   readonly kind: "queued";
   readonly jobId: string;
 };
-interface MediaFile {
-  readonly id: string;
-  readonly filename: string;
-  readonly contentType: string;
-  readonly kind: string;
-  readonly size: number;
-  readonly status: string;
-}
-export declare function acceptsType(accept: readonly string[], contentType: string): boolean;
-export declare const acceptAttribute: (field: MetaField) => string | undefined;
-export declare function fileProblem(field: MetaField, file: {
-  readonly name: string;
-  readonly size: number;
-  readonly type: string;
-}): "empty" | "type" | undefined;
-export declare function sizeText(bytes: number): string;
-export declare const isPicture: (file: MediaFile) => boolean;
-export declare function uploadName(name: string): string;
-interface Related {
-  readonly entity: MetaEntity;
-  readonly via: MetaField;
-}
-export declare function relatedOf(meta: Meta, entity: MetaEntity): readonly Related[];
-export declare const relatedFilter: (related: Related, id: string) => Filter;
-export declare const relatedDefaults: (related: Related, id: string) => Readonly<Record<string, string>>;
-export declare function prefillOf(form: readonly MetaField[], search: Readonly<Record<string, unknown>>): Record<string, string>;
-export declare const HISTORY_PATH = "/api/v1/audit-log/entries";
-export declare const historyQuery: (entity: string, id: string, pageSize?: number) => string;
-interface HistoryEntry {
-  readonly id: string;
-  readonly at: string;
-  readonly action: string;
-  readonly who: string;
-  readonly fields: readonly string[];
-}
-export declare function historyOf(body: unknown): HistoryEntry[];
-export declare const historyLine: (entry: HistoryEntry) => string;
-export declare function readOnlyOf(entity: MetaEntity, row: Row): {
-  readonly key: string;
-  readonly value: unknown;
-}[];
 interface FieldProblem {
   readonly path: string;
   readonly code: string;
@@ -305,15 +236,20 @@ export declare class AdminApiError extends Error {
   readonly fix: string;
   readonly problems: readonly FieldProblem[];
   readonly current: Row | undefined;
-  constructor(status: number, code: string, message: string, fix: string, problems?: readonly FieldProblem[], current?: Row);
+  readonly retryAfter: number | undefined;
+  constructor(status: number, code: string, message: string, fix: string, problems?: readonly FieldProblem[], current?: Row, retryAfter?: number);
 }
 interface AdminClientOptions {
   readonly baseUrl?: string;
   readonly fetch?: typeof fetch;
 }
+interface RequestInput {
+  readonly body?: unknown;
+  readonly headers?: Readonly<Record<string, string>>;
+}
 interface AdminClient {
+  request(method: string, path: string, input?: RequestInput): Promise<unknown>;
   session(): Promise<SessionUser | undefined>;
-  signIn(email: string, password: string): Promise<SessionUser>;
   signOut(): Promise<void>;
   meta(): Promise<Meta>;
   list(entity: MetaEntity, params?: ListParams): Promise<Page>;
@@ -321,10 +257,6 @@ interface AdminClient {
   create(entity: MetaEntity, body: Row): Promise<Row>;
   update(entity: MetaEntity, id: string, body: Row, version: number): Promise<Row>;
   remove(entity: MetaEntity, id: string, version: number): Promise<void>;
-  uploadFile(file: File): Promise<MediaFile>;
-  mediaFile(id: string): Promise<MediaFile>;
-  mediaUrl(id: string): Promise<string>;
-  history(entity: MetaEntity, id: string): Promise<readonly HistoryEntry[]>;
   transition(entity: MetaEntity, id: string, name: string, version: number, input?: Row): Promise<Row>;
   bulk(entity: MetaEntity, items: readonly {
     readonly id: string;
@@ -335,14 +267,8 @@ export declare function createAdminClient(options?: AdminClientOptions): AdminCl
 declare const en: {
   readonly "app.name": "Admin";
   readonly "language.label": "Language";
-  readonly "auth.signIn.title": "Sign in";
-  readonly "auth.email": "Email";
-  readonly "auth.password": "Password";
-  readonly "auth.signIn": "Sign in";
   readonly "auth.signOut": "Sign out";
-  readonly "auth.noAnswer": "The server did not answer. Try again.";
   readonly "brand.tagline": "One tidy kit. Every change on record.";
-  readonly "auth.signIn.subtitle": "Use the account of your organization.";
   readonly "menu.label": "Main menu";
   readonly "menu.group.app": "Application";
   readonly "menu.group.people": "People";
@@ -362,6 +288,7 @@ declare const en: {
   readonly "gate.noAnswer": "The server did not answer";
   readonly "common.yes": "Yes";
   readonly "common.no": "No";
+  readonly "common.close": "Close";
   readonly "common.cancel": "Cancel";
   readonly "common.delete": "Delete";
   readonly "list.new": "New";
@@ -400,12 +327,10 @@ declare const en: {
   readonly "list.selectRow": "Select {name}";
   readonly "list.sort": "Sort by";
   readonly "detail.details": "Details";
-  readonly "detail.history": "History";
   readonly "detail.newRelated": "New {name}";
   readonly "detail.noRelated": "Nothing yet";
-  readonly "detail.noHistory": "Nothing was recorded for this row";
-  readonly "detail.historyDenied": "The history is not open to you";
   readonly "detail.computed": "Filled in by the server";
+  readonly "field.noControl": "No plugin gives a control for files, so this field cannot be changed here.";
   readonly "relation.search": "Type to search";
   readonly "relation.pick": "Pick one";
   readonly "relation.none": "Nothing found";
@@ -414,15 +339,8 @@ declare const en: {
   readonly "lines.add": "Add {name}";
   readonly "lines.remove": "Remove";
   readonly "lines.removeLine": "Remove {name}";
-  readonly "file.type": "This file is not of a type that the field takes: {types}";
-  readonly "file.empty": "The file is empty";
-  readonly "file.noSigning": "The storage cannot take an upload from the browser. Use an S3 disk for files.";
-  readonly "file.failed": "The file could not be sent";
-  readonly "file.sending": "Sending";
-  readonly "file.remove": "Remove";
-  readonly "file.removeNamed": "Remove the file of {name}";
   readonly "plugin.failed": "This part could not be shown";
-  readonly "plugin.missing": "This page does not exist";
+  readonly "page.closed": "This page is not open to you";
   readonly "list.op.eq": "is";
   readonly "list.op.ne": "is not";
   readonly "list.op.in": "is one of";
@@ -462,18 +380,116 @@ declare const en: {
   readonly "conflict.theirs": "Their value";
   readonly "conflict.keepMine": "Keep my changes on top of theirs";
   readonly "conflict.takeTheirs": "Discard mine and take theirs";
+  readonly "account.mine": "My account";
 };
 type MessageKey = keyof typeof en;
 type Dictionary = Readonly<Record<MessageKey, string>>;
 type Locale = "en" | "vi" | "zh";
 export declare const LOCALES: readonly Locale[];
 export declare function loadMessages(locale: Locale): Promise<Dictionary>;
+export declare function fillText(text: string, values?: Readonly<Record<string, string | number>>): string;
 export declare function translator(dictionary?: Dictionary): (key: MessageKey, values?: Readonly<Record<string, string | number>>) => string;
 export declare function localeOf(languages: readonly string[], saved: string | undefined, supported?: readonly Locale[]): Locale;
 export declare function formatNumber(locale: Locale, value: number | string): string;
 export declare function formatDate(locale: Locale, day: string): string;
 export declare function formatDateTime(locale: Locale, instant: string, timeZone?: string): string;
 export declare function formatMoney(locale: Locale, amount: string, currency: string): string;
+type Load<C> = () => Promise<{
+  default: C;
+}>;
+interface Contribution<C> {
+  readonly id: string;
+  readonly load: Load<C>;
+  readonly permission?: string;
+}
+interface MenuContribution {
+  readonly page: string;
+  readonly group?: string;
+  readonly icon?: string;
+  readonly permission?: string;
+}
+interface PageContribution<C> {
+  readonly path: string;
+  readonly title: string;
+  readonly load: Load<C>;
+  readonly permission?: string;
+}
+interface GateState {
+  readonly metaError: unknown;
+}
+type Texts = Readonly<Record<string, string>>;
+interface AdminPartInput<C> {
+  readonly name: string;
+  readonly menu?: readonly MenuContribution[];
+  readonly pages?: readonly PageContribution<C>[];
+  readonly headerActions?: readonly Contribution<C>[];
+  readonly notices?: readonly Contribution<C>[];
+  readonly recordTabs?: readonly (Contribution<C> & {
+    readonly entity: string;
+    readonly title: string;
+  })[];
+  readonly fields?: readonly (Contribution<C> & {
+    readonly widget: string;
+  })[];
+  readonly homeBlocks?: readonly (Contribution<C> & {
+    readonly title: string;
+  })[];
+  readonly accountTabs?: readonly (Contribution<C> & {
+    readonly title: string;
+  })[];
+  readonly publicPages?: readonly {
+    readonly path: string;
+    readonly load: Load<C>;
+  }[];
+  readonly signIn?: {
+    readonly load: Load<C>;
+  };
+  readonly gates?: readonly (Contribution<C> & {
+    readonly needed: (state: GateState) => boolean;
+  })[];
+  readonly screens?: readonly (Contribution<C> & {
+    readonly replace: `list:${string}` | `form:${string}`;
+  })[];
+  readonly messages?: Partial<Record<Locale, () => Promise<{
+    default: Texts;
+  }>>>;
+}
+type AdminPart<C> = AdminPartInput<C>;
+type AdminView = ((props: never) => unknown) | (new (props: never) => unknown);
+export declare function defineAdminPlugin<C = AdminView>(input: AdminPartInput<NoInfer<C>>): AdminPart<C>;
+export declare function shortNameOf(name: string): string;
+interface AdminProblem {
+  readonly plugin: string;
+  readonly code: string;
+  readonly message: string;
+}
+type Slot<C, K extends keyof AdminPartInput<C>> = NonNullable<AdminPartInput<C>[K]> extends readonly (infer T)[] ? T : never;
+type Owned<T> = T & {
+  readonly plugin: string;
+};
+interface AdminRegistry<C> {
+  readonly menu: readonly Owned<MenuContribution>[];
+  readonly pages: readonly Owned<Slot<C, "pages">>[];
+  readonly headerActions: readonly Owned<Slot<C, "headerActions">>[];
+  readonly notices: readonly Owned<Slot<C, "notices">>[];
+  readonly recordTabs: readonly Owned<Slot<C, "recordTabs">>[];
+  readonly fields: readonly Owned<Slot<C, "fields">>[];
+  readonly homeBlocks: readonly Owned<Slot<C, "homeBlocks">>[];
+  readonly accountTabs: readonly Owned<Slot<C, "accountTabs">>[];
+  readonly publicPages: readonly Owned<Slot<C, "publicPages">>[];
+  readonly signIn: Owned<NonNullable<AdminPartInput<C>["signIn"]>> | undefined;
+  readonly gates: readonly Owned<Slot<C, "gates">>[];
+  readonly screens: readonly Owned<Slot<C, "screens">>[];
+  readonly parts: readonly AdminPart<C>[];
+}
+export declare function composeAdmin<C>(parts: readonly AdminPart<C>[]): {
+  readonly admin: AdminRegistry<C>;
+  readonly problems: readonly AdminProblem[];
+};
+export declare function messageProblems<C>(parts: readonly AdminPart<C>[], languages: readonly string[]): Promise<readonly AdminProblem[]>;
+export declare function allowed<T extends {
+  readonly permission?: string;
+}>(items: readonly T[], can: ReadonlySet<string>): readonly T[];
 export declare function labelOf(entity: MetaEntity, language: string): string;
 export declare function columnsOf(entity: MetaEntity): readonly MetaField[];
 export declare function formFieldsOf(entity: MetaEntity): readonly MetaField[];
@@ -552,6 +568,18 @@ interface FieldStates {
 export declare function statesOf(fields: readonly MetaField[], values: Readonly<Record<string, unknown>>): FieldStates;
 export declare function visibleValues(fields: readonly MetaField[], values: Readonly<Record<string, unknown>>): Record<string, unknown>;
 export declare const conditionalFields: (entity: MetaEntity) => readonly MetaField[];
+interface Related {
+  readonly entity: MetaEntity;
+  readonly via: MetaField;
+}
+export declare function relatedOf(meta: Meta, entity: MetaEntity): readonly Related[];
+export declare const relatedFilter: (related: Related, id: string) => Filter;
+export declare const relatedDefaults: (related: Related, id: string) => Readonly<Record<string, string>>;
+export declare function prefillOf(form: readonly MetaField[], search: Readonly<Record<string, unknown>>): Record<string, string>;
+export declare function readOnlyOf(entity: MetaEntity, row: Row): {
+  readonly key: string;
+  readonly value: unknown;
+}[];
 type Line = Record<string, unknown>;
 export declare const MAX_LINES = 200;
 export declare const editableInline: (entity: MetaEntity) => readonly MetaInline[];
@@ -563,20 +591,7 @@ export declare function lineProblems(inline: MetaInline, line: Readonly<Line>): 
 }[];
 export declare function linesChanged(inline: MetaInline, start: readonly Line[], now: readonly Line[]): boolean;
 export declare const newLine: (inline: MetaInline) => Line;
-export declare const extensionsOf: (meta: Meta | undefined) => MetaExtensions;
 export declare function labelText(label: MetaLabel | undefined, locale: string, fallback?: string): string;
-export declare const pageFor: (extensions: MetaExtensions, plugin: string, path: string) => MetaPage | undefined;
-export declare const widgetsIn: (extensions: MetaExtensions, slot: string) => readonly MetaWidget[];
-export declare const fieldWidgetFor: (extensions: MetaExtensions, name: string) => MetaWidget | undefined;
-export declare const screenFor: (extensions: MetaExtensions, kind: "list" | "form", entity: string) => MetaScreen | undefined;
-export declare const moduleSrc: (base: string, module: string) => string;
-interface AdminHost<UI = unknown> {
-  readonly ui: UI;
-  readonly client: AdminClient;
-  readonly locale: Locale;
-  readonly navigate: (path: string) => void;
-  readonly text: (label: MetaLabel | string) => string;
-}
 interface BrandSettings {
   readonly name?: string;
   readonly logo?: string;
@@ -612,13 +627,20 @@ interface MenuGroup {
   readonly label?: string | MetaLabel;
   readonly entries: readonly MenuEntry[];
 }
+interface MenuPage {
+  readonly path: string;
+  readonly module: string;
+  readonly label: MetaLabel;
+  readonly icons: readonly string[];
+  readonly group?: string;
+}
 export declare const DEFAULT_MENU: readonly MenuGroupSettings[];
-export declare function menuOf(meta: Meta, order?: readonly MenuGroupSettings[]): MenuGroup[];
+export declare function menuOf(meta: Meta, order?: readonly MenuGroupSettings[], pages?: readonly MenuPage[]): MenuGroup[];
 export declare function searchMenu(groups: readonly MenuGroup[], text: string, labelOfEntry: (entry: MenuEntry) => string): MenuEntry[];
 export declare function currentEntry(groups: readonly MenuGroup[], path: string): {
   readonly group: MenuGroup;
   readonly entry: MenuEntry;
 } | undefined;
 export declare const packageName = "@bieberkit/admin-core";
-export { type AdminClient, type AdminClientOptions, type AdminHost, type AdminSettings, type BrandSettings, type BulkOperation, type BulkOutcome, type BulkResult, type Conflict, type Connection, type ConnectionEvent, type CsvColumn, type Dictionary, type DraftStorage, en as ENGLISH, type ErrorReport, type FieldProblem, type FieldStates, type Filter, type FilterOperator, type HistoryEntry, type KeyPress, type Line, type ListParams, type Locale, type MediaFile, type MenuEntry, type MenuGroup, type MenuGroupSettings, type MessageKey, type Meta, type MetaEntity, type MetaExtensions, type MetaField, type MetaInline, type MetaLabel, type MetaMenuItem, type MetaPage, type MetaScreen, type MetaTransition, type MetaWidget, type Page, type Related, type Row, type SavedView, type SessionUser, type Shortcut, type ValueProblem, type Vital, type VitalReport, type When };
+export { type AdminClient, type AdminClientOptions, type AdminPart, type AdminPartInput, type AdminProblem, type AdminRegistry, type AdminSettings, type AdminView, type BrandSettings, type BulkOperation, type BulkOutcome, type BulkResult, type Conflict, type Connection, type ConnectionEvent, type Contribution, type CsvColumn, type Dictionary, type DraftStorage, en as ENGLISH, type ErrorReport, type FieldProblem, type FieldStates, type Filter, type FilterOperator, type GateState, type KeyPress, type Line, type ListParams, type Load, type Locale, type MenuContribution, type MenuEntry, type MenuGroup, type MenuGroupSettings, type MenuPage, type MessageKey, type Meta, type MetaEntity, type MetaField, type MetaInline, type MetaLabel, type MetaTransition, type Owned, type Page, type PageContribution, type Related, type RequestInput, type Row, type SavedView, type SessionUser, type Shortcut, type Texts, type ValueProblem, type Vital, type VitalReport, type When };
 ```

@@ -28,16 +28,16 @@
   "exports": {
     ".": {
       "@bieberkit/source": "./src/index.ts",
-      "types": "./dist/lib/index.d.ts",
-      "default": "./dist/lib/index.js"
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
     },
     "./package.json": "./package.json"
   },
   "publishConfig": {
     "exports": {
       ".": {
-        "types": "./dist/lib/index.d.ts",
-        "default": "./dist/lib/index.js"
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
       },
       "./package.json": "./package.json"
     },

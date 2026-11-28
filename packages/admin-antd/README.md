@@ -24,11 +24,11 @@
 
 # @bieberkit/admin-antd
 
-Default admin UI adapter on Ant Design.
+The admin on Ant Design, as a library. A project builds its admin from it: `apps/admin` calls `startAdmin(root, { parts })` with the admin parts of its plugins, which `bieberkit/admin-vite` lists from the config. It holds the shell, the generic list and form, the slots of the admin, and what the screens of a plugin use (hooks, slot prop types, shared components). It holds no screen of one plugin. See [writing a plugin](../../docs/guides/writing-a-plugin.md).
 
 - Product layer. Imports contracts and foundation, never tools.
 - Workspace dependencies: `@bieberkit/admin-core`, `@bieberkit/tokens`.
-- Status: placeholder. The design is in [the specification](../../docs/spec/SPEC.md).
+- The design is in [the specification](../../docs/spec/SPEC.md), section 16, and in [docs/modules/plugin-admin.md](../../docs/modules/plugin-admin.md).
 
 ## License
 
