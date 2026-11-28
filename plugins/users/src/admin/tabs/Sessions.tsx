@@ -28,9 +28,9 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Alert, Button, Skeleton, Tag } from 'antd';
 import { useState } from 'react';
 import type { JSX } from 'react';
-import styles from '../account.module.css';
-import { deviceOf } from '../rules.ts';
-import { useAccountApi, useAuthError } from '../useAccount.ts';
+import styles from '../components/account.module.css';
+import { deviceOf } from '../lib/rules.ts';
+import { useAccountApi, useAuthError } from '../lib/useAccount.ts';
 
 export function SessionsTab(): JSX.Element {
   const t = useText();

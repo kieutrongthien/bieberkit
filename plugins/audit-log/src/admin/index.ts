@@ -33,7 +33,7 @@ const part: AdminPart<AdminView> = defineAdminPlugin({
       entity: '*',
       title: 'audit-log.history',
       permission: 'audit-log.read',
-      load: async () => ({ default: (await import('./History.tsx')).History }),
+      load: async () => ({ default: (await import('./tabs/History.tsx')).History }),
     },
   ],
   messages: {

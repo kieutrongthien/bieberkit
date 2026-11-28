@@ -123,7 +123,7 @@ Pictures of each screen go to the maintainer before the screens are implemented.
 
 Names are proposals. The tests fix them.
 
-The calls and the rules are in the admin part of the `users` plugin (`plugins/users/src/admin/api.ts` and `rules.ts`), over `AdminClient.request` of `admin-core`, which keeps the session and the sign out. They are not exported by a shared package (UI-34).
+The calls and the rules are in the admin part of the `users` plugin (`plugins/users/src/admin/lib/api.ts` and `rules.ts`), over `AdminClient.request` of `admin-core`, which keeps the session and the sign out. They are not exported by a shared package (UI-34).
 
 ```ts
 // plugins/users/src/admin

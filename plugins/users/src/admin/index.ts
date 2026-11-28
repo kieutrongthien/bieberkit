@@ -24,27 +24,32 @@
 
 import { defineAdminPlugin } from '@bieberkit/admin-core';
 import type { AdminPart, AdminView } from '@bieberkit/admin-core';
-import { enrolmentNeeded } from './rules.ts';
+import { enrolmentNeeded } from './lib/rules.ts';
 
 const part: AdminPart<AdminView> = defineAdminPlugin({
   name: '@bieberkit/plugin-users',
-  signIn: { load: async () => ({ default: (await import('./SignIn.tsx')).SignIn }) },
+  signIn: { load: async () => ({ default: (await import('./pages/SignIn.tsx')).SignIn }) },
   publicPages: [
     {
       path: '/forgot-password',
-      load: async () => ({ default: (await import('./ForgotPassword.tsx')).ForgotPassword }),
+      load: async () => ({ default: (await import('./pages/ForgotPassword.tsx')).ForgotPassword }),
     },
     // An address of one segment cannot be the list of an entity, which has two.
-    { path: '/reset-password', load: async () => ({ default: (await import('./ResetPassword.tsx')).ResetPassword }) },
+    {
+      path: '/reset-password',
+      load: async () => ({ default: (await import('./pages/ResetPassword.tsx')).ResetPassword }),
+    },
   ],
   gates: [
     {
       id: 'enrol',
       needed: ({ metaError }) => enrolmentNeeded(metaError),
-      load: async () => ({ default: (await import('./EnrolScreen.tsx')).EnrolScreen }),
+      load: async () => ({ default: (await import('./pages/EnrolScreen.tsx')).EnrolScreen }),
     },
   ],
-  notices: [{ id: 'grace', load: async () => ({ default: (await import('./GraceNotice.tsx')).GraceNotice }) }],
+  notices: [
+    { id: 'grace', load: async () => ({ default: (await import('./components/GraceNotice.tsx')).GraceNotice }) },
+  ],
   accountTabs: [
     {
       id: 'profile',

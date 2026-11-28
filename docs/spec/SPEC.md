@@ -388,13 +388,13 @@ modules/crm/
 ├── routes/          custom HTTP routes (entity routes are generated)
 ├── actions/         entity actions and transition handlers
 ├── jobs/            defineJob files
-├── events/          event payload schemas and subscribers
+├── events/          event names, payload schemas and subscribers
 ├── workflows/       multi-step workflows with compensations
-├── admin/           custom admin pages and widgets
-├── i18n/            vi.json, en.json, zh.json
-└── tests/
+├── settings/        defineSetting files
+└── admin/           the admin part of a plugin: index.ts, pages/, tabs/, fields/, components/, lib/, messages/
 ```
 
+- **MOD-19** A file is in the folder of its kind, and the root of a module or of the source of a plugin holds its entry only. A folder is made when it has a file, and a test lies next to what it tests. `bieberkit check layout` warns about a file that is out of place (`docs/modules/file-layout.md`).
 - **MOD-15** Dependencies point one way: routes, actions, jobs and subscribers call services. Services use the data layer. Nothing below calls upward.
 - **MOD-16** Only services open transactions. A request handler never writes to the database directly, so business rules have one home and can be reused by jobs and the CLI.
 - **MOD-17** Errors are thrown as `BkError` subclasses with a stable code, an HTTP status and a safe message. The HTTP layer maps them to RFC 9457 problems, and jobs map them to retry or fail decisions. Unknown errors become 500 and are reported (OBS-06).
@@ -1748,6 +1748,7 @@ Open questions:
 
 | Version | Date | Changes |
 | --- | --- | --- |
+| 0.8.42 | 2026-11-28 | MOD-19 and 7.4: where each file of a module, a plugin and an admin part goes, with `bieberkit check layout`; `settings/` added, `i18n/` and `tests/` left out, for the texts are in `admin/messages/` and a test lies next to what it tests |
 | 0.8.41 | 2026-11-28 | `schemaVersion` 2 of `_meta`: the pages, widgets, screens and menu entries of plugins left it (UI-02, META-02), and the loader of ADR 0037 is gone; admin-core still reads version 1. The code follows ADR 0040 from here |
 | 0.8.40 | 2026-11-28 | ADR 0040 (accepted the same day by delegation) and `docs/modules/plugin-admin.md`: a plugin ships its own admin UI in fixed slots and a project builds its admin from its plugins (UI-34 to UI-38); no `auth-ui` plugin, the account screens are of `users` (12, UI-26); UI-03, UI-04, UI-10, UI-11, UI-24 to UI-32, the CLI table, 11.1 and 11.3 follow. The code still follows ADR 0025 and 0037 until the items of M2.2 land |
 | 0.8.39 | 2026-11-28 | UI-26 and `docs/modules/admin-account.md`: a second factor is optional unless it is asked for (AUTH-05), TOTP is always on (AUTH-03), a password set by a link ends the sessions (AUTH-06), the links lead to the admin (USR-10), `mfaRequired` (USR-12) and `requireMfa` of a system role (ROL-06) |

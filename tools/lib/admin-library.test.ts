@@ -160,7 +160,12 @@ it('UI-37 a project with the packed packages builds the admin from the library, 
 
 it('UI-37 the packed users plugin ships its admin part, and installing it for a server brings no React', () => {
   const files = execFileSync('tar', ['-tf', pack('plugins/users')], { encoding: 'utf8' }).split('\n');
-  for (const file of ['admin/index.js', 'admin/index.d.ts', 'admin/SignIn.js', 'admin/account.module.css'])
+  for (const file of [
+    'admin/index.js',
+    'admin/index.d.ts',
+    'admin/pages/SignIn.js',
+    'admin/components/account.module.css',
+  ])
     expect(files).toContain(`package/dist/${file}`);
   expect(files.filter((file) => file.startsWith('package/src/'))).toEqual([]);
   const { cwd } = consumer('server', ['@bieberkit/plugin-users']);

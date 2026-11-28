@@ -22,15 +22,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { ADMIN_ROLE_NAME, assignRole, AuthRole, AuthUser, NIL_TENANT } from '@bieberkit/auth';
 import { definePlugin, env } from '@bieberkit/core';
 import type { PluginDef } from '@bieberkit/core';
 import { runInUnitOfWork } from '@bieberkit/data/orm';
-import { routes } from './routes.ts';
-
-export { routes } from './routes.ts';
-
+import { ADMIN_ROLE_NAME, AuthRole, AuthUser, NIL_TENANT, assignRole } from '@bieberkit/auth';
 import pkg from '../package.json' with { type: 'json' };
+import { routes } from './routes/index.ts';
+export { routes } from './routes/index.ts';
 
 const plugin: PluginDef = definePlugin({
   name: '@bieberkit/plugin-users',

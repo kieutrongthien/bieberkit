@@ -22,21 +22,20 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { AuthRole, AuthRolePermission, createRole, NIL_TENANT } from '@bieberkit/auth';
 import { definePlugin } from '@bieberkit/core';
 import type { PluginDef } from '@bieberkit/core';
-import { recordAudit, runInTransaction, runInUnitOfWork } from '@bieberkit/data/orm';
-import type { Database } from '@bieberkit/data/orm';
-import { routes } from './routes.ts';
+import { runInUnitOfWork } from '@bieberkit/data/orm';
+import { AuthRole, NIL_TENANT, createRole } from '@bieberkit/auth';
+import pkg from '../package.json' with { type: 'json' };
+import { routes } from './routes/index.ts';
+import { grantAll } from './services/grant-all.ts';
+export { routes } from './routes/index.ts';
 
 /** The administrator role: a system role that nobody renames, deletes or changes, with every permission of the project. */
 export const ADMIN_ROLE = 'admin';
+
 /** The staff role: read access to everything that the project lets a person read. */
 export const STAFF_ROLE = 'staff';
-
-export { routes } from './routes.ts';
-
-import pkg from '../package.json' with { type: 'json' };
 
 const plugin: PluginDef = definePlugin({
   name: '@bieberkit/plugin-roles',
@@ -65,20 +64,3 @@ const plugin: PluginDef = definePlugin({
 });
 
 export default plugin;
-
-/** Adds the permissions that the system role lacks. A seeder may do what the service refuses to do for a person: the role grows with the project. */
-async function grantAll(database: Database, roleId: string, list: readonly string[]): Promise<void> {
-  await runInTransaction(database, async (em) => {
-    const current = new Set((await em.find(AuthRolePermission, { roleId })).map((row) => row.permission));
-    const added = list.filter((permission) => !current.has(permission));
-    if (added.length === 0) return;
-    for (const permission of added) em.create(AuthRolePermission, { roleId, permission });
-    recordAudit(em, {
-      action: 'auth.role.updated',
-      entity: 'authRole',
-      recordId: roleId,
-      data: { added, removed: [] },
-    });
-    await em.flush();
-  });
-}

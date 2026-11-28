@@ -322,7 +322,7 @@ describe('section 6 a project that was made starts', () => {
   }, 40_000);
 
   it('UI-38 follows the code of the plugins of the project too, whose entities the generated files hold', async () => {
-    const { root } = project({ 'plugins/notes/src/entity.ts': '', 'plugins/empty/README.md': '' });
+    const { root } = project({ 'plugins/notes/src/entities/item.ts': '', 'plugins/empty/README.md': '' });
     const watched: string[] = [];
     let stopped = 0;
     const { spawn } = fake({});

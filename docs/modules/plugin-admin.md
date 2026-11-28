@@ -53,6 +53,8 @@ plugins/users/
 └── src/admin/index.ts    the admin part, exported as "./admin"
 ```
 
+Where each file goes inside these is in [file-layout.md](file-layout.md).
+
 ## Slots (UI-35)
 
 The list is closed. A new slot is a change of this spec and of the API.
@@ -92,7 +94,9 @@ The contract is `defineAdminPlugin` of `@bieberkit/admin-core` (`part.ts`), with
 const part: AdminPart<AdminView> = defineAdminPlugin({
   name: 'bieberkit-plugin-notes',
   menu: [{ page: '/notes', group: 'content' }],
-  pages: [{ path: '/notes', title: 'notes.title', permission: 'notes.read', load: () => import('./NotesPage.tsx') }],
+  pages: [
+    { path: '/notes', title: 'notes.title', permission: 'notes.read', load: () => import('./pages/NotesPage.tsx') },
+  ],
   messages: { en: () => import('./messages/en.ts'), vi: () => import('./messages/vi.ts') },
 });
 export default part;

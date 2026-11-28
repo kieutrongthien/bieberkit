@@ -669,3 +669,24 @@ describe('AUTHZ-06 the scoped-permissions rule', () => {
     expect(unknown.codes).toEqual(['BK_AUTHZ_SUBJECT_UNKNOWN']);
   });
 });
+
+describe('MOD-19 bieberkit check layout', () => {
+  it('MOD-19 warns about a file of a module or a plugin that is out of place, and does not fail the check', async () => {
+    const { violations, codes } = await check(
+      entries(
+        source('apps/server/src/modules/sales/module.ts', 'export default 1;'),
+        source('apps/server/src/modules/sales/entities/order.ts', 'export const a = 1;'),
+        source('apps/server/src/modules/sales/helper.ts', 'export const b = 1;'),
+        source('plugins/notes/src/index.ts', 'export default 1;'),
+        source('plugins/notes/src/routes.ts', 'export const c = 1;'),
+        source('apps/server/src/main.ts', 'export const d = 1;'),
+        source('apps/admin/src/part.ts', 'export const e = 1;'),
+      ),
+      ['layout'],
+    );
+    expect(violations.map((found) => `${found.file} ${found.severity}`).toSorted((a, b) => a.localeCompare(b))).toEqual(
+      ['apps/server/src/modules/sales/helper.ts warning', 'plugins/notes/src/routes.ts warning'],
+    );
+    expect(new Set(codes)).toEqual(new Set(['BK_LAYOUT_MISPLACED']));
+  });
+});

@@ -289,6 +289,25 @@ describe('section 6 the files of a new project', () => {
     expect(read(cwd, 'demo/pnpm-workspace.yaml')).toContain('\ndedupePeerDependents: false\n');
   });
 
+  it('MOD-19 AGENTS.md of a new project says where the files of a module and of a plugin go, and how to make them', async () => {
+    const cwd = workdir();
+    await create(cwd, ['demo', '--yes', '--no-install', '--no-git']);
+    const agents = read(cwd, 'demo/AGENTS.md');
+    for (const folder of [
+      'entities/',
+      'services/',
+      'routes/',
+      'actions/',
+      'jobs/',
+      'events/',
+      'admin/pages/',
+      'admin/lib/',
+    ])
+      expect(agents).toContain(folder);
+    for (const command of ['make:module', 'make:entity', 'make:job', 'make:plugin', 'bieberkit check layout'])
+      expect(agents).toContain(command);
+  });
+
   it('6 a scoped name makes a folder without the scope, and the packages pin the version of the framework', async () => {
     const cwd = workdir();
     await create(cwd, ['@team/crm-app', '--yes', '--no-install', '--no-git']);

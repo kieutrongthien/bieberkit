@@ -27,9 +27,9 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Alert, Button, Flex, Skeleton, Tag, Typography } from 'antd';
 import { useState } from 'react';
 import type { JSX } from 'react';
-import styles from '../account.module.css';
-import { BackupCodes, PasswordPrompt, TwoFactorSetup } from '../TwoFactorSetup.tsx';
-import { useAccountApi, useHasPassword, useMe } from '../useAccount.ts';
+import styles from '../components/account.module.css';
+import { BackupCodes, PasswordPrompt, TwoFactorSetup } from '../components/TwoFactorSetup.tsx';
+import { useAccountApi, useHasPassword, useMe } from '../lib/useAccount.ts';
 
 type Step =
   | { readonly name: 'idle' }

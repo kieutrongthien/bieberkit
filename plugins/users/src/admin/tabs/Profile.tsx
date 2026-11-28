@@ -27,8 +27,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Alert, App as AntApp, Button, Descriptions, Form, Input, Skeleton } from 'antd';
 import { useState } from 'react';
 import type { JSX } from 'react';
-import styles from '../account.module.css';
-import { useAccountApi, useAuthError, useMe } from '../useAccount.ts';
+import styles from '../components/account.module.css';
+import { useAccountApi, useAuthError, useMe } from '../lib/useAccount.ts';
 
 export function ProfileTab(): JSX.Element {
   const t = useText();

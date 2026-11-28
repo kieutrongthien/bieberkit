@@ -22,17 +22,23 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type { ScopedPermission } from '@bieberkit/auth';
 import { definePlugin, env } from '@bieberkit/core';
 import type { PluginDef } from '@bieberkit/core';
-import type { ScopedPermission } from '@bieberkit/auth';
-import { Notification, Preference } from './entity.ts';
-import { createNotifier, expandJob, pruneJob, subscriptions } from './notifier.ts';
-import type { Notifier } from './notifier.ts';
-import { routes } from './routes.ts';
-
-export { Notification, Preference } from './entity.ts';
-export { expandJob, pruneJob } from './notifier.ts';
-export type { Channel, Level, Notifier, SendInput, SendResult } from './notifier.ts';
+import type { Notifier } from './services/types.ts';
+import pkg from '../package.json' with { type: 'json' };
+import { Notification } from './entities/notification.ts';
+import { Preference } from './entities/preference.ts';
+import { routes } from './routes/index.ts';
+import { expandJob } from './jobs/expand.ts';
+import { pruneJob } from './jobs/prune.ts';
+import { subscriptions } from './events/subscriptions.ts';
+import { createNotifier } from './services/notifier.ts';
+export { Notification } from './entities/notification.ts';
+export { Preference } from './entities/preference.ts';
+export { expandJob } from './jobs/expand.ts';
+export { pruneJob } from './jobs/prune.ts';
+export type { Channel, Level, Notifier, SendInput, SendResult } from './services/types.ts';
 
 declare module '@bieberkit/core' {
   interface ServiceRegistry {
@@ -59,8 +65,6 @@ export const scopedPermissions: Readonly<Record<string, ScopedPermission>> = {
     when: (user) => ({ userId: user.id }),
   },
 };
-
-import pkg from '../package.json' with { type: 'json' };
 
 const plugin: PluginDef = definePlugin({
   name: '@bieberkit/plugin-notifications',

@@ -27,10 +27,10 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Alert, App as AntApp, Button, Checkbox, Form, Input, Skeleton } from 'antd';
 import { useState } from 'react';
 import type { JSX } from 'react';
-import styles from '../account.module.css';
-import { NewPasswordFields } from '../NewPasswordFields.tsx';
-import type { NewPassword } from '../NewPasswordFields.tsx';
-import { useAccountApi, useAuthError, useHasPassword } from '../useAccount.ts';
+import styles from '../components/account.module.css';
+import { NewPasswordFields } from '../components/NewPasswordFields.tsx';
+import type { NewPassword } from '../components/NewPasswordFields.tsx';
+import { useAccountApi, useAuthError, useHasPassword } from '../lib/useAccount.ts';
 
 interface Values extends NewPassword {
   readonly current: string;

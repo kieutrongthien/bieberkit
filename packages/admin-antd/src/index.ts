@@ -38,13 +38,20 @@ export {
   useNotice,
   useSession,
   usePluginText as useText,
-} from './app/hooks.ts';
-export type { AdminLanguage, AdminNotice, NavigateOptions, Text } from './app/hooks.ts';
-export { AdminLink } from './app/AdminLink.tsx';
-export { AuthLinks, AuthShell, CodeInput } from './app/AuthShell.tsx';
-export { GateShell } from './app/GateShell.tsx';
-export { FolderArt, Icon } from './app/icons.tsx';
-export type { FieldProps, GateProps, NoticeProps, RecordTabProps, ScreenProps, SignInProps } from './app/slot-props.ts';
+} from './lib/hooks.ts';
+export type { AdminLanguage, AdminNotice, NavigateOptions, Text } from './lib/hooks.ts';
+export { AdminLink } from './components/AdminLink.tsx';
+export { AuthLinks, AuthShell, CodeInput } from './components/AuthShell.tsx';
+export { GateShell } from './components/GateShell.tsx';
+export { FolderArt, Icon } from './components/icons.tsx';
+export type {
+  FieldProps,
+  GateProps,
+  NoticeProps,
+  RecordTabProps,
+  ScreenProps,
+  SignInProps,
+} from './slots/slot-props.ts';
 
 /** npm name of this package. */
 export const packageName: string = '@bieberkit/admin-antd';

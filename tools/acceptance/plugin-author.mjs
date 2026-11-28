@@ -205,8 +205,8 @@ async function dev(root, browser) {
     ['exec', 'bieberkit', 'dev', '--no-services', '--admin-port', String(ADMIN_PORT)],
     root,
   );
-  const screen = join(root, 'plugins/notes/src/admin/NotesPage.tsx');
-  const entity = join(root, 'plugins/notes/src/entity.ts');
+  const screen = join(root, 'plugins/notes/src/admin/pages/NotesPage.tsx');
+  const entity = join(root, 'plugins/notes/src/entities/item.ts');
   const screenBefore = readFileSync(screen, 'utf8');
   const entityBefore = readFileSync(entity, 'utf8');
   try {
@@ -317,7 +317,8 @@ async function main() {
     check(true, 'the tables of the plugin are made and the administrator is seeded');
     step('the checks of the project');
     bieberkit('generate');
-    bieberkit('check');
+    const checked = bieberkit('check');
+    check(!checked.includes('BK_LAYOUT_MISPLACED'), 'every file of the made plugin is in the folder of its kind');
     check(true, 'bieberkit check passes on the new project with its plugin');
     browser = await chromium.launch();
     await dev(root, browser);

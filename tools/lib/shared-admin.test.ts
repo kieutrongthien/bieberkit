@@ -32,10 +32,10 @@ describe('UI-34 the shared packages name no first-party plugin', () => {
   it('UI-34 scans the sources of admin-core and admin-antd, and not their tests and fixtures', () => {
     const paths = [
       'packages/admin-core/src/client.ts',
-      'packages/admin-antd/src/app/Gate.tsx',
+      'packages/admin-antd/src/shell/Gate.tsx',
       'packages/admin-core/src/client.test.ts',
       'packages/admin-core/src/fixtures/text-adapter.ts',
-      'packages/admin-antd/src/app/controls.test.tsx',
+      'packages/admin-antd/src/screens/controls.test.tsx',
       'plugins/users/src/admin/api.ts',
       'packages/cli/src/admin-vite.ts',
     ];

@@ -26,7 +26,7 @@ import { defineAdminPlugin } from '@bieberkit/admin-core';
 import type { AdminPart, AdminView } from '@bieberkit/admin-core';
 
 const control = async (): Promise<{ default: AdminView }> => ({
-  default: (await import('./FileControl.tsx')).FileControl,
+  default: (await import('./fields/FileControl.tsx')).FileControl,
 });
 
 const part: AdminPart<AdminView> = defineAdminPlugin({

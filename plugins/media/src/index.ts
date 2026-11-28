@@ -24,20 +24,23 @@
 
 import { definePlugin, env } from '@bieberkit/core';
 import type { PluginDef } from '@bieberkit/core';
-import { Folder, Media } from './entity.ts';
-import { routes } from './routes.ts';
-import {
-  createMediaService,
-  DEFAULT_ALLOWED_TYPES,
-  deleteObjectJob,
-  prunePendingJob,
-  subscriptions,
-} from './service.ts';
-import type { MediaService } from './service.ts';
-
-export { Folder, Media } from './entity.ts';
-export { DEFAULT_ALLOWED_TYPES, deleteObjectJob, kindOf, pathOf, prunePendingJob } from './service.ts';
-export type { FolderView, MediaLimits, MediaService, MediaView } from './service.ts';
+import type { MediaService } from './services/types.ts';
+import pkg from '../package.json' with { type: 'json' };
+import { MIME, numberOf, typesOf } from './services/limits.ts';
+import { DEFAULT_ALLOWED_TYPES } from './services/content.ts';
+import { Media } from './entities/media.ts';
+import { Folder } from './entities/folder.ts';
+import { routes } from './routes/index.ts';
+import { deleteObjectJob } from './jobs/delete-object.ts';
+import { prunePendingJob } from './jobs/prune-pending.ts';
+import { subscriptions } from './events/subscriptions.ts';
+import { createMediaService } from './services/media.ts';
+export { Folder } from './entities/folder.ts';
+export { Media } from './entities/media.ts';
+export { DEFAULT_ALLOWED_TYPES, kindOf, pathOf } from './services/content.ts';
+export { deleteObjectJob } from './jobs/delete-object.ts';
+export { prunePendingJob } from './jobs/prune-pending.ts';
+export type { FolderView, MediaLimits, MediaService, MediaView } from './services/types.ts';
 
 declare module '@bieberkit/core' {
   interface ServiceRegistry {
@@ -47,24 +50,6 @@ declare module '@bieberkit/core' {
 }
 
 const MB = 1024 * 1024;
-
-/** A whole number from the env, or the default. The test app hands values over as they were given. */
-const numberOf = (value: unknown, fallback: number | undefined): number | undefined =>
-  typeof value === 'number' ? value : typeof value === 'string' && /^\d+$/.test(value) ? Number(value) : fallback;
-
-const typesOf = (value: unknown): readonly string[] =>
-  Array.isArray(value)
-    ? value.map(String)
-    : typeof value === 'string' && value.trim() !== ''
-      ? value
-          .split(',')
-          .map((type) => type.trim().toLowerCase())
-          .filter((type) => type !== '')
-      : DEFAULT_ALLOWED_TYPES;
-
-const MIME = /^[a-z0-9][a-z0-9!#$&^_.+-]*\/[a-z0-9][a-z0-9!#$&^_.+-]*$/;
-
-import pkg from '../package.json' with { type: 'json' };
 
 const plugin: PluginDef = definePlugin({
   name: '@bieberkit/plugin-media',

@@ -29,7 +29,7 @@ Open-source TypeScript framework for management-style web apps and APIs (Apache 
 ## Commands
 
 - `pnpm install` only. Never npm, yarn or bun.
-- `pnpm check` runs headers, package layers and skill sync. Run it before every commit.
+- `pnpm check` runs headers, package layers, file layout and skill sync, among others. Run it before every commit.
 - `pnpm typecheck`, `pnpm lint`, `pnpm format`, `pnpm test`, `pnpm build`.
 - One package: `pnpm --filter @bieberkit/core build`. One test file: `pnpm test packages/core/src/index.test.ts`.
 - `pnpm check:headers --fix` inserts a missing header. You still write the `@description`.
@@ -38,9 +38,19 @@ Open-source TypeScript framework for management-style web apps and APIs (Apache 
 ## Layout
 
 - `packages/` framework packages, one folder each, published as `@bieberkit/*`, `bieberkit` and `create-bieberkit`.
-- `plugins/`, `templates/`, `registry/`, `examples/` are empty until Phase 2.
+- `plugins/` first-party plugins. `templates/`, `registry/`, `examples/` are empty until Phase 2.
 - `skills/` holds skills shipped into generated projects. Skills for working on this repository are in `.agents/skills/`. Generic process skills come from the Superpowers plugin, which is not vendored here.
 - `docs/spec/SPEC.md` spec, `docs/adr/` decisions, `docs/modules/` module specs.
+
+## File layout (MOD-19)
+
+Put each file in the folder of its kind. `pnpm check` fails otherwise (`pnpm check:layout`, [docs/modules/file-layout.md](docs/modules/file-layout.md)).
+
+- Module or plugin backend (`modules/<name>/`, `plugins/<name>/src/`): `module.ts` or `index.ts` declares and publishes and holds no logic; then `entities/` (one file per entity), `services/`, `routes/` (`routes/index.ts` lists them in order), `actions/`, `jobs/`, `events/`, `workflows/`, `settings/`.
+- Admin part (`src/admin/`): `index.ts` declares the slots; then `pages/`, `tabs/`, `fields/`, `components/`, `lib/` (no user interface), `messages/`.
+- Admin shell (`packages/admin-antd/src/`): `app/` only starts the application; then `shell/`, `screens/`, `slots/`, `components/`, `lib/`.
+- A folder is made when it has a file. A test lies next to what it tests.
+- The generators (`make:module`, `make:entity`, `make:job`, `make:plugin` in `packages/cli/src/make.ts`) and the `AGENTS.md` of a new project (`packages/create/src/scaffold/render.ts`) follow this. Change them with the rule.
 
 ## Package layers (PKG-01)
 

@@ -37,5 +37,5 @@ export default defineConfig({
   clean: true,
   // The styles are copied beside the files that import them, and the build of the project reads them.
   deps: { neverBundle: [/\.css$/] },
-  copy: [{ from: 'src/admin/account.module.css', to: 'dist/admin' }],
+  copy: [{ from: 'src/admin/components/account.module.css', to: 'dist/admin/components' }],
 });

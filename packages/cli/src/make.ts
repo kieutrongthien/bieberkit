@@ -81,6 +81,7 @@ export function moduleFile(config: ProjectConfigInput, name: string, year: numbe
 import type { ModuleDef } from '@bieberkit/core';
 ${IMPORTS}
 
+// Entities go in entities/, business logic in services/, custom routes in routes/, jobs in jobs/ and subscriptions in events/.
 const definition: ModuleDef = defineModule({
   name: '${name}',
   entities: [
@@ -335,8 +336,8 @@ export default defineConfig({
 `,
     },
     {
-      path: `${dir}/src/entity.ts`,
-      content: `${header('src/entity.ts', `The ${pascal(short)} item of the ${short} plugin, with the routes that its settings generate.`)}import { defineEntity, f } from '@bieberkit/data';
+      path: `${dir}/src/entities/item.ts`,
+      content: `${header('src/entities/item.ts', `The ${pascal(short)} item of the ${short} plugin, with the routes that its settings generate.`)}import { defineEntity, f } from '@bieberkit/data';
 import type { EntityDef } from '@bieberkit/data';
 
 export const Item: EntityDef<'${entity}'> = defineEntity({
@@ -359,9 +360,9 @@ export const Item: EntityDef<'${entity}'> = defineEntity({
       content: `${header('src/index.ts', `The ${short} plugin: what it declares to the application (PLG-07).`)}import { definePlugin } from '@bieberkit/core';
 import type { PluginDef } from '@bieberkit/core';
 import pkg from '../package.json' with { type: 'json' };
-import { Item } from './entity.ts';
+import { Item } from './entities/item.ts';
 
-export { Item } from './entity.ts';
+export { Item } from './entities/item.ts';
 
 const plugin: PluginDef = definePlugin({
   name: '${name}',
@@ -398,6 +399,7 @@ The ${short} plugin for BieberKit.
 - \`pnpm build\` builds it and writes its static manifest into \`package.json\` (PLG-07). \`bieberkit build --check\` verifies the manifest without writing.
 - Add it to another project with \`bieberkit add ${name}\`, and take it out with \`bieberkit remove ${name}\`.
 - It owns the table \`${table}\`. Other plugins reach it through what this package exports, and never through its tables (PLG-01, PLG-02).
+- Its files are in the folder of their kind: \`entities/\`, \`services/\`, \`routes/\`, \`jobs/\`, \`events/\`, and in \`admin/\` the folders \`pages/\`, \`tabs/\`, \`fields/\`, \`components/\`, \`lib/\` and \`messages/\`. \`bieberkit check layout\` says when a file is out of place.
 `,
     },
     ...(plugin.admin ? adminFiles(plugin, header) : []),
@@ -422,12 +424,12 @@ function adminFiles(plugin: NewPlugin, header: (file: string, description: strin
 import type { AdminPart, AdminView } from '@bieberkit/admin-core';
 
 // The slots are a closed list: menu, pages, headerActions, notices, recordTabs, fields, homeBlocks, accountTabs, publicPages,
-// signIn, gates and screens. This module is read when the admin is built, so it imports no screen: each is loaded when it is drawn.
+// signIn, gates and screens. Whole screens go in pages/, tabs in tabs/, controls of fields in fields/, smaller pieces in components/. This module is read when the admin is built, so it imports no screen: each is loaded when it is drawn.
 const part: AdminPart<AdminView> = defineAdminPlugin({
   name: '${name}',
   menu: [{ page: '/${short}' }],
   pages: [
-    { path: '/${short}', title: '${short}.title', permission: '${short}.read', load: () => import('./${page}.tsx') },
+    { path: '/${short}', title: '${short}.title', permission: '${short}.read', load: () => import('./pages/${page}.tsx') },
   ],
   messages: {
     en: () => import('./messages/en.ts'),
@@ -440,8 +442,8 @@ export default part;
 `,
     },
     {
-      path: `${dir}/src/admin/${page}.tsx`,
-      content: `${header(`src/admin/${page}.tsx`, `The page of the ${short} plugin: its items, read with the client of the admin.`)}import { AdminLink, useAdminClient, useMeta, useText } from '@bieberkit/admin-antd';
+      path: `${dir}/src/admin/pages/${page}.tsx`,
+      content: `${header(`src/admin/pages/${page}.tsx`, `The page of the ${short} plugin: its items, read with the client of the admin.`)}import { AdminLink, useAdminClient, useMeta, useText } from '@bieberkit/admin-antd';
 import { useQuery } from '@tanstack/react-query';
 import { Alert, Skeleton, Table } from 'antd';
 import type { JSX } from 'react';

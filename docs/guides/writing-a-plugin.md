@@ -48,14 +48,36 @@ plugins/notes/
 ├── package.json              exports "." and "./admin" as source; publishConfig turns them to dist
 ├── tsconfig.json             the backend
 └── src/
-    ├── index.ts              definePlugin: entities, permissions, routes
-    ├── entity.ts
+    ├── index.ts              definePlugin: what the plugin declares and publishes
+    ├── entities/item.ts
     └── admin/
         ├── index.ts          defineAdminPlugin: what the admin gets
-        ├── NotesPage.tsx
+        ├── pages/NotesPage.tsx
         ├── messages/{en,vi,zh}.ts
         └── tsconfig.json     the screens: DOM and JSX
 ```
+
+### Where each file goes
+
+`make:plugin` makes only the folders that it needs. Add the others as the plugin grows:
+
+| Folder              | Holds                                                                  |
+| ------------------- | ---------------------------------------------------------------------- |
+| `entities/`         | One file for each `defineEntity`                                       |
+| `services/`         | Business logic and transactions                                        |
+| `routes/`           | Custom routes, with `routes/index.ts` that lists them                  |
+| `actions/`          | Actions and transitions of an entity                                   |
+| `jobs/`             | `defineJob` files                                                      |
+| `events/`           | Event names, payloads and subscriptions                                |
+| `workflows/`        | Work of many steps                                                     |
+| `settings/`         | `defineSetting` files                                                  |
+| `admin/pages/`      | Whole screens: pages, the sign in, gates, replaced lists and forms     |
+| `admin/tabs/`       | Tabs of a record and of "My account"                                   |
+| `admin/fields/`     | Controls of fields                                                     |
+| `admin/components/` | Header actions, notices, home blocks, and what screens share, with CSS |
+| `admin/lib/`        | Calls, rules and hooks, with no user interface                         |
+
+The root of `src/` holds `index.ts` and tests only. Routes, actions, jobs and subscriptions call services, and a service never calls them. `pnpm bieberkit check layout` warns when a file is out of place.
 
 While the plugin is in your project, its source is what runs. An edit of a screen shows in `pnpm dev` without a reload. `pnpm build` checks the types of the backend and of the screens and builds one admin.
 
@@ -72,7 +94,9 @@ import type { AdminPart, AdminView } from '@bieberkit/admin-core';
 const part: AdminPart<AdminView> = defineAdminPlugin({
   name: 'bieberkit-plugin-notes', // the name of the package
   menu: [{ page: '/notes', group: 'content' }],
-  pages: [{ path: '/notes', title: 'notes.title', permission: 'notes.read', load: () => import('./NotesPage.tsx') }],
+  pages: [
+    { path: '/notes', title: 'notes.title', permission: 'notes.read', load: () => import('./pages/NotesPage.tsx') },
+  ],
   messages: { en: () => import('./messages/en.ts'), vi: () => import('./messages/vi.ts') },
 });
 

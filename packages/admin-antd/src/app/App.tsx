@@ -28,18 +28,18 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createRootRoute, createRoute, createRouter, lazyRouteComponent, RouterProvider } from '@tanstack/react-router';
 import { compileAntdTheme, cssVariables, modeOf, readTheme } from '@bieberkit/tokens';
 import { App as AntApp, ConfigProvider, Empty, theme as antTheme } from 'antd';
-import { FolderArt } from './icons.tsx';
+import { FolderArt } from '../components/icons.tsx';
 import { useEffect, useState } from 'react';
-import { ENGLISH_RESOURCES, initialLocale, LanguageContext, loadResources, saveLocale } from './language.tsx';
-import type { Resources } from './language.tsx';
+import { ENGLISH_RESOURCES, initialLocale, LanguageContext, loadResources, saveLocale } from '../lib/language.tsx';
+import type { Resources } from '../lib/language.tsx';
 import type { JSX } from 'react';
-import { ErrorBoundary, ErrorScreen } from './ErrorScreens.tsx';
-import { Gate } from './Gate.tsx';
-import { adminBase } from './base.ts';
-import { ClientContext } from './context.ts';
-import { PluginPage } from './PluginPage.tsx';
-import { RegistryContext, Slot } from './slots.tsx';
-import type { Registry } from './slots.tsx';
+import { ErrorBoundary, ErrorScreen } from '../shell/ErrorScreens.tsx';
+import { Gate } from '../shell/Gate.tsx';
+import { adminBase } from '../lib/base.ts';
+import { ClientContext } from '../lib/context.ts';
+import { PluginPage } from '../screens/PluginPage.tsx';
+import { RegistryContext, Slot } from '../slots/slots.tsx';
+import type { Registry } from '../slots/slots.tsx';
 
 /** Whether the system asks for the dark palette, kept up to date while the page is open. */
 function useSystemDark(dark: MediaQueryList): boolean {
@@ -69,10 +69,10 @@ export function createApp(admin: Registry): () => JSX.Element {
 
   const root = createRootRoute({ component: Gate });
   // Every screen is a chunk of its own, loaded when its route is opened (UI-12).
-  const welcome = lazyRouteComponent(() => import('./Welcome.tsx'), 'Welcome');
-  const listScreen = lazyRouteComponent(() => import('./ListScreen.tsx'), 'ListScreen');
-  const formScreen = lazyRouteComponent(() => import('./FormScreen.tsx'), 'FormScreen');
-  const myAccount = lazyRouteComponent(() => import('./MyAccount.tsx'), 'MyAccount');
+  const welcome = lazyRouteComponent(() => import('../screens/Welcome.tsx'), 'Welcome');
+  const listScreen = lazyRouteComponent(() => import('../screens/ListScreen.tsx'), 'ListScreen');
+  const formScreen = lazyRouteComponent(() => import('../screens/FormScreen.tsx'), 'FormScreen');
+  const myAccount = lazyRouteComponent(() => import('../screens/MyAccount.tsx'), 'MyAccount');
   const index = createRoute({ getParentRoute: () => root, path: '/', component: welcome });
   // "My account", whose tabs the plugins give (UI-26). An address of one segment cannot be the list of an entity, which has two.
   const account = createRoute({ getParentRoute: () => root, path: 'account', component: myAccount });

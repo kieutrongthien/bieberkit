@@ -248,6 +248,18 @@ Built on BieberKit. The commands run from the root of the project:
 - \`pnpm check\` runs the rules of the framework (\`bieberkit check\`): headers, env access, boundaries, SQL, transactions, migrations.
 - \`bieberkit routes\`, \`bieberkit openapi\` and \`bieberkit client:generate\` show and generate the API.
 - \`bieberkit make:module\`, \`make:entity\` and \`make:job\` start new code from the official recipes.
+- \`bieberkit make:plugin bieberkit-plugin-<name>\` makes a plugin in \`plugins/\`, with its backend and its page in the admin.
+
+Where code goes. Every module (\`apps/server/src/modules/<name>/\`) and every plugin (\`plugins/<name>/src/\`) has the same shape, and \`bieberkit check layout\` says when a file is out of place:
+
+- \`module.ts\` (a module) or \`index.ts\` (a plugin) declares and publishes. It holds no logic.
+- \`entities/\` one file for each entity. \`services/\` business logic and transactions. \`routes/\` custom routes. \`actions/\` actions of an entity.
+- \`jobs/\` background work. \`events/\` event names, payloads and subscriptions. \`workflows/\` many steps. \`settings/\` declared settings.
+- Routes, actions, jobs and subscriptions call services. A service never calls them.
+- A plugin keeps its screens in \`admin/\`: \`index.ts\` declares the slots, \`admin/pages/\` whole screens, \`admin/tabs/\` tabs,
+  \`admin/fields/\` controls of fields, \`admin/components/\` smaller pieces, \`admin/lib/\` what has no user interface, \`admin/messages/\` the texts.
+- Screens of the project itself go in \`apps/admin/src\`.
+- A folder is made when it has a file. A test lies next to what it tests.
 
 Rules:
 

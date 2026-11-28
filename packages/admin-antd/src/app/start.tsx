@@ -38,9 +38,9 @@ import '@fontsource/be-vietnam-pro/700.css';
 // oxlint-disable-next-line import/no-unassigned-import
 import './app.css';
 import { createApp } from './App.tsx';
-import { reloadForChunk } from './chunk.ts';
-import { reportClientError, startReports } from './reports.ts';
-import type { AdminComponent } from './slots.tsx';
+import { reloadForChunk } from '../lib/chunk.ts';
+import { reportClientError, startReports } from '../lib/reports.ts';
+import type { AdminComponent } from '../slots/slots.tsx';
 
 export type { AdminComponent };
 

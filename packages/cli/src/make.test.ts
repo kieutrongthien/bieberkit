@@ -216,7 +216,7 @@ describe('PLG-03 make:plugin', () => {
   const FILES = [
     'plugins/notes/README.md',
     'plugins/notes/package.json',
-    'plugins/notes/src/entity.ts',
+    'plugins/notes/src/entities/item.ts',
     'plugins/notes/src/index.test.ts',
     'plugins/notes/src/index.ts',
     'plugins/notes/tsconfig.json',
@@ -349,7 +349,7 @@ function newProject(files: Readonly<Record<string, string>> = NEW_PROJECT): Fixt
 const jsonOf = (root: string, path: string): Record<string, unknown> => JSON.parse(read(root, path));
 
 const ADMIN_FILES = [
-  'plugins/notes/src/admin/NotesPage.tsx',
+  'plugins/notes/src/admin/pages/NotesPage.tsx',
   'plugins/notes/src/admin/index.ts',
   'plugins/notes/src/admin/messages/en.ts',
   'plugins/notes/src/admin/messages/vi.ts',
@@ -527,7 +527,7 @@ describe('UI-38 make:plugin in a project with an admin', () => {
   it('23.7 the made plugin with its admin part passes every rule of bieberkit check', async () => {
     const { root } = newProject();
     await run(root, ['make:plugin', NOTES, '--no-install']);
-    for (const rule of ['headers', 'boundaries', 'env-access', 'plugin-tables'])
+    for (const rule of ['headers', 'boundaries', 'env-access', 'plugin-tables', 'layout'])
       expect((await run(root, ['check', rule, '--json'])).data.violations).toEqual([]);
   });
 

@@ -24,14 +24,14 @@
 
 import { definePlugin } from '@bieberkit/core';
 import type { PluginDef } from '@bieberkit/core';
-import { declarations } from './declarations.ts';
-import { Setting } from './entity.ts';
-import { routes } from './routes.ts';
-import { createSettingsService } from './service.ts';
-import type { SettingsService } from './service.ts';
-
-export { siteLocale, siteLogo, siteName } from './declarations.ts';
-export { Setting } from './entity.ts';
+import type { SettingsService } from './services/types.ts';
+import pkg from '../package.json' with { type: 'json' };
+import { Setting } from './entities/setting.ts';
+import { routes } from './routes/index.ts';
+import { declarations } from './settings/site.ts';
+import { createSettingsService } from './services/settings.ts';
+export { siteLocale, siteLogo, siteName } from './settings/site.ts';
+export { Setting } from './entities/setting.ts';
 export type {
   Change,
   ExportedSetting,
@@ -42,7 +42,7 @@ export type {
   SettingsService,
   SettingView,
   Where,
-} from './service.ts';
+} from './services/types.ts';
 
 declare module '@bieberkit/core' {
   interface ServiceRegistry {
@@ -50,8 +50,6 @@ declare module '@bieberkit/core' {
     settings: SettingsService;
   }
 }
-
-import pkg from '../package.json' with { type: 'json' };
 
 const plugin: PluginDef = definePlugin({
   name: '@bieberkit/plugin-settings',

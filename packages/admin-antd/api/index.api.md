@@ -28,14 +28,14 @@
 Generated from the built declaration files by `pnpm api:update`. Do not edit by hand. A change here is a change to the public API and needs a changeset (spec section 22.3).
 
 ```ts
-import { AdminComponent } from "./app/slots.js";
-import { AdminLanguage, AdminNotice, NavigateOptions, Text, useAdminAddress, useAdminClient, useAdminNavigate, useCan, useLanguage, useMeta, useNotice, usePluginText, useSession } from "./app/hooks.js";
-import { AdminLink } from "./app/AdminLink.js";
+import { AdminComponent } from "./slots/slots.js";
+import { AdminLanguage, AdminNotice, NavigateOptions, Text, useAdminAddress, useAdminClient, useAdminNavigate, useCan, useLanguage, useMeta, useNotice, usePluginText, useSession } from "./lib/hooks.js";
+import { AdminLink } from "./components/AdminLink.js";
 import { AdminPart, StartOptions, startAdmin } from "./app/start.js";
-import { AuthLinks, AuthShell, CodeInput } from "./app/AuthShell.js";
-import { FieldProps, GateProps, NoticeProps, RecordTabProps, ScreenProps, SignInProps } from "./app/slot-props.js";
-import { FolderArt, Icon } from "./app/icons.js";
-import { GateShell } from "./app/GateShell.js";
+import { AuthLinks, AuthShell, CodeInput } from "./components/AuthShell.js";
+import { FieldProps, GateProps, NoticeProps, RecordTabProps, ScreenProps, SignInProps } from "./slots/slot-props.js";
+import { FolderArt, Icon } from "./components/icons.js";
+import { GateShell } from "./components/GateShell.js";
 export declare const packageName: string;
 export { type AdminComponent, type AdminLanguage, AdminLink, type AdminNotice, type AdminPart, AuthLinks, AuthShell, CodeInput, type FieldProps, FolderArt, type GateProps, GateShell, Icon, type NavigateOptions, type NoticeProps, type RecordTabProps, type ScreenProps, type SignInProps, type StartOptions, type Text, startAdmin, useAdminAddress, useAdminClient, useAdminNavigate, useCan, useLanguage, useMeta, useNotice, useSession, usePluginText as useText };
 ```

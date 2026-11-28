@@ -25,6 +25,7 @@
 import { boundariesRule } from './rules/boundaries.ts';
 import { envAccessRule } from './rules/env-access.ts';
 import { headersRule } from './rules/headers.ts';
+import { layoutRule } from './rules/layout.ts';
 import { generatedRule } from './rules/generated.ts';
 import { migrationsRule } from './rules/migrations.ts';
 import { ormRule } from './rules/orm.ts';
@@ -49,4 +50,5 @@ export const RULES: readonly Rule[] = [
   pluginStepsRule,
   pluginTablesRule,
   scopedPermissionsRule,
+  layoutRule,
 ];
