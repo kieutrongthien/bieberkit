@@ -202,7 +202,10 @@ export async function boot(options: BootOptions): Promise<Running> {
       // What the admin reads to draw its menu, its lists and its forms (UI-02).
       // What the plugins add to the admin: read and checked here, shown by `_meta`, served by `registerAdmin` (UI-04).
       const pluginAdmin = pluginAdminOf(project);
-      registerMeta(server, entities, { extensions: pluginAdmin.extensions });
+      registerMeta(server, entities, {
+        extensions: pluginAdmin.extensions,
+        permissions: permissionCatalog(project, modules),
+      });
       // What the admin tells about itself: its errors and its Core Web Vitals (UI-21).
       registerClientReports(server, { reporter, metrics });
       for (const route of contributed<RouteDef>(modules, 'routes')) server.route(route);

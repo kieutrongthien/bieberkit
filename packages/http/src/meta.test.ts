@@ -381,6 +381,23 @@ describe('META-04 only what the caller may see', () => {
     expect(meta.permissions).not.toContain('crm.note.read');
   });
 
+  it('UI-36 lists of the permissions of the project those that the caller holds, which the admin of a plugin asks about', async () => {
+    // A permission of a plugin that no entity and no route of the metadata names: without the list of the project, the route would
+    // never ask about it, and the admin could not tell whether to draw the page of the plugin.
+    const app = await entityApp({
+      authorizer: {
+        can: async (_p, permission) => permission !== 'notes.manage' && permission !== 'crm.account.close',
+      },
+    });
+    registerMeta(app.server, DEFS, { permissions: ['notes.read', 'notes.manage', 'crm.account.read'] });
+    const response = await app.server.inject({ method: 'GET', url: '/api/v1/_meta' });
+    const meta: Meta = JSON.parse(response.body);
+    expect(meta.permissions).toContain('notes.read');
+    expect(meta.permissions).not.toContain('notes.manage');
+    expect(meta.permissions.filter((name) => name === 'crm.account.read')).toHaveLength(1);
+    expect(meta.permissions).toEqual(meta.permissions.toSorted((a, b) => a.localeCompare(b)));
+  });
+
   it('META-04 has no row, no secret and no tenant in it', async () => {
     const app = await metaApp();
     await app.server.inject({

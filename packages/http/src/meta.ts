@@ -358,7 +358,14 @@ function staticOf(def: EntityDef<string>): StaticEntity {
 export function registerMeta(
   server: HttpServer,
   entities: readonly EntityDef<string>[],
-  options: { readonly extensions?: AdminExtensions } = {},
+  options: {
+    readonly extensions?: AdminExtensions;
+    /**
+     * Every permission of the project. The answer says which of them the caller holds, so that the admin part of a plugin knows what
+     * to draw (UI-36). It hides nothing that the server would give: every route checks its own permission.
+     */
+    readonly permissions?: readonly string[];
+  } = {},
 ): void {
   const extensions = options.extensions ?? { pages: [], widgets: [], screens: [], menu: [] };
   const prepared = entities
@@ -466,6 +473,8 @@ export function registerMeta(
           transitions,
         });
       }
+      // Asked last, so that the answers of the entities are used again and not asked twice.
+      for (const permission of options.permissions ?? []) await can(permission);
       return {
         schemaVersion: META_SCHEMA_VERSION,
         entities: out,
