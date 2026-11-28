@@ -25,7 +25,7 @@
 import { defineConfig } from 'tsdown';
 
 export default defineConfig({
-  entry: ['src/index.ts', 'src/bin.ts', 'src/oxlint.ts'],
+  entry: ['src/index.ts', 'src/bin.ts', 'src/oxlint.ts', 'src/admin-vite.ts'],
   format: 'esm',
   platform: 'node',
   target: 'node24.12',

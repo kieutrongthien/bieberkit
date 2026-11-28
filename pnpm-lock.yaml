@@ -320,6 +320,9 @@ importers:
 
   packages/cli:
     dependencies:
+      '@bieberkit/admin-core':
+        specifier: workspace:*
+        version: link:../admin-core
       '@bieberkit/auth':
         specifier: workspace:*
         version: link:../auth
@@ -341,6 +344,10 @@ importers:
       create-bieberkit:
         specifier: workspace:*
         version: link:../create
+    devDependencies:
+      vite:
+        specifier: 8.3.8
+        version: 8.3.8(@types/node@24.19.2)(yaml@2.9.1)
 
   packages/content:
     dependencies:

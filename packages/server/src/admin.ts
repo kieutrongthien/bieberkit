@@ -25,7 +25,7 @@
 import { existsSync, realpathSync } from 'node:fs';
 import { join } from 'node:path';
 import { serveStatic } from '@bieberkit/http';
-import { cssVariables, DEFAULT_THEME } from '@bieberkit/tokens';
+import { cssVariables, DEFAULT_THEME, parseTheme } from '@bieberkit/tokens';
 import type { Theme } from '@bieberkit/tokens';
 import type { AdminSettings } from '@bieberkit/admin-core';
 import type { HttpServer } from '@bieberkit/http';
@@ -179,6 +179,14 @@ export function pageAt(prefix: string, theme: Theme, settings: AdminSettings = {
         : placed.replace(/<title>[^<]*<\/title>/, () => `<title>${escapeAttribute(name)}</title>`);
     return titled.replace('</head>', () => head);
   };
+}
+
+/** `pageAt` for a project: its theme and its `admin` key. The dev server of the admin writes its page with it (UI-37). */
+export function adminPageOf(
+  config: { readonly theme?: unknown; readonly admin?: AdminSettings | undefined },
+  prefix: string,
+): (html: string) => string {
+  return pageAt(prefix, parseTheme(config.theme), config.admin);
 }
 
 /** Serves the admin where `location` says, when an adapter is installed. It answers whether it did. */
