@@ -47,7 +47,7 @@ export interface Measure {
   readonly total: number;
 }
 
-/** The compressed size of the initial scripts of a built admin (`dist/app`). */
+/** The compressed size of the initial scripts of a built admin (`apps/admin/dist` of a project). */
 export function measureAdmin(directory: string): Measure {
   const html = readFileSync(join(directory, 'index.html'), 'utf8');
   const files = initialScripts(html).map((path) => ({

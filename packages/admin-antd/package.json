@@ -1,7 +1,7 @@
 {
   "name": "@bieberkit/admin-antd",
   "version": "0.3.0",
-  "description": "The Ant Design adapter of the admin: login, the generic list and form, built as static files for /admin/.",
+  "description": "The Ant Design shell of the admin: the frame, the generic list and form, and the slots of the admin parts of plugins. A project builds its admin from it.",
   "keywords": [
     "bieberkit"
   ],
@@ -44,9 +44,8 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsdown && vite build",
-    "typecheck": "tsc --noEmit -p tsconfig.json",
-    "dev": "vite"
+    "build": "tsdown",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
     "@bieberkit/admin-core": "workspace:*",

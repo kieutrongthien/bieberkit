@@ -23,12 +23,15 @@
  */
 
 import { existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { ADMIN_BUDGET_BYTES, measureAdmin } from './lib/admin-size.ts';
 
-const directory = process.argv[2] ?? join(import.meta.dirname, '..', 'packages', 'admin-antd', 'dist', 'app');
+// The admin is built by a project, so the folder is the `apps/admin/dist` of one.
+const directory = resolve(process.argv[2] ?? join('apps', 'admin', 'dist'));
 if (!existsSync(join(directory, 'index.html'))) {
-  console.error(`check:admin-size: ${directory} has no index.html. Run pnpm build first.`);
+  console.error(
+    `check:admin-size: ${directory} has no index.html. Give the apps/admin/dist of a built project. pnpm test:e2e builds one and checks it.`,
+  );
   process.exit(1);
 }
 const { files, total } = measureAdmin(directory);

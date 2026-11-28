@@ -36,7 +36,22 @@ const ADMIN_PASSWORD = 'Playwright-Admin-Passw0rd!';
 const REPOSITORY = join(dirname(fileURLToPath(import.meta.url)), '..');
 const CLI = join(REPOSITORY, 'packages', 'cli', 'dist', 'bin.js');
 const PLUGINS = ['users', 'roles', 'settings', 'audit-log', 'notifications', 'media'];
-const PACKAGES = ['core', 'data', 'http', 'queue', 'server', 'auth', 'log', 'cache', 'mail', 'storage', 'admin-antd'];
+const PACKAGES = [
+  'core',
+  'data',
+  'http',
+  'queue',
+  'server',
+  'auth',
+  'log',
+  'cache',
+  'mail',
+  'storage',
+  'admin-core',
+  'admin-antd',
+];
+// What the admin of the project is built with, linked from where the library of the admin has it, so that there is one copy.
+const ADMIN_TOOLS = ['vite', '@vitejs/plugin-react', 'react', 'react-dom', 'antd'];
 
 // The tests of the account read the mailed links from the outbox, so the database is where they can find it.
 const DATABASE = join(tmpdir(), `bk-e2e-${PORT}.db`);
@@ -66,7 +81,7 @@ function run(cwd, args) {
   }
 }
 
-if (!existsSync(CLI) || !existsSync(join(REPOSITORY, 'packages', 'admin-antd', 'dist', 'app', 'index.html'))) {
+if (!existsSync(CLI) || !existsSync(join(REPOSITORY, 'packages', 'admin-antd', 'dist', 'lib', 'index.js'))) {
   process.stderr.write('Run `pnpm build` first: the browser test uses the built packages and the built admin.\n');
   process.exit(1);
 }
@@ -81,6 +96,22 @@ for (const name of PACKAGES)
 for (const name of PLUGINS)
   symlinkSync(join(REPOSITORY, 'plugins', name), join(root, 'node_modules', '@bieberkit', `plugin-${name}`), 'dir');
 symlinkSync(join(REPOSITORY, 'packages', 'data', 'node_modules', 'zod'), join(root, 'node_modules', 'zod'), 'dir');
+symlinkSync(join(REPOSITORY, 'packages', 'cli'), join(root, 'node_modules', 'bieberkit'), 'dir');
+mkdirSync(join(root, 'node_modules', '@vitejs'), { recursive: true });
+for (const name of ADMIN_TOOLS)
+  symlinkSync(
+    join(REPOSITORY, 'packages', 'admin-antd', 'node_modules', name),
+    join(root, 'node_modules', name),
+    'dir',
+  );
+// The admin depends on every plugin of the project, as `create` and `bieberkit add` write it.
+mkdirSync(join(root, 'apps', 'admin', 'node_modules', '@bieberkit'), { recursive: true });
+for (const name of PLUGINS)
+  symlinkSync(
+    join(REPOSITORY, 'plugins', name),
+    join(root, 'apps', 'admin', 'node_modules', '@bieberkit', `plugin-${name}`),
+    'dir',
+  );
 mkdirSync(join(root, 'data'), { recursive: true });
 writeFileSync(join(root, 'apps', 'server', 'src', 'seed.ts'), 'export default async function seed() {}\n');
 
@@ -98,6 +129,26 @@ writeFileSync(
   configPath,
   readFileSync(configPath, 'utf8').replace('plugins: [', `${brand}plugins: [\n    '@bieberkit/plugin-crm',`),
 );
+
+symlinkSync(
+  join(root, 'node_modules', '@bieberkit', 'plugin-crm'),
+  join(root, 'apps', 'admin', 'node_modules', '@bieberkit', 'plugin-crm'),
+  'dir',
+);
+
+/** A program that has to succeed before the server starts. */
+function node(cwd, args) {
+  const result = spawnSync(process.execPath, args, { cwd, env, encoding: 'utf8' });
+  if (result.status !== 0) {
+    process.stderr.write(`node ${args.join(' ')} failed:\n${result.stdout}${result.stderr}\n`);
+    process.exit(1);
+  }
+}
+
+// The admin of the project, built from its plugins as `bieberkit build` builds it, and held to the budget of section 18.1.
+const admin = join(root, 'apps', 'admin');
+node(admin, [join(root, 'node_modules', 'vite', 'bin', 'vite.js'), 'build']);
+node(REPOSITORY, [join(REPOSITORY, 'tools', 'check-admin-size.ts'), join(admin, 'dist')]);
 
 run(root, ['migrate:make']);
 run(root, ['migrate']);
