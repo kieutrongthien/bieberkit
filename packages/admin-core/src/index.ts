@@ -41,7 +41,7 @@ export type {
   PageContribution,
   Texts,
 } from './part.ts';
-export { allowed, composeAdmin, messageProblems } from './compose.ts';
+export { allowed, composeAdmin, gatesFor, messageProblems } from './compose.ts';
 export type { AdminProblem, AdminRegistry, Owned } from './compose.ts';
 export {
   fillText,

@@ -85,6 +85,7 @@ export function composeAdmin<C>(parts: readonly AdminPart<C>[]): {
   const paths = new Map<string, string>();
   const widgets = new Map<string, string>();
   const replaced = new Map<string, string>();
+  const prefixes = new Map<string, string>();
   const signIns: Owned<NonNullable<AdminPartInput<C>['signIn']>>[] = [];
 
   const owned = <T extends object>(read: (part: AdminPart<C>) => readonly T[] | undefined): Owned<T>[] =>
@@ -99,6 +100,10 @@ export function composeAdmin<C>(parts: readonly AdminPart<C>[]): {
       if (holder === undefined) taken.set(name, plugin);
       else add(code, `${what} "${name}" is taken by ${holder}.`);
     };
+
+    // The texts of a plugin are told apart by its short name, so two plugins with texts cannot share one.
+    if (part.messages !== undefined)
+      take(prefixes, shortNameOf(plugin), 'duplicate-name', 'The short name of the texts');
 
     for (const key of Object.keys(part))
       if (!SLOTS.has(key)) add('unknown-key', `"${key}" is no slot of the admin. The list of slots is closed.`);
@@ -226,6 +231,17 @@ export async function messageProblems<C>(
     }
   }
   return problems;
+}
+
+/**
+ * The gates that may be asked: one behind a permission that the person does not hold is left out. A refusal of the metadata, which
+ * some gates are there to answer, leaves the permissions unknown (`undefined`), and then every gate is asked.
+ */
+export function gatesFor<T extends { readonly permission?: string }>(
+  gates: readonly T[],
+  held: readonly string[] | undefined,
+): readonly T[] {
+  return held === undefined ? gates : allowed(gates, new Set(held));
 }
 
 /** What a person may see: what asks for no permission, and what they hold. The server stays the authority. */

@@ -22,7 +22,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { currentEntry, labelText } from '@bieberkit/admin-core';
+import { currentEntry, gatesFor, labelText } from '@bieberkit/admin-core';
 import type { GateState, MenuGroup, MessageKey } from '@bieberkit/admin-core';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link, Outlet, useNavigate, useRouterState } from '@tanstack/react-router';
@@ -295,7 +295,7 @@ function SignedIn(props: { readonly email: string }): JSX.Element {
   const queries = useQueryClient();
   const signOut = useSignOut();
   const { gates } = useRegistry();
-  const asked = gates.find((gate) => isNeeded(gate, { metaError: meta.error }));
+  const asked = gatesFor(gates, meta.data?.permissions).find((gate) => isNeeded(gate, { metaError: meta.error }));
   const wanted = asked === undefined ? undefined : nameOf(asked);
   const [held, setHeld] = useState<string | undefined>();
   useEffect(() => {

@@ -131,7 +131,7 @@ Done on 2026-11-28, in the order of the plan `docs/superpowers/plans/2026-11-28-
 
 ## Errors
 
-A wrong admin part stops the build with `BK_ADMIN_PART_INVALID`, which lists every problem with its plugin: `unknown-key`, `bad-path`, `reserved-path`, `duplicate-path`, `duplicate-id`, `duplicate-field`, `duplicate-screen`, `menu-without-page`, `no-sign-in`, `two-sign-ins`, `message-missing`, `message-extra`, `message-prefix`, `wrong-name` and `not-in-admin`. Two copies of a shared package are `BK_ADMIN_TWO_COPIES`, and a web role with an admin that is not built is `BK_ADMIN_NOT_BUILT`. They take the place of `BK_ADMIN_CONTRIBUTION_INVALID`.
+A wrong admin part stops the build with `BK_ADMIN_PART_INVALID`, which lists every problem with its plugin: `unknown-key`, `bad-path`, `reserved-path`, `duplicate-path`, `duplicate-id`, `duplicate-field`, `duplicate-screen`, `menu-without-page`, `no-sign-in`, `two-sign-ins`, `duplicate-name` (two plugins with texts and one short name), `message-missing`, `message-extra`, `message-prefix`, `wrong-name` and `not-in-admin`. Two copies of a shared package are `BK_ADMIN_TWO_COPIES`, and a web role with an admin that is not built is `BK_ADMIN_NOT_BUILT`. They take the place of `BK_ADMIN_CONTRIBUTION_INVALID`.
 
 ## Configuration
 

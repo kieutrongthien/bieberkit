@@ -487,6 +487,9 @@ export declare function composeAdmin<C>(parts: readonly AdminPart<C>[]): {
   readonly problems: readonly AdminProblem[];
 };
 export declare function messageProblems<C>(parts: readonly AdminPart<C>[], languages: readonly string[]): Promise<readonly AdminProblem[]>;
+export declare function gatesFor<T extends {
+  readonly permission?: string;
+}>(gates: readonly T[], held: readonly string[] | undefined): readonly T[];
 export declare function allowed<T extends {
   readonly permission?: string;
 }>(items: readonly T[], can: ReadonlySet<string>): readonly T[];

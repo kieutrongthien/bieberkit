@@ -133,7 +133,7 @@ Draw with Ant Design, so that the `theme` of the project changes your screens to
 | `BK_ADMIN_TWO_COPIES`   | The build found two copies of a shared package. Match the versions          |
 | `BK_ADMIN_NOT_BUILT`    | The web role started with an `apps/admin` that was not built. Run the build |
 
-The mistakes of a part are: a key that is no slot; an address that is not one segment, is of the shell (`/account`, `/ext`) or is taken; an id used twice; two controls for one widget or two replacements of one screen; a menu entry with no page; no sign in, or two; a text that is missing, extra or has the wrong prefix; a name that is not the one of the package; and a plugin that `apps/admin` does not depend on.
+The mistakes of a part are: a key that is no slot; an address that is not one segment, is of the shell (`/account`, `/ext`) or is taken; an id used twice; two plugins with texts and one short name; two controls for one widget or two replacements of one screen; a menu entry with no page; no sign in, or two; a text that is missing, extra or has the wrong prefix; a name that is not the one of the package; and a plugin that `apps/admin` does not depend on.
 
 Your own screens that belong to no plugin go in `apps/admin/src/part.ts`, an admin part with the name `app`.
 

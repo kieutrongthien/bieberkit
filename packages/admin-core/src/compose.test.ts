@@ -23,7 +23,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { allowed, composeAdmin, messageProblems } from './compose.ts';
+import { allowed, composeAdmin, gatesFor, messageProblems } from './compose.ts';
 import { defineAdminPlugin, shortNameOf } from './part.ts';
 import type { AdminPart, AdminPartInput } from './part.ts';
 
@@ -34,6 +34,8 @@ const part = (name: string, input: Omit<AdminPartInput<View>, 'name'> = {}): Adm
 /** A part that gives the sign in, which the admin needs. */
 const base = part('@bieberkit/plugin-users', { signIn: { load } });
 const codes = (parts: readonly AdminPart<View>[]): string[] => composeAdmin(parts).problems.map((p) => p.code);
+
+const texts = (value: Readonly<Record<string, string>>) => async () => ({ default: value });
 
 describe('UI-35 what the parts make together', () => {
   it('UI-35 keeps the order of the parts in every slot, and says whose each contribution is', () => {
@@ -140,6 +142,20 @@ describe('UI-36 the mistakes that stop the build', () => {
     expect(codes([base, part('bieberkit-plugin-x', { menu: [{ page: '/nowhere' }] })])).toEqual(['menu-without-page']);
   });
 
+  it('UI-36 two plugins with texts and one short name, whose keys would write over each other', () => {
+    const named = (name: string) => part(name, { messages: { en: texts({ 'notes.title': name }) } });
+    const { problems } = composeAdmin([base, named('bieberkit-plugin-notes'), named('@acme/bieberkit-plugin-notes')]);
+    expect(problems).toEqual([
+      {
+        plugin: '@acme/bieberkit-plugin-notes',
+        code: 'duplicate-name',
+        message: expect.stringContaining('bieberkit-plugin-notes'),
+      },
+    ]);
+    // Without texts the two take nothing from each other.
+    expect(codes([base, part('bieberkit-plugin-notes'), part('@acme/bieberkit-plugin-notes')])).toEqual([]);
+  });
+
   it('UI-26 no sign in, which the admin needs, and two of them', () => {
     expect(codes([])).toEqual(['no-sign-in']);
     expect(codes([base, part('bieberkit-plugin-x', { signIn: { load } })])).toEqual(['two-sign-ins']);
@@ -158,8 +174,6 @@ describe('UI-36 the mistakes that stop the build', () => {
     ]);
   });
 });
-
-const texts = (value: Readonly<Record<string, string>>) => async () => ({ default: value });
 
 /** A plugin with one page, whose title is a key, and these texts. */
 const notes = (messages: AdminPartInput<View>['messages']) =>
@@ -203,6 +217,20 @@ describe('UI-36 every language', () => {
     expect(await messageProblems([wrong], ['en'])).toEqual([
       { plugin: 'bieberkit-plugin-notes', code: 'message-prefix', message: expect.stringContaining('users.title') },
     ]);
+  });
+});
+
+describe('UI-36 which gates may stand in the way', () => {
+  const gates = [{ id: 'all' }, { id: 'managers', permission: 'a.manage' }];
+  const ids = (held: readonly string[] | undefined): string[] => gatesFor(gates, held).map((gate) => gate.id);
+
+  it('UI-36 a gate behind a permission is asked of a person who holds it, and of no other', () => {
+    expect(ids(['a.manage'])).toEqual(['all', 'managers']);
+    expect(ids([])).toEqual(['all']);
+  });
+
+  it('UI-36 while the permissions are not known, for the metadata was refused, every gate is asked', () => {
+    expect(ids(undefined)).toEqual(['all', 'managers']);
   });
 });
 
