@@ -22,7 +22,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { existsSync, realpathSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { serveStatic } from '@bieberkit/http';
 import { cssVariables, DEFAULT_THEME, parseTheme } from '@bieberkit/tokens';
@@ -31,9 +31,6 @@ import type { AdminSettings } from '@bieberkit/admin-core';
 import type { HttpServer } from '@bieberkit/http';
 import { retainAssets } from './admin-assets.ts';
 import { ServerError } from './errors.ts';
-
-/** The adapter that the framework maintains (UI-10). A project that installs another one sets its name in `admin.adapter` later. */
-export const ADMIN_PACKAGE = '@bieberkit/admin-antd';
 
 /** Where the admin is served when `ADMIN_URL` says nothing (UI-14). */
 export const ADMIN_PREFIX = '/admin';
@@ -136,20 +133,18 @@ export const ADMIN_POLICY: string = [
 ].join('; ');
 
 /**
- * The folder of the built admin of the project, or `undefined` when no adapter is installed. The adapter is a dependency of the
- * server app (or of the root), so it is in the `node_modules` of one of the two, and its application is `dist/app` in the package.
- * Only these two places are looked at: a package that happens to be on the path of the process is not the adapter of this project.
+ * The folder of the built admin of the project: `public/admin`, which the image of the server holds (DEP-06), else
+ * `apps/admin/dist`, which `bieberkit build` writes (UI-37). `undefined` when there is none.
  */
 export function adminDirectory(root: string): string | undefined {
-  for (const base of [join(root, 'apps', 'server'), root]) {
-    try {
-      const folder = join(realpathSync(join(base, 'node_modules', ADMIN_PACKAGE)), 'dist', 'app');
-      if (existsSync(join(folder, 'index.html'))) return folder;
-    } catch {
-      // Not installed here. Try the next place.
-    }
-  }
-  return undefined;
+  return [join(root, 'public', 'admin'), join(root, 'apps', 'admin', 'dist')].find((folder) =>
+    existsSync(join(folder, 'index.html')),
+  );
+}
+
+/** Whether the project has an admin, built or not: `bieberkit dev` serves it from its source and builds no file. */
+export function hasAdmin(root: string): boolean {
+  return existsSync(join(root, 'apps', 'admin', 'package.json')) || adminDirectory(root) !== undefined;
 }
 
 const escapeAttribute = (text: string): string =>
@@ -189,7 +184,7 @@ export function adminPageOf(
   return pageAt(prefix, parseTheme(config.theme), config.admin);
 }
 
-/** Serves the admin where `location` says, when an adapter is installed. It answers whether it did. */
+/** Serves the built admin where `location` says, when there is one. It answers whether it did. */
 export function registerAdmin(
   server: HttpServer,
   root: string,

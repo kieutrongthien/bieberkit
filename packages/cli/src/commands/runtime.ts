@@ -22,7 +22,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { existsSync, watch } from 'node:fs';
+import { ADMIN_APP, ADMIN_DEV_PORT } from '../admin-app.ts';
+import { existsSync, mkdirSync, watch, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { ROLES } from '@bieberkit/core';
 import type { Role } from '@bieberkit/core';
@@ -32,6 +33,7 @@ import { CliError, usageError } from '../errors.ts';
 import { generateFiles, writeFiles } from '../generate/files.ts';
 import { loadApp } from '../app.ts';
 import { realSpawn, supervise } from '../processes.ts';
+import type { Child } from '../processes.ts';
 import type { Spawn } from '../processes.ts';
 
 const isRole = (value: string): value is Role => ROLES.some((role) => role === value);
@@ -88,6 +90,11 @@ export function devCommand(deps: RuntimeDeps = {}): Command {
         type: 'boolean',
         description: 'Start the services of compose.yaml (default). --no-services skips them.',
       },
+      {
+        name: 'admin-port',
+        type: 'string',
+        description: `Where Vite serves the admin. Defaults to ${ADMIN_DEV_PORT}.`,
+      },
     ],
     async run(context) {
       const { root } = await loadConfig(context.cwd);
@@ -115,10 +122,27 @@ export function devCommand(deps: RuntimeDeps = {}): Command {
             timer = setTimeout(() => void regenerate(), 300);
           })
         : () => undefined;
+      // The admin is served by Vite from its source. The server is told its address as ADMIN_URL, so that the sign in trusts it,
+      // and the links that are mailed lead to it. The file is read by Node.js: a value that the real environment has wins.
+      let admin: Child | undefined;
+      const options: string[] = [];
+      if (existsSync(join(root, ADMIN_APP, 'package.json'))) {
+        const port = String(context.args.flags['admin-port'] ?? ADMIN_DEV_PORT);
+        const address = `http://localhost:${port}/`;
+        const environment = join(root, '.bieberkit', 'dev.env');
+        mkdirSync(join(root, '.bieberkit'), { recursive: true });
+        writeFileSync(environment, `# Written by bieberkit dev: where Vite serves the admin.\nADMIN_URL=${address}\n`);
+        options.push(`--env-file=${environment}`);
+        admin = spawn('pnpm', ['exec', 'vite', '--port', port, '--strictPort'], { cwd: join(root, ADMIN_APP) });
+        context.log(`The admin is at ${address}`);
+      }
       try {
-        const code = await supervise(spawn(process.execPath, ['--watch', entryOf(root), 'dev'], { cwd: root }));
+        const code = await supervise(
+          spawn(process.execPath, [...options, '--watch', entryOf(root), 'dev'], { cwd: root }),
+        );
         return { data: { exit: code }, text: `dev ended with ${code}.`, exit: code === 0 ? 0 : 1 };
       } finally {
+        admin?.kill('SIGTERM');
         clearTimeout(timer);
         stopWatching();
       }

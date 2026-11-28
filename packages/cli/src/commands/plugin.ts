@@ -22,6 +22,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { ADMIN_APP } from '../admin-app.ts';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { toManifest } from '@bieberkit/core';
@@ -45,14 +46,20 @@ export interface PluginDeps {
 const SERVER = 'apps/server';
 const PLUGIN_NAME = /^(?:@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*$/;
 
-/** Runs `pnpm add` or `pnpm remove` in the server app, where the plugins are dependencies (section 4.2). */
+/**
+ * Runs `pnpm add` or `pnpm remove` where the plugins are dependencies: the server app (section 4.2), and the admin app when the
+ * project has one, whose build needs the screens of the plugin and gives them its React (UI-37).
+ */
 async function pnpm(spawn: Spawn, root: string, args: readonly string[]): Promise<void> {
-  const code = await supervise(spawn('pnpm', args, { cwd: join(root, SERVER) }));
-  if (code !== 0) {
-    throw new CliError(`pnpm ${args.join(' ')} failed (${code}).`, {
-      code: 'BK_PNPM_FAILED',
-      fix: `Run it by hand in ${SERVER}, and read its message. The supply chain settings (minimumReleaseAge, strictDepBuilds) are never relaxed to make an install pass.`,
-    });
+  const apps = existsSync(join(root, ADMIN_APP, 'package.json')) ? [SERVER, ADMIN_APP] : [SERVER];
+  for (const app of apps) {
+    const code = await supervise(spawn('pnpm', args, { cwd: join(root, app) }));
+    if (code !== 0) {
+      throw new CliError(`pnpm ${args.join(' ')} failed (${code}).`, {
+        code: 'BK_PNPM_FAILED',
+        fix: `Run it by hand in ${app}, and read its message. The supply chain settings (minimumReleaseAge, strictDepBuilds) are never relaxed to make an install pass.`,
+      });
+    }
   }
 }
 

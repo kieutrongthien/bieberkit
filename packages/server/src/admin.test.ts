@@ -22,10 +22,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, expect, it } from 'vitest';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { describe, expect, it, onTestFinished } from 'vitest';
 import { validateConfig } from '@bieberkit/core';
 import { parseTheme, themeSection } from '@bieberkit/tokens';
-import { ADMIN_POLICY, adminLocation, pageAt, policyFor, storageOrigin } from './admin.ts';
+import { ADMIN_POLICY, adminDirectory, adminLocation, hasAdmin, pageAt, policyFor, storageOrigin } from './admin.ts';
 
 const APP = 'https://example.com';
 
@@ -196,5 +199,40 @@ describe('ADR 0036 the policy of the admin and the storage that it uploads to', 
     expect(policy.match(/files\.example\.com/g)).toHaveLength(2);
     expect(policy.replaceAll(' https://files.example.com', '')).toBe(ADMIN_POLICY);
     expect(policy).toContain("script-src 'self'");
+  });
+});
+
+describe('UI-37 DEP-06 where the admin of a project is', () => {
+  const projectWith = (...files: readonly string[]): string => {
+    const root = mkdtempSync(join(tmpdir(), 'bk-admin-at-'));
+    onTestFinished(() => rmSync(root, { recursive: true, force: true }));
+    for (const file of files) {
+      mkdirSync(join(root, file, '..'), { recursive: true });
+      writeFileSync(join(root, file), '<!doctype html>');
+    }
+    return root;
+  };
+
+  it('UI-37 the build of the project is apps/admin/dist', () => {
+    const root = projectWith('apps/admin/dist/index.html');
+    expect(adminDirectory(root)).toBe(join(root, 'apps/admin/dist'));
+    expect(hasAdmin(root)).toBe(true);
+  });
+
+  it('DEP-06 the image of the server has it in public/admin, which wins', () => {
+    const root = projectWith('apps/admin/dist/index.html', 'public/admin/index.html');
+    expect(adminDirectory(root)).toBe(join(root, 'public/admin'));
+  });
+
+  it('UI-37 a project with apps/admin has an admin before it is built, and one without has none', () => {
+    const unbuilt = projectWith('apps/admin/package.json');
+    expect([adminDirectory(unbuilt), hasAdmin(unbuilt)]).toEqual([undefined, true]);
+    const none = projectWith('apps/server/package.json');
+    expect([adminDirectory(none), hasAdmin(none)]).toEqual([undefined, false]);
+  });
+
+  it('UI-37 the adapter installed as a package is not an admin of the project: the project builds its own', () => {
+    const root = projectWith('node_modules/@bieberkit/admin-antd/dist/app/index.html');
+    expect([adminDirectory(root), hasAdmin(root)]).toEqual([undefined, false]);
   });
 });

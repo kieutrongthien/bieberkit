@@ -46,7 +46,7 @@ import { pluginAdminOf } from './plugin-admin.ts';
 import { registerClientReports } from './client-reports.ts';
 import { ServerError } from './errors.ts';
 import { parseTheme } from '@bieberkit/tokens';
-import { adminLocation, registerAdmin, storageOrigin } from './admin.ts';
+import { adminDirectory, adminLocation, hasAdmin, registerAdmin, storageOrigin } from './admin.ts';
 import { migrate } from './migrate.ts';
 import { settingsOf, settingsPolicyReader } from './policy.ts';
 import { createRuntimePlatform, permissionCatalog, registerRuntimeServices } from './services.ts';
@@ -176,6 +176,14 @@ export async function boot(options: BootOptions): Promise<Running> {
     });
     for (const module of modules) registerModule(container, module);
     await container.boot();
+
+    // A web role that would answer nothing at the address of the admin stops, and says what to do. In dev, Vite serves the admin.
+    if (roles.includes('web') && options.role !== 'dev' && hasAdmin(project.root) && !adminDirectory(project.root)) {
+      throw new ServerError('The project has an admin in apps/admin, and it is not built.', {
+        code: 'BK_ADMIN_NOT_BUILT',
+        fix: 'Run bieberkit build before bieberkit start web, or bieberkit dev, which serves the admin from its source.',
+      });
+    }
 
     if (roles.includes('web')) {
       const scoped = contributedRecord<ScopedPermission>(modules, 'scopedPermissions');

@@ -113,6 +113,18 @@ const project = (): Fixture => {
 };
 
 describe('section 5.2 add', () => {
+  it('UI-37 installs in apps/admin too, when the project has an admin, so that the screens of the plugin can be built', async () => {
+    const { root } = project();
+    mkdirSync(join(root, 'apps/admin'), { recursive: true });
+    writeFileSync(join(root, 'apps/admin/package.json'), '{}');
+    const { spawn, calls } = pnpmFor(root);
+    expect((await run(root, spawn, ['add', PAGES])).code).toBe(0);
+    expect(calls).toEqual([
+      { args: ['add', PAGES], cwd: join(root, 'apps/server') },
+      { args: ['add', PAGES], cwd: join(root, 'apps/admin') },
+    ]);
+  });
+
   it('5.2 installs in the server app, lists the plugin in the config, adds its keys to .env, and refreshes .env.example', async () => {
     const { root } = project();
     writeFileSync(join(root, '.env'), 'APP_NAME=demo\n');

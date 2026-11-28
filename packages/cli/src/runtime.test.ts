@@ -144,6 +144,35 @@ describe('section 5.2 dev', () => {
     expect(err).toContain('did not start');
   });
 
+  it('UI-37 serves the admin of the project with Vite, and gives the server its address, so that cookies and mailed links are right', async () => {
+    const { root } = project({ 'apps/admin/package.json': '{}' });
+    const stopped: string[] = [];
+    const calls: { file: string; args: readonly string[]; cwd: string }[] = [];
+    const spawn: Spawn = (file, args, options) => {
+      calls.push({ file, args, cwd: options.cwd });
+      const isAdmin = args.includes('vite');
+      return {
+        // Vite runs until it is stopped, and the server ends.
+        exit: isAdmin ? new Promise<number>(() => undefined) : Promise.resolve(0),
+        kill: (signal) => void stopped.push(`${isAdmin ? 'admin' : 'server'} ${signal}`),
+      };
+    };
+    const { code, err } = await run(root, { spawn, watch: () => () => undefined }, ['dev', '--no-services']);
+    expect(code).toBe(0);
+    const environment = join(root, '.bieberkit/dev.env');
+    expect(calls).toEqual([
+      { file: 'pnpm', args: ['exec', 'vite', '--port', '5173', '--strictPort'], cwd: join(root, 'apps/admin') },
+      {
+        file: process.execPath,
+        args: [`--env-file=${environment}`, '--watch', join(root, 'apps/server/src/main.ts'), 'dev'],
+        cwd: root,
+      },
+    ]);
+    expect(readFileSync(environment, 'utf8')).toContain('ADMIN_URL=http://localhost:5173/\n');
+    expect(err).toContain('The admin is at http://localhost:5173/');
+    expect(stopped).toContain('admin SIGTERM');
+  });
+
   it('GEN-02 regenerates the files a moment after the code changes, and stops watching when the server ends', async () => {
     const { root } = project();
     let change: (() => void) | undefined;

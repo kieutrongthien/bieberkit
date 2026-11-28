@@ -26,12 +26,12 @@
 export const packageName = '@bieberkit/server';
 
 export {
-  ADMIN_PACKAGE,
   ADMIN_POLICY,
   ADMIN_PREFIX,
   adminDirectory,
   adminLocation,
   adminPageOf,
+  hasAdmin,
   registerAdmin,
 } from './admin.ts';
 export type { AdminLocation } from './admin.ts';

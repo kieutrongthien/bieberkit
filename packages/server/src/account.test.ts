@@ -36,10 +36,8 @@ const PACKAGES = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const BOOT = JSON.stringify(new URL('./boot.ts', import.meta.url).href);
 const SEED = JSON.stringify(new URL('./seed.ts', import.meta.url).href);
 
-/** What `adminDirectory` looks for: the built application of the adapter, here a page that stands for it. */
-const ADMIN_INSTALLED = {
-  'node_modules/@bieberkit/admin-antd/dist/app/index.html': '<!doctype html><title>Admin</title>',
-};
+/** A project with an admin, not built: the links lead to it all the same, as in `bieberkit dev`, which builds no files. */
+const ADMIN_INSTALLED = { 'apps/admin/package.json': '{}' };
 
 /** Invites one person as the users plugin does, and prints where the mailed link would send them. */
 const INVITING_SEED = `import { createUserService } from '@bieberkit/auth';

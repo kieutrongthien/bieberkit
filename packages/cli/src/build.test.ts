@@ -22,7 +22,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { createRunner } from 'create-bieberkit/kit';
@@ -109,6 +109,37 @@ describe('section 5.2 build', () => {
     expect(code).toBe(1);
     expect(error['code']).toBe('BK_BUILD_TYPECHECK');
     expect(existsSync(join(root, 'apps/server/dist/standalone'))).toBe(false);
+  });
+
+  const withAdmin = (): Fixture => {
+    const made = project();
+    writeFileSync(join(made.root, 'tsconfig.json'), '{}');
+    mkdirSync(join(made.root, 'apps/admin'), { recursive: true });
+    writeFileSync(join(made.root, 'apps/admin/package.json'), '{}');
+    writeFileSync(join(made.root, 'apps/admin/tsconfig.json'), '{}');
+    return made;
+  };
+
+  it('UI-37 checks the types of the admin too, with its own tsconfig, and builds it with the Vite of the project', async () => {
+    const { root } = withAdmin();
+    const { deps, calls } = fake();
+    const { data } = await run(root, deps, ['build', '--json']);
+    expect(calls).toEqual([
+      { file: 'pnpm', args: ['exec', 'tsc', '--noEmit', '-p', 'tsconfig.json'], cwd: root },
+      { file: 'pnpm', args: ['exec', 'tsc', '--noEmit', '-p', 'apps/admin/tsconfig.json'], cwd: root },
+      { file: 'pnpm', args: ['exec', 'vite', 'build'], cwd: join(root, 'apps/admin') },
+    ]);
+    expect(data['steps']).toEqual(['generate', 'typecheck', 'standalone', 'admin']);
+  });
+
+  it('UI-37 an admin that does not build stops the build and says so', async () => {
+    const { root } = withAdmin();
+    const spawn: Spawn = (_file, args) => ({
+      exit: Promise.resolve(args.includes('vite') ? 1 : 0),
+      kill: () => undefined,
+    });
+    const { code, error } = await run(root, { spawn }, ['build', '--json']);
+    expect([code, error['code']]).toEqual([1, 'BK_BUILD_ADMIN']);
   });
 
   it('5.2 --no-typecheck skips the type check', async () => {

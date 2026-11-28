@@ -37,7 +37,7 @@ import type { Database } from '@bieberkit/data/orm';
 import type { RouteDef } from '@bieberkit/http';
 import type { Storage } from '@bieberkit/storage';
 import { createStorageFromConfig } from '@bieberkit/storage/flydrive';
-import { adminDirectory, adminLocation } from './admin.ts';
+import { adminLocation, hasAdmin } from './admin.ts';
 import { authMessages } from './auth-mail.ts';
 import { settingsOf, settingsPolicyReader } from './policy.ts';
 import { contributed, contributedRecord, entitiesOf } from './modules.ts';
@@ -95,7 +95,7 @@ export async function createRuntimePlatform(
 
 /**
  * What the authentication takes from the project: the name that an authenticator app shows, the one of the brand or the one of the
- * config (AUTH-03), and when the admin is installed, its reset page for the password links (USR-10).
+ * config (AUTH-03), and when the project has an admin, its reset page for the password links (USR-10).
  */
 function authOfProject(project: Pick<Project, 'root' | 'config'>, env: Pick<CoreEnv, 'APP_URL' | 'ADMIN_URL'>) {
   const admin = adminLocation(env.APP_URL, env.ADMIN_URL);
@@ -104,9 +104,7 @@ function authOfProject(project: Pick<Project, 'root' | 'config'>, env: Pick<Core
     methods: { totp: { issuer: project.config.admin?.brand?.name ?? project.config.name } },
     // The admin may have a host of its own, and a sign in from there is not a cross site request (UI-14).
     trustedOrigins: [admin.origin],
-    ...(adminDirectory(project.root) === undefined
-      ? {}
-      : { pages: { resetPassword: `${admin.origin}${admin.prefix}/reset-password` } }),
+    ...(!hasAdmin(project.root) ? {} : { pages: { resetPassword: `${admin.origin}${admin.prefix}/reset-password` } }),
   };
 }
 

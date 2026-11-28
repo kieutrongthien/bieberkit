@@ -31,9 +31,7 @@ import type { AdminPart, AdminProblem } from '@bieberkit/admin-core';
 import { loadEnv } from '@bieberkit/core';
 import { adminPageOf, findProjectRoot, loadConfig, loadProject } from '@bieberkit/server';
 import type { Plugin } from 'vite';
-
-/** Where a project keeps its admin (section 16.6). */
-export const ADMIN_APP = 'apps/admin';
+import { ADMIN_APP } from './admin-app.ts';
 
 const VIRTUAL = 'virtual:bieberkit/admin';
 const RESOLVED = `\0${VIRTUAL}`;

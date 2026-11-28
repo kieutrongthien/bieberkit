@@ -22,6 +22,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { ADMIN_APP } from '../admin-app.ts';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { writeStandalone } from '@bieberkit/data/build';
@@ -45,7 +46,8 @@ export function buildCommand(deps: BuildDeps = {}): Command {
   const spawn = deps.spawn ?? realSpawn;
   return {
     name: 'build',
-    summary: 'Regenerate everything, check the types, and emit the standalone validators and serializers.',
+    summary:
+      'Regenerate everything, check the types, emit the standalone validators and serializers, and build the admin.',
     flags: [
       { name: 'check', type: 'boolean', description: 'Verify a plugin manifest without writing files.' },
       {
@@ -71,19 +73,36 @@ export function buildCommand(deps: BuildDeps = {}): Command {
       // From scratch, so that a build never depends on what a developer left on the disk (GEN-02).
       writeFiles(root, generateFiles(app));
       steps.push('generate');
+      const admin = existsSync(join(root, ADMIN_APP, 'package.json'));
       if (context.args.flags['typecheck'] !== false && existsSync(join(root, 'tsconfig.json'))) {
         context.log('tsc --noEmit');
-        const code = await supervise(spawn('pnpm', ['exec', 'tsc', '--noEmit', '-p', 'tsconfig.json'], { cwd: root }));
-        if (code !== 0) {
-          throw new CliError(`The type check failed (tsc exited with ${String(code)}).`, {
-            code: 'BK_BUILD_TYPECHECK',
-            fix: 'Fix the errors above. bieberkit generate refreshes .bieberkit/types if an entity changed.',
-          });
+        // The admin has a tsconfig of its own: its screens need the types of the DOM and of JSX, which the server must not have.
+        const configs = ['tsconfig.json'];
+        if (admin && existsSync(join(root, ADMIN_APP, 'tsconfig.json'))) configs.push(`${ADMIN_APP}/tsconfig.json`);
+        for (const config of configs) {
+          const code = await supervise(spawn('pnpm', ['exec', 'tsc', '--noEmit', '-p', config], { cwd: root }));
+          if (code !== 0) {
+            throw new CliError(`The type check of ${config} failed (tsc exited with ${String(code)}).`, {
+              code: 'BK_BUILD_TYPECHECK',
+              fix: 'Fix the errors above. bieberkit generate refreshes .bieberkit/types if an entity changed.',
+            });
+          }
         }
         steps.push('typecheck');
       }
       const standalone = await writeStandalone(app.entities, join(root, STANDALONE_DIR));
       steps.push('standalone');
+      if (admin) {
+        context.log('vite build (the admin)');
+        const code = await supervise(spawn('pnpm', ['exec', 'vite', 'build'], { cwd: join(root, ADMIN_APP) }));
+        if (code !== 0) {
+          throw new CliError(`The admin did not build (vite exited with ${String(code)}).`, {
+            code: 'BK_BUILD_ADMIN',
+            fix: `Fix what Vite said above. The admin is built from the admin parts of your plugins and from ${ADMIN_APP}/src.`,
+          });
+        }
+        steps.push('admin');
+      }
       return {
         data: { steps, standalone: standalone.manifest },
         text: `Built: ${steps.join(', ')}.\n${String(standalone.manifest.entities.length)} entities have a validator and a serializer in ${STANDALONE_DIR}.`,

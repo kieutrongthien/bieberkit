@@ -113,19 +113,18 @@ export default defineModule({ name: 'platform', jobs: [job], routes: [route] });
   return { one, marker, ran };
 }
 
-/** An adapter whose page has one file, installed in the project, and the env of a booted process with the given addresses. */
+/** A built admin of one file in the project, and the env of a booted process with the given addresses. */
 
 async function adminProject(urls: (port: number) => Record<string, string>) {
   const fixture = makeProject();
   fixtures.push(fixture);
-  const folder = join(fixture.root, 'node_modules/@bieberkit/admin-antd');
-  mkdirSync(join(folder, 'dist/app/assets'), { recursive: true });
-  writeFileSync(join(folder, 'package.json'), JSON.stringify({ name: '@bieberkit/admin-antd', version: '0.0.0' }));
+  const folder = join(fixture.root, 'apps/admin');
+  mkdirSync(join(folder, 'dist/assets'), { recursive: true });
   writeFileSync(
-    join(folder, 'dist/app/index.html'),
+    join(folder, 'dist/index.html'),
     '<!doctype html><head><title>admin</title></head><script src="./assets/main.js"></script>',
   );
-  writeFileSync(join(folder, 'dist/app/assets/main.js'), 'console.log(1)');
+  writeFileSync(join(folder, 'dist/assets/main.js'), 'console.log(1)');
   const port = await freePort();
   const env = await testEnv(fixture.root, { APP_PORT: String(port), ...urls(port) });
   const one = await boot({ role: 'dev', cwd: fixture.root, env });
@@ -261,13 +260,28 @@ describe('section 7.1 the roles', () => {
     expect((await fetch(`${base}/api/v1/_meta`, { headers: { cookie: cookie ?? '' } })).status).toBe(200);
   });
 
-  it('UI-14 the web role serves the admin under /admin/ with its own policy when an adapter is installed, and the API keeps its own', async () => {
+  it('UI-37 the web role of a project with an admin and no build stops and says to build it, and dev starts without one', async () => {
+    const fixture = makeProject({ 'apps/admin/package.json': '{}' });
+    fixtures.push(fixture);
+    const env = await testEnv(fixture.root);
+    const migrated = await boot({ role: 'migrate', cwd: fixture.root, env });
+    await migrated.stop();
+    await expect(boot({ role: 'web', cwd: fixture.root, env })).rejects.toMatchObject({
+      code: 'BK_ADMIN_NOT_BUILT',
+      fix: expect.stringContaining('bieberkit build'),
+    });
+    // In dev the admin is served by the dev server of Vite, from the source.
+    const dev = await boot({ role: 'dev', cwd: fixture.root, env });
+    running.push(dev);
+    expect(dev.port).toBeGreaterThan(0);
+  });
+
+  it('UI-14 the web role serves the admin under /admin/ with its own policy when it is built, and the API keeps its own', async () => {
     const fixture = makeProject();
     fixtures.push(fixture);
-    const folder = join(fixture.root, 'node_modules/@bieberkit/admin-antd');
-    mkdirSync(join(folder, 'dist/app/assets'), { recursive: true });
-    writeFileSync(join(folder, 'package.json'), JSON.stringify({ name: '@bieberkit/admin-antd', version: '0.0.0' }));
-    writeFileSync(join(folder, 'dist/app/index.html'), '<!doctype html><title>admin</title>');
+    const folder = join(fixture.root, 'apps/admin');
+    mkdirSync(join(folder, 'dist/assets'), { recursive: true });
+    writeFileSync(join(folder, 'dist/index.html'), '<!doctype html><title>admin</title>');
     const env = await testEnv(fixture.root);
     const one = await boot({ role: 'web', cwd: fixture.root, env });
     running.push(one);
@@ -284,17 +298,16 @@ describe('section 7.1 the roles', () => {
   it('UI-22 a deploy keeps the hashed files of the release before for a day, so that a tab that is open still finds its chunks', async () => {
     const fixture = makeProject();
     fixtures.push(fixture);
-    const folder = join(fixture.root, 'node_modules/@bieberkit/admin-antd');
-    mkdirSync(join(folder, 'dist/app/assets'), { recursive: true });
-    writeFileSync(join(folder, 'package.json'), JSON.stringify({ name: '@bieberkit/admin-antd', version: '0.0.0' }));
-    writeFileSync(join(folder, 'dist/app/index.html'), '<!doctype html><title>one</title>');
-    writeFileSync(join(folder, 'dist/app/assets/chunk-one.js'), 'console.log("one")');
+    const folder = join(fixture.root, 'apps/admin');
+    mkdirSync(join(folder, 'dist/assets'), { recursive: true });
+    writeFileSync(join(folder, 'dist/index.html'), '<!doctype html><title>one</title>');
+    writeFileSync(join(folder, 'dist/assets/chunk-one.js'), 'console.log("one")');
     const first = await boot({ role: 'web', cwd: fixture.root, env: await testEnv(fixture.root) });
     await first.stop();
 
     // The next release has other files, and the old ones are not in it.
-    rmSync(join(folder, 'dist/app/assets/chunk-one.js'));
-    writeFileSync(join(folder, 'dist/app/assets/chunk-two.js'), 'console.log("two")');
+    rmSync(join(folder, 'dist/assets/chunk-one.js'));
+    writeFileSync(join(folder, 'dist/assets/chunk-two.js'), 'console.log("two")');
     const second = await boot({ role: 'web', cwd: fixture.root, env: await testEnv(fixture.root) });
     running.push(second);
     const base = `http://127.0.0.1:${String(second.port)}`;

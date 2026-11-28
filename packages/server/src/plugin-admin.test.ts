@@ -102,11 +102,8 @@ function serve() {
   const server = createHttpServer({ APP_ENV: 'test', APP_PORT: 0, TRUST_PROXY: false, API_DOCS_PUBLIC: false });
   const root = mkdtempSync(join(tmpdir(), 'bk-root-'));
   folders.push(root);
-  mkdirSync(join(root, 'apps/server/node_modules/@bieberkit/admin-antd/dist/app'), { recursive: true });
-  writeFileSync(
-    join(root, 'apps/server/node_modules/@bieberkit/admin-antd/dist/app/index.html'),
-    '<!doctype html><head></head><title>admin</title>',
-  );
+  mkdirSync(join(root, 'apps/admin/dist'), { recursive: true });
+  writeFileSync(join(root, 'apps/admin/dist/index.html'), '<!doctype html><head></head><title>admin</title>');
   const { folders: served } = pluginAdminOf({ plugins: [rich] });
   registerAdmin(
     server,
