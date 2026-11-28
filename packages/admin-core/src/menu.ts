@@ -45,6 +45,18 @@ export interface MenuGroup {
   readonly entries: readonly MenuEntry[];
 }
 
+/** A page that the admin part of a plugin puts in the menu (UI-35). */
+export interface MenuPage {
+  /** Its route in the admin, such as `/notes`. */
+  readonly path: string;
+  /** The short name of its plugin, which an order of the config may name. */
+  readonly module: string;
+  readonly label: MetaLabel;
+  readonly icons: readonly string[];
+  /** The group that it asks for. The order of the config wins over it. */
+  readonly group?: string;
+}
+
 const REST = 'app';
 
 /** The order of the base plugins of `blank` (section 12): what the project adds first. */
@@ -57,6 +69,8 @@ export const DEFAULT_MENU: readonly MenuGroupSettings[] = [
 
 interface Found extends MenuEntry {
   readonly module: string;
+  /** The group of an entry that no group of the order names. */
+  readonly home: string;
 }
 
 /** The entities that the person may list, and the pages that plugins add. `_meta` left out what the person may not use. */
@@ -72,35 +86,54 @@ function entriesOf(meta: Meta): Found[] {
         label: entity.label,
         name: short,
         icons: entity.icon === undefined ? [module] : [entity.icon, module],
+        home: REST,
       };
     });
   const pages = meta.menu.map((item): Found => {
     // An address of a page of a plugin is `/ext/<plugin>/<path>`.
     const plugin = item.path.split('/')[2] ?? '';
-    return { key: item.path, module: '', path: item.path, label: item.label, name: item.path, icons: [plugin] };
+    const { path, label } = item;
+    return { key: path, module: '', path, label, name: path, icons: [plugin], home: REST };
   });
   return [...entities, ...pages];
 }
 
-const withoutModule = ({ module: _module, ...entry }: Found): MenuEntry => entry;
+const entryOf = ({ module: _module, home: _home, ...entry }: Found): MenuEntry => entry;
 
-/** The groups of the menu. An entry is in the first group that names it, and what no group names goes to `app`. */
-export function menuOf(meta: Meta, order: readonly MenuGroupSettings[] = DEFAULT_MENU): MenuGroup[] {
-  let left = entriesOf(meta);
+/**
+ * The groups of the menu: the entities that the person may list and the pages of plugins. An entry is in the first group of the order
+ * that names it. What no group names goes to the group that its page asks for, and to `app` when it asks for none.
+ */
+export function menuOf(
+  meta: Meta,
+  order: readonly MenuGroupSettings[] = DEFAULT_MENU,
+  pages: readonly MenuPage[] = [],
+): MenuGroup[] {
+  let left: Found[] = [
+    ...entriesOf(meta),
+    ...pages.map(({ path, module, label, icons, group }) => ({
+      key: path,
+      module,
+      path,
+      label,
+      name: path,
+      icons,
+      home: group ?? REST,
+    })),
+  ];
   const groups = order.map((group) => {
     const entries: MenuEntry[] = [];
     for (const item of group.items) {
       const named = (entry: Found): boolean => entry.key === item || entry.module === item;
-      entries.push(...left.filter(named).map(withoutModule));
+      entries.push(...left.filter(named).map(entryOf));
       left = left.filter((entry) => !named(entry));
     }
     return { id: group.id, ...(group.label === undefined ? {} : { label: group.label }), entries };
   });
-  if (left.length > 0) {
-    const rest = left.map(withoutModule);
-    const own = groups.find((group) => group.id === REST);
-    if (own === undefined) groups.push({ id: REST, entries: rest });
-    else own.entries.push(...rest);
+  for (const entry of left) {
+    const own = groups.find((group) => group.id === entry.home);
+    if (own === undefined) groups.push({ id: entry.home, entries: [entryOf(entry)] });
+    else own.entries.push(entryOf(entry));
   }
   return groups.filter((group) => group.entries.length > 0);
 }

@@ -1,0 +1,21 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["esnext", "dom", "dom.iterable"],
+    "types": [],
+    "jsx": "react-jsx",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "isolatedDeclarations": false,
+    "declaration": false,
+    "paths": {
+      "@bieberkit/admin-antd": ["../../../packages/admin-antd/src/index.ts"],
+      "@bieberkit/admin-core": ["../../../packages/admin-core/src/index.ts"],
+      "antd": ["../../../packages/admin-antd/node_modules/antd"],
+      "react": ["../../../packages/admin-antd/node_modules/@types/react"],
+      "react/jsx-runtime": ["../../../packages/admin-antd/node_modules/@types/react/jsx-runtime"]
+    }
+  },
+  "include": ["src", "../../../packages/admin-antd/src/app/css.d.ts"]
+}

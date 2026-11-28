@@ -115,7 +115,7 @@ export const vi: Dictionary = {
   'file.remove': 'Gỡ',
   'file.removeNamed': 'Gỡ tệp của {name}',
   'plugin.failed': 'Không hiển thị được phần này',
-  'plugin.missing': 'Trang này không tồn tại',
+  'page.closed': 'Bạn không được mở trang này',
   'list.op.eq': 'là',
   'list.op.ne': 'khác',
   'list.op.in': 'là một trong',

@@ -1,8 +1,8 @@
 /**
  * BieberKit
  *
- * @file        e2e/fixtures/crm/admin/stats.js
- * @description A widget of the dashboard that the crm fixture plugin adds: it counts the accounts (UI-04).
+ * @file        e2e/fixtures/crm/src/admin/Labels.tsx
+ * @description The screen that the fixture plugin draws in place of the generic list of labels (UI-04).
  * @author      Bieber Kieu <kieutrongthien@gmail.com>
  * @copyright   Copyright (c) 2026 Bieber Kieu
  * @license     Apache-2.0
@@ -22,17 +22,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-export default function stats(host) {
-  const { React } = host.ui;
-  return function Stats() {
-    const [total, setTotal] = React.useState('...');
-    React.useEffect(() => {
-      host.client
-        .meta()
-        .then((meta) => meta.entities.find((entity) => entity.name === 'crm.Account'))
-        .then((entity) => host.client.list(entity, { pageSize: 1 }))
-        .then((page) => setTotal(String(page.total ?? page.rows.length)));
-    }, []);
-    return React.createElement('strong', null, `Accounts: ${total}`);
-  };
+import { useText } from '@bieberkit/admin-antd';
+import type { ScreenProps } from '@bieberkit/admin-antd';
+import type { JSX } from 'react';
+
+export default function Labels(props: ScreenProps): JSX.Element {
+  const text = useText();
+  return <div data-replaced={props.entity.name}>{text('crm.labels')}</div>;
 }

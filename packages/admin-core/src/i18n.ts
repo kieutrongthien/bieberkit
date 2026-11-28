@@ -50,15 +50,19 @@ export async function loadMessages(locale: Locale): Promise<Dictionary> {
 /** The language tag that `Intl` takes for each language. */
 const TAGS: Readonly<Record<Locale, string>> = { en: 'en-US', vi: 'vi-VN', zh: 'zh-CN' };
 
-/** A function that gives the text of a key in one language. `{name}` in the text is replaced by `values.name`, once, so a value cannot add a placeholder. */
+/** `{name}` in the text is replaced by `values.name`, once, so a value cannot add a placeholder. */
+export function fillText(text: string, values?: Readonly<Record<string, string | number>>): string {
+  return text.replaceAll(/\{(\w+)\}/g, (found, name: string) => {
+    const value = values?.[name];
+    return value === undefined ? found : String(value);
+  });
+}
+
+/** A function that gives the text of a key in one language, with its values filled in. */
 export function translator(
   dictionary: Dictionary = en,
 ): (key: MessageKey, values?: Readonly<Record<string, string | number>>) => string {
-  return (key, values) =>
-    dictionary[key].replaceAll(/\{(\w+)\}/g, (found, name: string) => {
-      const value = values?.[name];
-      return value === undefined ? found : String(value);
-    });
+  return (key, values) => fillText(dictionary[key], values);
 }
 
 const isLocale = (value: unknown, among: readonly Locale[]): value is Locale =>

@@ -33,6 +33,7 @@ export { defineAdminPlugin, shortNameOf } from './part.ts';
 export type {
   AdminPart,
   AdminPartInput,
+  AdminView,
   Contribution,
   GateState,
   Load,
@@ -59,6 +60,7 @@ export {
 } from './account.ts';
 export type { ResetSearch } from './account.ts';
 export {
+  fillText,
   formatDate,
   formatDateTime,
   formatMoney,
@@ -161,4 +163,4 @@ export type { AdminHost } from './extensions.ts';
 export { adminSection, BUILTIN_MENU_GROUPS, parseAdminSettings, readAdminSettings } from './settings.ts';
 export type { AdminSettings, BrandSettings, MenuGroupSettings } from './settings.ts';
 export { currentEntry, DEFAULT_MENU, menuOf, searchMenu } from './menu.ts';
-export type { MenuEntry, MenuGroup } from './menu.ts';
+export type { MenuEntry, MenuGroup, MenuPage } from './menu.ts';

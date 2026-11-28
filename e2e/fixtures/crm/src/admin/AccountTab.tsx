@@ -1,8 +1,8 @@
 /**
  * BieberKit
  *
- * @file        e2e/fixtures/crm/admin/labels.js
- * @description A list of labels that the crm fixture plugin draws in place of the generic list of the entity (UI-04).
+ * @file        e2e/fixtures/crm/src/admin/AccountTab.tsx
+ * @description A tab of the fixture plugin in "My account" (UI-35, slot 8).
  * @author      Bieber Kieu <kieutrongthien@gmail.com>
  * @copyright   Copyright (c) 2026 Bieber Kieu
  * @license     Apache-2.0
@@ -22,9 +22,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-export default function labels(host) {
-  const { React } = host.ui;
-  return function Labels(props) {
-    return React.createElement('div', { 'data-replaced': props.entity.name }, 'Labels drawn by the plugin');
-  };
+import { useSession, useText } from '@bieberkit/admin-antd';
+import type { JSX } from 'react';
+
+export default function AccountTab(): JSX.Element {
+  const text = useText();
+  const session = useSession();
+  return <p>{text('crm.signedInAs', { email: session?.email ?? '' })}</p>;
 }

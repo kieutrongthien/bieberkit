@@ -22,8 +22,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { normalizeCode, stepExpired } from '@bieberkit/admin-core';
-import type { CodeKind } from '@bieberkit/admin-core';
+import { ENGLISH, normalizeCode, stepExpired } from '@bieberkit/admin-core';
+import type { CodeKind, MessageKey } from '@bieberkit/admin-core';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { Alert, Button, Form, Input } from 'antd';
@@ -34,6 +34,8 @@ import { AuthShell } from './AuthShell.tsx';
 import { useClient } from './context.ts';
 import { useT } from './language.tsx';
 import { useNotice } from './notice.ts';
+
+const isShellKey = (key: string): key is MessageKey => Object.hasOwn(ENGLISH, key);
 
 interface Values {
   readonly email: string;
@@ -156,7 +158,9 @@ export function Login(): JSX.Element {
 
   return (
     <AuthShell title={t('auth.signIn.title')} text={t('auth.signIn.subtitle')}>
-      {notice === undefined ? null : <Alert type="success" showIcon title={t(notice)} style={{ marginBottom: 16 }} />}
+      {notice === undefined || !isShellKey(notice) ? null : (
+        <Alert type="success" showIcon title={t(notice)} style={{ marginBottom: 16 }} />
+      )}
       {failure === undefined ? null : <Alert type="error" showIcon title={failure} style={{ marginBottom: 16 }} />}
       <Form<Values>
         name="bk-sign-in"

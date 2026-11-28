@@ -1,8 +1,8 @@
 /**
  * BieberKit
  *
- * @file        e2e/fixtures/crm/admin/broken.js
- * @description A widget that the crm fixture plugin gives and that fails when it is drawn, to prove that a plugin cannot take the admin down (UI-04).
+ * @file        e2e/fixtures/crm/src/admin/QuickAction.tsx
+ * @description A button of the fixture plugin in the header of the admin (UI-35, slot 3).
  * @author      Bieber Kieu <kieutrongthien@gmail.com>
  * @copyright   Copyright (c) 2026 Bieber Kieu
  * @license     Apache-2.0
@@ -22,8 +22,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-export default function broken() {
-  return function Broken() {
-    throw new Error('This widget is broken on purpose');
-  };
+import { useAdminNavigate, useText } from '@bieberkit/admin-antd';
+import { Button } from 'antd';
+import type { JSX } from 'react';
+
+export default function QuickAction(): JSX.Element {
+  const text = useText();
+  const navigate = useAdminNavigate();
+  return <Button onClick={() => navigate('/reports')}>{text('crm.quick')}</Button>;
 }

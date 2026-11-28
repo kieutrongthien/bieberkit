@@ -37,6 +37,9 @@ import { ErrorBoundary, ErrorScreen } from './ErrorScreens.tsx';
 import { Gate } from './Gate.tsx';
 import { adminBase } from './base.ts';
 import { ClientContext } from './context.ts';
+import { PluginPage } from './PluginPage.tsx';
+import { RegistryContext, Slot } from './slots.tsx';
+import type { Registry } from './slots.tsx';
 
 /** Whether the system asks for the dark palette, kept up to date while the page is open. */
 function useSystemDark(dark: MediaQueryList): boolean {
@@ -53,7 +56,9 @@ function useSystemDark(dark: MediaQueryList): boolean {
  * The application, made when the page starts it: the client, the cache, the routes and the theme of this page. Nothing of it is made
  * when the module is read, so a build can read the module without a page.
  */
-export function createApp(): () => JSX.Element {
+export function createApp(admin: Registry): () => JSX.Element {
+  // Plugins with texts have them read with the language. Without them English is in the bundle and shows at once (UI-12).
+  const translated = admin.parts.some((part) => part.messages !== undefined);
   const client = createAdminClient();
   // A read that failed is tried again as the retry policy says, with a wait that grows and is spread (UI-19).
   const queries = new QueryClient({
@@ -67,7 +72,6 @@ export function createApp(): () => JSX.Element {
   const welcome = lazyRouteComponent(() => import('./Welcome.tsx'), 'Welcome');
   const listScreen = lazyRouteComponent(() => import('./ListScreen.tsx'), 'ListScreen');
   const formScreen = lazyRouteComponent(() => import('./FormScreen.tsx'), 'FormScreen');
-  const extensionPage = lazyRouteComponent(() => import('./ExtensionPage.tsx'), 'ExtensionPage');
   const forgotPassword = lazyRouteComponent(() => import('./ForgotPassword.tsx'), 'ForgotPassword');
   const resetPassword = lazyRouteComponent(() => import('./ResetPassword.tsx'), 'ResetPassword');
   const myAccount = lazyRouteComponent(() => import('./MyAccount.tsx'), 'MyAccount');
@@ -77,8 +81,23 @@ export function createApp(): () => JSX.Element {
   const forgot = createRoute({ getParentRoute: () => root, path: 'forgot-password', component: forgotPassword });
   const resetPage = createRoute({ getParentRoute: () => root, path: 'reset-password', component: resetPassword });
   const account = createRoute({ getParentRoute: () => root, path: 'account', component: myAccount });
-  // The pages that plugins add (UI-04). `ext` is a static segment, so it wins over `$module/$resource`.
-  const extension = createRoute({ getParentRoute: () => root, path: 'ext/$plugin/$page', component: extensionPage });
+  // The pages that plugins add, with a session and without one (UI-35). Each is one segment, which no list of an entity is.
+  const pluginPages = [
+    ...admin.pages.map((page) =>
+      createRoute({
+        getParentRoute: () => root,
+        path: page.path.slice(1),
+        component: () => <PluginPage page={page} />,
+      }),
+    ),
+    ...admin.publicPages.map((page) =>
+      createRoute({
+        getParentRoute: () => root,
+        path: page.path.slice(1),
+        component: () => <Slot name={`${page.plugin}${page.path}`} load={page.load} />,
+      }),
+    ),
+  ];
   const list = createRoute({ getParentRoute: () => root, path: '$module/$resource', component: listScreen });
   const create = createRoute({ getParentRoute: () => root, path: '$module/$resource/new', component: formScreen });
   const edit = createRoute({ getParentRoute: () => root, path: '$module/$resource/$id', component: formScreen });
@@ -90,7 +109,7 @@ export function createApp(): () => JSX.Element {
   const served = adminBase();
 
   const router = createRouter({
-    routeTree: root.addChildren([index, forgot, resetPage, account, extension, list, create, edit]),
+    routeTree: root.addChildren([index, forgot, resetPage, account, ...pluginPages, list, create, edit]),
     basepath: served === '' ? '/' : served,
     defaultPreload: 'intent',
     // Each route has its own boundary with a retry, so one screen that fails does not take the frame with it (UI-19).
@@ -117,12 +136,15 @@ export function createApp(): () => JSX.Element {
     // English is in the bundle and shows at once. Another language is read first, and the screen waits for it, so that it does not flash in English (UI-12).
     const [resources, setResources] = useState<Resources | undefined>(() => {
       const first = initialLocale();
-      return first === 'en' ? ENGLISH_RESOURCES : undefined;
+      return first === 'en' && !translated ? ENGLISH_RESOURCES : undefined;
     });
     const change = (next: Locale): void => {
       saveLocale(next);
       // A chunk that is gone (a deploy) or a network that failed: the language that is on the screen stays, or English when none is.
-      loadResources(next).then(setResources, () => setResources((now) => now ?? ENGLISH_RESOURCES));
+      loadResources(next, admin.parts).then(setResources, async () => {
+        const english = await loadResources('en', admin.parts).catch(() => ENGLISH_RESOURCES);
+        setResources((now) => now ?? english);
+      });
     };
     useEffect(() => {
       if (resources === undefined) change(initialLocale());
@@ -132,7 +154,7 @@ export function createApp(): () => JSX.Element {
     }, [resources]);
     const compiled = compileAntdTheme(brand, mode);
     if (resources === undefined) return <div aria-busy="true" />;
-    const { locale, dictionary, antd } = resources;
+    const { locale, dictionary, texts, antd } = resources;
     return (
       <ConfigProvider
         locale={antd}
@@ -144,12 +166,14 @@ export function createApp(): () => JSX.Element {
         }}
       >
         <AntApp>
-          <LanguageContext.Provider value={{ locale, dictionary, setLocale: change }}>
+          <LanguageContext.Provider value={{ locale, dictionary, texts, setLocale: change }}>
             <ClientContext.Provider value={client}>
               <QueryClientProvider client={queries}>
-                <ErrorBoundary>
-                  <RouterProvider router={router} />
-                </ErrorBoundary>
+                <RegistryContext.Provider value={admin}>
+                  <ErrorBoundary>
+                    <RouterProvider router={router} />
+                  </ErrorBoundary>
+                </RegistryContext.Provider>
               </QueryClientProvider>
             </ClientContext.Provider>
           </LanguageContext.Provider>

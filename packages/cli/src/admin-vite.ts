@@ -123,21 +123,57 @@ const failure = (code: string, lines: readonly string[]): string =>
 const line = (problem: AdminProblem): string =>
   problem.plugin === '' ? problem.message : `${problem.plugin}: ${problem.message}`;
 
-/** What Vite offers to run a module in Node.js, taken from the Vite of the project, which is the one that builds. */
+/** What runs the modules of the admin parts in Node.js. It stays open, for a part reads its texts with an `import()` of its own. */
 interface Runner {
-  readonly runnerImport: (
-    id: string,
-    config: { root: string; configFile: false; logLevel: 'silent' },
-  ) => Promise<{ module: unknown }>;
+  readonly import: (id: string) => Promise<unknown>;
+  readonly close: () => Promise<void>;
 }
 
-/** The Vite at `path`, with the one thing of it that is used here. */
-async function runnerOf(path: string): Promise<Runner> {
-  const loaded: unknown = await import(/* @vite-ignore */ pathToFileURL(path).href);
-  const run: unknown = Reflect.get(Object(loaded), 'runnerImport');
-  if (typeof run !== 'function') throw new Error(`${path} has no runnerImport. The admin needs Vite 8.`);
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the function of Vite, whose types the project has
-  return { runnerImport: run as Runner['runnerImport'] };
+/** A function of the Vite of the project, whose types the project has. */
+function callOf(from: unknown, name: string, where: string): (...args: readonly unknown[]) => unknown {
+  const found: unknown = Reflect.get(Object(from), name);
+  if (typeof found !== 'function') throw new Error(`${where} has no ${name}. The admin needs Vite 8.`);
+  return (...args) => Reflect.apply(found, from, args);
+}
+
+/**
+ * A runner of the Vite of the project, which is the one that builds, set up as its `runnerImport` sets one up. That function closes
+ * what it opens before an answer can be used, so it is not the one that is called.
+ */
+async function openRunner(vitePath: string, root: string): Promise<Runner> {
+  const vite: unknown = await import(/* @vite-ignore */ pathToFileURL(vitePath).href);
+  const config = await callOf(
+    vite,
+    'resolveConfig',
+    vitePath,
+  )(
+    {
+      root,
+      configFile: false,
+      envDir: false,
+      logLevel: 'silent',
+      environments: {
+        inline: {
+          consumer: 'server',
+          dev: { moduleRunnerTransform: true },
+          resolve: { external: true, mainFields: [], conditions: ['node', 'module-sync'] },
+        },
+      },
+    },
+    'serve',
+  );
+  const environment = callOf(vite, 'createRunnableDevEnvironment', vitePath)('inline', config, {
+    runnerOptions: { hmr: { logger: false } },
+    hot: false,
+  });
+  await callOf(environment, 'init', vitePath)();
+  const runner: unknown = Reflect.get(Object(environment), 'runner');
+  const load = callOf(runner, 'import', vitePath);
+  const close = callOf(environment, 'close', vitePath);
+  return {
+    import: async (id) => await load(id),
+    close: async () => void (await close()),
+  };
 }
 
 export interface AdminViteOptions {
@@ -178,41 +214,44 @@ export function bieberkitAdmin(options: AdminViteOptions = {}): Plugin {
       found = listed.parts;
       const problems: AdminProblem[] = [...listed.problems];
       const vitePath = createRequire(join(adminDir, 'package.json')).resolve('vite');
-      const { runnerImport } = await runnerOf(vitePath);
+      const runner = await openRunner(vitePath, adminDir);
       const parts: AdminPart<unknown>[] = [];
-      for (const item of found) {
-        const resolved = await this.resolve(item.specifier, join(adminDir, 'index.html'));
-        let value: unknown;
-        try {
-          if (resolved === null) throw new Error(`${item.specifier} cannot be found.`);
-          const loaded = await runnerImport(resolved.id, { root: adminDir, configFile: false, logLevel: 'silent' });
-          value = Reflect.get(Object(loaded.module), 'default');
-          if (typeof value !== 'object' || value === null)
-            throw new Error('It has no default export. Write: export default defineAdminPlugin({ ... }).');
-        } catch (error) {
-          this.error(
-            failure('BK_ADMIN_PART_INVALID', [
-              `${item.name}: its admin part cannot be read. ${error instanceof Error ? error.message : String(error)}`,
-            ]),
-          );
+      try {
+        for (const item of found) {
+          const resolved = await this.resolve(item.specifier, join(adminDir, 'index.html'));
+          let value: unknown;
+          try {
+            if (resolved === null) throw new Error(`${item.specifier} cannot be found.`);
+            value = Reflect.get(Object(await runner.import(resolved.id)), 'default');
+            if (typeof value !== 'object' || value === null)
+              throw new Error('It has no default export. Write: export default defineAdminPlugin({ ... }).');
+          } catch (error) {
+            this.error(
+              failure('BK_ADMIN_PART_INVALID', [
+                `${item.name}: its admin part cannot be read. ${error instanceof Error ? error.message : String(error)}`,
+              ]),
+            );
+          }
+          // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the shape is what composeAdmin and messageProblems check
+          const part = value as AdminPart<unknown>;
+          if (part.name !== item.name)
+            problems.push({
+              plugin: item.name,
+              code: 'wrong-name',
+              message: `Its admin part says that it is "${part.name}". The name is the one of the package.`,
+            });
+          parts.push(part);
         }
-        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the shape is what composeAdmin and messageProblems check
-        const part = value as AdminPart<unknown>;
-        if (part.name !== item.name)
-          problems.push({
-            plugin: item.name,
-            code: 'wrong-name',
-            message: `Its admin part says that it is "${part.name}". The name is the one of the package.`,
-          });
-        parts.push(part);
+        const { config } = await loadConfig(root);
+        problems.push(
+          ...composeAdmin(parts).problems.filter(
+            (problem) => options.requireSignIn === true || problem.code !== 'no-sign-in',
+          ),
+          ...(await messageProblems(parts, config.locales.supported)),
+        );
+      } finally {
+        await runner.close();
       }
-      const { config } = await loadConfig(root);
-      problems.push(
-        ...composeAdmin(parts).problems.filter(
-          (problem) => options.requireSignIn === true || problem.code !== 'no-sign-in',
-        ),
-        ...(await messageProblems(parts, config.locales.supported)),
-      );
       if (problems.length > 0) this.error(failure('BK_ADMIN_PART_INVALID', problems.map(line)));
     },
     resolveId(source, importer) {

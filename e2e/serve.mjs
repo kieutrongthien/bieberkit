@@ -116,9 +116,15 @@ mkdirSync(join(root, 'data'), { recursive: true });
 writeFileSync(join(root, 'apps', 'server', 'src', 'seed.ts'), 'export default async function seed() {}\n');
 
 // A plugin with accounts and tickets, because the base plugins have no entity that the screens can create and change.
-cpSync(join(REPOSITORY, 'e2e', 'fixtures', 'crm'), join(root, 'node_modules', '@bieberkit', 'plugin-crm'), {
+// It lies in `plugins/` of the project and is linked, as a plugin that the person writes: its admin part is TypeScript that the build
+// of the project compiles.
+const crm = join(root, 'plugins', 'crm');
+// Without its tsconfig, which points at the sources of this repository.
+cpSync(join(REPOSITORY, 'e2e', 'fixtures', 'crm'), crm, {
   recursive: true,
+  filter: (source) => !source.endsWith('tsconfig.json'),
 });
+symlinkSync(crm, join(root, 'node_modules', '@bieberkit', 'plugin-crm'), 'dir');
 const configPath = join(root, 'bieberkit.config.ts');
 // The server of the host of its own has a brand of its own, so that the test sees it travel from the config to the page (UI-33).
 const brand =
@@ -130,11 +136,7 @@ writeFileSync(
   readFileSync(configPath, 'utf8').replace('plugins: [', `${brand}plugins: [\n    '@bieberkit/plugin-crm',`),
 );
 
-symlinkSync(
-  join(root, 'node_modules', '@bieberkit', 'plugin-crm'),
-  join(root, 'apps', 'admin', 'node_modules', '@bieberkit', 'plugin-crm'),
-  'dir',
-);
+symlinkSync(crm, join(root, 'apps', 'admin', 'node_modules', '@bieberkit', 'plugin-crm'), 'dir');
 
 /** A program that has to succeed before the server starts. */
 function node(cwd, args) {

@@ -133,15 +133,4 @@ export default definePlugin({
   dialects: ['postgres', 'mysql', 'sqlite'],
   permissions: ['crm.account.read', 'crm.account.write', 'crm.ticket.read', 'crm.ticket.write', 'crm.ticket.close'],
   entities: [Account, Ticket, TicketNote, Label],
-  // What the plugin adds to the admin: files of its folder admin (UI-04).
-  admin: {
-    pages: [{ path: 'reports', module: 'reports.js', title: { en: 'Reports', vi: 'Báo cáo' }, menu: true }],
-    widgets: [
-      { slot: 'dashboard', module: 'stats.js', title: 'Account stats' },
-      { slot: 'dashboard', module: 'broken.js', title: 'Broken on purpose' },
-      { slot: 'form:crm.Account', module: 'panel.js', title: 'Panel' },
-      { slot: 'field:rating', module: 'rating.js' },
-    ],
-    screens: [{ replace: 'list:crm.Label', module: 'labels.js' }],
-  },
 });

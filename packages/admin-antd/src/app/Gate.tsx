@@ -22,28 +22,37 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { currentEntry, enrolmentNeeded, labelText, menuOf } from '@bieberkit/admin-core';
-import type { MenuGroup, MessageKey } from '@bieberkit/admin-core';
+import { currentEntry, enrolmentNeeded, labelText } from '@bieberkit/admin-core';
+import type { GateState, MenuGroup, MessageKey } from '@bieberkit/admin-core';
 import { useQueryClient } from '@tanstack/react-query';
 import { lazyRouteComponent, Link, Outlet, useNavigate, useRouterState } from '@tanstack/react-router';
 import { Dropdown, Grid, Layout, Menu, Result, Select, Skeleton } from 'antd';
 import { Suspense, useEffect, useState } from 'react';
 import type { JSX } from 'react';
-import { Brand, firstLetter, pageSettings } from './Brand.tsx';
+import { Brand, firstLetter } from './Brand.tsx';
 import { OfflineBanner } from './connection.tsx';
 import { useClient, useMeta, useSession } from './context.ts';
 import { GoTo } from './GoTo.tsx';
 import { GraceNotice } from './GraceNotice.tsx';
+import { usePluginText } from './hooks.ts';
 import { FolderArt, Icon } from './icons.tsx';
 import { LANGUAGE_NAMES, LOCALES, useLanguage, useT } from './language.tsx';
 import { Login } from './Login.tsx';
 import { NoticeContext, useNotice } from './notice.ts';
+import { reportClientError } from './reports.ts';
+import type { GateProps, NoticeProps, SignInProps } from './slot-props.ts';
+import { Slot, useAllowed, useRegistry } from './slots.tsx';
+import type { Registry } from './slots.tsx';
+import { useMenuGroups } from './useMenuGroups.ts';
 
 const { Header, Sider, Content } = Layout;
 
 const enrolScreen = lazyRouteComponent(() => import('./EnrolScreen.tsx'), 'EnrolScreen');
 
-/** The routes that open without a session, and with one: the pages of a forgotten password and of a password link (UI-26). */
+/**
+ * The routes of the shell that open without a session, and with one: the pages of a forgotten password and of a password link
+ * (UI-26). The pages of plugins that open without a session are added to them.
+ */
 const PUBLIC_ROUTES: ReadonlySet<string> = new Set(['/forgot-password', '/reset-password']);
 
 const GROUP_KEYS: Readonly<Record<string, MessageKey>> = {
@@ -117,26 +126,49 @@ function Account(props: { readonly email: string }): JSX.Element {
   );
 }
 
+/** The notices of plugins over the frame. One that the person closed stays closed while the page is open. */
+function Notices(): JSX.Element {
+  const notices = useAllowed(useRegistry().notices);
+  const [closed, setClosed] = useState<ReadonlySet<string>>(new Set());
+  return (
+    <>
+      {notices
+        .map((notice) => ({ ...notice, name: `${notice.plugin}/${notice.id}` }))
+        .filter((notice) => !closed.has(notice.name))
+        .map((notice) => (
+          <Slot
+            key={notice.name}
+            name={notice.name}
+            load={notice.load}
+            fallback={null}
+            given={{ close: () => setClosed((now) => new Set(now).add(notice.name)) } satisfies NoticeProps}
+          />
+        ))}
+    </>
+  );
+}
+
 function Frame(props: { readonly email: string }): JSX.Element {
   const meta = useMeta();
   const t = useT();
   const { locale, setLocale } = useLanguage();
   const groupName = useGroupName();
   const compact = Grid.useBreakpoint().md === false;
-  const groups = meta.data === undefined ? [] : menuOf(meta.data, pageSettings().menu);
+  const groups = useMenuGroups();
+  const registry = useRegistry();
+  const actions = useAllowed(registry.headerActions);
+  const text = usePluginText();
   // The address from the parts of the route, so that it is the same wherever the admin is served.
   const params = useRouterState({ select: (state) => state.matches.at(-1)?.params ?? {} });
   const read = (name: string): string | undefined => {
     const value: unknown = Reflect.get(params, name);
     return typeof value === 'string' ? value : undefined;
   };
-  const plugin = read('plugin');
-  const address =
-    plugin === undefined
-      ? `/${read('module') ?? ''}/${read('resource') ?? ''}`
-      : `/ext/${plugin}/${read('page') ?? ''}`;
+  const route = useRouterState({ select: (state): string => state.matches.at(-1)?.routeId ?? '' });
+  const pluginPage = registry.pages.find((page) => page.path === route);
+  const address = pluginPage?.path ?? `/${read('module') ?? ''}/${read('resource') ?? ''}`;
   const here = currentEntry(groups, address);
-  const atAccount = useRouterState({ select: (state) => state.matches.at(-1)?.routeId === '/account' });
+  const atAccount = route === '/account';
   const { setNotice } = useNotice();
   // A sentence that was meant for the sign in is not shown to somebody who is already in.
   useEffect(() => setNotice(undefined), [setNotice]);
@@ -172,6 +204,7 @@ function Frame(props: { readonly email: string }): JSX.Element {
         </Sider>
         <Layout>
           <GraceNotice />
+          <Notices />
           <Header className={compact ? 'bk-header bk-header-compact' : 'bk-header'}>
             <nav className="bk-crumbs" aria-label={t('breadcrumb.label')}>
               {atAccount ? (
@@ -182,7 +215,14 @@ function Frame(props: { readonly email: string }): JSX.Element {
                     </Link>
                   </li>
                 </ol>
-              ) : here === undefined ? null : (
+              ) : here === undefined ? (
+                // A page of a plugin that is in no menu names itself.
+                pluginPage === undefined ? null : (
+                  <ol>
+                    <li aria-current="page">{text(pluginPage.title)}</li>
+                  </ol>
+                )
+              ) : (
                 <ol>
                   <li>{groupName(here.group)}</li>
                   <li>
@@ -199,6 +239,14 @@ function Frame(props: { readonly email: string }): JSX.Element {
             </nav>
             <div className="bk-header-tools">
               <GoTo groups={groups} />
+              {actions.map((action) => (
+                <Slot
+                  key={`${action.plugin}/${action.id}`}
+                  name={`${action.plugin}/${action.id}`}
+                  load={action.load}
+                  fallback={null}
+                />
+              ))}
               <Select
                 aria-label={t('language.label')}
                 value={locale}
@@ -233,31 +281,55 @@ function Opening(): JSX.Element {
   );
 }
 
+/** A gate of a plugin that cannot say whether it is needed is reported, and does not stand in the way. */
+function isNeeded(gate: Registry['gates'][number], state: GateState): boolean {
+  try {
+    return gate.needed(state);
+  } catch (error) {
+    reportClientError(error);
+    return false;
+  }
+}
+
+/** How a gate of a plugin is called, in the state and in the message of a failure. */
+const nameOf = (gate: Registry['gates'][number]): string => `${gate.plugin}/${gate.id}`;
+
+/** The gate of the shell: the second factor that is asked of a person who has none (AUTH-05, POL-02). */
+const ENROL = 'enrol';
+
 /**
- * The admin of a signed-in person. When the API says that a second factor is asked of them, the screen that sets it up stands in its
- * place until it is done (AUTH-05, POL-02). Once it is up it stays, whatever is read again meanwhile, so the backup codes that are
- * shown once are not lost.
+ * The admin of a signed-in person. While the shell or a gate of a plugin says that something is asked of them, its screen stands in
+ * the place of the admin until it is done. Once it is up it stays, whatever is read again meanwhile, so that what it shows once is
+ * not lost.
  */
 function SignedIn(props: { readonly email: string }): JSX.Element {
   const meta = useMeta();
   const queries = useQueryClient();
   const signOut = useSignOut();
-  const [enrolling, setEnrolling] = useState(false);
-  const needed = enrolmentNeeded(meta.error);
+  const { gates } = useRegistry();
+  const asked = gates.find((gate) => isNeeded(gate, { metaError: meta.error }));
+  const wanted = enrolmentNeeded(meta.error) ? ENROL : asked === undefined ? undefined : nameOf(asked);
+  const [held, setHeld] = useState<string | undefined>();
   useEffect(() => {
-    if (needed) setEnrolling(true);
-  }, [needed]);
-  if (!needed && !enrolling) return <Frame email={props.email} />;
+    if (wanted !== undefined) setHeld((now) => now ?? wanted);
+  }, [wanted]);
+  const active = held ?? wanted;
+  if (active === undefined) return <Frame email={props.email} />;
+  const given: GateProps = {
+    onDone: () => {
+      setHeld(undefined);
+      void queries.resetQueries();
+    },
+    onSignOut: signOut,
+  };
+  const gate = gates.find((candidate) => nameOf(candidate) === active);
+  if (gate !== undefined) {
+    return <Slot name={active} load={gate.load} given={given} fallback={<Opening />} />;
+  }
   const EnrolScreen = enrolScreen;
   return (
     <Suspense fallback={<Opening />}>
-      <EnrolScreen
-        onDone={() => {
-          setEnrolling(false);
-          void queries.resetQueries();
-        }}
-        onSignOut={signOut}
-      />
+      <EnrolScreen {...given} />
     </Suspense>
   );
 }
@@ -266,17 +338,33 @@ function SignedIn(props: { readonly email: string }): JSX.Element {
 function Session(): JSX.Element {
   const t = useT();
   const session = useSession();
+  const queries = useQueryClient();
+  const { signIn } = useRegistry();
   if (session.isPending) return <Opening />;
   if (session.isError) {
     return <Result status="error" title={t('gate.noAnswer')} subTitle={session.error.message} />;
   }
-  if (session.data === null) return <Login />;
+  if (session.data === null) {
+    // The sign in of a plugin, and until one gives it, the one of the shell.
+    return signIn === undefined ? (
+      <Login />
+    ) : (
+      <Slot
+        name={signIn.plugin}
+        load={signIn.load}
+        fallback={<Opening />}
+        given={{ onSignedIn: () => void queries.invalidateQueries() } satisfies SignInProps}
+      />
+    );
+  }
   return <SignedIn email={session.data.email} />;
 }
 
 export function Gate(): JSX.Element {
-  const open = useRouterState({ select: (state) => PUBLIC_ROUTES.has(state.matches.at(-1)?.routeId ?? '') });
-  const [notice, setNotice] = useState<MessageKey | undefined>();
+  const route = useRouterState({ select: (state): string => state.matches.at(-1)?.routeId ?? '' });
+  const { publicPages } = useRegistry();
+  const open = PUBLIC_ROUTES.has(route) || publicPages.some((page) => page.path === route);
+  const [notice, setNotice] = useState<string | undefined>();
   return (
     <NoticeContext.Provider value={{ notice, setNotice }}>
       {open ? (

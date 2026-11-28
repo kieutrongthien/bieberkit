@@ -22,8 +22,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { composeAdmin } from '@bieberkit/admin-core';
 import type { AdminPart as CorePart } from '@bieberkit/admin-core';
-import type { ComponentType } from 'react';
 import { createRoot } from 'react-dom/client';
 // The stylesheets are imported for their effect: the build of the project bundles them. The font comes with the admin and from no
 // other origin (UI-14, ADR 0039), and a browser reads only the files of the scripts that the page shows.
@@ -39,10 +39,10 @@ import '@fontsource/be-vietnam-pro/700.css';
 import './app.css';
 import { createApp } from './App.tsx';
 import { reloadForChunk } from './chunk.ts';
-import { startReports } from './reports.ts';
+import { reportClientError, startReports } from './reports.ts';
+import type { AdminComponent } from './slots.tsx';
 
-/** The component of a slot. Each slot gives it its own props, so the contract names no one shape. */
-export type AdminComponent = ComponentType<never>;
+export type { AdminComponent };
 
 /** The admin part of a plugin for this adapter: what its entry `./admin` exports by default. */
 export type AdminPart = CorePart<AdminComponent>;
@@ -53,12 +53,16 @@ export interface StartOptions {
 }
 
 /** Draws the admin in `root`. A project calls it once, from the entry of `apps/admin`. */
-export function startAdmin(root: HTMLElement, _options: StartOptions): void {
+export function startAdmin(root: HTMLElement, options: StartOptions): void {
   // Vite says so when the file of a screen is gone: a deploy replaced it while this tab was open (UI-22).
   window.addEventListener('vite:preloadError', (event) => {
     if (reloadForChunk(new Error('Failed to fetch dynamically imported module')) === 'reload') event.preventDefault();
   });
   startReports();
-  const App = createApp();
+  // The build of the project stops on a mistake in a part. What reaches a browser anyway is reported, and the rest is drawn.
+  const { admin, problems } = composeAdmin(options.parts);
+  for (const problem of problems)
+    if (problem.code !== 'no-sign-in') reportClientError(new Error(`${problem.plugin}: ${problem.message}`));
+  const App = createApp(admin);
   createRoot(root).render(<App />);
 }

@@ -1,8 +1,8 @@
 /**
  * BieberKit
  *
- * @file        e2e/fixtures/crm/admin/panel.js
- * @description A tab that the crm fixture plugin adds to the detail of an account: it shows the code of the row that is open (UI-04).
+ * @file        e2e/fixtures/crm/src/admin/Secret.tsx
+ * @description A page behind a permission that nobody holds: its chunk is never asked for (UI-35).
  * @author      Bieber Kieu <kieutrongthien@gmail.com>
  * @copyright   Copyright (c) 2026 Bieber Kieu
  * @license     Apache-2.0
@@ -22,9 +22,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-export default function panel(host) {
-  const { React } = host.ui;
-  return function Panel(props) {
-    return React.createElement('p', null, `Panel of ${String(props.row?.code)}`);
-  };
+import type { JSX } from 'react';
+
+export default function Secret(): JSX.Element {
+  return <p>This must never be shown.</p>;
 }

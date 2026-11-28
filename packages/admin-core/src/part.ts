@@ -94,8 +94,17 @@ export interface AdminPartInput<C> {
 
 export type AdminPart<C> = AdminPartInput<C>;
 
-/** What the entry `./admin` of a plugin exports by default. */
-export function defineAdminPlugin<C>(input: AdminPartInput<C>): AdminPart<C> {
+/**
+ * A component of any adapter: something that draws from its props. Each slot gives its own props, so the contract names none, and the
+ * types of an adapter say what each slot gives.
+ */
+export type AdminView = ((props: never) => unknown) | (new (props: never) => unknown);
+
+/**
+ * What the entry `./admin` of a plugin exports by default. The type of a component is not inferred from the first slot that has one,
+ * which would refuse the others: without a type argument every component is taken, and a key that no slot has is still an error.
+ */
+export function defineAdminPlugin<C = AdminView>(input: AdminPartInput<NoInfer<C>>): AdminPart<C> {
   return input;
 }
 

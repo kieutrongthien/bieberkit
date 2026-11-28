@@ -23,11 +23,12 @@
  */
 
 import { ENGLISH, loadMessages, localeOf, LOCALES, translator } from '@bieberkit/admin-core';
-import type { Dictionary, Locale, MessageKey } from '@bieberkit/admin-core';
+import type { AdminPart, Dictionary, Locale, MessageKey, Texts } from '@bieberkit/admin-core';
 import type { ConfigProviderProps } from 'antd';
 import enUS from 'antd/locale/en_US';
 import { createContext, useContext, useMemo } from 'react';
 import type { Context } from 'react';
+import { loadTexts } from './texts.ts';
 
 type AntLocale = NonNullable<ConfigProviderProps['locale']>;
 
@@ -56,13 +57,19 @@ export interface Resources {
   readonly locale: Locale;
   readonly dictionary: Dictionary;
   readonly antd: AntLocale;
+  /** The texts of the plugins. */
+  readonly texts: Texts;
 }
 
-export const ENGLISH_RESOURCES: Resources = { locale: 'en', dictionary: ENGLISH, antd: enUS };
+export const ENGLISH_RESOURCES: Resources = { locale: 'en', dictionary: ENGLISH, antd: enUS, texts: {} };
 
-export async function loadResources(locale: Locale): Promise<Resources> {
-  const [dictionary, antd] = await Promise.all([loadMessages(locale), antdLocaleOf(locale)]);
-  return { locale, dictionary, antd };
+export async function loadResources<C>(locale: Locale, parts: readonly AdminPart<C>[]): Promise<Resources> {
+  const [dictionary, antd, texts] = await Promise.all([
+    loadMessages(locale),
+    antdLocaleOf(locale),
+    loadTexts(parts, locale),
+  ]);
+  return { locale, dictionary, antd, texts };
 }
 
 /** The language that this person chose, when the browser keeps it. A browser that refuses storage just forgets the choice. */
@@ -90,12 +97,14 @@ export interface Language {
   /** The language that is on the screen. It changes when the texts of a new one have been read. */
   readonly locale: Locale;
   readonly dictionary: Dictionary;
+  readonly texts: Texts;
   readonly setLocale: (locale: Locale) => void;
 }
 
 export const LanguageContext: Context<Language> = createContext<Language>({
   locale: 'en',
   dictionary: ENGLISH,
+  texts: {},
   setLocale: () => undefined,
 });
 

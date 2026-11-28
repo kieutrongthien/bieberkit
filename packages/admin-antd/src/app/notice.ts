@@ -22,13 +22,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { MessageKey } from '@bieberkit/admin-core';
 import { createContext, useContext } from 'react';
 import type { Context } from 'react';
 
 export interface Notice {
-  readonly notice: MessageKey | undefined;
-  readonly setNotice: (notice: MessageKey | undefined) => void;
+  /** A key of the texts of the shell or of a plugin. */
+  readonly notice: string | undefined;
+  readonly setNotice: (notice: string | undefined) => void;
 }
 
 export const NoticeContext: Context<Notice> = createContext<Notice>({

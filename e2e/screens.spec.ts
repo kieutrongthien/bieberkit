@@ -623,69 +623,6 @@ test('UI-11 an image shows its picture, a file can be removed, and the server re
   await page.unrouteAll({ behavior: 'ignoreErrors' });
 });
 
-test('UI-04 a plugin adds a page with a menu entry, and the page reads the API with the client of the admin', async () => {
-  const page = shared;
-  await page.goto('/admin/');
-  await makeRow(page, ACCOUNTS, { code: 'EXT-A', name: 'Extension account' });
-  await page.goto('/admin/');
-  await page.getByRole('menuitem', { name: 'Reports' }).click();
-  await expect(page).toHaveURL(/\/admin\/ext\/crm\/reports$/);
-  await expect(page.locator('.ant-card-head-title', { hasText: 'Reports' })).toBeVisible();
-  await expect(page.getByText('Accounts by code')).toBeVisible();
-  await expect(page.getByRole('list', { name: 'codes' }).getByText('EXT-A')).toBeVisible();
-
-  // A reload on the address of the page gives the page, and a page that does not exist is a 404 screen.
-  await page.reload();
-  await expect(page.getByText('Accounts by code')).toBeVisible();
-  await page.goto('/admin/ext/crm/nothing');
-  await expect(page.getByText('This page does not exist')).toBeVisible();
-});
-
-test('UI-04 widgets of the dashboard are drawn, and one that breaks leaves the rest of the screen as it is', async () => {
-  const page = shared;
-  await page.goto('/admin/');
-  await expect(page.getByText(/Accounts: \d+/)).toBeVisible();
-  await expect(page.getByRole('alert').filter({ hasText: 'This part could not be shown' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Welcome' })).toBeVisible();
-  await expect(page.getByRole('menuitem', { name: 'Account' })).toBeVisible();
-});
-
-test('UI-04 a panel is a tab of the detail of the entity, and a control of the plugin draws the field that names it', async () => {
-  const page = shared;
-  await page.goto('/admin/crm/accounts/new');
-  await page.getByRole('textbox', { name: 'code' }).fill('EXT-B');
-  await page.getByRole('textbox', { name: 'name' }).fill('Rated');
-  await page.getByRole('group', { name: 'rating' }).getByRole('button', { name: '4' }).click();
-  await expect(page.getByRole('group', { name: 'rating' }).getByRole('button', { name: '4' })).toHaveAttribute(
-    'aria-pressed',
-    'true',
-  );
-  await page.getByRole('button', { name: 'Save' }).click();
-  await page.getByRole('link', { name: 'EXT-B' }).click();
-  await expect(page.getByRole('group', { name: 'rating' }).getByRole('button', { name: '4' })).toHaveAttribute(
-    'aria-pressed',
-    'true',
-  );
-  await page.getByRole('tab', { name: 'Panel' }).click();
-  await expect(page.getByText('Panel of EXT-B')).toBeVisible();
-});
-
-test('UI-04 a plugin draws the list of an entity in place of the generic one', async () => {
-  const page = shared;
-  await page.goto('/admin/crm/labels');
-  await expect(page.getByText('Labels drawn by the plugin')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'New' })).toHaveCount(0);
-});
-
-test('UI-04 what a plugin adds is files of the admin origin only, and nothing outside its folder', async ({
-  request,
-}) => {
-  expect((await request.get('/admin/plugins/crm/reports.js')).status()).toBe(200);
-  expect((await request.get('/admin/plugins/crm/nothing.js')).status()).toBe(404);
-  expect((await request.get('/admin/plugins/crm/..%2fpackage.json')).status()).toBe(404);
-  expect((await request.get('/admin/plugins/crm/package.json')).status()).toBe(404);
-});
-
 test('UI-19 an offline browser shows the banner and not a blank screen, and the banner goes when the network is back', async () => {
   const page = shared;
   await page.goto('/admin/crm/accounts');

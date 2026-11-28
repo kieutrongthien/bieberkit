@@ -22,24 +22,26 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { labelText, menuOf, widgetsIn } from '@bieberkit/admin-core';
+import { labelText } from '@bieberkit/admin-core';
 import { Link } from '@tanstack/react-router';
 import { Card, Col, Empty, Row, Skeleton, Typography } from 'antd';
 import type { JSX } from 'react';
-import { pageSettings } from './Brand.tsx';
 import { useMeta } from './context.ts';
 import { useGroupName } from './Gate.tsx';
 import { FolderArt, Icon } from './icons.tsx';
+import { usePluginText } from './hooks.ts';
 import { useLanguage, useT } from './language.tsx';
-import { PluginSlot, useExtensions } from './Plugins.tsx';
+import { Slot, useAllowed, useRegistry } from './slots.tsx';
+import { useMenuGroups } from './useMenuGroups.ts';
 
 export function Welcome(): JSX.Element {
   const meta = useMeta();
   const t = useT();
   const { locale } = useLanguage();
   const groupName = useGroupName();
-  const widgets = widgetsIn(useExtensions(), 'dashboard');
-  const groups = meta.data === undefined ? [] : menuOf(meta.data, pageSettings().menu);
+  const text = usePluginText();
+  const blocks = useAllowed(useRegistry().homeBlocks);
+  const groups = useMenuGroups();
   return (
     <>
       <div className="bk-page-head">
@@ -67,12 +69,12 @@ export function Welcome(): JSX.Element {
           </ul>
         </section>
       ))}
-      {widgets.length === 0 ? null : (
+      {blocks.length === 0 ? null : (
         <Row gutter={[16, 16]} style={{ marginTop: 24 }}>
-          {widgets.map((widget) => (
-            <Col key={widget.module} xs={24} md={12}>
-              <Card size="small" title={labelText(widget.title, locale, widget.slot)}>
-                <PluginSlot module={widget.module} name={`${widget.plugin}/${widget.slot}`} />
+          {blocks.map((block) => (
+            <Col key={`${block.plugin}/${block.id}`} xs={24} md={12}>
+              <Card size="small" title={text(block.title)}>
+                <Slot name={`${block.plugin}/${block.id}`} load={block.load} />
               </Card>
             </Col>
           ))}

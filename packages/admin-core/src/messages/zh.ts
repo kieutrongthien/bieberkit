@@ -115,7 +115,7 @@ export const zh: Dictionary = {
   'file.remove': '移除',
   'file.removeNamed': '移除{name}的文件',
   'plugin.failed': '无法显示此部分',
-  'plugin.missing': '该页面不存在',
+  'page.closed': '你无权打开此页面',
   'list.op.eq': '等于',
   'list.op.ne': '不等于',
   'list.op.in': '属于',

@@ -162,3 +162,56 @@ describe('UI-24 the entry of an address', () => {
     expect(currentEntry(groups, '/shop/ordersx')).toBeUndefined();
   });
 });
+
+const page = (path: string, module: string, group?: string) => ({
+  path,
+  module,
+  label: { en: path.slice(1) },
+  icons: [module],
+  ...(group === undefined ? {} : { group }),
+});
+
+describe('UI-35 the pages of plugins in the menu', () => {
+  const entities = [entity('media.Media', 'Media'), entity('shop.Order', 'Orders')];
+
+  it('UI-35 a page goes to the group that it asks for, after what is there, and one that asks for none to what the project adds', () => {
+    const groups = menuOf(meta(entities), DEFAULT_MENU, [
+      page('/reports', 'crm'),
+      page('/albums', 'albums', 'content'),
+      page('/team', 'team', 'people'),
+    ]);
+    expect(shape(groups)).toEqual([
+      ['app', ['shop.Order', '/reports']],
+      ['people', ['/team']],
+      ['content', ['media.Media', '/albums']],
+    ]);
+  });
+
+  it('UI-24 the order of the config wins over the group that a page asks for, by its address or the name of its plugin', () => {
+    const order = [
+      { id: 'first', items: ['/reports', 'albums'] },
+      { id: 'content', items: ['media'] },
+    ];
+    const groups = menuOf(meta(entities), order, [
+      page('/reports', 'crm', 'content'),
+      page('/albums', 'albums', 'content'),
+    ]);
+    expect(shape(groups)).toEqual([
+      ['first', ['/reports', '/albums']],
+      ['content', ['media.Media']],
+      ['app', ['shop.Order']],
+    ]);
+  });
+
+  it('UI-35 a page that asks for a group that the menu has not makes that group', () => {
+    const groups = menuOf(meta([]), DEFAULT_MENU, [page('/stock', 'stock', 'warehouse')]);
+    expect(shape(groups)).toEqual([['warehouse', ['/stock']]]);
+    expect(groups[0]?.entries[0]).toEqual({
+      key: '/stock',
+      path: '/stock',
+      label: { en: 'stock' },
+      name: '/stock',
+      icons: ['stock'],
+    });
+  });
+});

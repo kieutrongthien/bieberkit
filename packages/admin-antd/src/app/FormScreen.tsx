@@ -35,7 +35,6 @@ import {
   initialValues,
   isDirty,
   labelOf,
-  labelText,
   lineProblems,
   linesBody,
   linesChanged,
@@ -45,10 +44,8 @@ import {
   readOnlyOf,
   relatedOf,
   saveDraft,
-  screenFor,
   shortcutOf,
   statesOf,
-  widgetsIn,
 } from '@bieberkit/admin-core';
 import type { Line, MetaEntity, MetaTransition, Row } from '@bieberkit/admin-core';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -60,9 +57,11 @@ import { Control, fromControl, rulesOf, toControl } from './controls.tsx';
 import { useClient, useEntity, useMeta } from './context.ts';
 import { RowMoves } from './moves.tsx';
 import { LinesEditor } from './Lines.tsx';
-import { PluginSlot, useExtensions } from './Plugins.tsx';
 import { History, RelatedRows } from './Related.tsx';
+import { usePluginText } from './hooks.ts';
 import { useLanguage, useT } from './language.tsx';
+import type { RecordTabProps, ScreenProps } from './slot-props.ts';
+import { Slot, useAllowed, useRegistry } from './slots.tsx';
 
 /** A value as a cell of the table of a conflict shows it. */
 const shown = (value: unknown): string =>
@@ -283,8 +282,9 @@ function Editor(props: {
   const computed = base === undefined ? [] : readOnlyOf(entity, base);
   const id = base === undefined ? undefined : String(base['id']);
   const related = meta.data === undefined ? [] : relatedOf(meta.data, entity);
-  // The panels that plugins add to the detail of this entity are tabs of their own (UI-04).
-  const panels = widgetsIn(useExtensions(), `form:${entity.name}`);
+  // The tabs that plugins add to the detail of this entity, or of every entity (UI-35).
+  const text = usePluginText();
+  const added = useAllowed(useRegistry().recordTabs).filter((tab) => tab.entity === '*' || tab.entity === entity.name);
 
   const details = (
     <>
@@ -429,14 +429,14 @@ function Editor(props: {
               label: labelOf(item.entity, locale),
               children: <RelatedRows related={item} id={id} />,
             })),
-            ...panels.map((panel) => ({
-              key: `${panel.plugin}:${panel.module}`,
-              label: labelText(panel.title, locale, panel.slot),
+            ...added.map((tab) => ({
+              key: `${tab.plugin}/${tab.id}`,
+              label: text(tab.title),
               children: (
-                <PluginSlot
-                  module={panel.module}
-                  name={`${panel.plugin}/${panel.slot}`}
-                  props={{ entity, row: base }}
+                <Slot
+                  name={`${tab.plugin}/${tab.id}`}
+                  load={tab.load}
+                  given={{ entity, id, row: base } satisfies RecordTabProps}
                 />
               ),
             })),
@@ -455,8 +455,9 @@ export function FormScreen(): JSX.Element {
   const client = useClient();
   const id = params.id;
   // The hook is called whatever the metadata holds, so that the order of the hooks does not change when it arrives.
-  const extensions = useExtensions();
-  const replacement = entity === undefined ? undefined : screenFor(extensions, 'form', entity.name);
+  const replacement = useAllowed(useRegistry().screens).find(
+    (screen) => screen.replace === `form:${entity?.name ?? ''}`,
+  );
   const search: Readonly<Record<string, unknown>> = useSearch({ strict: false });
   const row = useQuery({
     queryKey: ['row', entity?.name, id],
@@ -469,10 +470,10 @@ export function FormScreen(): JSX.Element {
   if (row.isError) return <Result status="error" title={t('form.rowLoadError')} subTitle={row.error.message} />;
   if (replacement !== undefined)
     return (
-      <PluginSlot
-        module={replacement.module}
-        name={`${replacement.plugin}/${replacement.replace}`}
-        props={{ entity, row: row.data }}
+      <Slot
+        name={`${replacement.plugin}/${replacement.id}`}
+        load={replacement.load}
+        given={{ entity, row: row.data } satisfies ScreenProps}
       />
     );
   return (

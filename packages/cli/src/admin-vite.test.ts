@@ -147,6 +147,17 @@ describe('UI-37 the admin of a project is built from its plugins', () => {
     expect((await build(admin)).scripts).toContain('MINE');
   }, 60_000);
 
+  it('UI-36 reads the texts that a part loads with an import of its own, to check each language', async () => {
+    const texts = 'messages: { en: () => import("./en.js") }';
+    const { admin } = project(
+      [{ name: 'bieberkit-plugin-a', admin: part('bieberkit-plugin-a', `${SIGN_IN}, ${texts}`) }],
+      {
+        files: { 'node_modules/bieberkit-plugin-a/admin/en.js': 'export default { "a.title": "MARK-OF-TEXT" };\n' },
+      },
+    );
+    expect((await build(admin)).scripts).toContain('bieberkit-plugin-a');
+  }, 60_000);
+
   it('UI-36 stops with every mistake of the parts, the plugin of each, and the languages of the project', async () => {
     const { admin } = project([
       { name: 'bieberkit-plugin-users', admin: part('bieberkit-plugin-users', `${SIGN_IN}, sidebar: []`) },

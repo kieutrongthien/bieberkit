@@ -22,6 +22,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { shortNameOf } from '@bieberkit/admin-core';
 import { useNavigate, useRouterState } from '@tanstack/react-router';
 import { Tabs, Typography } from 'antd';
 import type { JSX } from 'react';
@@ -29,16 +30,32 @@ import { PasswordTab } from './account/Password.tsx';
 import { ProfileTab } from './account/Profile.tsx';
 import { SessionsTab } from './account/Sessions.tsx';
 import { TwoFactorTab } from './account/TwoFactor.tsx';
+import { usePluginText } from './hooks.ts';
 import { useT } from './language.tsx';
-
-const TABS = ['profile', 'password', 'factor', 'sessions'] as const;
-type TabName = (typeof TABS)[number];
+import { Slot, useAllowed, useRegistry } from './slots.tsx';
 
 export function MyAccount(): JSX.Element {
   const t = useT();
   const navigate = useNavigate();
   const asked = useRouterState({ select: (state): string => String(Reflect.get(state.location.search, 'tab') ?? '') });
-  const active: TabName = TABS.find((name) => name === asked) ?? 'profile';
+  const text = usePluginText();
+  const added = useAllowed(useRegistry().accountTabs);
+  const items = [
+    { key: 'profile', label: t('account.tab.profile'), children: <ProfileTab /> },
+    { key: 'password', label: t('account.tab.password'), children: <PasswordTab /> },
+    { key: 'factor', label: t('account.tab.factor'), children: <TwoFactorTab /> },
+    { key: 'sessions', label: t('account.tab.sessions'), children: <SessionsTab /> },
+  ];
+  // The address names a tab by its id, and by the name of its plugin too when another tab has that id.
+  for (const tab of added) {
+    const taken = items.some((item) => item.key === tab.id);
+    items.push({
+      key: taken ? `${shortNameOf(tab.plugin)}-${tab.id}` : tab.id,
+      label: text(tab.title),
+      children: <Slot name={`${tab.plugin}/${tab.id}`} load={tab.load} />,
+    });
+  }
+  const active = items.some((item) => item.key === asked) ? asked : 'profile';
   return (
     <>
       <div className="bk-page-head">
@@ -53,12 +70,7 @@ export function MyAccount(): JSX.Element {
         // A tab that is left is gone: no form of it stays on the page, and no password stays in one.
         destroyOnHidden
         onChange={(tab) => void navigate({ to: '/account', search: { tab }, replace: true })}
-        items={[
-          { key: 'profile', label: t('account.tab.profile'), children: <ProfileTab /> },
-          { key: 'password', label: t('account.tab.password'), children: <PasswordTab /> },
-          { key: 'factor', label: t('account.tab.factor'), children: <TwoFactorTab /> },
-          { key: 'sessions', label: t('account.tab.sessions'), children: <SessionsTab /> },
-        ]}
+        items={items}
       />
     </>
   );
